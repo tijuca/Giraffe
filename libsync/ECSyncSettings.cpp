@@ -28,14 +28,14 @@ ECSyncSettings* ECSyncSettings::GetInstance()
 	scoped_lock lock(s_hMutex);
 
 	if (s_lpInstance == NULL)
-		s_lpInstance = new ECSyncSettings;
-	return s_lpInstance;
+		s_lpInstance.reset(new ECSyncSettings);
+	return s_lpInstance.get();
 }
 
 ECSyncSettings::ECSyncSettings(void) :
 	m_ulSyncLogLevel(EC_LOGLEVEL_INFO)
 {
-	char *env = getenv("KOPANO_SYNC_LOGLEVEL");
+	const char *env = getenv("KOPANO_SYNC_LOGLEVEL");
 	if (env && env[0] != '\0') {
 		unsigned loglevel = strtoul(env, NULL, 10);
 		if (loglevel > 0) {
@@ -177,10 +177,4 @@ ULONG ECSyncSettings::SetStreamBatchSize(ULONG ulBatchSize) {
 }
 
 std::mutex ECSyncSettings::s_hMutex;
-ECSyncSettings* ECSyncSettings::s_lpInstance = NULL;
-
-ECSyncSettings::__initializer::~__initializer() {
-	delete ECSyncSettings::s_lpInstance;
-}
-
-ECSyncSettings::__initializer ECSyncSettings::__i;
+std::unique_ptr<ECSyncSettings> ECSyncSettings::s_lpInstance;

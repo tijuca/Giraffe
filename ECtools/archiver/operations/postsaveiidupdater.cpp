@@ -58,7 +58,7 @@ HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper)
 		return hr;
 	if (ptrRows.empty())
 		return MAPI_E_NOT_FOUND;
-	hr = m_ptrDestMsg->OpenAttach(ptrRows[0].lpProps[0].Value.ul, &ptrAttach.iid(), 0, &~ptrAttach);
+	hr = m_ptrDestMsg->OpenAttach(ptrRows[0].lpProps[0].Value.ul, &iid_of(ptrAttach), 0, &~ptrAttach);
 	if (hr != hrSuccess)
 		return hr;
 	hr = GetUniqueIDs(ptrAttach, &~ptrDestServerUID, &cbDestInstanceID, &~ptrDestInstanceID);
@@ -74,14 +74,14 @@ HRESULT TaskBase::GetUniqueIDs(IAttach *lpAttach, LPSPropValue *lppServerUID, UL
 {
 	HRESULT hr;
 	SPropValuePtr ptrServerUID;
-	ECSingleInstancePtr ptrInstance;
+	KCHL::object_ptr<IECSingleInstance> ptrInstance;
 	ULONG cbInstanceID = 0;
 	EntryIdPtr ptrInstanceID;
 
 	hr = HrGetOneProp(lpAttach, PR_EC_SERVER_UID, &~ptrServerUID);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpAttach->QueryInterface(ptrInstance.iid(), &~ptrInstance);
+	hr = lpAttach->QueryInterface(iid_of(ptrInstance), &~ptrInstance);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrInstance->GetSingleInstanceId(&cbInstanceID, &~ptrInstanceID);
@@ -108,17 +108,17 @@ TaskVerifyAndUpdateInstanceId::TaskVerifyAndUpdateInstanceId(const AttachPtr &pt
 { }
 
 HRESULT TaskVerifyAndUpdateInstanceId::DoExecute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper, const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID) {
-	HRESULT hr = hrSuccess;
 	SBinary lhs, rhs;
 	lhs.cb = cbDestInstanceID;
 	lhs.lpb = (LPBYTE)lpDestInstanceID;
 	rhs.cb = m_destInstanceID.size();
 	rhs.lpb = m_destInstanceID;
 
-	if (Util::CompareSBinary(lhs, rhs) != 0)
-		hr = ptrMapper->SetMappedInstances(ulPropTag, sourceServerUID, cbSourceInstanceID, lpSourceInstanceID, destServerUID, cbDestInstanceID, lpDestInstanceID);
-
-	return hr;
+	if (Util::CompareSBinary(lhs, rhs) == 0)
+		return hrSuccess;
+	return ptrMapper->SetMappedInstances(ulPropTag, sourceServerUID,
+	       cbSourceInstanceID, lpSourceInstanceID, destServerUID,
+	       cbDestInstanceID, lpDestInstanceID);
 }
 
 PostSaveInstanceIdUpdater::PostSaveInstanceIdUpdater(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper, const TaskList &lstDeferred)

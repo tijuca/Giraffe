@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ECMsgStorePublic.h"
@@ -36,22 +36,20 @@
 using namespace std;
 using namespace KCHL;
 
-ECMsgStorePublic::ECMsgStorePublic(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore) :
-	ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, false, bOfflineStore)
+ECMsgStorePublic::ECMsgStorePublic(const char *lpszProfname,
+    IMAPISupport *lpSupport, WSTransport *lpTransport, BOOL fModify,
+    ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore) :
+	ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify,
+	    ulProfileFlags, fIsSpooler, false, bOfflineStore)
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECMsgStorePublic::ECMsgStorePublic","");
-
 	HrAddPropHandlers(PR_IPM_SUBTREE_ENTRYID,			GetPropHandler,	DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
 	HrAddPropHandlers(PR_IPM_PUBLIC_FOLDERS_ENTRYID,	GetPropHandler,	DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
 	HrAddPropHandlers(PR_IPM_FAVORITES_ENTRYID,			GetPropHandler,	DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
 	HrAddPropHandlers(PR_EC_PUBLIC_IPM_SUBTREE_ENTRYID,	GetPropHandler, SetPropHandler,			(void*) this, FALSE, TRUE);
-	TRACE_MAPI(TRACE_RETURN, "ECMsgStorePublic::ECMsgStorePublic","");
 }
 
 ECMsgStorePublic::~ECMsgStorePublic(void)
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECMsgStorePublic::~ECMsgStorePublic","");
-
 	if (m_lpDefaultMsgStore)
 		m_lpDefaultMsgStore->Release();
 
@@ -60,21 +58,17 @@ ECMsgStorePublic::~ECMsgStorePublic(void)
 	MAPIFreeBuffer(m_lpIPMSubTreeID);
 	MAPIFreeBuffer(m_lpIPMFavoritesID);
 	MAPIFreeBuffer(m_lpIPMPublicFoldersID);
-	TRACE_MAPI(TRACE_RETURN, "~ECMsgStorePublic::ECMsgStorePublic","");
-
 }
 
-HRESULT	ECMsgStorePublic::Create(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore, ECMsgStore **lppECMsgStore) {
-	HRESULT hr = hrSuccess;
-
-	ECMsgStorePublic *lpStore = new ECMsgStorePublic(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, bOfflineStore);
-
-	hr = lpStore->QueryInterface(IID_ECMsgStore, (void **)lppECMsgStore);
-
-	if(hr != hrSuccess)
-		delete lpStore;
-
-	return hr;
+HRESULT ECMsgStorePublic::Create(const char *lpszProfname,
+    IMAPISupport *lpSupport, WSTransport *lpTransport, BOOL fModify,
+    ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore,
+    ECMsgStore **lppECMsgStore)
+{
+	return alloc_wrap<ECMsgStorePublic>(lpszProfname, lpSupport,
+	       lpTransport, fModify, ulProfileFlags,
+	       fIsSpooler, bOfflineStore)
+	       .as(IID_ECMsgStore, reinterpret_cast<void **>(lppECMsgStore));
 }
 
 HRESULT ECMsgStorePublic::QueryInterface(REFIID refiid, void **lppInterface)
@@ -85,8 +79,7 @@ HRESULT ECMsgStorePublic::QueryInterface(REFIID refiid, void **lppInterface)
 HRESULT ECMsgStorePublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
 {
 	HRESULT hr = hrSuccess;
-
-	ECMsgStorePublic *lpStore = (ECMsgStorePublic *)lpParam;
+	auto lpStore = static_cast<ECMsgStorePublic *>(lpParam);
 
 	switch(ulPropTag) {
 	case PR_IPM_SUBTREE_ENTRYID:
@@ -109,8 +102,7 @@ HRESULT ECMsgStorePublic::SetPropHandler(ULONG ulPropTag, void *lpProvider,
     const SPropValue *lpsPropValue, void *lpParam)
 {
 	SPropValue sPropValue;
-
-	ECMsgStorePublic *lpStore = (ECMsgStorePublic *)lpParam;
+	auto lpStore = static_cast<ECMsgStorePublic *>(lpParam);
 
 	switch(ulPropTag) {
 	case PR_EC_PUBLIC_IPM_SUBTREE_ENTRYID:
@@ -122,7 +114,7 @@ HRESULT ECMsgStorePublic::SetPropHandler(ULONG ulPropTag, void *lpProvider,
 	}
 }
 
-HRESULT ECMsgStorePublic::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
+HRESULT ECMsgStorePublic::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId)
 {
 	HRESULT hr;
 	
@@ -133,7 +125,9 @@ HRESULT ECMsgStorePublic::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 	return BuildIPMSubTree();
 }
 
-HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
+HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    const IID *lpInterface, ULONG ulFlags, ULONG *lpulObjType,
+    IUnknown **lppUnk)
 {
 	HRESULT				hr = hrSuccess;
 	unsigned int		ulObjType = 0;
@@ -249,7 +243,7 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 		hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpsPropValue);
 		if(hr != hrSuccess)
 			return hr;
-		if (HrGetOneProp((LPMAPIPROP)(&lpMAPIFolder->m_xMAPIFolder), PR_PARENT_ENTRYID, &~lpParentProp) == hrSuccess &&
+		if (HrGetOneProp(lpMAPIFolder, PR_PARENT_ENTRYID, &~lpParentProp) == hrSuccess &&
 			HrGetRealProp(PR_IPM_SUBTREE_ENTRYID, 0, lpsPropValue, lpsPropValue) == hrSuccess &&
 			CompareEntryIDs(lpsPropValue->Value.bin.cb, (LPENTRYID)lpsPropValue->Value.bin.lpb, lpParentProp->Value.bin.cb, (LPENTRYID)lpParentProp->Value.bin.lpb, 0, &ulResults) == hrSuccess &&
 			ulResults == TRUE)
@@ -347,7 +341,8 @@ HRESULT ECMsgStorePublic::GetPublicEntryId(enumPublicEntryID ePublicEntryID, voi
 	return hrSuccess;
 }
 
-HRESULT ECMsgStorePublic::ComparePublicEntryId(enumPublicEntryID ePublicEntryID, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpulResult)
+HRESULT ECMsgStorePublic::ComparePublicEntryId(enumPublicEntryID ePublicEntryID,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG *lpulResult)
 {
 	HRESULT hr;
 	ULONG ulResult = 0;
@@ -443,8 +438,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_NAME_W;
-	lpProps[cProps++].Value.lpszW = _W("Favorites"); // FIXME: Use dynamic name, read from global profile (like exchange)
-
+	lpProps[cProps++].Value.lpszW = KC_W("Favorites"); // FIXME: Use dynamic name, read from global profile (like exchange)
 	lpProps[cProps].ulPropTag = PR_CONTENT_COUNT;
 	lpProps[cProps++].Value.ul = 0;
 	lpProps[cProps].ulPropTag = PR_CONTENT_UNREAD;
@@ -535,8 +529,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_NAME_W;
-	lpProps[cProps++].Value.lpszW = _W("Public Folders"); // FIXME: Use dynamic name, read from global profile (like exchange)
-
+	lpProps[cProps++].Value.lpszW = KC_W("Public Folders"); // FIXME: Use dynamic name, read from global profile (like exchange)
 	lpProps[cProps].ulPropTag = PR_CONTENT_COUNT;
 	lpProps[cProps++].Value.ul = 0;
 	lpProps[cProps].ulPropTag = PR_CONTENT_UNREAD;
@@ -629,7 +622,7 @@ HRESULT ECMsgStorePublic::GetDefaultShortcutFolder(IMAPIFolder** lppFolder)
 		}
  		if(hr != hrSuccess)
 			goto exit;
-		hr = WrapStoreEntryID(0, (LPTSTR)WCLIENT_DLL_NAME, cbStoreEntryID, lpStoreEntryID, &cbEntryId, &~lpEntryId);
+		hr = WrapStoreEntryID(0, reinterpret_cast<const TCHAR *>(WCLIENT_DLL_NAME), cbStoreEntryID, lpStoreEntryID, &cbEntryId, &~lpEntryId);
 		if(hr != hrSuccess)
 			goto exit;
 

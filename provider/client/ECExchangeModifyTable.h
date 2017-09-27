@@ -23,35 +23,22 @@
 #include <kopano/ECMemTable.h>
 #include <mapidefs.h>
 #include <edkmdb.h>
-#include "IECExchangeModifyTable.h"
+#include <kopano/IECInterfaces.hpp>
 
-class ECExchangeModifyTable _kc_final : public ECUnknown {
+class ECExchangeModifyTable _kc_final :
+    public ECUnknown, public IECExchangeModifyTable {
 public:
 	ECExchangeModifyTable(ULONG ulUniqueTag, ECMemTable *table, ECMAPIProp *lpParent, ULONG ulStartRuleId, ULONG ulFlags);
 	virtual ~ECExchangeModifyTable();
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
-	virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT __stdcall GetTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT __stdcall ModifyTable(ULONG ulFlags, LPROWLIST lpMods);
-
-	virtual HRESULT __stdcall DisablePushToServer();
+	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
+	virtual HRESULT GetTable(ULONG ulFlags, LPMAPITABLE *lppTable);
+	virtual HRESULT ModifyTable(ULONG ulFlags, LPROWLIST lpMods);
+	virtual HRESULT DisablePushToServer();
 
 	/* static creates */
-	static HRESULT __stdcall CreateRulesTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
-	static HRESULT __stdcall CreateACLTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
-
-	class xExchangeModifyTable _kc_final : public IExchangeModifyTable {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IExchangeModifyTable.hpp>
-	} m_xExchangeModifyTable;
-
-	class xECExchangeModifyTable _kc_final :
-	    public IECExchangeModifyTable {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IExchangeModifyTable.hpp>
-		// <kopano/xclsfrag/IECExchangeModifyTable.hpp>
-		virtual HRESULT __stdcall DisablePushToServer(void) _kc_override;
-	} m_xECExchangeModifyTable;
+	static HRESULT CreateRulesTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
+	static HRESULT CreateACLTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
 
 private:
 	static HRESULT HrSerializeTable(ECMemTable *lpTable, char **lppSerialized);
@@ -68,17 +55,11 @@ private:
 	bool m_bPushToServer = true;
 };
 
-class ECExchangeRuleAction _kc_final : public ECUnknown {
+class ECExchangeRuleAction _kc_final :
+    public ECUnknown, public IExchangeRuleAction {
 public:
-	HRESULT __stdcall ActionCount(ULONG *lpcActions);
-	HRESULT __stdcall GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction);
-
-	class xExchangeRuleAction _kc_final : public IExchangeRuleAction {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		// <kopano/xclsfrag/IExchangeRuleAction.hpp>
-		virtual HRESULT __stdcall ActionCount(ULONG *lpcActions) _kc_override;
-		virtual HRESULT __stdcall GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction) _kc_override;
-	} m_xExchangeRuleAction;
+	HRESULT ActionCount(ULONG *lpcActions);
+	HRESULT GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction);
 };
 
 #endif

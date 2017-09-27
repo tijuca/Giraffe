@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include "config.h"
 #include <memory>
 #include <string>
 #include <utility>
@@ -36,6 +37,34 @@ DB_RESULT::~DB_RESULT(void)
 		return;
 	m_db->FreeResult_internal(m_res);
 	m_res = nullptr;
+}
+
+DB_RESULT &DB_RESULT::operator=(DB_RESULT &&o)
+{
+	if (m_res != nullptr) {
+		assert(m_db != nullptr);
+		m_db->FreeResult_internal(m_res);
+	}
+	m_res = o.m_res;
+	m_db = o.m_db;
+	o.m_res = nullptr;
+	o.m_db = nullptr;
+	return *this;
+}
+
+size_t DB_RESULT::get_num_rows(void) const
+{
+	return mysql_num_rows(static_cast<MYSQL_RES *>(m_res));
+}
+
+DB_ROW DB_RESULT::fetch_row(void)
+{
+	return mysql_fetch_row(static_cast<MYSQL_RES *>(m_res));
+}
+
+DB_LENGTHS DB_RESULT::fetch_row_lengths(void)
+{
+	return mysql_fetch_lengths(static_cast<MYSQL_RES *>(m_res));
 }
 
 KDatabase::KDatabase(void)
@@ -80,7 +109,7 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 		ec_log_err("KDatabase::Connect(): \"SHOW tables\" failed %d", er);
 		goto exit;
 	}
-	if (GetNumRows(result) == 0) {
+	if (result.get_num_rows() == 0) {
 		er = KCERR_DATABASE_NOT_FOUND;
 		ec_log_err("KDatabase::Connect(): database missing %d", er);
 		goto exit;
@@ -93,7 +122,7 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 		goto exit;
 	}
 
-	row = FetchRow(result);
+	row = result.fetch_row();
 	/* row[0] has the variable name, [1] the value */
 	if (row == nullptr || row[0] == nullptr || row[1] == nullptr) {
 		ec_log_warn("Unable to retrieve max_allowed_packet value. Assuming %d.", KC_DFL_MAX_PACKET_SIZE);
@@ -174,14 +203,35 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 	if (er != erSuccess)
 		return er;
 
+	ec_log_info("Database structure has been created");
+	return erSuccess;
+}
+
+ECRESULT KDatabase::CreateTables(void)
+{
 	auto tables = GetDatabaseDefs();
+
 	for (size_t i = 0; tables[i].lpSQL != nullptr; ++i) {
+		DB_RESULT result;
+		auto query = format("SHOW tables LIKE '%s'", tables[i].lpComment);
+		auto er = DoSelect(query, &result);
+		if (er != erSuccess) {
+			ec_log_err("Error running query %s", query.c_str());
+			return er;
+		}
+
+		if (result.get_num_rows() > 0) {
+			ec_log_debug("Table \"%s\" exists", tables[i].lpComment);
+			continue;
+		}
+
 		ec_log_info("Create table: %s", tables[i].lpComment);
+
 		er = DoInsert(tables[i].lpSQL);
 		if (er != erSuccess)
 			return er;
 	}
-	ec_log_info("Database structure has been created");
+
 	return erSuccess;
 }
 
@@ -206,7 +256,7 @@ ECRESULT KDatabase::Close(void)
 ECRESULT KDatabase::DoDelete(const std::string &q, unsigned int *aff)
 {
 	autolock alk(*this);
-	return _Update(q, aff);
+	return I_Update(q, aff);
 }
 
 /**
@@ -224,7 +274,7 @@ ECRESULT KDatabase::DoInsert(const std::string &q, unsigned int *idp,
     unsigned int *aff)
 {
 	autolock alk(*this);
-	auto er = _Update(q, aff);
+	auto er = I_Update(q, aff);
 	if (er == erSuccess && idp != nullptr)
 		*idp = GetInsertId();
 	return er;
@@ -254,7 +304,7 @@ ECRESULT KDatabase::DoSelect(const std::string &q, DB_RESULT *res_p,
 	autolock alk(*this);
 
 	if (Query(q) != erSuccess) {
-		ec_log_err("KDatabsae::DoSelect(): query failed: %s: %s", q.c_str(), GetError());
+		ec_log_err("KDatabase::DoSelect(): query failed: %s: %s", q.c_str(), GetError());
 		return KCERR_DATABASE_ERROR;
 	}
 
@@ -332,7 +382,7 @@ ECRESULT KDatabase::DoSequence(const std::string &seq, unsigned int count,
 ECRESULT KDatabase::DoUpdate(const std::string &q, unsigned int *aff)
 {
 	autolock alk(*this);
-	return _Update(q, aff);
+	return I_Update(q, aff);
 }
 
 std::string KDatabase::Escape(const std::string &s)
@@ -358,16 +408,6 @@ std::string KDatabase::EscapeBinary(const unsigned char *data, size_t len)
 std::string KDatabase::EscapeBinary(const std::string &s)
 {
 	return EscapeBinary(reinterpret_cast<const unsigned char *>(s.c_str()), s.size());
-}
-
-DB_ROW KDatabase::FetchRow(DB_RESULT &r)
-{
-	return mysql_fetch_row(static_cast<MYSQL_RES *>(r.get()));
-}
-
-DB_LENGTHS KDatabase::FetchRowLengths(DB_RESULT &r)
-{
-	return mysql_fetch_lengths(static_cast<MYSQL_RES *>(r.get()));
 }
 
 void KDatabase::FreeResult_internal(void *r)
@@ -406,11 +446,6 @@ DB_ERROR KDatabase::GetLastError(void)
 	}
 }
 
-unsigned int KDatabase::GetNumRows(const DB_RESULT &r) const
-{
-	return mysql_num_rows(static_cast<MYSQL_RES *>(r.get()));
-}
-
 ECRESULT KDatabase::InitEngine(bool reconnect)
 {
 	assert(!m_bMysqlInitialize);
@@ -419,7 +454,8 @@ ECRESULT KDatabase::InitEngine(bool reconnect)
 		return KCERR_DATABASE_ERROR;
 	}
 	m_bMysqlInitialize = true;
-	m_lpMySQL.reconnect = reconnect;
+	my_bool xtrue = true;
+	mysql_options(&m_lpMySQL, MYSQL_OPT_RECONNECT, &xtrue);
 	return erSuccess;
 }
 
@@ -434,7 +470,7 @@ ECRESULT KDatabase::IsInnoDBSupported(void)
 		return er;
 	}
 
-	while ((row = FetchRow(res)) != nullptr) {
+	while ((row = res.fetch_row()) != nullptr) {
 		if (strcasecmp(row[0], "InnoDB") != 0)
 			continue;
 		if (strcasecmp(row[1], "DISABLED") == 0) {
@@ -463,17 +499,22 @@ ECRESULT KDatabase::Query(const std::string &q)
 	if (err == 0)
 		return erSuccess;
 	/* Callers without reconnect will emit different messages. */
+	auto ers = mysql_error(&m_lpMySQL);
+#ifdef HAVE_MYSQL_GET_OPTION
+	my_bool reconn = false;
+	if (mysql_get_option(&m_lpMySQL, MYSQL_OPT_RECONNECT, &reconn) == 0 && reconn)
+#else
 	if (m_lpMySQL.reconnect)
+#endif
 		ec_log_err("%p: SQL Failed: %s, Query: \"%s\"",
-			static_cast<void *>(&m_lpMySQL), mysql_error(&m_lpMySQL),
-			q.c_str());
+			static_cast<void *>(&m_lpMySQL), ers, q.c_str());
 	return KCERR_DATABASE_ERROR;
 }
 
-ECRESULT KDatabase::_Update(const std::string &q, unsigned int *aff)
+ECRESULT KDatabase::I_Update(const std::string &q, unsigned int *aff)
 {
 	if (Query(q) != 0) {
-		ec_log_err("KDatabase::_Update() query failed: %s: %s",
+		ec_log_err("KDatabase::I_Update() query failed: %s: %s",
 			q.c_str(), GetError());
 		return KCERR_DATABASE_ERROR;
 	}

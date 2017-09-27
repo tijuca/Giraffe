@@ -9,11 +9,13 @@ global:
 	PSETID_*;
 	WAB_GUID;
 	muidStoreWrap;
+	pbGlobalProfileSectionGuid;
 	extern "C++" {
 		KC::*;
 		typeinfo*;
 		vtable*;
-		*::_Rep::_S_empty_rep_storage;
+		VTT*;
+		std::*::_S_*;
 	};
 local:
 	*;

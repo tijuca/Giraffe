@@ -302,9 +302,8 @@ static void showtop(LPMDB lpStore)
             session.times.ulRequests = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_REQUESTS);
             session.ullSessionId = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_ID);
             session.ullSessionGroupId = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_GROUP_ID);
-            if(session.ulPeerPid) {
+			if (session.ulPeerPid != 0)
 				session.strPeer = stringify(session.ulPeerPid);
-			}
 
             session.times.dblUser = GetDouble(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CPU_USER);
             session.times.dblSystem = GetDouble(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CPU_SYSTEM);
@@ -616,7 +615,7 @@ int main(int argc, char *argv[])
 	strwUsername = convert_to<wstring>(user ? user : "SYSTEM");
 	strwPassword = convert_to<wstring>(pass ? pass : "");
 
-	hr = HrOpenECSession(&~lpSession, "kopano-stats", PROJECT_SVN_REV_STR,
+	hr = HrOpenECSession(&~lpSession, "stats", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), host,
 	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE);
 	if (hr != hrSuccess) {

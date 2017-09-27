@@ -63,7 +63,7 @@ namespace detail {
 		 */
 		const wchar_t *convert(const char *lpsz) {
 			scoped_lock l_cache(m_hCacheLock);
-			auto insResult = m_cache.insert(cache_type::value_type(lpsz, std::wstring()));
+			auto insResult = m_cache.insert({lpsz, std::wstring()});
 			if (insResult.second == true)	// successful insert, so not found in cache
 				insResult.first->second.assign(m_converter.convert_to<std::wstring>(lpsz));
 			
@@ -106,13 +106,11 @@ namespace detail {
 LPWSTR kopano_dcgettext_wide(const char *domainname, const char *msgid)
 {
 	const char *lpsz = msgid;
-	detail::converter *lpConverter = detail::converter::getInstance();
 
 #ifndef NO_GETTEXT
 	lpsz = dcgettext(domainname, msgid, LC_MESSAGES);
 #endif
-
-	return (LPWSTR)lpConverter->convert(lpsz);
+	return const_cast<wchar_t *>(detail::converter::getInstance()->convert(lpsz));
 }
 
 } /* namespace */

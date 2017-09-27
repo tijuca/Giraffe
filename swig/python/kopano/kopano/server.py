@@ -1,10 +1,11 @@
 """
-Part of the high-level python bindings for Kopano
+Part of the high-level python bindings for Kopano.
 
 Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
+import atexit
 import datetime
 import os
 import time
@@ -46,6 +47,7 @@ from .parser import parser
 from .table import Table
 from .company import Company
 from .group import Group
+from .prop import _proptag_to_name
 
 from .compat import (
     unhex as _unhex, decode as _decode, repr as _repr,
@@ -53,15 +55,31 @@ from .compat import (
 )
 
 if sys.hexversion >= 0x03000000:
-    from . import user as _user
-    from . import config as _config
-    from . import utils as _utils
-    from . import store as _store
+    try:
+        from . import user as _user
+    except ImportError:
+        _user = sys.modules[__package__+'.user']
+    try:
+        from . import config as _config
+    except ImportError:
+        _config = sys.modules[__package__+'.config']
+    from . import ics as _ics
+    try:
+        from . import store as _store
+    except ImportError:
+        _store = sys.modules[__package__+'.store']
 else:
     import user as _user
     import config as _config
-    import utils as _utils
+    import ics as _ics
     import store as _store
+
+# avoid module-class-decorator-cache-store references, which are
+# somehow not dereferenced correctly (python bug?), resulting in
+# many valgrind errors
+def _clear_cache():
+    Server._store2.cache_clear()
+atexit.register(_clear_cache)
 
 def _timed_cache(seconds=0, minutes=0, hours=0, days=0):
     # used with permission from will mcgugan, https://www.willmcgugan.com
@@ -93,25 +111,27 @@ def _timed_cache(seconds=0, minutes=0, hours=0, days=0):
     return decorate
 
 class Server(object):
-    """Server class
-
-    By default, tries to connect to a storage server as configured in ``/etc/kopano/admin.cfg`` or
-    at UNIX socket ``/var/run/kopano/server.sock``
-
-    Looks at command-line to see if another server address or other related options were given (such as -c, -s, -k, -p)
-
-    :param server_socket: similar to 'server_socket' option in config file
-    :param sslkey_file: similar to 'sslkey_file' option in config file
-    :param sslkey_pass: similar to 'sslkey_pass' option in config file
-    :param config: path of configuration file containing common server options, for example ``/etc/kopano/admin.cfg``
-    :param auth_user: username to user for user authentication
-    :param auth_pass: password to use for user authentication
-    :param log: logger object to receive useful (debug) information
-    :param options: OptionParser instance to get settings from (see :func:`parser`)
-    :param parse_args: set this True if cli arguments should be parsed
-    """
+    """Server class."""
 
     def __init__(self, options=None, config=None, sslkey_file=None, sslkey_pass=None, server_socket=None, auth_user=None, auth_pass=None, log=None, service=None, mapisession=None, parse_args=True):
+        """
+        Create Server instance.
+
+        By default, tries to connect to a storage server as configured in ``/etc/kopano/admin.cfg`` or
+        at UNIX socket ``/var/run/kopano/server.sock``
+
+        Looks at command-line to see if another server address or other related options were given (such as -c, -s, -k, -p)
+
+        :param server_socket: similar to 'server_socket' option in config file
+        :param sslkey_file: similar to 'sslkey_file' option in config file
+        :param sslkey_pass: similar to 'sslkey_pass' option in config file
+        :param config: path of configuration file containing common server options, for example ``/etc/kopano/admin.cfg``
+        :param auth_user: username to user for user authentication
+        :param auth_pass: password to use for user authentication
+        :param log: logger object to receive useful (debug) information
+        :param options: OptionParser instance to get settings from (see :func:`parser`)
+        :param parse_args: set this True if cli arguments should be parsed
+        """
         self.options = options
         self.config = config
         self.sslkey_file = sslkey_file
@@ -190,7 +210,7 @@ class Server(object):
         self._gab = None
         entryid = HrGetOneProp(self.mapistore, PR_STORE_ENTRYID).Value
         self.pseudo_url = entryid[entryid.find(b'pseudo:'):-1] # XXX ECSERVER
-        self.name = self.pseudo_url[9:] # XXX get this kind of stuff from pr_ec_statstable_servers..?
+        self.name = self.pseudo_url[9:].decode('ascii') # XXX encoding, get this kind of stuff from pr_ec_statstable_servers..?
 
     def nodes(self): # XXX delay mapi sessions until actually needed
         for row in self.table(PR_EC_STATSTABLE_SERVERS).dict_rows():
@@ -212,7 +232,6 @@ class Server(object):
 
     @property
     def ab(self):
-        """ Address Book """
         if not self._ab:
             self._ab = self.mapisession.OpenAddressBook(0, None, 0) # XXX
         return self._ab
@@ -225,21 +244,22 @@ class Server(object):
 
     @property
     def gab(self):
-        """ Global Address Book """
-
         if not self._gab:
             self._gab = self.ab.OpenEntry(self.ab.GetDefaultDir(), None, 0)
         return self._gab
 
     @property
     def guid(self):
-        """ Server GUID """
-
+        """Server GUID."""
         return bin2hex(HrGetOneProp(self.mapistore, PR_MAPPING_SIGNATURE).Value)
 
     def user(self, name=None, email=None, create=False):
-        """ Return :class:`user <User>` with given name """
+        """Return :class:`user <User>` with given name or email address.
 
+        :param name: user name
+        :param email: email address
+        :param create: create user if it doesn't exist (name required)
+        """
         try:
             return _user.User(name, email=email, server=self)
         except NotFoundError:
@@ -249,20 +269,18 @@ class Server(object):
                 raise
 
     def get_user(self, name):
-        """ Return :class:`user <User>` with given name or *None* if not found """
-
+        """Return :class:`user <User>` with given name or *None* if not found."""
         try:
             return self.user(name)
-        except Error:
+        except NotFoundError:
             pass
 
     def users(self, remote=False, system=False, parse=True):
-        """ Return all :class:`users <User>` on server
+        """Return all :class:`users <User>` on server.
 
-            :param remote: include users on remote server nodes
-            :param system: include system users
+        :param remote: include users on remote server nodes
+        :param system: include system users
         """
-
         if parse and getattr(self.options, 'users', None):
             for username in self.options.users:
                 yield _user.User(_decode(username), self)
@@ -279,9 +297,9 @@ class Server(object):
                         yield _user.User(server=self, ecuser=ecuser)
 
     def create_user(self, name, email=None, password=None, company=None, fullname=None, create_store=True):
-        """ Create a new :class:`user <Users>` on the server
+        """Create a new :class:`user <User>` on the server.
 
-        :param name: the login name of the new user
+        :param name: the login name of the user
         :param email: the email address of the user
         :param password: the login password of the user
         :param company: the company of the user
@@ -305,11 +323,16 @@ class Server(object):
         else:
             try:
                 self.sa.CreateUser(ECUSER(name, password, email, fullname), MAPI_UNICODE)
+            except MAPIErrorNoSupport:
+                raise NotSupportedError("cannot create users with configured user plugin")
             except MAPIErrorCollision:
                 raise DuplicateError("user '%s' already exists" % name)
             user = self.user(name)
         if create_store:
-            self.sa.CreateStore(ECSTORE_TYPE_PRIVATE, _unhex(user.userid))
+            try:
+                self.sa.CreateStore(ECSTORE_TYPE_PRIVATE, _unhex(user.userid))
+            except MAPIErrorCollision:
+                pass # create-user userscript may already create store
         return user
 
     def remove_user(self, name): # XXX delete(object)?
@@ -317,8 +340,11 @@ class Server(object):
         self.sa.DeleteUser(user._ecuser.UserID)
 
     def company(self, name, create=False):
-        """ Return :class:`company <Company>` with given name; raise exception if not found """
+        """Return :class:`company <Company>` with given name.
 
+        :param name: company name
+        :param create: create company if it doesn't exist
+        """
         try:
             return Company(name, self)
         except MAPIErrorNoSupport:
@@ -330,18 +356,17 @@ class Server(object):
                 raise
 
     def get_company(self, name):
-        """ Return :class:`company <Company>` with given name or *None* if not found """
-
+        """Return :class:`company <Company>` with given name or *None* if not found."""
         try:
             return self.company(name)
-        except Error:
+        except NotFoundError:
             pass
 
     def remove_company(self, name): # XXX delete(object)?
         company = self.company(name)
 
         if company.name == u'Default':
-            raise NotSupportedError('cannot remove company in singletenant mode')
+            raise NotSupportedError('cannot remove company in single-tenant mode')
         else:
             self.sa.DeleteCompany(company._eccompany.CompanyID)
 
@@ -350,8 +375,7 @@ class Server(object):
 
     @property
     def multitenant(self):
-        """ Return boolean showing if the server is multitenant """
-
+        """The server is multi-tenant."""
         try:
             self._companylist()
             return True
@@ -359,9 +383,9 @@ class Server(object):
             return False
 
     def companies(self, remote=False, parse=True): # XXX remote?
-        """ Return all :class:`companies <Company>` on server
+        """Return all :class:`companies <Company>` on server.
 
-            :param remote: include companies without users on this server node
+        :param remote: include companies without users on this server node
         """
         if parse and getattr(self.options, 'companies', None):
             for name in self.options.companies:
@@ -377,14 +401,18 @@ class Server(object):
         except MAPIErrorNoSupport:
             yield Company(u'Default', self)
 
-    def create_company(self, name): # XXX deprecated because of company(create=True)?
+    def create_company(self, name):
+        """Create a new :class:`company <Company>` on the server.
+
+        :param name: the name of the company
+        """
         name = _unicode(name)
         try:
             self.sa.CreateCompany(ECCOMPANY(name, None), MAPI_UNICODE)
         except MAPIErrorCollision:
             raise DuplicateError("company '%s' already exists" % name)
         except MAPIErrorNoSupport:
-            raise NotSupportedError("cannot create company in singletenant mode")
+            raise NotSupportedError("cannot create company in single-tenant mode")
         return self.company(name)
 
     def _store(self, guid):
@@ -398,7 +426,7 @@ class Server(object):
         table.SetColumns([PR_ENTRYID], 0)
         table.Restrict(SPropertyRestriction(RELOP_EQ, PR_STORE_RECORD_KEY, SPropValue(PR_STORE_RECORD_KEY, storeid)), TBL_BATCH)
         for row in table.QueryRows(-1, 0):
-            return self.mapisession.OpenMsgStore(0, row[0].Value, None, MDB_WRITE)
+            return self._store2(row[0].Value)
         raise NotFoundError("no such store: '%s'" % guid)
 
     @_lru_cache(128) # backend doesn't like more than 1000 stores open on certain multiserver setup
@@ -406,20 +434,34 @@ class Server(object):
         return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore, MDB_WRITE)
 
     def groups(self):
-        """ Return all :class:`groups <Group>` on server """
-
+        """Return all :class:`groups <Group>` on server."""
         try:
             for ecgroup in self.sa.GetGroupList(None, MAPI_UNICODE):
                 yield Group(ecgroup.Groupname, self)
-        except MAPIErrorNotFound: # XXX what to do here (single-tenant..), as groups do exist?
+        except NotFoundError: # XXX what to do here (single-tenant..), as groups do exist?
             pass
 
-    def group(self, name):
-        """ Return :class:`group <Group>` with given name """
+    def group(self, name, create=False):
+        """Return :class:`group <Group>` with given name.
 
-        return Group(name, self)
+        :param name: group name
+        :param create: create group if it doesn't exist
+        """
+        try:
+            return Group(name, self)
+        except NotFoundError:
+            if create:
+                return self.create_group(name)
+            else:
+                raise
 
     def create_group(self, name, fullname='', email='', hidden=False, groupid=None):
+        """Create a new :class:`group <Group>` on the server.
+
+        :param name: the name of the group
+        :param fullname: the full name of the group (optional)
+        :param email: the email address of the group (optional)
+        """
         name = _unicode(name) # XXX: fullname/email unicode?
         email = _unicode(email)
         fullname = _unicode(fullname)
@@ -434,13 +476,17 @@ class Server(object):
         group = self.group(name)
         self.sa.DeleteGroup(group._ecgroup.GroupID)
 
-    def delete(self, items):
-        if isinstance(items, (_user.User, Group, Company, _store.Store)):
-            items = [items]
-        else:
-            items = list(items)
+    def delete(self, objects):
+        """Delete users, groups, companies or stores from server.
 
-        for item in items:
+        :param objects: The object(s) to delete
+        """
+        if isinstance(objects, (_user.User, Group, Company, _store.Store)):
+            objects = [objects]
+        else:
+            objects = list(objects)
+
+        for item in objects:
             if isinstance(item, _user.User):
                 self.remove_user(item.name)
             elif isinstance(item, Group):
@@ -462,29 +508,25 @@ class Server(object):
             return company.public_store
 
     def store(self, guid=None, entryid=None):
-        """ Return :class:`store <Store>` with given GUID """
-
+        """Return :class:`store <Store>` with given GUID."""
         if _unicode(guid).split('@')[0] == 'public':
             return self._pubstore(guid)
         else:
             return _store.Store(guid=guid, entryid=entryid, server=self)
 
     def get_store(self, guid):
-        """ Return :class:`store <Store>` with given GUID or *None* if not found """
-
+        """Return :class:`store <Store>` with given GUID or *None* if not found."""
         try:
             return self.store(guid)
         except Error:
             pass
 
     def stores(self, system=False, remote=False, parse=True): # XXX implement remote
-        """ Return all :class:`stores <Store>` on server node
+        """Return all :class:`stores <Store>` on server node.
 
         :param system: include system stores
         :param remote: include stores on other nodes
-
         """
-
         if parse and getattr(self.options, 'stores', None):
             for guid in self.options.stores:
                 if guid.split('@')[0] == 'public':
@@ -496,17 +538,15 @@ class Server(object):
         table = self.ems.GetMailboxTable(None, 0)
         table.SetColumns([PR_DISPLAY_NAME_W, PR_ENTRYID], 0)
         for row in table.QueryRows(-1, 0):
-            store = _store.Store(mapiobj=self.mapisession.OpenMsgStore(0, row[1].Value, None, MDB_WRITE), server=self) # XXX cache
+            store = _store.Store(mapiobj=self._store2(row[1].Value), server=self)
             if system or store.public or (store.user and store.user.name != 'SYSTEM'):
                 yield store
 
-    def create_store(self, public=False): # XXX deprecated?
-        if public:
-            return self.create_public_store()
-        # XXX
-
-    def remove_store(self, store): # XXX server.delete?
-        self.sa.RemoveStore(_unhex(store.guid))
+    def remove_store(self, store):
+        try:
+            self.sa.RemoveStore(_unhex(store.guid))
+        except MAPIErrorCollision:
+            raise Error("cannot remove store with GUID '%s'" % store.guid)
 
     def sync_users(self):
         self.sa.SyncUsers(None)
@@ -526,44 +566,44 @@ class Server(object):
     def _pubhelper(self):
         try:
             self.sa.GetCompanyList(MAPI_UNICODE)
-            raise Error('request for server-wide public store in multi-company setup')
+            raise Error('request for server-wide public store in multi-tenant setup')
         except MAPIErrorNoSupport:
             return next(self.companies())
 
     @property
     def public_store(self):
-        """ public :class:`store <Store>` in single-company mode """
-
+        """Public :class:`store <Store>` in single-tenant mode."""
         return self._pubhelper().public_store
 
     def create_public_store(self):
-
+        """Create public :class:`store <Store>` in single-tenant mode."""
         return self._pubhelper().create_public_store()
 
     def hook_public_store(self, store):
+        """Hook public :class:`store <Store>` in single-tenant mode.
 
+        :param store: store to hook
+        """
         return self._pubhelper().hook_public_store(store)
 
     def unhook_public_store(self):
-
+        """Unhook public :class:`store <Store>` in single-tenant mode."""
         return self._pubhelper().unhook_public_store()
 
     @property
     def state(self):
-        """ Current server state """
-
-        return _utils.state(self.mapistore)
+        """Current server state."""
+        return _ics.state(self.mapistore)
 
     def sync(self, importer, state, log=None, max_changes=None, window=None, begin=None, end=None, stats=None):
-        """ Perform synchronization against server node
+        """Perform synchronization against server node.
 
         :param importer: importer instance with callbacks to process changes
         :param state: start from this state (has to be given)
         :log: logger instance to receive important warnings/errors
         """
-
         importer.store = None
-        return _utils.sync(self, self.mapistore, importer, state, log or self.log, max_changes, window=window, begin=begin, end=end, stats=stats)
+        return _ics.sync(self, self.mapistore, importer, state, log or self.log, max_changes, window=window, begin=begin, end=end, stats=stats)
 
     @_timed_cache(minutes=60)
     def _resolve_email(self, entryid=None):
@@ -572,6 +612,14 @@ class Server(object):
             return self.user(HrGetOneProp(mailuser, PR_ACCOUNT_W).Value).email # XXX PR_SMTP_ADDRESS_W from mailuser?
         except (Error, MAPIErrorNotFound): # XXX deleted user
             return '' # XXX groups
+
+    def id_to_name(self, proptag):
+        """Give the name representation of an property id. For example 0x80710003 => 'task:33025'.
+
+        :param proptag: the property identifier
+        """
+
+        return _proptag_to_name(proptag, self.admin_store)
 
     def __unicode__(self):
         return u'Server(%s)' % self.server_socket

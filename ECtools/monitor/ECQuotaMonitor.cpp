@@ -35,17 +35,14 @@
 #include <kopano/ECDefs.h>
 #include <kopano/ECRestriction.h>
 #include <kopano/ECABEntryID.h>
-#include <kopano/IECUnknown.h>
 #include <kopano/Util.h>
 #include <kopano/ecversion.h>
 #include <kopano/charset/convert.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/MAPIErrors.h>
-
-//#include <kopano/IECSecurity.h>
 #include <kopano/ECGuid.h>
 #include <kopano/ECTags.h>
-#include <kopano/IECServiceAdmin.h>
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/CommonUtil.h>
 #include <kopano/stringutil.h>
 #include <kopano/mapiext.h>
@@ -96,7 +93,7 @@ ECQuotaMonitor::~ECQuotaMonitor()
 void* ECQuotaMonitor::Create(void* lpVoid)
 {
 	HRESULT				hr = hrSuccess;
-	ECTHREADMONITOR *lpThreadMonitor = reinterpret_cast<ECTHREADMONITOR *>(lpVoid);
+	auto lpThreadMonitor = static_cast<ECTHREADMONITOR *>(lpVoid);
 	std::unique_ptr<ECQuotaMonitor> lpecQuotaMonitor;
 	object_ptr<IMAPISession> lpMAPIAdminSession;
 	object_ptr<IMsgStore> lpMDBAdmin;
@@ -108,8 +105,8 @@ void* ECQuotaMonitor::Create(void* lpVoid)
 	lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Quota monitor starting");
 
 	//Open admin session
-	hr = HrOpenECAdminSession(&~lpMAPIAdminSession, "kopano-monitor:create",
-	     PROJECT_SVN_REV_STR, lpPath, 0,
+	hr = HrOpenECAdminSession(&~lpMAPIAdminSession, "monitor:create",
+	     PROJECT_VERSION, lpPath, 0,
 	     lpThreadMonitor->lpConfig->GetSetting("sslkey_file", "", NULL),
 	     lpThreadMonitor->lpConfig->GetSetting("sslkey_pass", "", NULL));
 	if (hr != hrSuccess) {
@@ -172,7 +169,7 @@ HRESULT ECQuotaMonitor::CheckQuota()
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get internal object, error code: 0x%08X", hr);
 		return hr;
 	}
-	hr = reinterpret_cast<IECUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
+	hr = reinterpret_cast<IUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if(hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get service admin, error code: 0x%08X", hr);
 		return hr;
@@ -265,8 +262,7 @@ HRESULT ECQuotaMonitor::CheckCompanyQuota(ECCOMPANY *lpecCompany)
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get internal object, error code: 0x%08X", hr);
 		return hr;
 	}
-
-	hr = reinterpret_cast<IECUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
+	hr = reinterpret_cast<IUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if(hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get service admin, error code: 0x%08X", hr);
 		return hr;
@@ -327,7 +323,10 @@ HRESULT ECQuotaMonitor::CheckCompanyQuota(ECCOMPANY *lpecCompany)
 				continue;
 			}
 		} else {
-			hr = HrOpenECAdminSession(&~lpSession, "kopano-monitor:check-company", PROJECT_SVN_REV_STR, lpszConnection, 0, m_lpThreadMonitor->lpConfig->GetSetting("sslkey_file", "", nullptr), m_lpThreadMonitor->lpConfig->GetSetting("sslkey_pass", "", nullptr));
+			hr = HrOpenECAdminSession(&~lpSession, "monitor:check-company",
+			     PROJECT_VERSION, lpszConnection, 0,
+			     m_lpThreadMonitor->lpConfig->GetSetting("sslkey_file", "", nullptr),
+			     m_lpThreadMonitor->lpConfig->GetSetting("sslkey_pass", "", nullptr));
 			if (hr != hrSuccess) {
 				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to connect to server %s, error code 0x%08X", lpszConnection.get(), hr);
 				++m_ulFailed;
@@ -1085,7 +1084,7 @@ HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage,
 	if (hr != hrSuccess)
 		return hr;
 
-	/* Determine when the last warning mail was send, and if a new one should be send. */
+	/* Determine when the last warning mail was send, and if a new one should be sent. */
 	lpResendInterval = m_lpThreadMonitor->lpConfig->GetSetting("mailquota_resend_interval");
 	ulResendInterval = (lpResendInterval && atoui(lpResendInterval) > 0) ? atoui(lpResendInterval) : 1;
 	GetSystemTimeAsFileTime(&ft);
@@ -1172,7 +1171,7 @@ HRESULT ECQuotaMonitor::Notify(ECUSER *lpecUser, ECCOMPANY *lpecCompany,
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get internal object, error code: 0x%08X", hr);
 		return hr;
 	}
-	hr = reinterpret_cast<IECUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
+	hr = reinterpret_cast<IUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if (hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get service admin, error code: 0x%08X", hr);
 		return hr;

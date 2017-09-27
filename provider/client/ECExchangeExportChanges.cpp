@@ -14,9 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
+#include <kopano/MAPIErrors.h>
 #include <kopano/memory.hpp>
 #include <kopano/mapi_ptr.h>
 #include "ECExchangeExportChanges.h"
@@ -103,49 +103,45 @@ HRESULT ECExchangeExportChanges::SetLogger(ECLogger *lpLogger)
 }
 
 HRESULT ECExchangeExportChanges::Create(ECMsgStore *lpStore, REFIID iid, const std::string& sourcekey, const wchar_t *szDisplay, unsigned int ulSyncType, LPEXCHANGEEXPORTCHANGES* lppExchangeExportChanges){
-	ECExchangeExportChanges *lpEEC = NULL;
-
 	if (lpStore == NULL || (ulSyncType != ICS_SYNC_CONTENTS && ulSyncType != ICS_SYNC_HIERARCHY))
 		return MAPI_E_INVALID_PARAMETER;
-
-	lpEEC = new ECExchangeExportChanges(lpStore, sourcekey, szDisplay, ulSyncType);
-	return lpEEC->QueryInterface(iid, reinterpret_cast<void **>(lppExchangeExportChanges));
+	return alloc_wrap<ECExchangeExportChanges>(lpStore, sourcekey,
+	       szDisplay, ulSyncType).as(iid, lppExchangeExportChanges);
 }
 
 HRESULT	ECExchangeExportChanges::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECExchangeExportChanges, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IExchangeExportChanges, &this->m_xECExportChanges);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xECExportChanges);
-	REGISTER_INTERFACE2(IECExportChanges, &this->m_xECExportChanges);
+	REGISTER_INTERFACE2(IExchangeExportChanges, this);
+	REGISTER_INTERFACE2(IUnknown, this);
+	REGISTER_INTERFACE2(IECExportChanges, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECExchangeExportChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError){
 	HRESULT		hr = hrSuccess;
-	LPMAPIERROR	lpMapiError = NULL;
+	ecmem_ptr<MAPIERROR> lpMapiError;
 	memory_ptr<TCHAR> lpszErrorMsg;
 
 	//FIXME: give synchronization errors messages
 	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ECAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError);
+		return hr;
+	hr = ECAllocateBuffer(sizeof(MAPIERROR), &~lpMapiError);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (ulFlags & MAPI_UNICODE) {
 		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg.get());
 		std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
-			goto exit;
+			return hr;
 		wcscpy((wchar_t*)lpMapiError->lpszError, wstrErrorMsg.c_str());
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
-			goto exit;
+			return hr;
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str());
 
 	} else {
@@ -153,25 +149,19 @@ HRESULT ECExchangeExportChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LP
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy((char*)lpMapiError->lpszError, strErrorMsg.c_str());
 
 		if ((hr = MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy((char*)lpMapiError->lpszComponent, strCompName.c_str());
 	}
 
 	lpMapiError->ulContext		= 0;
 	lpMapiError->ulLowLevelError= 0;
 	lpMapiError->ulVersion		= 0;
-
-	*lppMAPIError = lpMapiError;
-
-exit:
-	if( hr != hrSuccess && lpMapiError)
-		ECFreeBuffer(lpMapiError);
-
-	return hr;
+	*lppMAPIError = lpMapiError.release();
+	return hrSuccess;
 }
 
 HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKNOWN lpCollector, LPSRestriction lpRestriction, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize){
@@ -334,16 +324,16 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 			switch (ICS_ACTION(m_lpChanges[ulStep].ulChangeType)) {
 			case ICS_NEW:
 			case ICS_CHANGE:
-				mapChanges.insert(ChangeMap::value_type(m_lpChanges[ulStep].sSourceKey, lstChange.insert(lstChange.end(), m_lpChanges[ulStep])));
+				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, lstChange.insert(lstChange.end(), m_lpChanges[ulStep])});
 				break;
 			case ICS_FLAG:
-				mapChanges.insert(ChangeMap::value_type(m_lpChanges[ulStep].sSourceKey, m_lstFlag.insert(m_lstFlag.end(), m_lpChanges[ulStep])));
+				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstFlag.insert(m_lstFlag.end(), m_lpChanges[ulStep])});
 				break;
 			case ICS_SOFT_DELETE:
-				mapChanges.insert(ChangeMap::value_type(m_lpChanges[ulStep].sSourceKey, m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep])));
+				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep])});
 				break;
 			case ICS_HARD_DELETE:
-				mapChanges.insert(ChangeMap::value_type(m_lpChanges[ulStep].sSourceKey, m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep])));
+				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep])});
 				break;
 			default:
 				break;
@@ -676,18 +666,6 @@ HRESULT ECExchangeExportChanges::SetMessageInterface(REFIID refiid) {
 	return hrSuccess;
 }
 
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, Config, (LPSTREAM, lpStream), (ULONG, ulFlags), (LPUNKNOWN, lpCollector), (LPSRestriction, lpRestriction), (LPSPropTagArray, lpIncludeProps), (LPSPropTagArray, lpExcludeProps), (ULONG, ulBufferSize))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, ConfigSelective, (ULONG, ulPropTag), (LPENTRYLIST, lpEntries), (LPENTRYLIST, lpParents), (ULONG, ulFlags), (LPUNKNOWN, lpCollector), (LPSPropTagArray, lpIncludeProps), (LPSPropTagArray, lpExcludeProps), (ULONG, ulBufferSize))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, Synchronize, (ULONG *, pulSteps), (ULONG *, pulProgress))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, UpdateState, (LPSTREAM, lpStream))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, GetChangeCount, (ULONG *, lpcChanges))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, SetMessageInterface, (REFIID, refiid))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeExportChanges, ECExportChanges, SetLogger, (ECLogger *, lpLogger))
-
 HRESULT ECExchangeExportChanges::ExportMessageChanges() {
 	assert(m_lpImportContents != NULL);
 	if (m_lpImportStreamedContents != NULL)
@@ -743,15 +721,24 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 				ZLOG_DEBUG(m_lpLogger, "Error while getting entryid from sourcekey %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey.cb, m_lstChange.at(m_ulStep).sSourceKey.lpb).c_str());
 				goto exit;
 			}
-			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &m_iidMessage, MAPI_MODIFY, &ulObjType, &~lpSourceMessage);
+			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpSourceMessage);
 			if(hr == MAPI_E_NOT_FOUND){
 				hr = hrSuccess;
 				goto next;
 			}
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to open message with entryid %s", bin2hex(cbEntryID, reinterpret_cast<const unsigned char *>(lpEntryID.get())).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Unable to open message with entryid %s: %s", bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr));
 				goto exit;
 			}
+			/* Check if requested interface exists */
+			void *throwaway;
+			hr = lpSourceMessage->QueryInterface(m_iidMessage, &throwaway);
+			if (hr != hrSuccess) {
+				ZLOG_DEBUG(m_lpLogger, "Unable to open message with entryid %s: %s", bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr));
+				goto exit;
+			}
+			lpSourceMessage->Release(); /* give back one ref taken by QI */
+
 			hr = lpSourceMessage->GetProps(sptImportProps, 0, &ulCount, &~lpPropArray);
 			if(FAILED(hr)) {
 				ZLOG_DEBUG(m_lpLogger, "Unable to get properties from source message");
@@ -936,7 +923,7 @@ exit:
 HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 {
 	HRESULT hr = hrSuccess;
-	WSSerializedMessagePtr ptrSerializedMessage;
+	object_ptr<WSSerializedMessage> ptrSerializedMessage;
 	ULONG cbProps = 0;
 	SPropValuePtr ptrProps;
 	const SPropValue *lpPropVal = NULL;
@@ -968,8 +955,8 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 	const auto lpImportProps = m_sourcekey.empty() ? sptImportPropsServerWide : sptImportProps;
 
 	// No more changes (add/modify).
-	ZLOG_DEBUG(m_lpLogger, "ExportFast: At step %u, changeset contains %lu items)",
-		m_ulStep, static_cast<unsigned long>(m_lstChange.size()));
+	ZLOG_DEBUG(m_lpLogger, "ExportFast: At step %u, changeset contains %zu items)",
+		m_ulStep, m_lstChange.size());
 	if (m_ulStep >= m_lstChange.size())
 		goto exit;
 

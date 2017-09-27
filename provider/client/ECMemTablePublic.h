@@ -20,6 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECMemTable.h>
+#include <kopano/Util.h>
 #include "ECMAPIFolderPublic.h"
 
 #include <mapidefs.h>
@@ -46,8 +47,6 @@ public:
 	
 	static void FreeRelation(t_sRelation* lpRelation);
 	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
-	//virtual ULONG AddRef(void) _kc_override;
-	//virtual ULONG Release(void) _kc_override;
 	HRESULT Init(ULONG ulFlags);
 
 	HRESULT ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow);
@@ -62,7 +61,7 @@ public:
 	IMAPITable *m_lpShortcutTable = nullptr;
 	ULONG m_ulRowId = 1;
 	ECMAPFolderRelation	m_mapRelation; //Relation between shortcut instancekey and rowid
-
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif //#ifndef ECMEMTABLEPUBLIC_H

@@ -371,7 +371,7 @@ ECRESULT ECDatabase::InitLibrary(const char *lpDatabaseDir,
 	 * mysql's function signature stinks, and even their samples
 	 * do the cast :(
 	 */
-	if ((ret = mysql_library_init(arraySize(server_args),
+	if ((ret = mysql_library_init(ARRAY_SIZE(server_args),
 	     const_cast<char **>(server_args),
 	     const_cast<char **>(server_groups))) != 0) {
 		ec_log_crit("Unable to initialize mysql: error 0x%08X", ret);
@@ -392,25 +392,23 @@ ECRESULT ECDatabase::InitializeDBState(void)
 
 ECRESULT ECDatabase::InitializeDBStateInner(void)
 {
-	ECRESULT er;
-
-	for (unsigned int i = 0; i < arraySize(stored_procedures); ++i) {
-		er = DoUpdate(std::string("DROP PROCEDURE IF EXISTS ") + stored_procedures[i].szName);
+	for (size_t i = 0; i < ARRAY_SIZE(stored_procedures); ++i) {
+		auto er = DoUpdate(std::string("DROP PROCEDURE IF EXISTS ") + stored_procedures[i].szName);
 		if(er != erSuccess)
 			return er;
 			
 		er = DoUpdate(stored_procedures[i].szSQL);
-		if(er != erSuccess) {
-			int err = mysql_errno(&m_lpMySQL);
-			if (err == ER_DBACCESS_DENIED_ERROR) {
-				ec_log_err("The storage server is not allowed to create stored procedures");
-				ec_log_err("Please grant CREATE ROUTINE permissions to the mysql user \"%s\" on the \"%s\" database",
-								m_lpConfig->GetSetting("mysql_user"), m_lpConfig->GetSetting("mysql_database"));
-			} else {
-				ec_log_err("The storage server is unable to create stored procedures, error %d", err);
-			}
-			return er;
+		if (er == erSuccess)
+			break;
+		int err = mysql_errno(&m_lpMySQL);
+		if (err == ER_DBACCESS_DENIED_ERROR) {
+			ec_log_err("The storage server is not allowed to create stored procedures");
+			ec_log_err("Please grant CREATE ROUTINE permissions to the mysql user \"%s\" on the \"%s\" database",
+				m_lpConfig->GetSetting("mysql_user"), m_lpConfig->GetSetting("mysql_database"));
+		} else {
+			ec_log_err("The storage server is unable to create stored procedures, error %d", err);
 		}
+		return er;
 	}
 	return erSuccess;
 }
@@ -432,40 +430,33 @@ void ECDatabase::UnloadLibrary(void)
 ECRESULT ECDatabase::CheckExistColumn(const std::string &strTable,
     const std::string &strColumn, bool *lpbExist)
 {
-	ECRESULT		er = erSuccess;
-	std::string		strQuery;
 	DB_RESULT lpDBResult;
 
-	strQuery = "SELECT 1 FROM information_schema.COLUMNS "
+	std::string strQuery = "SELECT 1 FROM information_schema.COLUMNS "
 				"WHERE TABLE_SCHEMA = '" + string(m_lpConfig->GetSetting("mysql_database")) + "' "
 				"AND TABLE_NAME = '" + strTable + "' "
 				"AND COLUMN_NAME = '" + strColumn + "'";
-				
-	er = DoSelect(strQuery, &lpDBResult);
+	auto er = DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
-	
-	*lpbExist = (FetchRow(lpDBResult) != NULL);
+	*lpbExist = lpDBResult.fetch_row() != nullptr;
 	return er;
 }
 
 ECRESULT ECDatabase::CheckExistIndex(const std::string &strTable,
     const std::string &strKey, bool *lpbExist)
 {
-	ECRESULT		er = erSuccess;
-	std::string		strQuery;
 	DB_RESULT lpDBResult;
 	DB_ROW			lpRow = NULL;
 
 	// WHERE not supported in MySQL < 5.0.3 
-	strQuery = "SHOW INDEXES FROM " + strTable;
-
-	er = DoSelect(strQuery, &lpDBResult);
+	std::string strQuery = "SHOW INDEXES FROM " + strTable;
+	auto er = DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
 
 	*lpbExist = false;
-	while ((lpRow = FetchRow(lpDBResult)) != NULL) {
+	while ((lpRow = lpDBResult.fetch_row()) != nullptr) {
 		// 2 is Key_name
 		if (lpRow[2] && strcmp(lpRow[2], strKey.c_str()) == 0) {
 			*lpbExist = true;
@@ -551,7 +542,7 @@ ECRESULT ECDatabase::Query(const std::string &strQuery)
 
 	if(err) {
 		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
-			ec_log_err("SQL [%08lu] Failed: %s, Query Size: %lu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), static_cast<unsigned long>(strQuery.size()), strQuery.c_str());
+			ec_log_err("SQL [%08lu] Failed: %s, Query Size: %zu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), strQuery.size(), strQuery.c_str());
 		er = KCERR_DATABASE_ERROR;
 		// Don't assert on ER_NO_SUCH_TABLE because it's an anticipated error in the db upgrade code.
 		if (mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
@@ -653,11 +644,10 @@ exit:
  */
 ECRESULT ECDatabase::FinalizeMulti(void)
 {
-	DB_RESULT lpResult;
 	autolock alk(*this);
 
 	mysql_next_result(&m_lpMySQL);
-	lpResult = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
+	auto lpResult = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
 	if (lpResult != nullptr) {
 		ec_log_err("SQL [%08lu] result failed: unexpected results received at end of batch", m_lpMySQL.thread_id);
 		return KCERR_DATABASE_ERROR;
@@ -768,6 +758,7 @@ bool ECDatabase::SuppressLockErrorLogging(bool bSuppress)
 
 ECRESULT ECDatabase::Begin(void)
 {
+	Query("SET autocommit=0;");
 	auto er = KDatabase::Begin();
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
@@ -786,6 +777,7 @@ ECRESULT ECDatabase::Begin(void)
 ECRESULT ECDatabase::Commit(void)
 {
 	auto er = KDatabase::Commit();
+	Query("SET autocommit=1;");
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: COMMIT", &m_lpMySQL);
@@ -803,6 +795,7 @@ ECRESULT ECDatabase::Commit(void)
 ECRESULT ECDatabase::Rollback(void)
 {
 	auto er = KDatabase::Rollback();
+	Query("SET autocommit=1;");
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: ROLLBACK", &m_lpMySQL);
@@ -829,6 +822,10 @@ void ECDatabase::ThreadEnd(void)
 ECRESULT ECDatabase::CreateDatabase(void)
 {
 	auto er = KDatabase::CreateDatabase(m_lpConfig, false);
+	if (er != erSuccess)
+		return er;
+
+	er = KDatabase::CreateTables();
 	if (er != erSuccess)
 		return er;
 
@@ -885,19 +882,15 @@ static inline bool row_has_null(DB_ROW row, size_t z)
 
 ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 {
-	ECRESULT		er = erSuccess;
-	string			strQuery;
 	DB_RESULT lpResult;
 	DB_ROW			lpDBRow = NULL;
-	bool have_micro;
 
 	/* Check if the "micro" column already exists (it does since v64) */
-	er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &lpResult);
+	auto er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &lpResult);
 	if (er != erSuccess)
 		return er;
-	have_micro = GetNumRows(lpResult) > 0;
-
-	strQuery = "SELECT major, minor";
+	bool have_micro = lpResult.get_num_rows() > 0;
+	std::string strQuery = "SELECT major, minor";
 	strQuery += have_micro ? ", micro" : ", 0";
 	strQuery += ", revision, databaserevision FROM versions ORDER BY major DESC, minor DESC";
 	if (have_micro)
@@ -908,7 +901,7 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 	if(er != erSuccess && mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
 		return er;
 
-	if(er != erSuccess || GetNumRows(lpResult) == 0) {
+	if (er != erSuccess || lpResult.get_num_rows() == 0) {
 		// Ok, maybe < than version 5.10
 		// check version
 
@@ -917,8 +910,7 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 		if(er != erSuccess)
 			return er;
 
-		lpDBRow = FetchRow(lpResult);
-		while (lpDBRow != NULL) {
+		for (lpDBRow = lpResult.fetch_row(); lpDBRow != nullptr; lpDBRow = lpResult.fetch_row()) {
 			if (lpDBRow[0] != NULL && strcasecmp(lpDBRow[0], "storeid") == 0) {
 				dbv->v_major  = 5;
 				dbv->v_minor  = 0;
@@ -927,12 +919,11 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 				er = erSuccess;
 				break;
 			}
-			lpDBRow = FetchRow(lpResult);
 		}
 		return KCERR_UNKNOWN_DATABASE;
 	}
 
-	lpDBRow = FetchRow(lpResult);
+	lpDBRow = lpResult.fetch_row();
 	if (row_has_null(lpDBRow, 5)) {
 		ec_log_err("ECDatabase::GetDatabaseVersion(): NULL row or columns");
 		return KCERR_DATABASE_ERROR;
@@ -949,38 +940,34 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 ECRESULT ECDatabase::IsUpdateDone(unsigned int ulDatabaseRevision,
     unsigned int ulRevision)
 {
-	ECRESULT		er = KCERR_NOT_FOUND;
-	string			strQuery;
 	DB_RESULT lpResult;
 
-	strQuery = "SELECT major,minor,revision,databaserevision FROM versions WHERE databaserevision = " + stringify(ulDatabaseRevision);
+	std::string strQuery = "SELECT major,minor,revision,databaserevision FROM versions WHERE databaserevision = " + stringify(ulDatabaseRevision);
 	if (ulRevision > 0)
 		strQuery += " AND revision = " + stringify(ulRevision);
 
 	strQuery += " ORDER BY major DESC, minor DESC, revision DESC, databaserevision DESC LIMIT 1";
-	
-	er = DoSelect(strQuery, &lpResult);
+	auto er = DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)
 		return er;
-	if(GetNumRows(lpResult) != 1)
+	if (lpResult.get_num_rows() != 1)
 		return KCERR_NOT_FOUND;
 	return erSuccess;
 }
 
 ECRESULT ECDatabase::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
 {
-	ECRESULT		er = erSuccess;
 	DB_RESULT lpResult;
 	DB_ROW			lpDBRow = NULL;
 
-	er = DoSelect("SELECT MIN(databaserevision) FROM versions", &lpResult);
+	auto er = DoSelect("SELECT MIN(databaserevision) FROM versions", &lpResult);
 	if(er != erSuccess && mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
 		return er;
 	else if(er == erSuccess)
-		lpDBRow = FetchRow(lpResult);
-	if (lpDBRow == NULL || lpDBRow[0] == NULL ) {
+		lpDBRow = lpResult.fetch_row();
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
 		*lpulDatabaseRevision = 0;
-	}else
+	else
 		*lpulDatabaseRevision = atoui(lpDBRow[0]);
 	return erSuccess;
 }
@@ -995,15 +982,13 @@ ECRESULT ECDatabase::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
  */
 ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 {
-	ECRESULT er;
 	bool			bUpdated = false;
 	bool			bSkipped = false;
 	unsigned int	ulDatabaseRevisionMin = 0;
 	zcp_versiontuple stored_ver;
 	zcp_versiontuple program_ver(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_MICRO, PROJECT_VERSION_REVISION, Z_UPDATE_LAST);
-	int cmp;
 
-	er = GetDatabaseVersion(&stored_ver);
+	auto er = GetDatabaseVersion(&stored_ver);
 	if(er != erSuccess)
 		return er;
 	er = GetFirstUpdate(&ulDatabaseRevisionMin);
@@ -1015,7 +1000,7 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 	            stored_ver.stringify() + " to " + program_ver.stringify();
 
 	// Check version
-	cmp = stored_ver.compare(program_ver);
+	int cmp = stored_ver.compare(program_ver);
 	if (cmp == 0 && stored_ver.v_schema == Z_UPDATE_LAST) {
 		// up to date
 		return erSuccess;
@@ -1083,26 +1068,23 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 
 ECRESULT ECDatabase::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 {
-	ECRESULT er;
-	string		strQuery;
 	DB_RESULT result;
-	bool have_micro;
 
 	/* Check for "micro" column (present in v64+) */
-	er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &result);
+	auto er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &result);
 	if (er != erSuccess)
 		return er;
-	have_micro = GetNumRows(result) > 0;
+	bool have_micro = result.get_num_rows() > 0;
 
 	// Insert version number
-	strQuery = "INSERT INTO versions (major, minor, ";
+	std::string strQuery = "INSERT INTO versions (major, minor, ";
 	if (have_micro)
 		strQuery += "micro, ";
 	strQuery += "revision, databaserevision, updatetime) VALUES(";
 	strQuery += stringify(PROJECT_VERSION_MAJOR) + std::string(", ") + stringify(PROJECT_VERSION_MINOR) + std::string(", ");
 	if (have_micro)
 		strQuery += stringify(PROJECT_VERSION_MICRO) + std::string(", ");
-	strQuery += std::string("'") + std::string(PROJECT_SVN_REV_STR) +  std::string("', ") + stringify(ulDatabaseRevision) + ", FROM_UNIXTIME("+stringify(time(NULL))+") )";
+	strQuery += "'" + stringify(PROJECT_VERSION_REVISION) + "', " + stringify(ulDatabaseRevision) + ", FROM_UNIXTIME(" + stringify(time(nullptr)) + "))";
 	return DoInsert(strQuery);
 }
 /**
@@ -1110,21 +1092,19 @@ ECRESULT ECDatabase::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 */
 ECRESULT ECDatabase::ValidateTables(void)
 {
-	ECRESULT	er = erSuccess;
-	string		strQuery;
 	list<std::string> listTables;
 	list<std::string> listErrorTables;
 	DB_RESULT lpResult;
 	DB_ROW		lpDBRow = NULL;
 
-	er = DoSelect("SHOW TABLES", &lpResult);
+	auto er = DoSelect("SHOW TABLES", &lpResult);
 	if(er != erSuccess) {
 		ec_log_err("Unable to get all tables from the mysql database. %s", GetError());
 		return er;
 	}
 
 	// Get all tables of the database
-	while( (lpDBRow = FetchRow(lpResult))) {
+	while ((lpDBRow = lpResult.fetch_row()) != nullptr) {
 		if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 			ec_log_err("Wrong table information.");
 			return KCERR_DATABASE_ERROR;
@@ -1139,8 +1119,7 @@ ECRESULT ECDatabase::ValidateTables(void)
 			ec_log_err("Unable to check table \"%s\"", table.c_str());
 			return er;
 		}
-
-		lpDBRow = FetchRow(lpResult);
+		lpDBRow = lpResult.fetch_row();
 		if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
 			ec_log_err("Wrong check table information.");
 			return KCERR_DATABASE_ERROR;

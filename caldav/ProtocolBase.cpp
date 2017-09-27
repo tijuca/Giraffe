@@ -33,30 +33,6 @@ ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession,
 {
 }
 
-ProtocolBase::~ProtocolBase()
-{
-	if (m_lpLoginUser)
-		m_lpLoginUser->Release();
-
-	if (m_lpActiveUser)
-		m_lpActiveUser->Release();
-
-	if (m_lpIPMSubtree)
-		m_lpIPMSubtree->Release();
-
-	if (m_lpUsrFld)
-		m_lpUsrFld->Release();
-
-	if (m_lpAddrBook)
-		m_lpAddrBook->Release();
-
-	if (m_lpDefStore)
-		m_lpDefStore->Release();
-
-	if (m_lpActiveStore)
-		m_lpActiveStore->Release();
-}
-
 /**
  * Opens the store and folders required for the Request. Also checks
  * if DELETE or RENAME actions are allowed on the folder.
@@ -103,7 +79,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 	if (m_wstrFldOwner.empty())
 		m_wstrFldOwner = m_wstrUser;
 
-	hr = m_lpSession->OpenAddressBook(0, NULL, 0, &m_lpAddrBook);
+	hr = m_lpSession->OpenAddressBook(0, NULL, 0, &~m_lpAddrBook);
 	if(hr != hrSuccess)
 	{
 		ec_log_err("Error opening addressbook, error code: 0x%08X", hr);
@@ -111,14 +87,14 @@ HRESULT ProtocolBase::HrInitializeClass()
 	}
 
 	// default store required for various actions (delete, freebusy, ...)
-	hr = HrOpenDefaultStore(m_lpSession, &m_lpDefStore);
+	hr = HrOpenDefaultStore(m_lpSession, &~m_lpDefStore);
 	if(hr != hrSuccess)
 	{
 		ec_log_err("Error opening default store of user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
 		return hr;
 	}
 
-	hr = HrGetOwner(m_lpSession, m_lpDefStore, &m_lpLoginUser);
+	hr = HrGetOwner(m_lpSession, m_lpDefStore, &~m_lpLoginUser);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -128,14 +104,14 @@ HRESULT ProtocolBase::HrInitializeClass()
 	if (bIsPublic)
 	{
 		// open public
-		hr = HrOpenECPublicStore(m_lpSession, &m_lpActiveStore);
+		hr = HrOpenECPublicStore(m_lpSession, &~m_lpActiveStore);
 		if (hr != hrSuccess) {
 			ec_log_err("Unable to open public store with user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
 			return hr;
 		}
 	} else if (wcscasecmp(m_wstrUser.c_str(), m_wstrFldOwner.c_str())) {
 		// open shared store
-		hr = HrOpenUserMsgStore(m_lpSession, (WCHAR*)m_wstrFldOwner.c_str(), &m_lpActiveStore);
+		hr = HrOpenUserMsgStore(m_lpSession, (WCHAR*)m_wstrFldOwner.c_str(), &~m_lpActiveStore);
 		if (hr != hrSuccess) {
 			ec_log_err("Unable to open store of user %ls with user %ls, error code: 0x%08X", m_wstrFldOwner.c_str(), m_wstrUser.c_str(), hr);
 			return hr;
@@ -143,7 +119,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 		m_ulFolderFlag |= SHARED_FOLDER;
 	} else {
 		// @todo, make auto pointers
-		hr = m_lpDefStore->QueryInterface(IID_IMsgStore, (void**)&m_lpActiveStore);
+		hr = m_lpDefStore->QueryInterface(IID_IMsgStore, &~m_lpActiveStore);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -155,16 +131,16 @@ HRESULT ProtocolBase::HrInitializeClass()
 
 	// get active user info
 	if (bIsPublic)
-		hr = m_lpLoginUser->QueryInterface(IID_IMailUser, (void**)&m_lpActiveUser);
+		hr = m_lpLoginUser->QueryInterface(IID_IMailUser, &~m_lpActiveUser);
 	else
-		hr = HrGetOwner(m_lpSession, m_lpActiveStore, &m_lpActiveUser);
+		hr = HrGetOwner(m_lpSession, m_lpActiveStore, &~m_lpActiveUser);
 	if(hr != hrSuccess)
 		return hr;
 
 	/*
 	 * Set m_lpIPMSubtree, used for CopyFolder, CreateFolder, DeleteFolder
 	 */
-	hr = OpenSubFolder(m_lpActiveStore, NULL, '/', bIsPublic, false, &m_lpIPMSubtree);
+	hr = OpenSubFolder(m_lpActiveStore, NULL, '/', bIsPublic, false, &~m_lpIPMSubtree);
 	if(hr != hrSuccess)
 	{
 		ec_log_err("Error opening IPM SUBTREE, using user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
@@ -172,7 +148,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 	}
 
 	// Get active store default calendar to prevent delete action on this folder
-	hr = m_lpActiveStore->OpenEntry(0, nullptr, nullptr, 0, &ulType, &~lpRoot);
+	hr = m_lpActiveStore->OpenEntry(0, nullptr, &iid_of(lpRoot), 0, &ulType, &~lpRoot);
 	if(hr != hrSuccess)
 	{
 		ec_log_err("Error opening root container, using user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
@@ -196,7 +172,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 	{
 		// created in the IPM_SUBTREE
 		hr = OpenSubFolder(m_lpActiveStore, NULL, '/', bIsPublic,
-		     false, &m_lpUsrFld);
+		     false, &~m_lpUsrFld);
 		if(hr != hrSuccess)
 		{
 			ec_log_err("Error opening IPM_SUBTREE folder of user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
@@ -206,7 +182,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 	else if(!m_wstrFldName.empty())
 	{
 		// @note, caldav allows creation of calendars for non-existing urls, but since this can also use IDs, I am not sure we want to.
-		hr = HrFindFolder(m_lpActiveStore, m_lpIPMSubtree, m_lpNamedProps, m_wstrFldName, &m_lpUsrFld);
+		hr = HrFindFolder(m_lpActiveStore, m_lpIPMSubtree, m_lpNamedProps, m_wstrFldName, &~m_lpUsrFld);
 		if(hr != hrSuccess)
 		{
 			ec_log_err("Error opening named folder of user %ls, folder %ls, error code: 0x%08X", m_wstrUser.c_str(), m_wstrFldName.c_str(), hr);
@@ -217,9 +193,9 @@ HRESULT ProtocolBase::HrInitializeClass()
 		// check if this is the default calendar folder to enable freebusy publishing
 		if (lpDefaultProp &&
 		    HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &~lpEntryID) == hrSuccess &&
-			m_lpActiveStore->CompareEntryIDs(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb,
-											 lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, 0, &ulRes) == hrSuccess &&
-			ulRes == TRUE)
+		    m_lpActiveStore->CompareEntryIDs(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb,
+		    lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, 0, &ulRes) == hrSuccess &&
+		    ulRes == TRUE)
 		{
 			// disable delete default folder, and enable fb publish
 			m_blFolderAccess = false;
@@ -228,12 +204,13 @@ HRESULT ProtocolBase::HrInitializeClass()
 	}
 	// default calendar
 	else if (bIsPublic) {
-		hr = m_lpIPMSubtree->QueryInterface(IID_IMAPIFolder, (void**)&m_lpUsrFld);
+		hr = m_lpIPMSubtree->QueryInterface(IID_IMAPIFolder, &~m_lpUsrFld);
 		if (hr != hrSuccess)
 			return hr;
 	} else {
 		// open default calendar
-		hr = m_lpActiveStore->OpenEntry(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&m_lpUsrFld);
+		hr = m_lpActiveStore->OpenEntry(lpDefaultProp->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpDefaultProp->Value.bin.lpb),
+		     &iid_of(m_lpUsrFld), MAPI_BEST_ACCESS, &ulType, &~m_lpUsrFld);
 		if (hr != hrSuccess)
 		{
 			ec_log_err("Unable to open default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);

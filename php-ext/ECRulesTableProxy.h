@@ -20,10 +20,10 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
-
+#include <kopano/Util.h>
 #include <mapidefs.h>
 
-class ECRulesTableProxy _kc_final : public ECUnknown {
+class ECRulesTableProxy _kc_final : public ECUnknown, public IMAPITable {
 protected:
 	ECRulesTableProxy(LPMAPITABLE lpTable);
 	virtual ~ECRulesTableProxy();
@@ -55,14 +55,9 @@ public:
 	virtual HRESULT GetCollapseState(ULONG ulFlags, ULONG cbInstanceKey, LPBYTE lpbInstanceKey, ULONG *lpcbCollapseState, LPBYTE *lppbCollapseState);
 	virtual HRESULT SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBYTE pbCollapseState, BOOKMARK *lpbkLocation);
 
-protected:
-	class xMAPITable _kc_final : public IMAPITable {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPITable.hpp>
-	} m_xMAPITable;
-
 private:
 	LPMAPITABLE m_lpTable;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // ndef ECRULESTABLEPROXY_INCLUDED

@@ -7,6 +7,7 @@
 #include <ctime>
 #include <getopt.h>
 #include <spawn.h>
+#include <unistd.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/ECLogger.h>
 #include <kopano/MAPIErrors.h>
@@ -14,6 +15,7 @@
 #include <kopano/ECMemTable.h>
 #include <kopano/automapi.hpp>
 #include <kopano/memory.hpp>
+#include <kopano/IECInterfaces.hpp>
 #ifdef HAVE_CURL_CURL_H
 #	include <curl/curl.h>
 #endif
@@ -29,6 +31,7 @@ static std::wstring mpt_userw, mpt_passw;
 static const wchar_t *mpt_user, *mpt_pass;
 static const char *mpt_socket;
 static size_t mpt_repeat = ~0U;
+static int mpt_loglevel = EC_LOGLEVEL_NOTICE;
 
 static void mpt_stat_dump(int s = 0)
 {
@@ -57,6 +60,7 @@ static void mpt_stat_record(const struct mpt_stat_entry &dp, size_t limit = 50)
 
 static int mpt_setup_tick(void)
 {
+#ifdef HAVE_TIMER_CREATE
 	struct sigaction sa;
 	sa.sa_handler = mpt_stat_dump;
 	sa.sa_flags = SA_RESTART;
@@ -81,6 +85,10 @@ static int mpt_setup_tick(void)
 		perror("timer_settime");
 		return -errno;
 	}
+#else
+	/* Not guaranteed to use CLOCK_MONOTONIC */
+	alarm(1);
+#endif
 	return 1;
 }
 
@@ -100,7 +108,26 @@ static int mpt_main_init(void)
 	return EXIT_SUCCESS;
 }
 
-static int mpt_main_login(void)
+static void mpt_ping(IMAPISession *ses)
+{
+	object_ptr<IMsgStore> store;
+	auto ret = HrOpenDefaultStore(ses, &~store);
+	if (ret != hrSuccess)
+		return;
+	object_ptr<IECTestProtocol> tp;
+	ret = store->QueryInterface(IID_IECTestProtocol, &~tp);
+	if (ret != hrSuccess)
+		return;
+	memory_ptr<char> out;
+	tp->TestGet("ping", &~out);
+}
+
+/**
+ * @with_lo:	whether to include the logoff RPC in the time
+ * 		measurement (it is executed in any case)
+ * @with_ping:	whether to issue some more RPCs
+ */
+static int mpt_main_login(bool with_lo, bool with_ping)
 {
 	HRESULT ret = MAPIInitialize(NULL);
 	if (ret != hrSuccess) {
@@ -119,22 +146,30 @@ static int mpt_main_login(void)
 		clock_gettime(CLOCK_MONOTONIC, &dp.start);
 		ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
 		      mpt_socket, 0, NULL, NULL);
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		if (!with_lo)
+			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
 		if (ret != hrSuccess) {
 			fprintf(stderr, "Logon failed: %s\n", GetMAPIErrorMessage(ret));
 			sleep(1);
 			continue;
 		}
-		ses.reset();
+		if (with_lo) {
+			if (with_ping)
+				mpt_ping(ses);
+			ses.reset();
+			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		}
 		mpt_stat_record(dp);
 	}
 	MAPIUninitialize();
 	return EXIT_SUCCESS;
 }
 
-static int mpt_main_lilo(void)
+/* Login-Logout with Save–Restore */
+static int mpt_main_lsr(bool with_ping)
 {
-	HRESULT ret = MAPIInitialize(NULL);
+	AutoMAPI automapi;
+	auto ret = automapi.Initialize();
 	if (ret != hrSuccess) {
 		perror("MAPIInitialize");
 		return EXIT_FAILURE;
@@ -144,23 +179,33 @@ static int mpt_main_lilo(void)
 	if (err < 0)
 		return EXIT_FAILURE;
 
-	struct mpt_stat_entry dp;
+	object_ptr<IMAPISession> ses;
+	ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
+	      mpt_socket, 0, nullptr, nullptr);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "Logon failed: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
+	}
 
+	struct mpt_stat_entry dp;
 	while (mpt_repeat-- > 0) {
-		object_ptr<IMAPISession> ses;
 		clock_gettime(CLOCK_MONOTONIC, &dp.start);
-		ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
-		      mpt_socket, 0, NULL, NULL);
+		std::string data;
+		ret = kc_session_save(ses, data);
 		if (ret != hrSuccess) {
-			fprintf(stderr, "Logon failed: %s\n", GetMAPIErrorMessage(ret));
-			sleep(1);
-			continue;
+			fprintf(stderr, "save failed: %s\n", GetMAPIErrorMessage(ret));
+			return EXIT_FAILURE;
 		}
-		ses.reset();
+		ret = kc_session_restore(data, &~ses);
+		if (ret != hrSuccess) {
+			fprintf(stderr, "restore failed: %s\n", GetMAPIErrorMessage(ret));
+			return EXIT_FAILURE;
+		}
+		if (with_ping)
+			mpt_ping(ses);
 		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
 		mpt_stat_record(dp);
 	}
-	MAPIUninitialize();
 	return EXIT_SUCCESS;
 }
 
@@ -264,13 +309,86 @@ static int mpt_main_exectime(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int mpt_main_cast(bool which)
+{
+	AutoMAPI mapiinit;
+	HRESULT ret = mapiinit.Initialize();
+	if (ret != hrSuccess) {
+		perror("MAPIInitialize");
+		return EXIT_FAILURE;
+	}
+	int err = mpt_setup_tick();
+	if (err < 0)
+		return EXIT_FAILURE;
+	object_ptr<IProfAdmin> profadm;
+	ret = MAPIAdminProfiles(0, &~profadm);
+	if (ret != hrSuccess)
+		return EXIT_FAILURE;
+	object_ptr<IUnknown> unk;
+	ret = profadm->QueryInterface(IID_IUnknown, &~unk);
+	if (ret != hrSuccess)
+		return EXIT_FAILURE;
+
+	if (which == 0) { /* qicast */
+		while (mpt_repeat-- > 0) {
+			struct mpt_stat_entry dp;
+			unsigned int rep = 100000;
+			clock_gettime(CLOCK_MONOTONIC, &dp.start);
+			while (rep-- > 0)
+				unk->QueryInterface(IID_IProfAdmin, &~profadm);
+			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+			mpt_stat_record(dp);
+		}
+	} else if (which == 1) { /* dycast */
+		while (mpt_repeat-- > 0) {
+			struct mpt_stat_entry dp;
+			unsigned int rep = 100000;
+			clock_gettime(CLOCK_MONOTONIC, &dp.start);
+			while (rep-- > 0)
+				profadm.reset(dynamic_cast<IProfAdmin *>(unk.get()));
+			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+			mpt_stat_record(dp);
+		}
+	}
+	return EXIT_SUCCESS;
+}
+
+static int mpt_main_malloc(void)
+{
+	struct mpt_stat_entry dp;
+	void *base, *x;
+	int err = mpt_setup_tick();
+	if (err < 0)
+		return EXIT_FAILURE;
+
+	while (mpt_repeat-- > 0) {
+		clock_gettime(CLOCK_MONOTONIC, &dp.start);
+		auto ret = MAPIAllocateBuffer(sizeof(MAPIUID), &base);
+		if (ret != hrSuccess)
+			return EXIT_FAILURE;
+		for (unsigned int i = 0; i < 10000; ++i) {
+			ret = MAPIAllocateMore(sizeof(MAPIUID), base, &x);
+			if (ret != hrSuccess)
+				return EXIT_FAILURE;
+		}
+		MAPIFreeBuffer(base);
+		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		mpt_stat_record(dp);
+	}
+	return EXIT_SUCCESS;
+}
+
 static void mpt_usage(void)
 {
-	fprintf(stderr, "mapitime [-p pass] [-s server] [-u username] [-z count] {init|lilo}\n");
+	fprintf(stderr, "mapitime [-p pass] [-s server] [-u username] [-z count] benchmark_choice\n");
 	fprintf(stderr, "  -z count    Run this many iterations (default: finite but almost forever)\n");
 	fprintf(stderr, "Benchmark choices:\n");
 	fprintf(stderr, "  init        Just the library initialization\n");
-	fprintf(stderr, "  lilo        Send login and logoff RPCs to the server\n");
+	fprintf(stderr, "  li          Issue login/logoff RPCs, but measure only login\n");
+	fprintf(stderr, "  lilo        Issue login/logoff RPCs, and measure both\n");
+	fprintf(stderr, "  ping        Issue login/logoff/PING RPCs, and measure all\n");
+	fprintf(stderr, "  lsr         Measure profile save-restore cycle\n");
+	fprintf(stderr, "  lsr+ping    lsr with forced network access (PING RPC)\n");
 	fprintf(stderr, "  vft         Measure C++ class dispatching\n");
 	fprintf(stderr, "  pagetime    Measure webpage retrieval time\n");
 	fprintf(stderr, "  exectime    Measure process runtime\n");
@@ -284,20 +402,24 @@ static int mpt_option_parse(int argc, char **argv)
 		mpt_usage();
 		return EXIT_FAILURE;
 	}
-	while ((c = getopt(argc, argv, "p:s:u:z:")) != -1) {
-		if (c == 'p')
+	while ((c = getopt(argc, argv, "p:s:u:vz:")) != -1) {
+		if (c == 'p') {
 			pass = optarg;
-		else if (c == 'u')
+		} else if (c == 'u') {
 			user = optarg;
-		else if (c == 's')
+		} else if (c == 's') {
 			mpt_socket = optarg;
-		else if (c == 'z')
+		} else if (c == 'v') {
+			if (mpt_loglevel <= EC_LOGLEVEL_DEBUG)
+			++mpt_loglevel;
+		} else if (c == 'z') {
 			mpt_repeat = strtoul(optarg, NULL, 0);
-		else {
+		} else {
 			fprintf(stderr, "Error: unknown option -%c\n", c);
 			mpt_usage();
 		}
 	}
+	ec_log_get()->SetLoglevel(mpt_loglevel);
 	if (user == NULL) {
 		user = "foo";
 		fprintf(stderr, "Info: defaulting to username \"foo\"\n");
@@ -322,19 +444,36 @@ int main(int argc, char **argv)
 	int ret = mpt_option_parse(argc, argv);
 	if (ret != EXIT_SUCCESS)
 		return ret;
+	argc -= optind - 1;
 	argv += optind - 1;
+	if (argc < 2) {
+		mpt_usage();
+		return EXIT_FAILURE;
+	}
 	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "i") == 0)
 		return mpt_main_init();
 	else if (strcmp(argv[1], "li") == 0)
-		return mpt_main_login();
+		return mpt_main_login(false, false);
 	else if (strcmp(argv[1], "lilo") == 0)
-		return mpt_main_lilo();
+		return mpt_main_login(true, false);
+	else if (strcmp(argv[1], "ping") == 0)
+		return mpt_main_login(true, true);
+	else if (strcmp(argv[1], "lsr") == 0)
+		return mpt_main_lsr(false);
+	else if (strcmp(argv[1], "lsr+ping") == 0)
+		return mpt_main_lsr(true);
 	else if (strcmp(argv[1], "vft") == 0)
 		return mpt_main_vft();
 	else if (strcmp(argv[1], "exectime") == 0)
 		return mpt_main_exectime(argc - 1, argv + 1);
 	else if (strcmp(argv[1], "pagetime") == 0)
 		return mpt_main_pagetime(argc - 1, argv + 1);
+	else if (strcmp(argv[1], "qicast") == 0)
+		return mpt_main_cast(0);
+	else if (strcmp(argv[1], "dycast") == 0)
+		return mpt_main_cast(1);
+	else if (strcmp(argv[1], "malloc") == 0)
+		return mpt_main_malloc();
 
 	mpt_usage();
 	return EXIT_FAILURE;

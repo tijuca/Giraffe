@@ -34,6 +34,27 @@ using namespace KCHL;
 
 namespace KC {
 
+/**
+ * Defines a free/busy event block. This is one block of a array of FBEvent blocks.
+ *
+ * The event blocks are stored properties PR_FREEBUSY_*
+ * TODO: rename sfbEvent to FBEvent
+ *
+ * @rtmStart:	The start time is the number of minutes between 00:00 UTC of
+ * 		the first day of the month and the tsart time of the event
+ * 		in UTC.
+ * @rtmEnd:	The end time is the number of minutes between 00:00 UTC of the
+ * 		first day of the month and the end time of the event in UTC.
+ */
+struct sfbEvent {
+	short rtmStart, rtmEnd;
+};
+
+#define FB_DATE(yearmonth,daytime)	((static_cast<ULONG>(static_cast<unsigned short>(yearmonth)) << 16) | static_cast<ULONG>(static_cast<unsigned short>(daytime)))
+#define FB_YEARMONTH(year, month)	(((static_cast<unsigned short>(year) << 4) & 0xFFF0) | static_cast<unsigned short>(month))
+#define FB_YEAR(yearmonth)		(static_cast<unsigned short>(yearmonth) >> 4)
+#define FB_MONTH(yearmonth)		(static_cast<unsigned short>(yearmonth) & 0x000F)
+
 static bool leapyear(short year)
 {
 	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); 
@@ -156,133 +177,124 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 		     &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpMessage);
 		if(hr != hrSuccess)
 			return hr;
+		return lpMessage->QueryInterface(IID_IMessage,
+		       reinterpret_cast<void **>(lppMessage));
 	}
-	else if (bCreateIfNotExist == TRUE)
-	{
-		//Create new freebusymessage
-		hr = lpFreeBusyFolder->CreateMessage(nullptr, 0, &~lpMessage);
-		if(hr != hrSuccess)
-			return hr;
-
-		//Set the user entry id 
-		hr = lpMessage->SetProps(1, &sPropUser, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Set the accountname in properties PR_DISPLAY_NAME and PR_SUBJECT
-		object_ptr<IAddrBook> lpAdrBook;
-		hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAdrBook);
- 		if(hr != hrSuccess)
-			return hr;
-		object_ptr<IMailUser> lpMailUser;
-		hr = lpAdrBook->OpenEntry(cbUserEntryID, lpUserEntryID, &IID_IMailUser, MAPI_BEST_ACCESS, &ulObjType, &~lpMailUser);
- 		if(hr != hrSuccess)
-			return hr;
-		hr = HrGetOneProp(lpMailUser, PR_ACCOUNT, &~lpPropName);
-		if(hr != hrSuccess)
-			return hr;
-		hr = HrGetOneProp(lpMailUser, PR_EMAIL_ADDRESS, &~lpPropEmail);
-		if(hr != hrSuccess)
-			return hr;
-
-		//Set the displayname with accountname 
-		lpPropName->ulPropTag = PR_DISPLAY_NAME;
-		hr = lpMessage->SetProps(1, lpPropName, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		//Set the subject with accountname 
-		lpPropName->ulPropTag = PR_SUBJECT;
-		hr = lpMessage->SetProps(1, lpPropName, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		//Set the PR_FREEBUSY_EMA with the email address
-		lpPropEmail->ulPropTag = PR_FREEBUSY_EMAIL_ADDRESS;
-		hr = lpMessage->SetProps(1, lpPropEmail, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		//Save message
-		hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Update the user freebusy entryid array
-
-		if (lpUserStore) {
-			// Get entryid
-			hr = HrGetOneProp(lpMessage, PR_ENTRYID, &~lpPropFBMessage);
-			if(hr != hrSuccess)
-				return hr;
-
-			//Open root folder
-			object_ptr<IMAPIFolder> lpFolder;
-			hr = lpUserStore->OpenEntry(0, NULL, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
-			if(hr != hrSuccess)
-				return hr;
-
-			ulMvItems = 4;
-			// Get current freebusy entryid array
-			if (HrGetOneProp(lpFolder, PR_FREEBUSY_ENTRYIDS, &~lpPropfbEntryids) == hrSuccess)
-				ulMvItems = (lpPropfbEntryids->Value.MVbin.cValues>ulMvItems)?lpPropfbEntryids->Value.MVbin.cValues:ulMvItems;
-
-			hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropfbEntryidsNew);
-			if(hr != hrSuccess)
-				return hr;
-
-			lpPropfbEntryidsNew->Value.MVbin.cValues = ulMvItems;
-
-			hr = MAPIAllocateMore(sizeof(SBinary)*lpPropfbEntryidsNew->Value.MVbin.cValues, lpPropfbEntryidsNew, (void**)&lpPropfbEntryidsNew->Value.MVbin.lpbin);
-			if(hr != hrSuccess)
-				return hr;
-
-			memset(lpPropfbEntryidsNew->Value.MVbin.lpbin, 0, sizeof(SBinary)*lpPropfbEntryidsNew->Value.MVbin.cValues);
-
-			// move the old entryids to the new array
-			if(lpPropfbEntryids) {
-				for (i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; ++i) {
-					lpPropfbEntryidsNew->Value.MVbin.lpbin[i].cb = lpPropfbEntryids->Value.MVbin.lpbin[i].cb;
-					lpPropfbEntryidsNew->Value.MVbin.lpbin[i].lpb = lpPropfbEntryids->Value.MVbin.lpbin[i].lpb; //cheap copy
-				}
-			}
-			// Add the new entryid on position 3
-			lpPropfbEntryidsNew->Value.MVbin.lpbin[2].cb = lpPropFBMessage->Value.bin.cb;
-			lpPropfbEntryidsNew->Value.MVbin.lpbin[2].lpb = lpPropFBMessage->Value.bin.lpb;
-
-			lpPropfbEntryidsNew->ulPropTag = PR_FREEBUSY_ENTRYIDS;
-
-			hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
-			if(hr != hrSuccess)
-				return hr;
-
-			hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
-			if(hr != hrSuccess)
-				return hr;
-
-			// Get the inbox
-			hr = lpUserStore->GetReceiveFolder(nullptr, 0, &cbInBoxEntry, &~lpInboxEntry, nullptr);
-			if(hr != hrSuccess)
-				return hr;
-
-			// Open the inbox
-			hr = lpUserStore->OpenEntry(cbInBoxEntry, lpInboxEntry, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
-			if(hr != hrSuccess)
-				return hr;
-			hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
-			if(hr != hrSuccess)
-				return hr;
-			hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
-			if(hr != hrSuccess)
-				return hr;
-		}
-
-	}
-	else
-	{
+	if (!bCreateIfNotExist)
 		return MAPI_E_NOT_FOUND;
-	}
 
+	// Create new freebusymessage
+	hr = lpFreeBusyFolder->CreateMessage(nullptr, 0, &~lpMessage);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Set the user entry id
+	hr = lpMessage->SetProps(1, &sPropUser, NULL);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Set the accountname in properties PR_DISPLAY_NAME and PR_SUBJECT
+	object_ptr<IAddrBook> lpAdrBook;
+	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAdrBook);
+	if (hr != hrSuccess)
+		return hr;
+	object_ptr<IMailUser> lpMailUser;
+	hr = lpAdrBook->OpenEntry(cbUserEntryID, lpUserEntryID, &IID_IMailUser, MAPI_BEST_ACCESS, &ulObjType, &~lpMailUser);
+	if (hr != hrSuccess)
+		return hr;
+	hr = HrGetOneProp(lpMailUser, PR_ACCOUNT, &~lpPropName);
+	if (hr != hrSuccess)
+		return hr;
+	hr = HrGetOneProp(lpMailUser, PR_EMAIL_ADDRESS, &~lpPropEmail);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Set the displayname with accountname
+	lpPropName->ulPropTag = PR_DISPLAY_NAME;
+	hr = lpMessage->SetProps(1, lpPropName, NULL);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Set the subject with accountname
+	lpPropName->ulPropTag = PR_SUBJECT;
+	hr = lpMessage->SetProps(1, lpPropName, NULL);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Set the PR_FREEBUSY_EMA with the email address
+	lpPropEmail->ulPropTag = PR_FREEBUSY_EMAIL_ADDRESS;
+	hr = lpMessage->SetProps(1, lpPropEmail, NULL);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Save message
+	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Update the user freebusy entryid array
+	if (lpUserStore == nullptr)
+		return lpMessage->QueryInterface(IID_IMessage,
+		       reinterpret_cast<void **>(lppMessage));
+
+	// Get entryid
+	hr = HrGetOneProp(lpMessage, PR_ENTRYID, &~lpPropFBMessage);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Open root folder
+	object_ptr<IMAPIFolder> lpFolder;
+	hr = lpUserStore->OpenEntry(0, NULL, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
+	if (hr != hrSuccess)
+		return hr;
+
+	ulMvItems = 4;
+	// Get current freebusy entryid array
+	if (HrGetOneProp(lpFolder, PR_FREEBUSY_ENTRYIDS, &~lpPropfbEntryids) == hrSuccess)
+		ulMvItems = (lpPropfbEntryids->Value.MVbin.cValues > ulMvItems) ? lpPropfbEntryids->Value.MVbin.cValues : ulMvItems;
+	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropfbEntryidsNew);
+	if (hr != hrSuccess)
+		return hr;
+
+	lpPropfbEntryidsNew->Value.MVbin.cValues = ulMvItems;
+	hr = MAPIAllocateMore(sizeof(SBinary) * lpPropfbEntryidsNew->Value.MVbin.cValues, lpPropfbEntryidsNew, (void **)&lpPropfbEntryidsNew->Value.MVbin.lpbin);
+	if (hr != hrSuccess)
+		return hr;
+	memset(lpPropfbEntryidsNew->Value.MVbin.lpbin, 0, sizeof(SBinary) * lpPropfbEntryidsNew->Value.MVbin.cValues);
+
+	// move the old entryids to the new array
+	if (lpPropfbEntryids) {
+		for (i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; ++i) {
+			lpPropfbEntryidsNew->Value.MVbin.lpbin[i].cb = lpPropfbEntryids->Value.MVbin.lpbin[i].cb;
+			lpPropfbEntryidsNew->Value.MVbin.lpbin[i].lpb = lpPropfbEntryids->Value.MVbin.lpbin[i].lpb; //cheap copy
+		}
+	}
+	// Add the new entryid on position 3
+	lpPropfbEntryidsNew->Value.MVbin.lpbin[2].cb = lpPropFBMessage->Value.bin.cb;
+	lpPropfbEntryidsNew->Value.MVbin.lpbin[2].lpb = lpPropFBMessage->Value.bin.lpb;
+	lpPropfbEntryidsNew->ulPropTag = PR_FREEBUSY_ENTRYIDS;
+	hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Get the inbox
+	hr = lpUserStore->GetReceiveFolder(nullptr, 0, &cbInBoxEntry, &~lpInboxEntry, nullptr);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Open the inbox
+	hr = lpUserStore->OpenEntry(cbInBoxEntry, lpInboxEntry, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
+	if (hr != hrSuccess)
+		return hr;
 	return lpMessage->QueryInterface(IID_IMessage,
 	       reinterpret_cast<void **>(lppMessage));
 }
@@ -475,16 +487,20 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	hr = MAPIAllocateBuffer(2 * sizeof(SPropValue), &~lpPropFBDataArray);
 	if (hr != hrSuccess)
 		return hr;
-	
-	lpPropFBDataArray[0].Value.MVl.cValues = 0;
-	lpPropFBDataArray[1].Value.MVbin.cValues = 0;
 
-	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(ULONG), lpPropFBDataArray, (void**)&lpPropFBDataArray[0].Value.MVl.lpl)) != hrSuccess)	 // +1 for free/busy in two months
+	auto &xmo = lpPropFBDataArray[0].Value.MVl;
+	auto &fbd = lpPropFBDataArray[1].Value.MVbin;
+	xmo.cValues = 0;
+	fbd.cValues = 0;
+
+	hr = MAPIAllocateMore((ulMonths + 1) * sizeof(ULONG), lpPropFBDataArray, reinterpret_cast<void **>(&xmo.lpl));  // +1 for free/busy in two months
+	if (hr != hrSuccess)
 		return hr;
-	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(SBinary), lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin)) != hrSuccess) // +1 for free/busy in two months
+	hr = MAPIAllocateMore((ulMonths + 1) * sizeof(SBinary), lpPropFBDataArray, reinterpret_cast<void **>(&fbd.lpbin)); // +1 for free/busy in two months
+	if (hr != hrSuccess)
 		return hr;
 
-	//memset(&lpPropFBDataArray[1].Value.MVbin.lpbin, 0, ulArrayItems);
+	//memset(&fbd.lpbin, 0, ulArrayItems);
 
 	lpPropFBDataArray[0].ulPropTag = ulPropMonths;
 	lpPropFBDataArray[1].ulPropTag = ulPropEvents;
@@ -508,13 +524,13 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 			if(tmStart.tm_year > ulLastYear || tmStart.tm_mon > ulLastMonth)
 			{
 				++iMonth;
-				lpPropFBDataArray[0].Value.MVl.lpl[iMonth] =  FB_YEARMONTH((tmStart.tm_year+1900), (tmStart.tm_mon+1));
-				++lpPropFBDataArray[0].Value.MVl.cValues;
-				++lpPropFBDataArray[1].Value.MVbin.cValues;
-				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+				xmo.lpl[iMonth] = FB_YEARMONTH(tmStart.tm_year + 1900, tmStart.tm_mon + 1);
+				++xmo.cValues;
+				++fbd.cValues;
+				hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, reinterpret_cast<void **>(&fbd.lpbin[iMonth].lpb));
+				if (hr != hrSuccess)
 					return hr;
-				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
-				
+				fbd.lpbin[iMonth].cb = 0;
 			}
 
 			//Different months in a block
@@ -524,10 +540,9 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				getMaxMonthMinutes((short)tmStart.tm_year+1900, (short)tmStart.tm_mon, (short*)&fbEvent.rtmEnd);
 
 				// Add item to struct
-				memcpy(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb+lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
-				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb += sizeof(sfbEvent);
-				assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
-
+				memcpy(fbd.lpbin[iMonth].lpb+fbd.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
+				fbd.lpbin[iMonth].cb += sizeof(sfbEvent);
+				assert(fbd.lpbin[iMonth].cb <= ulMaxItemDataSize);
 				ulDiffMonths = DiffYearMonthToMonth(&tmStart, &tmEnd);
 
 				tmTmp = tmStart;
@@ -535,42 +550,39 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				// Set the day on the begin of the month because: if mday is 31 and the next month is 30 then you get the wrong month
 				tmTmp.tm_mday = 1;
 				
-				for (i = 1; i < ulDiffMonths && lpPropFBDataArray[0].Value.MVl.cValues < ulMonths; ++i) {
+				for (i = 1; i < ulDiffMonths && xmo.cValues < ulMonths; ++i) {
 					++iMonth;
 					tmTmp.tm_isdst = -1;
 					++tmTmp.tm_mon;
 					mktime(&tmTmp);
-					
-
-					lpPropFBDataArray[0].Value.MVl.lpl[iMonth] = FB_YEARMONTH((tmTmp.tm_year+1900), (tmTmp.tm_mon+1));
-					++lpPropFBDataArray[0].Value.MVl.cValues;
-					++lpPropFBDataArray[1].Value.MVbin.cValues;
-
-					if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+					xmo.lpl[iMonth] = FB_YEARMONTH(tmTmp.tm_year + 1900, tmTmp.tm_mon + 1);
+					++xmo.cValues;
+					++fbd.cValues;
+					hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, reinterpret_cast<void **>(&fbd.lpbin[iMonth].lpb));
+					if (hr != hrSuccess)
 						return hr;
-					lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
+					fbd.lpbin[iMonth].cb = 0;
 				
 					fbEvent.rtmStart = 0;					
 					getMaxMonthMinutes((short)tmTmp.tm_year+1900, (short)tmTmp.tm_mon, (short*)&fbEvent.rtmEnd);
 
 					// Add item to struct
-					memcpy(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb+lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
-					lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb += sizeof(sfbEvent);
-					assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
+					memcpy(fbd.lpbin[iMonth].lpb + fbd.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
+					fbd.lpbin[iMonth].cb += sizeof(sfbEvent);
+					assert(fbd.lpbin[iMonth].cb <= ulMaxItemDataSize);
 				}
 
 				++iMonth;
 				++tmTmp.tm_mon;
 				tmTmp.tm_isdst = -1;
 				mktime(&tmTmp);
-
-				lpPropFBDataArray[0].Value.MVl.lpl[iMonth] = FB_YEARMONTH((tmTmp.tm_year+1900), (tmTmp.tm_mon+1));
-				++lpPropFBDataArray[0].Value.MVl.cValues;
-				++lpPropFBDataArray[1].Value.MVbin.cValues;
-
-				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+				xmo.lpl[iMonth] = FB_YEARMONTH(tmTmp.tm_year + 1900, tmTmp.tm_mon + 1);
+				++xmo.cValues;
+				++fbd.cValues;
+				hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, reinterpret_cast<void **>(&fbd.lpbin[iMonth].lpb));
+				if (hr != hrSuccess)
 					return hr;
-				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
+				fbd.lpbin[iMonth].cb = 0;
 
 				fbEvent.rtmStart = 0;
 				fbEvent.rtmEnd = (short)( ((tmEnd.tm_mday-1)*24*60) + (tmEnd.tm_hour*60) + tmEnd.tm_min);
@@ -580,18 +592,18 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 			}
 
 			// Add item to struct
-			memcpy(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb+lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
-			lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb += sizeof(sfbEvent);
+			memcpy(fbd.lpbin[iMonth].lpb + fbd.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
+			fbd.lpbin[iMonth].cb += sizeof(sfbEvent);
 
 			ulLastYear = tmEnd.tm_year;
 			ulLastMonth = tmEnd.tm_mon;
 
 			bFound = true;
-			assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
+			assert(fbd.lpbin[iMonth].cb <= ulMaxItemDataSize);
 		}
 		assert(iMonth == -1 || (iMonth >= 0 && static_cast<ULONG>(iMonth) < ulMonths + 1));
-		assert(lpPropFBDataArray[1].Value.MVbin.cValues <= ulMonths + 1);
-		assert(lpPropFBDataArray[0].Value.MVl.cValues <= ulMonths + 1);
+		assert(fbd.cValues <= ulMonths + 1);
+		assert(xmo.cValues <= ulMonths + 1);
 	}
 
 	if(bFound == false)

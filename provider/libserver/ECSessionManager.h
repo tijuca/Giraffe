@@ -48,12 +48,10 @@ namespace KC {
 class ECLogger;
 class ECTPropsPurge;
 
-using namespace std;
-
-typedef hash_map<ECSESSIONGROUPID, ECSessionGroup*>::Type EC_SESSIONGROUPMAP;
-typedef hash_map<ECSESSIONID, BTSession*>::Type SESSIONMAP;
-typedef hash_map<ECSESSIONID, unsigned int>::Type PERSISTENTBYSESSION;
-typedef hash_map<unsigned int, ECSESSIONID>::Type PERSISTENTBYCONNECTION;
+typedef std::unordered_map<ECSESSIONGROUPID, ECSessionGroup *> EC_SESSIONGROUPMAP;
+typedef std::unordered_map<ECSESSIONID, BTSession *> SESSIONMAP;
+typedef std::unordered_map<ECSESSIONID, unsigned int> PERSISTENTBYSESSION;
+typedef std::unordered_map<unsigned int, ECSESSIONID> PERSISTENTBYCONNECTION;
 typedef std::multimap<unsigned int, ECSESSIONGROUPID> OBJECTSUBSCRIPTIONSMULTIMAP;
 
 struct TABLESUBSCRIPTION {
@@ -62,8 +60,8 @@ struct TABLESUBSCRIPTION {
      unsigned int ulObjectType;
      unsigned int ulObjectFlags;
      
-     bool operator==(const TABLESUBSCRIPTION &b) const { return memcmp(this, &b, sizeof(*this)) == 0; }
-     bool operator<(const TABLESUBSCRIPTION &b) const { return memcmp(this, &b, sizeof(*this)) < 0; }
+	bool operator==(const TABLESUBSCRIPTION &b) const noexcept { return memcmp(this, &b, sizeof(*this)) == 0; }
+	bool operator<(const TABLESUBSCRIPTION &b) const noexcept { return memcmp(this, &b, sizeof(*this)) < 0; }
 };
 
 typedef std::multimap<TABLESUBSCRIPTION, ECSESSIONID> TABLESUBSCRIPTIONMULTIMAP;
@@ -184,7 +182,7 @@ protected:
 	KC::shared_mutex m_hCacheRWLock; ///< locking of the sessionMap
 	KC::shared_mutex m_hGroupLock; ///< locking of session group map and lonely list
 	std::mutex m_hExitMutex; /* Mutex needed for the release signal */
-	std::condition_variable m_hExitSignal; /* Signal that should be send to the sessionncleaner when to exit */
+	std::condition_variable m_hExitSignal; /* Signal that should be sent to the sessionncleaner when to exit */
 	pthread_t			m_hSessionCleanerThread;///< Thread that is used for the sessioncleaner
 	bool				m_bTerminateThread;
 	ECConfig*			m_lpConfig;

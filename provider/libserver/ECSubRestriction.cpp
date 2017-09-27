@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <utility>
 #include <cassert>
 #include "ECSubRestriction.h"
 
@@ -31,6 +32,8 @@
 #include "ECSessionManager.h"
 
 namespace KC {
+
+static ECRESULT RunSubRestriction(ECSession *, const void *ecod_store, struct restrictSub *, ECObjectTableList *, const ECLocale &, SUBRESTRICTIONRESULT &);
 
 static ECRESULT GetSubRestrictionRecursive(struct restrictTable *lpRestrict,
     unsigned int *lpulCount, unsigned int ulSubRestriction,
@@ -98,41 +101,37 @@ ECRESULT GetSubRestriction(struct restrictTable *lpBase, unsigned int ulCount, s
 	return GetSubRestrictionRecursive(lpBase, NULL, ulCount, lppSubRestrict, SUBRESTRICTION_MAXDEPTH);
 }
 
-// Get results for all subqueries for a set of objects (should be freed with FreeSubRestrictionResults() )
-ECRESULT RunSubRestrictions(ECSession *lpSession, void *lpECODStore, struct restrictTable *lpRestrict, ECObjectTableList *lpObjects, const ECLocale &locale, SUBRESTRICTIONRESULTS **lppResults)
+// Get results for all subqueries for a set of objects
+ECRESULT RunSubRestrictions(ECSession *lpSession, const void *lpECODStore,
+    struct restrictTable *lpRestrict, ECObjectTableList *lpObjects,
+    const ECLocale &locale, SUBRESTRICTIONRESULTS &results)
 {
-	ECRESULT er;
-    unsigned int i = 0;
     unsigned int ulCount = 0;
-    SUBRESTRICTIONRESULTS *lpResults = NULL;
-    SUBRESTRICTIONRESULT *lpResult = NULL;
     struct restrictSub *lpSubRestrict = NULL;
-    
-    er = GetSubRestrictionCount(lpRestrict, &ulCount);
+
+	results.clear();
+	auto er = GetSubRestrictionCount(lpRestrict, &ulCount);
     if(er != erSuccess)
 		return er;
-    
-    lpResults = new SUBRESTRICTIONRESULTS;
-    
-    for (i = 0; i < ulCount; ++i) {
+
+	for (unsigned int i = 0; i < ulCount; ++i) {
         er = GetSubRestriction(lpRestrict, i, &lpSubRestrict);
         if(er != erSuccess)
 			return er;
-        er = RunSubRestriction(lpSession, lpECODStore, lpSubRestrict, lpObjects, locale, &lpResult);
+		SUBRESTRICTIONRESULT result;
+		er = RunSubRestriction(lpSession, lpECODStore, lpSubRestrict, lpObjects, locale, result);
         if(er != erSuccess)
 			return er;
-            
-        lpResults->push_back(lpResult);
+		results.push_back(std::move(result));
     }
-    
-	*lppResults = lpResults;
 	return erSuccess;
 }
 
 // Run a single subquery on a set of objects
-ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restrictSub *lpRestrict, ECObjectTableList *lpObjects, const ECLocale &locale, SUBRESTRICTIONRESULT **lppResult)
+static ECRESULT RunSubRestriction(ECSession *lpSession, const void *lpECODStore,
+    struct restrictSub *lpRestrict, ECObjectTableList *lpObjects,
+    const ECLocale &locale, SUBRESTRICTIONRESULT &result)
 {
-    ECRESULT er = erSuccess;
     unsigned int ulType = 0;
     std::string strQuery;
 	DB_RESULT lpDBResult;
@@ -149,9 +148,10 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     sObjectTableKey sKey;
     ECDatabase *lpDatabase = NULL;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto cache = lpSession->GetSessionManager()->GetCacheManager();
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 	if (lpObjects->empty())
 		goto exit;				// nothing to search in, return success.
     
@@ -191,9 +191,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
         goto exit;
         
     while(1) {
-        
-        lpRow = lpDatabase->FetchRow(lpDBResult);
-        
+		lpRow = lpDBResult.fetch_row();
         if(lpRow == NULL)
             break;
             
@@ -226,7 +224,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     iterObject = lstSubObjects.cbegin();
     // Loop through all the rows, see if they match
     for (gsoap_size_t i = 0; i < lpRowSet->__size; ++i) {
-        er = ECGenericObjectTable::MatchRowRestrict(lpSession->GetSessionManager()->GetCacheManager(), &lpRowSet->__ptr[i], lpRestrict->lpSubObject, NULL, locale, &fMatch);
+		er = ECGenericObjectTable::MatchRowRestrict(cache, &lpRowSet->__ptr[i], lpRestrict->lpSubObject, nullptr, locale, &fMatch);
         if(er != erSuccess)
             goto exit;
             
@@ -234,8 +232,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
             auto iterParent = mapParent.find(iterObject->ulObjId);
             if (iterParent != mapParent.cend())
                 // Remember the id of the message one of whose subobjects matched
-
-                lpResult->insert(iterParent->second);
+                result.insert(iterParent->second);
         }
         
         // Optimisation possibility: if one of the subobjects matches, we shouldn't bother checking
@@ -246,23 +243,11 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     }
 
 exit:
-	if (er == erSuccess)
-		*lppResult = lpResult.release();
     if(lpRowSet)
         FreeRowSet(lpRowSet, true);
     if(lpPropTags)
         FreePropTagArray(lpPropTags);
         
-    return er;
-}
-
-// Frees a SUBRESTRICTIONRESULTS object
-ECRESULT FreeSubRestrictionResults(SUBRESTRICTIONRESULTS *lpResults) {
-    ECRESULT er = erSuccess;
-	for (const auto &r : *lpResults)
-		delete r;
-    delete lpResults;
-    
     return er;
 }
 

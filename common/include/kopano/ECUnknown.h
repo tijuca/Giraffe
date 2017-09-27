@@ -19,11 +19,10 @@
 #define ECUNKNOWN_H
 
 #include <kopano/zcdefs.h>
-#include <kopano/IECUnknown.h>
-
 #include <list>
 #include <mutex>
 #include <mapi.h>
+#include <mapidefs.h>
 
 namespace KC {
 
@@ -74,7 +73,7 @@ namespace KC {
 		} \
 	} while (false)
 
-class _kc_export ECUnknown : public IECUnknown {
+class _kc_export ECUnknown : public virtual IUnknown {
 public:
 	ECUnknown(const char *szClassName = NULL);
 	virtual ~ECUnknown(void);
@@ -83,10 +82,6 @@ public:
 	virtual HRESULT QueryInterface(REFIID refiid, void **iface) _kc_override;
 	virtual HRESULT AddChild(ECUnknown *lpChild);
 	virtual HRESULT RemoveChild(ECUnknown *lpChild);
-
-	class xUnknown _kc_final : public IUnknown {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-	} m_xUnknown;
 
 	// lpParent is public because it is always thread-safe and valid
 	ECUnknown *lpParent = nullptr;

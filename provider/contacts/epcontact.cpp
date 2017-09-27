@@ -19,20 +19,17 @@
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <kopano/ECDebug.h>
-#include <kopano/Trace.h>
 #include <kopano/memory.hpp>
 #include "ZCABProvider.h"
 #include "EntryPoint.h"
 
 using namespace KCHL;
 
-HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
+HRESULT MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
     LPMAPISUP psup, ULONG ulUIParam, ULONG ulFlags, ULONG ulContext,
-    ULONG cvals, LPSPropValue pvals, LPPROVIDERADMIN lpAdminProviders,
+    ULONG cvals, const SPropValue *pvals, IProviderAdmin *lpAdminProviders,
     MAPIERROR **lppMapiError)
 {
-	TRACE_MAPI(TRACE_ENTRY, "MSGServiceEntry", "flags=0x%08X, context=%s", ulFlags, MsgServiceContextToString(ulContext));
-
 	HRESULT hr = hrSuccess;
 
 	switch(ulContext) {
@@ -61,39 +58,26 @@ HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
 
 	if (lppMapiError)
 		*lppMapiError = NULL;
-
-	TRACE_MAPI(TRACE_RETURN, "MSGServiceEntry", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }
 
-HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc,
+HRESULT ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc,
     LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore,
     LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer,
     ULONG *lpulProviderVer, LPABPROVIDER *lppABProvider)
 {
-	TRACE_MAPI(TRACE_ENTRY, "ZContacts::ABProviderInit", "");
-
-	HRESULT hr = hrSuccess;
 	object_ptr<ZCABProvider> lpABProvider;
 
 	if (ulMAPIVer < CURRENT_SPI_VERSION)
-	{
-		hr = MAPI_E_VERSION;
-		goto exit;
-	}
+		return MAPI_E_VERSION;
 
 	// create provider and query interface.
-	hr = ZCABProvider::Create(&~lpABProvider);
+	auto hr = ZCABProvider::Create(&~lpABProvider);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpABProvider->QueryInterface(IID_IABProvider, (void **)lppABProvider);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	*lpulProviderVer = CURRENT_SPI_VERSION;
-
-exit:
-	TRACE_MAPI(TRACE_RETURN, "ZContacts::ABProviderInit", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }

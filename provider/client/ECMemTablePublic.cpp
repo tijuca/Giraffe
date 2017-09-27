@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/ECRestriction.h>
 #include <kopano/memory.hpp>
@@ -70,9 +70,8 @@ HRESULT ECMemTablePublic::Create(ECMAPIFolderPublic *lpECParentFolder, ECMemTabl
 		PR_CONTENT_UNREAD, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY,
 		PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY,
 		PR_ACCESS, PR_ACCESS_LEVEL, PR_CONTAINER_CLASS}};
-	ECMemTablePublic *lpMemTable = new ECMemTablePublic(lpECParentFolder,
-		sPropsHierarchyColumns, PR_ROWID);
-	return lpMemTable->QueryInterface(IID_ECMemTablePublic, reinterpret_cast<void **>(lppECMemTable));
+	return alloc_wrap<ECMemTablePublic>(lpECParentFolder,
+		sPropsHierarchyColumns, PR_ROWID).put(lppECMemTable);
 }
 
 HRESULT ECMemTablePublic::QueryInterface(REFIID refiid, void **lppInterface)
@@ -88,7 +87,7 @@ HRESULT ECMemTablePublic::QueryInterface(REFIID refiid, void **lppInterface)
 	This is used to build the favorits tree
 */
 
-static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
+static LONG AdviseShortCutCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
 	if (lpContext == NULL) {
@@ -96,7 +95,7 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 	}
 
 	HRESULT hr = hrSuccess;
-	ECMemTablePublic *lpMemTablePublic = (ECMemTablePublic*)lpContext;
+	auto lpMemTablePublic = static_cast<ECMemTablePublic *>(lpContext);
 
 	lpMemTablePublic->AddRef(); // Besure we have the object
 
@@ -144,13 +143,13 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 	return S_OK;
 }
 
-static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
+static LONG AdviseFolderCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
 	if (lpContext == NULL)
 		return S_OK;
 
-	ECMemTablePublic *lpMemTablePublic = (ECMemTablePublic*)lpContext;
+	auto lpMemTablePublic = static_cast<ECMemTablePublic *>(lpContext);
 	ULONG ulResult;
 	SBinary sInstanceKey;
 
@@ -171,10 +170,8 @@ static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
 					{
 					case fnevObjectModified:
 						lpMemTablePublic->ModifyRow(&sInstanceKey, NULL);
-						TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectModified    fnevObjectModified");
 						break;
 					case fnevObjectDeleted:
-						TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectDeleted    fnevObjectDeleted");
 						lpMemTablePublic->DelRow(&sInstanceKey);
 						break;
 					}
@@ -200,60 +197,52 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 	m_ulFlags = ulFlags;
 
 	// Get the messages to build a folder list
-	if (((ECMsgStorePublic *)m_lpECParentFolder->GetMsgStore())->GetDefaultShortcutFolder(&~lpShortcutFolder) == hrSuccess) {
-		HRESULT hr = lpShortcutFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &~lpShortcutTable);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpShortcutTable->SetColumns(GetShortCutTagArray(), MAPI_DEFERRED_ERRORS);
-		if(hr != hrSuccess)
-			return hr;
+	if (((ECMsgStorePublic *)m_lpECParentFolder->GetMsgStore())->GetDefaultShortcutFolder(&~lpShortcutFolder) != hrSuccess)
+		return hrSuccess;
 
-		// build restriction
-		if (HrGetOneProp(&m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY, &~lpPropTmp) != hrSuccess)
-		{
-			hr = ECNotRestriction(ECExistRestriction(PR_FAV_PARENT_SOURCE_KEY)).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
-		}else {
-			hr = HrGetOneProp(&m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY, &~lpPropTmp);
-			if (hr != hrSuccess)
-				return hr;
-			hr = ECPropertyRestriction(RELOP_EQ, PR_FAV_PARENT_SOURCE_KEY, lpPropTmp, ECRestriction::Cheap).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
-		}
+	HRESULT hr = lpShortcutFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &~lpShortcutTable);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpShortcutTable->SetColumns(GetShortCutTagArray(), MAPI_DEFERRED_ERRORS);
+	if (hr != hrSuccess)
+		return hr;
+
+	// build restriction
+	if (HrGetOneProp(m_lpECParentFolder, PR_SOURCE_KEY, &~lpPropTmp) != hrSuccess) {
+		hr = ECNotRestriction(ECExistRestriction(PR_FAV_PARENT_SOURCE_KEY)).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
+	} else {
+		hr = HrGetOneProp(m_lpECParentFolder, PR_SOURCE_KEY, &~lpPropTmp);
 		if (hr != hrSuccess)
 			return hr;
+		hr = ECPropertyRestriction(RELOP_EQ, PR_FAV_PARENT_SOURCE_KEY, lpPropTmp, ECRestriction::Cheap).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
+	}
+	if (hr != hrSuccess)
+		return hr;
 	
-		// No advise needed because the client disable notifications
-		// If you remove this check the webaccess favorites doesn't work.
-		if(! (m_lpECParentFolder->GetMsgStore()->m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS) )
-		{
-
-			hr = HrAllocAdviseSink(AdviseShortCutCallback, this, &m_lpShortCutAdviseSink);
-			if (hr != hrSuccess)
-				return hr;
-
-			// NOTE: the advise will destruct at release time
-			hr = lpShortcutTable->Advise(fnevTableModified, m_lpShortCutAdviseSink, &ulConnection);
-			if (hr != hrSuccess)
-				return hr;
-		}
-
-		while(true)
-		{
-			rowset_ptr lpRows;
-			hr = lpShortcutTable->QueryRows(1, 0, &~lpRows);
-			if (hr != hrSuccess)
-				return hr;
-
-			if (lpRows->cRows == 0)
-				break;
-
-			ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
-		}
-
-		hr = lpShortcutTable->QueryInterface(IID_IMAPITable, (void **)&m_lpShortcutTable);
+	// No advise needed because the client disable notifications
+	// If you remove this check the webaccess favorites doesn't work.
+	if (!(m_lpECParentFolder->GetMsgStore()->m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS))
+	{
+		hr = HrAllocAdviseSink(AdviseShortCutCallback, this, &m_lpShortCutAdviseSink);
+		if (hr != hrSuccess)
+			return hr;
+		// NOTE: the advise will destruct at release time
+		hr = lpShortcutTable->Advise(fnevTableModified, m_lpShortCutAdviseSink, &ulConnection);
 		if (hr != hrSuccess)
 			return hr;
 	}
-	return hrSuccess;
+
+	while (true)
+	{
+		rowset_ptr lpRows;
+		hr = lpShortcutTable->QueryRows(1, 0, &~lpRows);
+		if (hr != hrSuccess)
+			return hr;
+		if (lpRows->cRows == 0)
+			break;
+		ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
+	}
+	return lpShortcutTable->QueryInterface(IID_IMAPITable, reinterpret_cast<void **>(&m_lpShortcutTable));
 }
 
 /*
@@ -478,7 +467,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 			sRelFolder.ulAdviseConnectionId = 0;
 		}
 
-		m_mapRelation.insert(ECMAPFolderRelation::value_type(strInstanceKey, sRelFolder));
+		m_mapRelation.insert({strInstanceKey, sRelFolder});
 		++m_ulRowId;
 	}
 

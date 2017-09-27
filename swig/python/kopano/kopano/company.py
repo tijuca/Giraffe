@@ -1,11 +1,10 @@
 """
-Part of the high-level python bindings for Kopano
+Part of the high-level python bindings for Kopano.
 
 Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
-import codecs
 import sys
 
 from MAPI import (
@@ -20,6 +19,7 @@ from MAPI.Struct import (
 from MAPI.Tags import PR_EC_COMPANY_NAME_W, PR_EC_STOREGUID
 from MAPI.Util import GetPublicStore
 
+from .base import Base
 from .quota import Quota
 from .group import Group
 
@@ -32,18 +32,25 @@ from .compat import (
 )
 
 if sys.hexversion >= 0x03000000:
-    from . import server as _server
-    from . import user as _user
-    from . import utils as _utils
-    from . import store as _store
+    try:
+        from . import server as _server
+    except ImportError:
+        _server = sys.modules[__package__+'.server']
+    try:
+        from . import user as _user
+    except ImportError:
+        _user = sys.modules[__package__+'.user']
+    try:
+        from . import store as _store
+    except ImportError:
+        _store = sys.modules[__package__+'.store']
 else:
     import server as _server
     import user as _user
-    import utils as _utils
     import store as _store
 
-class Company(object):
-    """Company class"""
+class Company(Base):
+    """Company class."""
 
     def __init__(self, name, server=None):
         self.server = server or _server.Server()
@@ -51,11 +58,12 @@ class Company(object):
         self._name = name = _unicode(name)
         if name != u'Default': # XXX
             try:
-                self._eccompany = self.server.sa.GetCompany(self.server.sa.ResolveCompanyName(self._name, MAPI_UNICODE), MAPI_UNICODE)
+                companyid = self.server.sa.ResolveCompanyName(self._name, MAPI_UNICODE)
+                self._eccompany = self.server.sa.GetCompany(companyid, MAPI_UNICODE)
             except MAPIErrorNotFound:
                 raise NotFoundError("no such company: '%s'" % name)
-        self._public_store = None # XXX cached because GetPublicStore does not see changes.. do we need folder & store notifications (slow)?
 
+        self._public_store = None # XXX cached because GetPublicStore does not see changes.. do we need folder & store notifications (slow)?
         self._mapiobj = None
 
     @property
@@ -66,30 +74,31 @@ class Company(object):
 
     @property
     def companyid(self): # XXX single-tenant case
-        return bin2hex(self._eccompany.CompanyID)
+        if self._name != u'Default':
+            return bin2hex(self._eccompany.CompanyID)
 
     @property
     def admin(self):
+        """Company :class:`administrator <User>` in multi-tenant mode."""
         if self._name != u'Default':
             ecuser = self.server.sa.GetUser(self._eccompany.AdministratorID, MAPI_UNICODE)
             return self.server.user(ecuser.Username)
-        # XXX
 
     @admin.setter
     def admin(self, user):
-        self._eccompany.AdminstratorID = user._ecuser.UserID
+        self._eccompany.AdministratorID = user._ecuser.UserID
         self.server.sa.SetCompany(self._eccompany, MAPI_UNICODE)
 
     @property
     def hidden(self):
+        """The company is hidden from the addressbook."""
         if self._name != u'Default':
-            return self._eccompany.IsHidden
-        # XXX
+            return bool(self._eccompany.IsHidden)
+        return False
 
     @property
     def name(self):
-        """ Company name """
-
+        """Company name."""
         return self._name
 
     @name.setter
@@ -100,6 +109,7 @@ class Company(object):
         self.server.sa.SetCompany(self._eccompany, MAPI_UNICODE)
 
     def store(self, guid):
+        """Return :class:`store <Store>` with given GUID."""
         if guid == 'public':
             if not self.public_store:
                 raise NotFoundError("no public store for company '%s'" % self.name)
@@ -108,27 +118,21 @@ class Company(object):
             return self.server.store(guid)
 
     def stores(self):
+        """Return all company :class:`stores <Store>`."""
         if self.server.multitenant:
             table = self.server.sa.OpenUserStoresTable(MAPI_UNICODE)
             table.Restrict(SPropertyRestriction(RELOP_EQ, PR_EC_COMPANY_NAME_W, SPropValue(PR_EC_COMPANY_NAME_W, self.name)), TBL_BATCH)
             for row in table.QueryRows(-1, 0):
                 prop = PpropFindProp(row, PR_EC_STOREGUID)
                 if prop:
-                    yield _store.Store(codecs.encode(prop.Value, 'hex'), self.server)
+                    yield _store.Store(_hex(prop.Value), self.server)
         else:
             for store in self.server.stores():
                 yield store
 
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def props(self):
-        return _utils.props(self.mapiobj)
-
     @property
     def public_store(self):
-        """ Company public :class:`store <Store>` """
-
+        """Company public :class:`store <Store>`."""
         if not self._public_store:
             if self._name == u'Default': # XXX
                 pubstore = GetPublicStore(self.server.mapisession)
@@ -147,6 +151,7 @@ class Company(object):
         return self._public_store
 
     def create_public_store(self):
+        """Create company public :class:`store <Store>`."""
         if self._name == u'Default':
             try:
                 storeid_rootid = self.server.sa.CreateStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE)
@@ -163,12 +168,11 @@ class Company(object):
         self._public_store = _store.Store(entryid=_hex(store_entryid), server=self.server)
         return self._public_store
 
-    def create_store(self, public=False): # XXX deprecated?
-        if public:
-            return self.create_public_store
-        # XXX
-
     def hook_public_store(self, store):
+        """Hook company public :class:`store <Store>`.
+
+        :param store: store to hook as public store
+        """
         if self._name == u'Default':
             try:
                 self.server.sa.HookStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE, _unhex(store.guid))
@@ -183,6 +187,7 @@ class Company(object):
         self._public_store = store
 
     def unhook_public_store(self):
+        """Unhook company public :class:`store <Store>`."""
         if self._name == u'Default':
             try:
                 self.server.sa.UnhookStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE)
@@ -196,35 +201,40 @@ class Company(object):
         self._public_store = None
 
     def user(self, name, create=False):
-        """ Return :class:`user <User>` with given name; raise exception if not found """
+        """Return :class:`user <User>` with given name.
 
-        name = _unicode(name)
-        for user in self.users(): # XXX slow
-            if user.name == name:
-                return _user.User(name, self.server)
-        if create:
-            return self.create_user(name)
-        else:
-            raise NotFoundError("no such user: '%s'" % name)
+        :param name: user name
+        :param create: create user if it doesn't exist (default False)
+        """
+        if not '@' in name and self._name != 'Default':
+            name = name + '@' + self._name
+        try:
+            return self.server.user(name)
+        except NotFoundError:
+            if create:
+                return self.create_user(name)
+            else:
+                raise
 
     def get_user(self, name):
-        """ Return :class:`user <User>` with given name or *None* if not found """
+        """Return :class:`user <User>` with given name or *None* if not found.
 
+        :param name: user name
+        """
         try:
             return self.user(name)
-        except Error:
+        except NotFoundError:
             pass
 
-    def users(self, parse=True):
-        """ Return all :class:`users <User>` within company """
-
+    def users(self, parse=True, system=False):
+        """Return all :class:`users <User>` within company."""
         if parse and getattr(self.server.options, 'users', None):
             for username in self.server.options.users:
                 yield _user.User(username, self.server)
             return
 
         if self._name == u'Default':
-            for user in self.server.users():
+            for user in self.server.users(system=system, remote=True):
                 yield user
         else:
             for ecuser in self.server.sa.GetUserList(self._eccompany.CompanyID, MAPI_UNICODE):
@@ -245,7 +255,7 @@ class Company(object):
         try:
             self.server.sa.DelUserFromRemoteAdminList(user._ecuser.UserID, self._eccompany.CompanyID)
         except MAPIErrorNotFound:
-            raise DuplicateError("user '%s' no admin for company '%s'" % (user.name, self.name))
+            raise NotFoundError("user '%s' no admin for company '%s'" % (user.name, self.name))
 
     def views(self):
         for eccompany in self.server.sa.GetRemoteViewList(self._eccompany.CompanyID, MAPI_UNICODE):
@@ -264,27 +274,37 @@ class Company(object):
             raise NotFoundError("company '%s' not in view-list for company '%s'" % (company.name, self.name))
 
     def create_user(self, name, password=None):
+        """Create a new :class:`user <User>` within the company.
+
+        :param name: user name
+        """
+        name = name.split('@')[0]
         self.server.create_user(name, password=password, company=self._name)
         return self.user('%s@%s' % (name, self._name))
 
+    #XXX create_group/create=True
     def group(self, name):
+        """Return :class:`group <Group>` with given name.
+
+        :param name: group name
+        """
         for group in self.groups(): # XXX
             if group.name == name:
                 return group
         raise NotFoundError("no such group: '%s'" % name)
 
     def groups(self):
+        """Return all :class:`groups <Group>` within the company."""
         if self.name == u'Default': # XXX
-            for ecgroup in self.server.sa.GetGroupList(None, MAPI_UNICODE):
-                yield Group(ecgroup.Groupname, self.server)
+            for group in self.server.groups():
+                yield group
         else:
             for ecgroup in self.server.sa.GetGroupList(self._eccompany.CompanyID, MAPI_UNICODE):
                 yield Group(ecgroup.Groupname, self.server)
 
     @property
     def quota(self):
-        """ Company :class:`Quota` """
-
+        """Company :class:`Quota`."""
         if self._name == u'Default':
             return Quota(self.server, None)
         else:
@@ -303,6 +323,3 @@ class Company(object):
 
     def __unicode__(self):
         return u"Company('%s')" % self._name
-
-    def __repr__(self):
-        return _repr(self)

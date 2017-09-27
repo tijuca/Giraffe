@@ -79,7 +79,7 @@ void ECSessionGroup::Unlock()
 void ECSessionGroup::AddSession(ECSession *lpSession)
 {
 	scoped_rlock lock(m_hSessionMapLock);
-	m_mapSessions.insert(SESSIONINFOMAP::value_type(lpSession->GetSessionId(), sessionInfo(lpSession)));
+	m_mapSessions.insert({lpSession->GetSessionId(), sessionInfo(lpSession)});
 }
 
 void ECSessionGroup::ReleaseSession(ECSession *lpSession)
@@ -132,7 +132,7 @@ ECRESULT ECSessionGroup::AddAdvise(ECSESSIONID ulSessionId, unsigned int ulConne
 
 	{
 		scoped_lock lock(m_hNotificationLock);
-		m_mapSubscribe.insert(SUBSCRIBEMAP::value_type(ulConnection, sSubscribeItem));
+		m_mapSubscribe.insert({ulConnection, sSubscribeItem});
 	}
 	
 	if(ulEventMask & (fnevNewMail | fnevObjectModified | fnevObjectCreated | fnevObjectCopied | fnevObjectDeleted | fnevObjectMoved)) {
@@ -159,13 +159,12 @@ ECRESULT ECSessionGroup::AddChangeAdvise(ECSESSIONID ulSessionId, unsigned int u
 	sSubscribeItem.sSyncState = *lpSyncState;
 
 	scoped_lock lock(m_hNotificationLock);
-	m_mapChangeSubscribe.insert(CHANGESUBSCRIBEMAP::value_type(lpSyncState->ulSyncId, sSubscribeItem));
+	m_mapChangeSubscribe.insert({lpSyncState->ulSyncId, sSubscribeItem});
 	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::DelAdvise(ECSESSIONID ulSessionId, unsigned int ulConnection)
 {
-	ECRESULT		hr = erSuccess;
 	scoped_lock lock(m_hNotificationLock);
 	auto iterSubscription = m_mapSubscribe.find(ulConnection);
 	if (iterSubscription == m_mapSubscribe.cend()) {
@@ -191,12 +190,11 @@ ECRESULT ECSessionGroup::DelAdvise(ECSESSIONID ulSessionId, unsigned int ulConne
 		}
 		m_mapSubscribe.erase(iterSubscription);
 	}
-	return hr;
+	return hrSuccess;
 }
 
 ECRESULT ECSessionGroup::AddNotification(notification *notifyItem, unsigned int ulKey, unsigned int ulStore, ECSESSIONID ulSessionId)
 {
-	ECRESULT		hr = erSuccess;
 	ulock_normal l_note(m_hNotificationLock);
 	ECNotification notify(*notifyItem);
 
@@ -215,14 +213,12 @@ ECRESULT ECSessionGroup::AddNotification(notification *notifyItem, unsigned int 
 	scoped_rlock l_ses(m_hSessionMapLock);
 	for (const auto &p : m_mapSessions)
 		m_lpSessionManager->NotifyNotificationReady(p.second.lpSession->GetSessionId());
-	return hr;
+	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned int ulType, unsigned int ulObjType, unsigned int ulTableId,
 											  sObjectTableKey* lpsChildRow, sObjectTableKey* lpsPrevRow, struct propValArray *lpRow)
 {
-	ECRESULT hr = erSuccess;
-
 	Lock();
 	auto lpNotify = s_alloc<notification>(nullptr);
 	memset(lpNotify, 0, sizeof(notification));
@@ -282,19 +278,18 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 	FreeNotificationStruct(lpNotify);
 
 	Unlock();
-
-	return hr;
+	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syncIds, unsigned int ulChangeId, unsigned int ulChangeType)
 {
-	ECRESULT		er = erSuccess;
 	notification notifyItem{__gszeroinit};
 	notificationICS ics{__gszeroinit};
-	entryId			syncStateBin = {0};
-	notifySyncState	syncState = {0, ulChangeId};
+	entryId syncStateBin;
+	notifySyncState	syncState;
 	std::map<ECSESSIONID,unsigned int> mapInserted;
 
+	syncState.ulChangeId = ulChangeId;
 	notifyItem.ulEventType = fnevKopanoIcsChange;
 	notifyItem.ics = &ics;
 	notifyItem.ics->pSyncState = &syncStateBin;
@@ -330,18 +325,18 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 		m_lpSessionManager->NotifyNotificationReady(p.second.lpSession->GetSessionId());
 	l_ses.unlock();
 	Unlock();
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::AddChangeNotification(ECSESSIONID ulSessionId, unsigned int ulConnection, unsigned int ulSyncId, unsigned long ulChangeId)
 {
-	ECRESULT		er = erSuccess;
 	notification notifyItem{__gszeroinit};
 	notificationICS ics{__gszeroinit};
-	entryId			syncStateBin = {0};
+	entryId syncStateBin;
+	notifySyncState	syncState;
 
-	notifySyncState	syncState = { ulSyncId, static_cast<unsigned int>(ulChangeId) };
-
+	syncState.ulSyncId = ulSyncId;
+	syncState.ulChangeId = ulChangeId;
 	notifyItem.ulEventType = fnevKopanoIcsChange;
 	notifyItem.ics = &ics;
 	notifyItem.ics->pSyncState = &syncStateBin;
@@ -363,7 +358,7 @@ ECRESULT ECSessionGroup::AddChangeNotification(ECSESSIONID ulSessionId, unsigned
 		m_lpSessionManager->NotifyNotificationReady(p.second.lpSession->GetSessionId());
 	l_ses.unlock();
 	Unlock();
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::GetNotifyItems(struct soap *soap, ECSESSIONID ulSessionId, struct notifyResponse *notifications)

@@ -155,7 +155,11 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 
 		if (icRRule.by_day[0] < 0) {
 			// outlook can only have _one_ last day of the month/year (not daily or weekly here!)
-			ulWeekDays |= (1 << (abs(icRRule.by_day[0]%8) - 1));
+			auto dy = abs(icRRule.by_day[0] % 8);
+			if (dy != 0)
+				ulWeekDays = 1 << (dy - 1);
+			else
+				ulWeekDays = 0b1111111;
 			// next call also changes pattern to 3!
 			lpRec->setWeekNumber(5);
 		} else if (icRRule.by_day[0] >= 1 && icRRule.by_day[0] <= 7) {
@@ -187,7 +191,11 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 			}
 		} else {
 			// monthly, first sunday: 9, monday: 10
-			ulWeekDays |= (1 << ((icRRule.by_day[0]%8) - 1));
+			auto dy = icRRule.by_day[0] % 8;
+			if (dy != 0)
+				ulWeekDays = 1 << (dy - 1);
+			else
+				ulWeekDays = 0b1111111;
 			lpRec->setWeekNumber((int)(icRRule.by_day[0]/8)); // 1..4
 		}
 		lpRec->setWeekDays(ulWeekDays);
@@ -764,9 +772,9 @@ HRESULT ICalRecurrence::HrCreateICalRecurrence(TIMEZONE_STRUCT sTimeZone, bool b
 		// add EXDATE props
 		for (const auto &exc : lstExceptions) {
 			if(bIsAllDay)
-				ittExDate = icaltime_from_timet(LocalToUTC(exc, sTZgmt), bIsAllDay);
+				ittExDate = icaltime_from_timet_with_zone(LocalToUTC(exc, sTZgmt), bIsAllDay, nullptr);
 			else
-				ittExDate = icaltime_from_timet(LocalToUTC(exc, sTimeZone), 0);
+				ittExDate = icaltime_from_timet_with_zone(LocalToUTC(exc, sTimeZone), 0, nullptr);
 
 			ittExDate.is_utc = 1;
 
@@ -879,7 +887,7 @@ HRESULT ICalRecurrence::HrCreateICalRecurrenceType(TIMEZONE_STRUCT sTimeZone, bo
 		*/
 		icRec.count = 0;
 		// if untiltime is saved as UTC it breaks last occurrence.
-		icRec.until = icaltime_from_timet(lpRecurrence->getEndDate() + lpRecurrence->getStartTimeOffset(), bIsAllday);
+		icRec.until = icaltime_from_timet_with_zone(lpRecurrence->getEndDate() + lpRecurrence->getStartTimeOffset(), bIsAllday, nullptr);
 		icRec.until.is_utc = 0;
 		break;
 	case recurrence::NUMBER:

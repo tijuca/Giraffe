@@ -20,7 +20,8 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECMemTable.h>
-
+#include <kopano/Util.h>
+#include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECMsgStore.h"
@@ -29,7 +30,7 @@
 class ECAttach;
 class IAttachFactory {
 public:
-	virtual HRESULT Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, ULONG ulAttachNum, ECMAPIProp *lpRoot, ECAttach **lppAttach) const = 0;
+	virtual HRESULT Create(ECMsgStore *, ULONG obj_type, BOOL modify, ULONG attach_num, const ECMAPIProp *root, ECAttach **) const = 0;
 };
 
 /**
@@ -38,7 +39,7 @@ public:
  * This class represents any kind of MAPI message and exposes it through
  * the IMessage interface.
  */
-class ECMessage : public ECMAPIProp {
+class ECMessage : public ECMAPIProp, public IMessage {
 protected:
 	/**
 	 * \param lpMsgStore	The store owning this message.
@@ -48,7 +49,7 @@ protected:
 	 * \param bEmbedded		Specifies whether the message is embedded.
 	 * \param lpRoot		The parent object when the message is embedded.
 	 */
-	ECMessage(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot);
+	ECMessage(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root);
 	virtual ~ECMessage();
 
 public:
@@ -67,7 +68,7 @@ public:
 	 *
 	 * \return hrSuccess on success.
 	 */
-	static HRESULT	Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot, ECMessage **lpMessage);
+	static HRESULT Create(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root, ECMessage **);
 
 	/**
 	 * \brief Handles GetProp requests for previously registered properties.
@@ -128,21 +129,6 @@ public:
 	// RTF overrides
 	virtual HRESULT HrSetRealProp(const SPropValue *lpsPropValue);
 
-	class xMessage _kc_final : public IMessage {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-
-		// <kopano/xclsfrag/IMessage.hpp>
-		virtual HRESULT __stdcall GetAttachmentTable(ULONG flags, LPMAPITABLE *lppTable) _kc_override;
-		virtual HRESULT __stdcall OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG flags, LPATTACH *lppAttach) _kc_override;
-		virtual HRESULT __stdcall CreateAttach(LPCIID lpInterface, ULONG flags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach) _kc_override;
-		virtual HRESULT __stdcall DeleteAttach(ULONG ulAttachmentNum, ULONG ui_param, LPMAPIPROGRESS lpProgress, ULONG flags) _kc_override;
-		virtual HRESULT __stdcall GetRecipientTable(ULONG flags, LPMAPITABLE *lppTable) _kc_override;
-		virtual HRESULT __stdcall ModifyRecipients(ULONG flags, const ADRLIST *lpMods) _kc_override;
-		virtual HRESULT __stdcall SubmitMessage(ULONG flags) _kc_override;
-		virtual HRESULT __stdcall SetReadFlag(ULONG flags) _kc_override;
-	} m_xMessage;
-
 protected:
 	void RecursiveMarkDelete(MAPIOBJECT *lpObj);
 
@@ -187,11 +173,18 @@ public:
 	ENTRYID *m_lpParentID = nullptr; // For new messages
 	ECMemTable *lpRecips = nullptr, *lpAttachments = nullptr;
 	ULONG ulNextRecipUniqueId = 0, ulNextAttUniqueId = 0;
+	ALLOC_WRAP_FRIEND;
 };
 
 class ECMessageFactory _kc_final : public IMessageFactory {
 public:
-	HRESULT Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot, ECMessage **lpMessage) const;
+	HRESULT Create(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root, ECMessage **) const;
 };
+
+namespace KC {
+
+static inline constexpr const IID &iid_of(const ECMessage *) { return IID_ECMessage; }
+
+}
 
 #endif // ECMESSAGE_H

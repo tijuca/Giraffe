@@ -24,7 +24,31 @@
 #include <kopano/mapiext.h>
 using namespace KC::helpers;
 
-namespace KC { namespace operations {
+namespace KC {
+
+/**
+ * Check if the store entryid from a SObjectEntry is wrapped with a server path.
+ *
+ * This class is used as the predicate argument in find_if. 
+ */
+class IsNotWrapped _kc_final {
+	public:
+	/**
+	 * This method is called for each SObjectEntry for which the store entryid needs to be
+	 * checked if it is wrapped or not.
+	 *
+	 * @param[in]	sEntry	The SObjectEntry under inspection.
+	 *
+	 * @retval	true	The store entryid from the passed SObjectEntry is wrapped.
+	 * @retval	false	The store entryid from the passed SObjectEntry is not wrapped.
+	 */
+	inline bool operator()(const SObjectEntry &sEntry) const
+	{
+		return !sEntry.sStoreEntryId.isWrapped();
+	}
+};
+
+namespace operations {
 
 /**
  * @param[in]	lpLogger
@@ -120,8 +144,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	sProps[0].Value.b = 1;
 	
 	sProps[1].ulPropTag = PR_BODY;
-	sProps[1].Value.LPSZ = const_cast<TCHAR *>(_T("This message is archived..."));
-
+	sProps[1].Value.LPSZ = const_cast<TCHAR *>(KC_T("This message is archived..."));
 	sProps[2].ulPropTag = PR_ICON_INDEX;
 	sProps[2].Value.l = 2;
 
@@ -152,14 +175,14 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		}
 		
 		Logger()->Log(EC_LOGLEVEL_INFO, "Adding placeholder attachment");		
-		hr = lpMessage->CreateAttach(&ptrAttach.iid(), 0, &ulAttachNum, &~ptrAttach);
+		hr = lpMessage->CreateAttach(&iid_of(ptrAttach), 0, &ulAttachNum, &~ptrAttach);
 		if (hr != hrSuccess) {
 			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to create attachment. (hr=%s)", stringify(hr, true).c_str());
 			return hr;
 		}
 		
 		sProp.ulPropTag = PR_ATTACH_FILENAME;
-		sProp.Value.LPSZ = const_cast<TCHAR *>(_T("dummy"));
+		sProp.Value.LPSZ = const_cast<TCHAR *>(KC_T("dummy"));
 		hr = ptrAttach->SetProps(1, &sProp, NULL);
 		if (hr != hrSuccess) {
 			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to set attachment properties. (hr=%s)", stringify(hr, true).c_str());

@@ -46,21 +46,21 @@ class _kc_export DB_RESULT _kc_final {
 	DB_RESULT(KDatabase *d, void *r) : m_res(r), m_db(d) {}
 	DB_RESULT(DB_RESULT &&o) = default;
 	~DB_RESULT(void);
-	void operator=(DB_RESULT &&o)
-	{
-		std::swap(m_res, o.m_res);
-		std::swap(m_db, o.m_db);
-	}
+	DB_RESULT &operator=(DB_RESULT &&o);
 	operator bool(void) const { return m_res != nullptr; }
-	bool operator==(std::nullptr_t) const { return m_res == nullptr; }
-	bool operator!=(std::nullptr_t) const { return m_res != nullptr; }
-	void *get(void) const { return m_res; }
-	void *release(void)
+	bool operator==(std::nullptr_t) const noexcept { return m_res == nullptr; }
+	bool operator!=(std::nullptr_t) const noexcept { return m_res != nullptr; }
+	void *get(void) const noexcept { return m_res; }
+	void *release(void) noexcept
 	{
 		void *p = m_res;
 		m_res = nullptr;
 		return p;
 	}
+
+	size_t get_num_rows(void) const;
+	DB_ROW fetch_row(void);
+	DB_LENGTHS fetch_row_lengths(void);
 
 	private:
 	void *m_res = nullptr;
@@ -74,6 +74,7 @@ class _kc_export KDatabase {
 	ECRESULT Close(void);
 	virtual ECRESULT Connect(ECConfig *, bool, unsigned int, unsigned int);
 	virtual ECRESULT CreateDatabase(ECConfig *, bool);
+	virtual ECRESULT CreateTables(void);
 	virtual ECRESULT DoDelete(const std::string &query, unsigned int *affect = nullptr);
 	virtual ECRESULT DoInsert(const std::string &query, unsigned int *insert_id = nullptr, unsigned int *affect = nullptr);
 	virtual ECRESULT DoSelect(const std::string &query, DB_RESULT *, bool stream = false);
@@ -83,12 +84,9 @@ class _kc_export KDatabase {
 	std::string Escape(const std::string &);
 	std::string EscapeBinary(const unsigned char *, size_t);
 	std::string EscapeBinary(const std::string &);
-	DB_ROW FetchRow(DB_RESULT &);
-	DB_LENGTHS FetchRowLengths(DB_RESULT &);
 	const char *GetError(void);
 	DB_ERROR GetLastError(void);
 	unsigned int GetMaxAllowedPacket(void) const { return m_ulMaxAllowedPacket; }
-	unsigned int GetNumRows(const DB_RESULT &) const;
 	/*
 	 * Transactions.
 	 * These functions should be used to wrap blocks of queries into
@@ -119,7 +117,7 @@ class _kc_export KDatabase {
 	bool isConnected(void) const { return m_bConnected; }
 	ECRESULT IsInnoDBSupported(void);
 	virtual ECRESULT Query(const std::string &q);
-	ECRESULT _Update(const std::string &q, unsigned int *affected);
+	ECRESULT I_Update(const std::string &q, unsigned int *affected);
 
 	MYSQL m_lpMySQL;
 	unsigned int m_ulMaxAllowedPacket = KC_DFL_MAX_PACKET_SIZE;

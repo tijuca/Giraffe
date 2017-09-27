@@ -31,14 +31,8 @@
  */
 HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink)
 {
-	if (lpFifoBuffer == NULL || lppSink == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-
-	WSMessageStreamSinkPtr ptrSink(new(std::nothrow) WSMessageStreamSink(lpFifoBuffer, ulTimeout, lpImporter));
-	if (ptrSink == nullptr)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	*lppSink = ptrSink.release();
-	return hrSuccess;
+	return alloc_wrap<WSMessageStreamSink>(lpFifoBuffer, ulTimeout,
+	       lpImporter).put(lppSink);
 }
 
 /**
@@ -89,8 +83,7 @@ WSMessageStreamSink::~WSMessageStreamSink()
 HRESULT WSMessageStreamImporter::Create(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSTransport *lpTransport, WSMessageStreamImporter **lppStreamImporter)
 {
 	HRESULT hr = hrSuccess;
-	entryId sEntryId = {0};
-	entryId sFolderEntryId = {0};
+	entryId sEntryId, sFolderEntryId;
 	struct propVal sConflictItems{__gszeroinit};
 	WSMessageStreamImporterPtr ptrStreamImporter;
 	ECSyncSettings* lpSyncSettings = NULL;
@@ -144,7 +137,7 @@ exit:
 HRESULT WSMessageStreamImporter::StartTransfer(WSMessageStreamSink **lppSink)
 {
 	HRESULT hr;
-	WSMessageStreamSinkPtr ptrSink;
+	KCHL::object_ptr<WSMessageStreamSink> ptrSink;
 	
 	if (!m_threadPool.dispatch(this))
 		return MAPI_E_CALL_FAILED;
@@ -196,8 +189,7 @@ WSMessageStreamImporter::~WSMessageStreamImporter()
 void WSMessageStreamImporter::run()
 {
 	unsigned int ulResult = 0;
-	struct xsd__Binary sStreamData{__gszeroinit};
-
+	struct xsd__Binary sStreamData;
 	struct soap *lpSoap = m_ptrTransport->m_lpCmd->soap;
 	propVal *lpsConflictItems = NULL;
 
@@ -227,20 +219,17 @@ void WSMessageStreamImporter::run()
 
 void* WSMessageStreamImporter::StaticMTOMReadOpen(struct soap *soap, void *handle, const char *id, const char *type, const char *description)
 {
-	WSMessageStreamImporter	*lpImporter = reinterpret_cast<WSMessageStreamImporter*>(handle);
-	return lpImporter->MTOMReadOpen(soap, handle, id, type, description);
+	return static_cast<WSMessageStreamImporter *>(handle)->MTOMReadOpen(soap, handle, id, type, description);
 }
 
 size_t WSMessageStreamImporter::StaticMTOMRead(struct soap *soap, void *handle, char *buf, size_t len)
 {
-	WSMessageStreamImporter	*lpImporter = reinterpret_cast<WSMessageStreamImporter*>(handle);
-	return lpImporter->MTOMRead(soap, handle, buf, len);
+	return static_cast<WSMessageStreamImporter *>(handle)->MTOMRead(soap, handle, buf, len);
 }
 
 void WSMessageStreamImporter::StaticMTOMReadClose(struct soap *soap, void *handle)
 {
-	WSMessageStreamImporter	*lpImporter = reinterpret_cast<WSMessageStreamImporter*>(handle);
-	lpImporter->MTOMReadClose(soap, handle);
+	static_cast<WSMessageStreamImporter *>(handle)->MTOMReadClose(soap, handle);
 }
 
 void* WSMessageStreamImporter::MTOMReadOpen(struct soap* /*soap*/, void *handle, const char* /*id*/, const char* /*type*/, const char* /*description*/)

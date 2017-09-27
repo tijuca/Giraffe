@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <new>
 #include <kopano/tie.hpp>
 #include "ECStatsTables.h"
 
@@ -33,7 +34,7 @@
 #include <edkmdb.h>
 #include <kopano/ECTags.h>
 #include <kopano/stringutil.h>
-
+#include <kopano/Util.h>
 #include "ECStatsCollector.h"
 
 #if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
@@ -68,11 +69,7 @@ ECSystemStatsTable::ECSystemStatsTable(ECSession *lpSession, unsigned int ulFlag
 ECRESULT ECSystemStatsTable::Create(ECSession *lpSession, unsigned int ulFlags,
     const ECLocale &locale, ECGenericObjectTable **lppTable)
 {
-	*lppTable = new ECSystemStatsTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECSystemStatsTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 void ECSystemStatsTable::load_tcmalloc(void)
@@ -113,9 +110,7 @@ void ECSystemStatsTable::load_tcmalloc(void)
 
 ECRESULT ECSystemStatsTable::Load()
 {
-	ECRESULT er = erSuccess;
 	sObjectTableKey sRowItem;
-	unsigned int i;
 	unsigned int ulQueueLen = 0;
 	double dblAge = 0;
 	unsigned int ulThreads = 0;
@@ -126,11 +121,11 @@ ECRESULT ECSystemStatsTable::Load()
 	id = 0;
 	g_lpStatsCollector->ForEachString(this->GetStatsCollectorData, (void*)this);
 	g_lpStatsCollector->ForEachStat(this->GetStatsCollectorData, (void*)this);
-	lpSession->GetSessionManager()->GetCacheManager()->ForEachCacheItem(this->GetStatsCollectorData, (void*)this);
+	auto sesmgr = lpSession->GetSessionManager();
+	sesmgr->GetCacheManager()->ForEachCacheItem(this->GetStatsCollectorData, (void*)this);
 
 	// Receive session stats
-	lpSession->GetSessionManager()->GetStats(this->GetStatsCollectorData, (void*)this);
-
+	sesmgr->GetStats(this->GetStatsCollectorData, static_cast<void *>(this));
 	kopano_get_server_stats(&ulQueueLen, &dblAge, &ulThreads, &ulIdleThreads);
 
 	GetStatsCollectorData("queuelen", "Current queue length", stringify(ulQueueLen), this);
@@ -138,7 +133,7 @@ ECRESULT ECSystemStatsTable::Load()
 	GetStatsCollectorData("threads", "Number of threads running to process items", stringify(ulThreads), this);
 	GetStatsCollectorData("threads_idle", "Number of idle threads", stringify(ulIdleThreads), this);
 
-	lpSession->GetSessionManager()->GetLicensedUsers(0 /*SERVICE_TYPE_ZCP*/, &ulLicensedUsers);
+	sesmgr->GetLicensedUsers(0 /*SERVICE_TYPE_ZCP*/, &ulLicensedUsers);
 	lpSession->GetUserManagement()->GetCachedUserCount(&userCount);
 
 	GetStatsCollectorData("usercnt_licensed", "Number of allowed users", stringify(ulLicensedUsers), this);
@@ -150,7 +145,7 @@ ECRESULT ECSystemStatsTable::Load()
 	GetStatsCollectorData("usercnt_contact", "Number of contacts", stringify(userCount[usercount_t::ucContact]), this);
 
 	// @todo report licensed archived users and current archieved users
-	//lpSession->GetSessionManager()->GetLicensedUsers(1/*SERVICE_TYPE_ARCHIVE*/, &ulLicensedArchivedUsers);
+	//sesmgr->GetLicensedUsers(1/*SERVICE_TYPE_ARCHIVE*/, &ulLicensedArchivedUsers);
 	//GetStatsCollectorData("??????????", "Number of allowed archive users", stringify(ulLicensedArchivedUsers), this);
 
 	load_tcmalloc();
@@ -160,19 +155,18 @@ ECRESULT ECSystemStatsTable::Load()
 	GetStatsCollectorData("pt_allocated", "Current allocated memory by libc ptmalloc, in bytes", stringify_int64(malloc_info.uordblks), this);
 #endif
 	/* Configuration data */
-	auto lpConfig = lpSession->GetSessionManager()->GetConfig();
-	GetStatsCollectorData("userplugin", "User plugin used", lpConfig->GetSetting("user_plugin"), this);
+	GetStatsCollectorData("userplugin", "User plugin used", sesmgr->GetConfig()->GetSetting("user_plugin"), this);
 
 	// add all items to the keytable
-	for (i = 0; i < id; ++i)
+	for (unsigned int i = 0; i < id; ++i)
 		// Use MAPI_STATUS as ulObjType for the key table .. this param may be removed in the future..?
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
-	return er;
+	return erSuccess;
 }
 
 void ECSystemStatsTable::GetStatsCollectorData(const std::string &name, const std::string &description, const std::string &value, void *obj)
 {
-	ECSystemStatsTable *lpThis = (ECSystemStatsTable*)obj;
+	auto lpThis = static_cast<ECSystemStatsTable *>(obj);
 	statstrings ss;
 
 	ss.name = name;
@@ -183,13 +177,15 @@ void ECSystemStatsTable::GetStatsCollectorData(const std::string &name, const st
 	++lpThis->id;
 }
 
-ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	struct rowSet *lpsRowSet = NULL;
-	ECSystemStatsTable *lpThis = (ECSystemStatsTable *)lpGenericThis;
+	auto lpThis = static_cast<ECSystemStatsTable *>(lpGenericThis);
 	gsoap_size_t i;
 
-	lpsRowSet = s_alloc<rowSet>(soap);
+	auto lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -282,16 +278,11 @@ ECSessionStatsTable::ECSessionStatsTable(ECSession *lpSession, unsigned int ulFl
 ECRESULT ECSessionStatsTable::Create(ECSession *lpSession, unsigned int ulFlags,
     const ECLocale &locale, ECGenericObjectTable **lppTable)
 {
-	*lppTable = new ECSessionStatsTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECSessionStatsTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECSessionStatsTable::Load()
 {
-	ECRESULT er = erSuccess;
 	sObjectTableKey sRowItem;
 	ECSessionManager *lpSessionManager = lpSession->GetSessionManager();
 	unsigned int i;
@@ -305,12 +296,12 @@ ECRESULT ECSessionStatsTable::Load()
 	for (i = 0; i < id; ++i)
 		// Use MAPI_STATUS as ulObjType for the key table .. this param may be removed in the future..?
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
-	return er;
+	return erSuccess;
 }
 
 void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 {
-	ECSessionStatsTable *lpThis = (ECSessionStatsTable*)obj;
+	auto lpThis = static_cast<ECSessionStatsTable *>(obj);
 	sessiondata sd;
 
 	if (lpSession == nullptr)
@@ -352,14 +343,16 @@ void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 	++lpThis->id;
 }
 
-ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	struct rowSet *lpsRowSet = NULL;
-	ECSessionStatsTable *lpThis = (ECSessionStatsTable *)lpGenericThis;
+	auto lpThis = static_cast<ECSessionStatsTable *>(lpGenericThis);
 	gsoap_size_t i;
 	std::string strTemp;
 
-	lpsRowSet = s_alloc<rowSet>(soap);
+	auto lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -553,23 +546,18 @@ ECUserStatsTable::ECUserStatsTable(ECSession *lpSession, unsigned int ulFlags, c
 ECRESULT ECUserStatsTable::Create(ECSession *lpSession, unsigned int ulFlags,
     const ECLocale &locale, ECGenericObjectTable **lppTable)
 {
-	*lppTable = new ECUserStatsTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECUserStatsTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECUserStatsTable::Load()
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpCompanies;
 
 	// load all active and non-active users
 	// FIXME: group/company quota already possible?
 
 	// get company list if hosted and is sysadmin
-	er = lpSession->GetSecurity()->GetViewableCompanyIds(0, &unique_tie(lpCompanies));
+	auto er = lpSession->GetSecurity()->GetViewableCompanyIds(0, &unique_tie(lpCompanies));
 	if (er != erSuccess)
 		return er;
 	if (lpCompanies->empty()) {
@@ -588,16 +576,16 @@ ECRESULT ECUserStatsTable::Load()
 
 ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	sObjectTableKey sRowItem;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
-	bool bDistrib = lpSession->GetSessionManager()->IsDistributedSupported();
-	const char* server = lpSession->GetSessionManager()->GetConfig()->GetSetting("server_name");
+	auto sesmgr = lpSession->GetSessionManager();
+	bool bDistrib = sesmgr->IsDistributedSupported();
+	auto server = sesmgr->GetConfig()->GetSetting("server_name");
 	std::list<unsigned int> lstObjId;
 
-	er = lpUserManagement->GetCompanyObjectListAndSync(OBJECTCLASS_USER,
-	     ulCompanyId, &unique_tie(lpObjects), 0);
+	auto er = lpUserManagement->GetCompanyObjectListAndSync(OBJECTCLASS_USER,
+	          ulCompanyId, &unique_tie(lpObjects), 0);
 	if (FAILED(er))
 		return er;
 	for (const auto &obj : *lpObjects) {
@@ -611,11 +599,12 @@ ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 	return erSuccess;
 }
 
-ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	ECRESULT er;
 	gsoap_size_t i;
-	struct rowSet *lpsRowSet = NULL;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
@@ -625,15 +614,14 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	bool bNoObjectDetails = false;
 	bool bNoQuotaDetails = false;
 	std::string strData;
-	DB_ROW lpDBRow = NULL;
 	DB_RESULT lpDBResult;
 	std::string strQuery;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
 
-	lpsRowSet = s_alloc<rowSet>(soap);
+	auto lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -785,8 +773,8 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 					er = erSuccess;
 					break;
 				}
-				if (lpDatabase->GetNumRows(lpDBResult) > 0) {
-					lpDBRow = lpDatabase->FetchRow(lpDBResult);
+				if (lpDBResult.get_num_rows() > 0) {
+					auto lpDBRow = lpDBResult.fetch_row();
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_hilo;
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 					lpsRowSet->__ptr[i].__ptr[k].Value.hilo = s_alloc<hiloLong>(soap);
@@ -809,8 +797,8 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				}
 				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_b;
 				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
-				if (lpDatabase->GetNumRows(lpDBResult) > 0) {
-					lpDBRow = lpDatabase->FetchRow(lpDBResult);
+				if (lpDBResult.get_num_rows() > 0) {
+					auto lpDBRow = lpDBResult.fetch_row();
 					lpsRowSet->__ptr[i].__ptr[k].Value.b = atoi(lpDBRow[0]);
 				} else {
 					lpsRowSet->__ptr[i].__ptr[k].Value.b = 0;
@@ -834,20 +822,15 @@ ECCompanyStatsTable::ECCompanyStatsTable(ECSession *lpSession, unsigned int ulFl
 ECRESULT ECCompanyStatsTable::Create(ECSession *lpSession, unsigned int ulFlags,
     const ECLocale &locale, ECGenericObjectTable **lppTable)
 {
-	*lppTable = new ECCompanyStatsTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECCompanyStatsTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECCompanyStatsTable::Load()
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpCompanies;
 	sObjectTableKey sRowItem;
 
-	er = lpSession->GetSecurity()->GetViewableCompanyIds(0, &unique_tie(lpCompanies));
+	auto er = lpSession->GetSecurity()->GetViewableCompanyIds(0, &unique_tie(lpCompanies));
 	if (er != erSuccess)
 		return er;
 	for (const auto &com : *lpCompanies)
@@ -855,11 +838,12 @@ ECRESULT ECCompanyStatsTable::Load()
 	return erSuccess;
 }
 
-ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	ECRESULT er;
 	gsoap_size_t i;
-	struct rowSet *lpsRowSet = NULL;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
@@ -868,15 +852,14 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 	bool bNoCompanyDetails = false;
 	bool bNoQuotaDetails = false;
 	std::string strData;
-	DB_ROW lpDBRow = NULL;
 	DB_RESULT lpDBResult;
 	std::string strQuery;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
 
-	lpsRowSet = s_alloc<rowSet>(soap);
+	auto lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -928,12 +911,12 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 				break;
 
 			case PROP_ID(PR_EC_COMPANY_NAME):
-				if (!bNoCompanyDetails) {
-					strData = companyDetails.GetPropString(OB_PROP_S_FULLNAME);
-					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_lpszA;
-					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
-					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, strData.data());
-				}
+				if (bNoCompanyDetails)
+					break;
+				strData = companyDetails.GetPropString(OB_PROP_S_FULLNAME);
+				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_lpszA;
+				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
+				lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, strData.data());
 				break;
 			case PROP_ID(PR_EC_COMPANY_ADMIN):
 				strData = companyDetails.GetPropObject(OB_PROP_O_SYSADMIN).id;
@@ -942,11 +925,11 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 				lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, strData.data());
 				break;
 			case PROP_ID(PR_MESSAGE_SIZE_EXTENDED):
-				if (llStoreSize > 0) {
-					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_li;
-					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
-					lpsRowSet->__ptr[i].__ptr[k].Value.li = llStoreSize;
-				}
+				if (llStoreSize <= 0)
+					break;
+				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_li;
+				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
+				lpsRowSet->__ptr[i].__ptr[k].Value.li = llStoreSize;
 				break;
 
 			case PROP_ID(PR_QUOTA_WARNING_THRESHOLD):
@@ -978,14 +961,14 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 					er = erSuccess;
 					break;
 				}
-				if (lpDatabase->GetNumRows(lpDBResult) > 0) {
-					lpDBRow = lpDatabase->FetchRow(lpDBResult);
-					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_hilo;
-					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
-					lpsRowSet->__ptr[i].__ptr[k].Value.hilo = s_alloc<hiloLong>(soap);
-					lpsRowSet->__ptr[i].__ptr[k].Value.hilo->hi = atoi(lpDBRow[0]);
-					lpsRowSet->__ptr[i].__ptr[k].Value.hilo->lo = atoi(lpDBRow[1]);
-				}
+				if (lpDBResult.get_num_rows() == 0)
+					break;
+				auto lpDBRow = lpDBResult.fetch_row();
+				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_hilo;
+				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
+				lpsRowSet->__ptr[i].__ptr[k].Value.hilo = s_alloc<hiloLong>(soap);
+				lpsRowSet->__ptr[i].__ptr[k].Value.hilo->hi = atoi(lpDBRow[0]);
+				lpsRowSet->__ptr[i].__ptr[k].Value.hilo->lo = atoi(lpDBRow[1]);
 				break;
 			};
 		}
@@ -1005,21 +988,16 @@ ECServerStatsTable::ECServerStatsTable(ECSession *lpSession, unsigned int ulFlag
 ECRESULT ECServerStatsTable::Create(ECSession *lpSession, unsigned int ulFlags,
     const ECLocale &locale, ECGenericObjectTable **lppTable)
 {
-	*lppTable = new ECServerStatsTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECServerStatsTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECServerStatsTable::Load()
 {
-	ECRESULT er;
 	sObjectTableKey sRowItem;
 	serverlist_t servers;
 	unsigned int i = 1;
 
-	er = lpSession->GetUserManagement()->GetServerList(&servers);
+	auto er = lpSession->GetUserManagement()->GetServerList(&servers);
 	if (er != erSuccess)
 		return er;
 		
@@ -1033,14 +1011,16 @@ ECRESULT ECServerStatsTable::Load()
 	return erSuccess;
 }
 
-ECRESULT ECServerStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECServerStatsTable::QueryRowData(ECGenericObjectTable *lpThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
 	gsoap_size_t i;
 	struct rowSet *lpsRowSet = NULL;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	serverdetails_t details;
-	
-	ECServerStatsTable *lpStats = (ECServerStatsTable *)lpThis;
+	auto lpStats = static_cast<ECServerStatsTable *>(lpThis);
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;

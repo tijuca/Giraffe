@@ -30,6 +30,7 @@
 #include <kopano/stringutil.h>
 #include "fsck.h"
 
+using namespace std;
 using namespace KCHL;
 
 static bool ReadYesNoMessage(const std::string &strMessage,
@@ -212,10 +213,9 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 
 		for (ULONG i = 0; i < lpRows->cRows; ++i) {
 			hr = ProcessFolderEntry(lpFsck, lpFolder, &lpRows->aRow[i]);
-			if (hr != hrSuccess) {
-				cout << "Failed to validate entry." << endl;
+			if (hr != hrSuccess)
 				// Move along, nothing to see.
-			}
+				cout << "Failed to validate entry." << endl;
 		}
 	}
 	return hrSuccess;
@@ -298,12 +298,13 @@ HRESULT Fsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &
 
 	lpMods->cEntries = 0;
 	for (const auto &recip : mapiReciptDel) {
-		lpMods->aEntries[lpMods->cEntries].cValues = 1;
-		hr = MAPIAllocateMore(sizeof(SPropValue), lpMods, reinterpret_cast<void **>(&lpMods->aEntries[lpMods->cEntries].rgPropVals));
+		auto &ent = lpMods->aEntries[lpMods->cEntries];
+		ent.cValues = 1;
+		hr = MAPIAllocateMore(sizeof(SPropValue), lpMods, reinterpret_cast<void **>(&ent.rgPropVals));
 		if (hr != hrSuccess)
 			return hr;
-		lpMods->aEntries[lpMods->cEntries].rgPropVals->ulPropTag = PR_ROWID;
-		lpMods->aEntries[lpMods->cEntries++].rgPropVals->Value.ul = recip;
+		ent.rgPropVals->ulPropTag = PR_ROWID;
+		ent.rgPropVals->Value.ul = recip;
 	}
 
 	hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, lpMods.get());
@@ -322,12 +323,11 @@ HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder,
 {
 	HRESULT hr = hrSuccess;
 
-	if (ReadYesNoMessage("Delete message?", auto_del)) {
-		hr = DeleteEntry(lpFolder, lpItemProperty);
-		if (hr == hrSuccess)
-			++this->ulDeleted;
-	}
-
+	if (!ReadYesNoMessage("Delete message?", auto_del))
+		return hr;
+	hr = DeleteEntry(lpFolder, lpItemProperty);
+	if (hr == hrSuccess)
+		++this->ulDeleted;
 	return hr;
 }
 

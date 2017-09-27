@@ -14,9 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include "ECFreeBusyData.h"
 
@@ -55,26 +54,15 @@ HRESULT ECFreeBusyData::Init(LONG rtmStart, LONG rtmEnd, ECFBBlockList* lpfbBloc
 
 HRESULT ECFreeBusyData::Create(ECFreeBusyData **lppECFreeBusyData)
 {
-	HRESULT hr = hrSuccess;
-	ECFreeBusyData *lpECFreeBusyData = NULL;
-
-	lpECFreeBusyData = new ECFreeBusyData();
-
-	hr = lpECFreeBusyData->QueryInterface(IID_ECFreeBusyData, (void **)lppECFreeBusyData);
-
-	if(hr != hrSuccess)
-		delete lpECFreeBusyData;
-
-	return hr;
+	return alloc_wrap<ECFreeBusyData>().put(lppECFreeBusyData);
 }
 
 HRESULT ECFreeBusyData::QueryInterface(REFIID refiid, void** lppInterface)
 {
 	REGISTER_INTERFACE2(ECFreeBusyData, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IFreeBusyData, &this->m_xFreeBusyData);
-	REGISTER_INTERFACE(IID_ECUnknown, &this->m_xFreeBusyData);
-/*NEW*/	REGISTER_INTERFACE2(IUnknown, &this->m_xFreeBusyData);
+	REGISTER_INTERFACE2(IFreeBusyData, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -172,18 +160,5 @@ HRESULT ECFreeBusyData::GetFBPublishRange(LONG *prtmStart, LONG *prtmEnd)
 	*prtmEnd = m_rtmEnd;
 	return S_OK;
 }
-
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, QueryInterface, (REFIID, refiid), (void**, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, Reload, (void*, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, EnumBlocks, (IEnumFBBlock **, ppenumfb), (FILETIME, ftmStart), (FILETIME, ftmEnd))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, Merge, (void*, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, GetDelegateInfo, (void*, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, FindFreeBlock, (LONG, ulBegin), (LONG, ulMinutes), (LONG, ulNumber), (BOOL, bA), (LONG, ulEnd), (LONG, ulUnknown), (LONG, ulMinutesPerDay), (FBBlock_1 *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, InterSect, (void *, lpData1), (LONG, ulA), (void *, lpData2))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, SetFBRange, (LONG, rtmStart), (LONG, rtmEnd))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, NextFBAppt, (void *, lpData1), (ULONG, ulA), (void *, lpData2), (ULONG, ulB), (void *, lpData3), (void *, lpData4))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyData, FreeBusyData, GetFBPublishRange, (LONG *, prtmStart), (LONG *, prtmEnd))
 
 } /* namespace */

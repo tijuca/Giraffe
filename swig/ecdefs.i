@@ -2,14 +2,10 @@
 %include "typemaps.i"
 
 %{
-#include "IECChangeAdvisor.h"
-#include "IECChangeAdviseSink.h"
-#include <kopano/IECSingleInstance.h>
-#include "IECImportContentsChanges.h"
-#include "IECImportHierarchyChanges.h"
+#include <kopano/IECInterfaces.hpp>
 %}
 
-class IECChangeAdvisor : public IUnknown {
+class IECChangeAdvisor : public virtual IUnknown {
 public:
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) = 0;
 	virtual HRESULT Config(IStream * lpStream, GUID * lpGUID, IECChangeAdviseSink* lpAdviseSink, ULONG ulFlags) = 0;
@@ -23,7 +19,7 @@ public:
 	}
 };
 
-class IECChangeAdviseSink : public IUnknown {
+class IECChangeAdviseSink : public virtual IUnknown {
 public:
 	virtual ULONG OnNotify(ULONG ulFlags, LPENTRYLIST lpEntryList) = 0;
 	%extend {
@@ -35,7 +31,6 @@ class IECImportContentsChanges : public IExchangeImportContentsChanges {
 public:
 	virtual HRESULT ConfigForConversionStream(IStream * lpStream, ULONG ulFlags, ULONG cValuesConversion, LPSPropValue lpPropArrayConversion) = 0;
 	virtual HRESULT ImportMessageChangeAsAStream(ULONG cValues, LPSPropValue lpProps, ULONG ulFlags, IStream ** lppStream) = 0;
-	virtual HRESULT SetMessageInterface(const IID& refiid) = 0;
 	%extend {
 		virtual ~IECImportContentsChanges() { self->Release(); }
 	}
@@ -49,8 +44,7 @@ public:
 	}
 };
 
-
-class IECSingleInstance : public IUnknown {
+class IECSingleInstance : public virtual IUnknown {
 public:
 	virtual HRESULT GetSingleInstanceId(ULONG *OUTPUT /*lpcbInstanceID*/, LPENTRYID *OUTPUT /*lppInstanceID*/) = 0;
 	virtual HRESULT SetSingleInstanceId(ULONG cbInstanceID, LPENTRYID lpInstanceID) = 0;

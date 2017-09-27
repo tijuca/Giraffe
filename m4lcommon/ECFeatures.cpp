@@ -14,8 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#include "ECFeatures.h"
+#include <kopano/ECFeatures.hpp>
 #include "ECFeatureList.h"
 #include <kopano/CommonUtil.h>
 #include <kopano/mapi_ptr.h>
@@ -33,7 +32,7 @@ namespace KC {
  */
 bool isFeature(const char* feature)
 {
-	for (size_t i = 0; i < arraySize(kopano_features); ++i)
+	for (size_t i = 0; i < ARRAY_SIZE(kopano_features); ++i)
 		if (strcasecmp(feature, kopano_features[i]) == 0)
 			return true;
 	return false;

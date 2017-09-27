@@ -13,11 +13,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
 #include "WSMAPIPropStorage.h"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 #include <kopano/Util.h>
@@ -76,7 +76,7 @@ WSMAPIPropStorage::~WSMAPIPropStorage()
 HRESULT WSMAPIPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(WSMAPIPropStorage, this);
-	REGISTER_INTERFACE2(IECPropStorage, &this->m_xECPropStorage);
+	REGISTER_INTERFACE2(IECPropStorage, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -86,17 +86,9 @@ HRESULT WSMAPIPropStorage::Create(ULONG cbParentEntryId,
     ECSESSIONID ecSessionId, unsigned int ulServerCapabilities,
     WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage)
 {
-	HRESULT hr = hrSuccess;
-	WSMAPIPropStorage *lpStorage = NULL;
-	
-	lpStorage = new WSMAPIPropStorage(cbParentEntryId, lpParentEntryId, cbEntryId, lpEntryId, ulFlags, lpCmd, lpDataLock, ecSessionId, ulServerCapabilities, lpTransport);
-
-	hr = lpStorage->QueryInterface(IID_WSMAPIPropStorage, (void **)lppPropStorage);
-
-	if(hr != hrSuccess)
-		delete lpStorage;
-
-	return hr;
+	return alloc_wrap<WSMAPIPropStorage>(cbParentEntryId, lpParentEntryId,
+	       cbEntryId, lpEntryId, ulFlags, lpCmd, lpDataLock, ecSessionId,
+	       ulServerCapabilities, lpTransport).put(lppPropStorage);
 }
 
 HRESULT WSMAPIPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *ppValues)
@@ -350,17 +342,18 @@ ECRESULT WSMAPIPropStorage::EcFillPropTags(struct saveObject *lpsSaveObj, MAPIOB
 ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj)
 {
 	ECRESULT ec = erSuccess;
-	LPSPropValue lpsProp = NULL;
 	convert_context	context;
 
 	for (gsoap_size_t i = 0; i < lpsSaveObj->modProps.__size; ++i) {
-		ECAllocateBuffer(sizeof(SPropValue), (void **)&lpsProp);
+		ecmem_ptr<SPropValue> lpsProp;
 
+		ec = ECAllocateBuffer(sizeof(SPropValue), &~lpsProp);
+		if (ec != erSuccess)
+			break;
 		ec = CopySOAPPropValToMAPIPropVal(lpsProp, &lpsSaveObj->modProps.__ptr[i], lpsProp, &context);
 		if (ec != erSuccess)
 			break;
 		lpsMapiObj->lstProperties.push_back(ECProperty(lpsProp));
-		ECFreeBuffer(lpsProp);
 	}
 
 	return ec;
@@ -614,7 +607,7 @@ exit:
 }
 
 IECPropStorage* WSMAPIPropStorage::GetServerStorage() {
-	return &this->m_xECPropStorage;				// I am the server storage
+	return this; /* I am the server storage */
 }
 
 //FIXME: one lock/unlock function
@@ -642,25 +635,6 @@ HRESULT WSMAPIPropStorage::HrSetSyncId(ULONG ulSyncId) {
 
 // Called when the session ID has changed
 HRESULT WSMAPIPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
-	WSMAPIPropStorage *lpThis = (WSMAPIPropStorage *)lpParam;
-	lpThis->ecSessionId = sessionId;
-
+	static_cast<WSMAPIPropStorage *>(lpParam)->ecSessionId = sessionId;
 	return hrSuccess;
-}
-
-// Interface IECPropStorage
-DEF_ULONGMETHOD0(WSMAPIPropStorage, ECPropStorage, AddRef, (void))
-DEF_ULONGMETHOD0(WSMAPIPropStorage, ECPropStorage, Release, (void))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrReadProps, (LPSPropTagArray *, lppPropTags), (ULONG *, cValues), (LPSPropValue *, lppValues))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrLoadProp, (ULONG, ulObjId), (ULONG, ulPropTag), (LPSPropValue *, lppsPropValue))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrWriteProps, (ULONG, cValues), (LPSPropValue, lpValues), (ULONG, ulFlags))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrDeleteProps, (const SPropTagArray *, lpsPropTagArray))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrSaveObject, (ULONG, ulFlags), (MAPIOBJECT *, lpsMapiObject))
-DEF_HRMETHOD0(WSMAPIPropStorage, ECPropStorage, HrLoadObject, (MAPIOBJECT **, lppsMapiObject))
-
-IECPropStorage* WSMAPIPropStorage::xECPropStorage::GetServerStorage()
-{
-	METHOD_PROLOGUE_(WSMAPIPropStorage, ECPropStorage);
-	return pThis->GetServerStorage();
 }

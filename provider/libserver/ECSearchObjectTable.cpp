@@ -14,9 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
+#include <kopano/Util.h>
+#include "ECSecurity.h"
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -41,31 +43,64 @@ ECRESULT ECSearchObjectTable::Create(ECSession *lpSession,
     unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale,
     ECStoreObjectTable **lppTable)
 {
-	ECRESULT er = erSuccess;
-
-	*lppTable = new ECSearchObjectTable(lpSession, ulStoreId, lpGuid, ulFolderId, ulObjType, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-	
-	return er;
+	return alloc_wrap<ECSearchObjectTable>(lpSession, ulStoreId, lpGuid,
+	       ulFolderId, ulObjType, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECSearchObjectTable::Load() {
-    ECRESULT er = erSuccess;
-    sObjectTableKey		sRowItem;
-    std::list<unsigned int> lstObjId;
+	ECRESULT er = erSuccess;
+	sObjectTableKey		sRowItem;
+	std::list<unsigned int> lstObjId;
 	scoped_rlock biglock(m_hLock);
+	std::string strInQuery;
+	std::string strQuery;
+	std::set<unsigned int> setObjIdPrivate;
+	std::list<unsigned int> lstObjId2;
+	ECDatabase*             lpDatabase = NULL;
+	DB_RESULT lpDBResult;
+	DB_ROW                  lpDBRow = NULL;
 
-    if(m_ulFolderId) {
-        // Get the search results
-        er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(m_ulStoreId, m_ulFolderId, &lstObjId);
-        if(er != erSuccess)
-			return er;
-        er = UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, true);
-        if(er != hrSuccess)
-			return er;
-    }
-    return er;
+	if (m_ulFolderId == 0)
+		return er;
+	// Get the search results
+	er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(m_ulStoreId, m_ulFolderId, &lstObjId);
+	if (er != erSuccess)
+		return er;
+
+	if(lpSession->GetSecurity()->IsStoreOwner(m_ulFolderId) != KCERR_NO_ACCESS ||
+	    lpSession->GetSecurity()->GetAdminLevel() > 0 ||
+	    lstObjId.size() == 0)
+		return UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, true);
+
+	// Outlook may show the subject of sensitive messages (e.g. in
+	// reminder popup), so filter these from shared store searches
+
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
+		return er;
+
+	for(auto it = lstObjId.begin(); it != lstObjId.end(); ++it) {
+		if(it != lstObjId.begin())
+			strInQuery += ",";
+		strInQuery += stringify(*it);
+	}
+
+	strQuery = "SELECT hierarchyid FROM properties WHERE hierarchyid IN (" + strInQuery + ") AND tag = " + stringify(PROP_ID(PR_SENSITIVITY)) + " AND val_ulong >= 2;";
+
+	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if(er != erSuccess)
+		return er;
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
+		if(lpDBRow == NULL || lpDBRow[0] == NULL)
+			continue;
+		setObjIdPrivate.insert(atoui(lpDBRow[0]));
+	}
+
+	for(auto it = lstObjId.begin(); it != lstObjId.end(); ++it)
+		if (setObjIdPrivate.find(*it) == setObjIdPrivate.end())
+			lstObjId2.push_back(*it);
+
+	return UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId2, 0, true);
 }
 
 } /* namespace */

@@ -41,12 +41,12 @@ static bool g_bInitLib = false;
 void AddDatabaseObject(ECDatabase* lpDatabase)
 {
 	scoped_lock lk(g_hMutexDBObjectList);
-	g_lpDBObjectList.insert(std::set<ECDatabase*>::value_type(lpDatabase));
+	g_lpDBObjectList.insert(lpDatabase);
 }
 
 static void database_destroy(void *lpParam)
 {
-	ECDatabase *lpDatabase = (ECDatabase *)lpParam;
+	auto lpDatabase = static_cast<ECDatabase *>(lpParam);
 	ulock_normal l_obj(g_hMutexDBObjectList);
 
 	g_lpDBObjectList.erase(std::set<ECDatabase*>::key_type(lpDatabase));
@@ -57,15 +57,11 @@ static void database_destroy(void *lpParam)
 
 static void plugin_destroy(void *lpParam)
 {
-	UserPlugin *lpPlugin = (UserPlugin *)lpParam;
-
-	delete lpPlugin;
+	delete static_cast<UserPlugin *>(lpParam);
 }
 
 ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 {
-	ECRESULT er;
-
 	if (g_bInitLib == true)
 		return KCERR_CALL_FAILED;
 
@@ -76,7 +72,7 @@ ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 	pthread_key_create(&plugin_key, plugin_destroy); // same goes for the userDB-plugin
 
 	// Init mutex for database object list
-	er = ECDatabase::InitLibrary(lpDatabaseDir, lpConfigFile);
+	auto er = ECDatabase::InitLibrary(lpDatabaseDir, lpConfigFile);
 	g_lpStatsCollector = new ECStatsCollector();
 	
 	//TODO: with an error remove all variables and g_bInitLib = false
@@ -119,13 +115,11 @@ ECRESULT kopano_unloadlibrary(void)
 
 ECRESULT kopano_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedKopano, bool bDistributedKopano)
 {
-	ECRESULT er;
-
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
 
 	g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedKopano, bDistributedKopano);
-	er = g_lpSessionManager->LoadSettings();
+	auto er = g_lpSessionManager->LoadSettings();
 	if(er != erSuccess)
 		return er;
 	er = g_lpSessionManager->CheckUserLicense();
@@ -190,15 +184,15 @@ static int kopano_fparsehdr(struct soap *soap, const char *key,
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
 	if (strlen(szProxy) > 0 && strcasecmp(key, szProxy) == 0)
-		((SOAPINFO *)soap->user)->bProxy = true;
-	return ((SOAPINFO *)soap->user)->fparsehdr(soap, key, val);
+		soap_info(soap)->bProxy = true;
+	return soap_info(soap)->fparsehdr(soap, key, val);
 }
 
 // Called just after a new soap connection is established
 void kopano_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
-	SOAPINFO *lpInfo = new SOAPINFO;
+	auto lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
 	lpInfo->bProxy = false;
 	soap->user = (void *)lpInfo;
@@ -217,12 +211,12 @@ void kopano_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 
 void kopano_end_soap_connection(struct soap *soap)
 {
-	delete (SOAPINFO *)soap->user;
+	delete soap_info(soap);
 }
 
 void kopano_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
 {
-	SOAPINFO *lpInfo = new SOAPINFO;
+	auto lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
 	lpInfo->bProxy = false;
 	soap->user = (void *)lpInfo;
@@ -230,7 +224,7 @@ void kopano_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
 
 void kopano_end_soap_listener(struct soap *soap)
 {
-	delete (SOAPINFO *)soap->user;
+	delete soap_info(soap);
 }
 
 // Called just before the socket is reset, with the server-side socket still

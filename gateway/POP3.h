@@ -81,12 +81,12 @@ private:
 	HRESULT HrMakeMailList();
 	HRESULT HrLogin(const std::string &strUsername, const std::string &strPassword);
 	std::string DotFilter(const char *input);
-	BOOL IsAuthorized() { return !!lpStore; }
+	BOOL IsAuthorized() const { return !!lpStore; }
 
-	IMAPISession *lpSession = nullptr;
-	IMsgStore *lpStore = nullptr;
-	IMAPIFolder *lpInbox = nullptr;
-	IAddrBook *lpAddrBook = nullptr;
+	KCHL::object_ptr<IMAPISession> lpSession;
+	KCHL::object_ptr<IMsgStore> lpStore;
+	KCHL::object_ptr<IMAPIFolder> lpInbox;
+	KCHL::object_ptr<IAddrBook> lpAddrBook;
 	sending_options sopt;
 
 	std::string szUser;

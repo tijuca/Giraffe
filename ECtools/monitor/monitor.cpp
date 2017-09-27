@@ -14,10 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
 #include <kopano/platform.h>
 #include <condition_variable>
 #include <mutex>
+#include <new>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -82,7 +82,7 @@ static HRESULT running_service(void)
 	ulInterval = atoi(m_lpThreadMonitor->lpConfig->GetSetting("quota_check_interval", nullptr, "15"));
 	if (ulInterval == 0)
 		ulInterval = 15;
-	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-monitor version " PROJECT_VERSION_MONITOR_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-monitor version " PROJECT_VERSION " (pid %d)", getpid());
 
 	// Add Quota monitor
 	hr = lpECScheduler->AddSchedule(SCHEDULE_MINUTES, ulInterval, ECQuotaMonitor::Create, m_lpThreadMonitor);
@@ -143,8 +143,7 @@ static void sighup(int signr)
 // SIGSEGV catcher
 static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(m_lpThreadMonitor->lpLogger, "Monitor",
-		PROJECT_VERSION_MONITOR_STR, signr, si, uc);
+	generic_sigsegv_handler(m_lpThreadMonitor->lpLogger, "kopano-monitor", PROJECT_VERSION, signr, si, uc);
 }
 
 static void print_help(const char *name)
@@ -174,9 +173,9 @@ int main(int argc, char *argv[]) {
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/monitor.pid" },
 		{ "running_path", "/var/lib/kopano" },
-		{ "log_method","file" },
-		{ "log_file","/var/log/kopano/monitor.log" },
-		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
+		{"log_method", "file", CONFIGSETTING_NONEMPTY},
+		{"log_file", "/var/log/kopano/monitor.log", CONFIGSETTING_NONEMPTY},
+		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 		{ "log_timestamp","1" },
 		{ "log_buffer_size", "0" },
 		{ "sslkey_file", "" },
@@ -238,8 +237,7 @@ int main(int argc, char *argv[]) {
 			bIgnoreUnknownConfigOptions = true;
 			break;
 		case 'V':
-			cout << "Product version:\t" <<  PROJECT_VERSION_MONITOR_STR << endl
-				 << "File version:\t\t" << PROJECT_SVN_REV_STR << endl;
+			cout << "kopano-monitor " PROJECT_VERSION << endl;
 			return 1;
 		case OPT_HELP:
 		default:
@@ -248,13 +246,22 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	m_lpThreadMonitor = new ECTHREADMONITOR;
+	m_lpThreadMonitor = new(std::nothrow) ECTHREADMONITOR;
+	if (m_lpThreadMonitor == nullptr) {
+		hr = MAPI_E_NOT_ENOUGH_MEMORY;
+		goto exit;
+	}
 
 	m_lpThreadMonitor->lpConfig = ECConfig::Create(lpDefaults);
 	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) ||
 	    m_lpThreadMonitor->lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
-		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create fatal logger without a timestamp to stderr
+		/* Create fatal logger without a timestamp to stderr. */
+		m_lpThreadMonitor->lpLogger = new(std::nothrow) ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);
+		if (m_lpThreadMonitor->lpLogger == nullptr) {
+			hr = MAPI_E_NOT_ENOUGH_MEMORY;
+			goto exit;
+		}
 		ec_log_set(m_lpThreadMonitor->lpLogger);
 		LogConfigErrors(m_lpThreadMonitor->lpConfig);
 		hr = E_FAIL;

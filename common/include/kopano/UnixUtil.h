@@ -29,7 +29,7 @@ namespace KC {
 
 class fs_deleter {
 	public:
-	void operator()(DIR *d)
+	void operator()(DIR *d) const
 	{
 		if (d != nullptr)
 			closedir(d);
@@ -54,7 +54,7 @@ struct _popen_rlimit_array_ ## _name { \
 
 extern _kc_export int unix_runas(ECConfig *);
 extern _kc_export int unix_chown(const char *filename, const char *user, const char *group);
-extern _kc_export void unix_coredump_enable(void);
+extern _kc_export void unix_coredump_enable(const char *);
 extern _kc_export int unix_create_pidfile(const char *argv0, ECConfig *, bool force = true);
 extern _kc_export int unix_daemonize(ECConfig *);
 extern _kc_export int unix_fork_function(void *(*)(void *), void *param, int nfds, int *closefds);

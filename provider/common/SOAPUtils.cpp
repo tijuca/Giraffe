@@ -427,16 +427,15 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 
 	// First check if the any of the properties is in the sSpecials list
 	for (size_t x = 0; x < ARRAY_SIZE(sSpecials); ++x) {
-		if ((lpProp1->ulPropTag == sSpecials[x].ulPropTag && PROP_TYPE(lpProp2->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag)) ||
-			(PROP_TYPE(lpProp1->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag) && lpProp2->ulPropTag == sSpecials[x].ulPropTag))
-		{
-			er = sSpecials[x].lpfnComparer(lpProp1, lpProp2, &nCompareResult);
-			if (er == erSuccess)
-				goto skip_check;
-
-			er = erSuccess;
-			break;
-		}
+		bool special = lpProp1->ulPropTag == sSpecials[x].ulPropTag && PROP_TYPE(lpProp2->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag);
+		special |= PROP_TYPE(lpProp1->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag) && lpProp2->ulPropTag == sSpecials[x].ulPropTag;
+		if (!special)
+			continue;
+		er = sSpecials[x].lpfnComparer(lpProp1, lpProp2, &nCompareResult);
+		if (er == erSuccess)
+			goto skip_check;
+		er = erSuccess;
+		break;
 	}
 
 	// Perform a regular comparison
@@ -960,13 +959,12 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		break;
 
 	case RES_COMMENT:
-		if (lpRestrict->lpComment) {
-			if (lpRestrict->lpComment->lpResTable)
-				FreeRestrictTable(lpRestrict->lpComment->lpResTable);
-
-			FreePropValArray(&lpRestrict->lpComment->sProps);
-			s_free(nullptr, lpRestrict->lpComment);
-		}
+		if (lpRestrict->lpComment == nullptr)
+			break;
+		if (lpRestrict->lpComment->lpResTable)
+			FreeRestrictTable(lpRestrict->lpComment->lpResTable);
+		FreePropValArray(&lpRestrict->lpComment->sProps);
+		s_free(nullptr, lpRestrict->lpComment);
 		break;
 
 	case RES_SUBRESTRICTION:
@@ -1050,11 +1048,8 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 			return KCERR_INVALID_TYPE;
 		lpDst->Value.bin = s_alloc<struct xsd__base64Binary>(soap);
 		lpDst->Value.bin->__size = lpSrc->Value.bin->__size;
-		
-		if(bTruncate) {
-			if(lpDst->Value.bin->__size > TABLE_CAP_BINARY)
-				lpDst->Value.bin->__size = TABLE_CAP_BINARY;
-		}
+		if (bTruncate && lpDst->Value.bin->__size > TABLE_CAP_BINARY)
+			lpDst->Value.bin->__size = TABLE_CAP_BINARY;
 		
 		lpDst->Value.bin->__ptr = s_alloc<unsigned char>(soap, lpSrc->Value.bin->__size);
 		memcpy(lpDst->Value.bin->__ptr, lpSrc->Value.bin->__ptr, lpDst->Value.bin->__size);
@@ -1364,14 +1359,13 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 
 ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase)
 {
-	if(lpPropValArray) {
-		for (gsoap_size_t i = 0; i < lpPropValArray->__size; ++i)
-			FreePropVal(&(lpPropValArray->__ptr[i]), false);
-		s_free(nullptr, lpPropValArray->__ptr);
-		if(bFreeBase)
-			s_free(nullptr, lpPropValArray);
-	}
-
+	if (lpPropValArray == nullptr)
+		return erSuccess;
+	for (gsoap_size_t i = 0; i < lpPropValArray->__size; ++i)
+		FreePropVal(&(lpPropValArray->__ptr[i]), false);
+	s_free(nullptr, lpPropValArray->__ptr);
+	if (bFreeBase)
+		s_free(nullptr, lpPropValArray);
 	return erSuccess;
 }
 
@@ -1387,8 +1381,7 @@ ECRESULT CopyEntryId(struct soap *soap, entryId* lpSrc, entryId** lppDst)
 
 	if(lpSrc->__size > 0) {
 		lpDst->__ptr = s_alloc<unsigned char>(soap, lpSrc->__size);
-
-		memcpy(lpDst->__ptr, lpSrc->__ptr, sizeof(unsigned char) * lpSrc->__size);
+		memcpy(lpDst->__ptr, lpSrc->__ptr, lpSrc->__size);
 	} else {
 		lpDst->__ptr = NULL;
 	}
@@ -1414,7 +1407,7 @@ ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryL
 	for (unsigned int i = 0; i < lpSrc->__size; ++i) {
 		lpDst->__ptr[i].__size = lpSrc->__ptr[i].__size;
 		lpDst->__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpSrc->__ptr[i].__size);
-		memcpy(lpDst->__ptr[i].__ptr, lpSrc->__ptr[i].__ptr, sizeof(unsigned char) * lpSrc->__ptr[i].__size);
+		memcpy(lpDst->__ptr[i].__ptr, lpSrc->__ptr[i].__ptr, lpSrc->__ptr[i].__size);
 	}
 
 	*lppDst = lpDst;
@@ -1565,9 +1558,8 @@ ECRESULT FreeNotificationArrayStruct(notificationArray *lpNotifyArray, bool bFre
 	s_free(nullptr, lpNotifyArray->__ptr);
 	if(bFreeBase)
 		s_free(nullptr, lpNotifyArray);
-	else {
+	else
 		lpNotifyArray->__size = 0;
-	}
 	return erSuccess;
 }
 
@@ -1630,7 +1622,8 @@ ECRESULT FreeRightsArray(struct rightsArray *lpRights)
 
 	if(lpRights->__ptr)
 	{
-		s_free(nullptr, lpRights->__ptr->sUserId.__ptr);
+		for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
+			s_free(nullptr, lpRights->__ptr[i].sUserId.__ptr);
 		s_free(nullptr, lpRights->__ptr);
 	}
 	s_free(nullptr, lpRights);
@@ -1763,7 +1756,7 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 		lpsoapPropmap->__ptr = s_alloc<struct propmapPair>(soap, propmap.size());
 		for (const auto &iter : propmap) {
 			if (PROP_TYPE(iter.first) == PT_BINARY && bCopyBinary) {
-				string strData = base64_encode((const unsigned char *)iter.second.data(), iter.second.size());
+				string strData = base64_encode(iter.second.data(), iter.second.size());
 				lpsoapPropmap->__ptr[lpsoapPropmap->__size].ulPropId = iter.first;
 				lpsoapPropmap->__ptr[lpsoapPropmap->__size++].lpszValue = s_strcpy(soap, strData.c_str());
 				continue;
@@ -1787,7 +1780,7 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size = iter.second.size();
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr = s_alloc<char *>(soap, lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size);
 				for (const auto &entry : iter.second) {
-					string strData = base64_encode(reinterpret_cast<const unsigned char *>(entry.data()), entry.size());
+					string strData = base64_encode(entry.data(), entry.size());
 					lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr[j] = s_strcpy(soap, strData.c_str());
 					++j;
 				}
@@ -2227,7 +2220,7 @@ size_t EntryListSize(const struct entryList *lpSrc)
 	size_t ulSize = sizeof(entryList);
 	ulSize += sizeof(entryId) * lpSrc->__size;
 	for (unsigned int i = 0; i < lpSrc->__size; ++i)
-		ulSize += lpSrc->__ptr[i].__size * sizeof(unsigned char);
+		ulSize += lpSrc->__ptr[i].__size;
 	return ulSize;
 }
 
@@ -2347,12 +2340,10 @@ size_t SortOrderArraySize(const struct sortOrderArray *lpsSortOrder)
  */
 ULONG NormalizePropTag(ULONG ulPropTag)
 {
-	if((PROP_TYPE(ulPropTag) == PT_STRING8 || PROP_TYPE(ulPropTag) == PT_UNICODE) && PROP_TYPE(ulPropTag) != PT_TSTRING) {
+	if ((PROP_TYPE(ulPropTag) == PT_STRING8 || PROP_TYPE(ulPropTag) == PT_UNICODE) && PROP_TYPE(ulPropTag) != PT_TSTRING)
 		return CHANGE_PROP_TYPE(ulPropTag, PT_TSTRING);
-	}
-	if((PROP_TYPE(ulPropTag) == PT_MV_STRING8 || PROP_TYPE(ulPropTag) == PT_MV_UNICODE) && PROP_TYPE(ulPropTag) != PT_MV_TSTRING) {
+	if ((PROP_TYPE(ulPropTag) == PT_MV_STRING8 || PROP_TYPE(ulPropTag) == PT_MV_UNICODE) && PROP_TYPE(ulPropTag) != PT_MV_TSTRING)
 		return CHANGE_PROP_TYPE(ulPropTag, PT_MV_TSTRING);
-	}
 	return ulPropTag;
 }
 
@@ -2368,7 +2359,7 @@ ULONG NormalizePropTag(ULONG ulPropTag)
  */
 const char *GetSourceAddr(struct soap *soap)
 {
-	if( ((SOAPINFO *)soap->user)->bProxy && soap->proxy_from)
+	if (soap_info(soap)->bProxy && soap->proxy_from != nullptr)
 		return soap->proxy_from;
 	else
 		return soap->host;

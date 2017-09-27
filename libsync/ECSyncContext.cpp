@@ -25,16 +25,13 @@
 #include "ECSyncContext.h"
 #include "ECSyncUtil.h"
 #include "ECSyncSettings.h"
-#include <IECExportAddressbookChanges.h>
-#include <IECExportChanges.h>
-#include <IECChangeAdvisor.h>
-
 #include <kopano/ECUnknown.h>
 #include <kopano/ECGuid.h>
 #include <kopano/ECTags.h>
 #include <kopano/ECLogger.h>
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/stringutil.h>
-
+#include <kopano/Util.h>
 #include <mapix.h>
 #include <kopano/mapiext.h>
 #include <mapiutil.h>
@@ -45,15 +42,14 @@
 
 using namespace KCHL;
 
-typedef object_ptr<IECChangeAdvisor, IID_IECChangeAdvisor> ECChangeAdvisorPtr;
+typedef object_ptr<IECChangeAdvisor> ECChangeAdvisorPtr;
 //DEFINEMAPIPTR(ECChangeAdvisor);
-typedef object_ptr<IECChangeAdviseSink, IID_IECChangeAdviseSink> ECChangeAdviseSinkPtr;
-//DEFINEMAPIPTR(ECChangeAdviseSink);
 
 #define EC_SYNC_STATUS_VERSION			1
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-class ECChangeAdviseSink _kc_final : public ECUnknown {
+class ECChangeAdviseSink _kc_final :
+    public ECUnknown, public IECChangeAdviseSink {
 public:
 	typedef ULONG(ECSyncContext::*NOTIFYCALLBACK)(ULONG,LPENTRYLIST);
 
@@ -63,19 +59,12 @@ public:
 	{ }
 
 	// IUnknown
-	HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override
+	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override
 	{
-		if (refiid == IID_ECUnknown || refiid == IID_ECChangeAdviseSink) {
-			AddRef();
-			*lpvoid = (void *)this;
-			return hrSuccess;
-		}
-		if (refiid == IID_IUnknown || refiid == IID_IECChangeAdviseSink) {
-			AddRef();
-			*lpvoid = (void *)&this->m_xECChangeAdviseSink;
-			return hrSuccess;
-		}
-
+		REGISTER_INTERFACE2(ECChangeAdviseSink, this);
+		REGISTER_INTERFACE2(ECUnknown, this);
+		REGISTER_INTERFACE2(IECChangeAdviseSink, this);
+		REGISTER_INTERFACE2(IUnknown, this);
 		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 	}
 
@@ -85,35 +74,6 @@ public:
 	}
 
 private:
-	class xECChangeAdviseSink _kc_final : public IECChangeAdviseSink {
-	public:
-		// <kopano/xclsfrag/IUnknown.hpp>
-		virtual ULONG __stdcall AddRef(void) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->AddRef();
-		}
-
-		virtual ULONG __stdcall Release(void) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->Release();
-		}
-
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->QueryInterface(refiid, pInterface);
-		}
-
-		// <kopano/xclsfrag/IExchangeChangeAdviseSink.hpp>
-		virtual ULONG __stdcall OnNotify(ULONG ulFlags, LPENTRYLIST lpEntryList) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->OnNotify(ulFlags, lpEntryList);
-		}
-	} m_xECChangeAdviseSink;
-
 	ECSyncContext	*m_lpsSyncContext;
 	NOTIFYCALLBACK	m_fnCallback;
 };
@@ -122,14 +82,8 @@ static HRESULT HrCreateECChangeAdviseSink(ECSyncContext *lpsSyncContext,
     ECChangeAdviseSink::NOTIFYCALLBACK fnCallback,
     IECChangeAdviseSink **lppAdviseSink)
 {
-	object_ptr<ECChangeAdviseSink> lpAdviseSink(new(std::nothrow) ECChangeAdviseSink(lpsSyncContext, fnCallback));
-	if (lpAdviseSink == NULL)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	HRESULT hr = lpAdviseSink->QueryInterface(IID_IECChangeAdviseSink,
-		reinterpret_cast<void **>(lppAdviseSink));
-	if (hr == hrSuccess)
-		lpAdviseSink.release();
-	return hr;
+	return alloc_wrap<ECChangeAdviseSink>(lpsSyncContext, fnCallback)
+	       .as(IID_IECChangeAdviseSink, lppAdviseSink);
 }
 
 ECSyncContext::ECSyncContext(LPMDB lpStore, ECLogger *lpLogger)
@@ -230,7 +184,7 @@ HRESULT ECSyncContext::HrReleaseChangeAdvisor()
 HRESULT ECSyncContext::HrResetChangeAdvisor()
 {
 	ECChangeAdvisorPtr ptrChangeAdvisor;
-	ECChangeAdviseSinkPtr ptrChangeAdviseSink;
+	object_ptr<IECChangeAdviseSink> ptrChangeAdviseSink;
 
 	HRESULT hr = HrReleaseChangeAdvisor();
 	if (hr != hrSuccess)
@@ -364,7 +318,8 @@ HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULON
 
 fallback:
 	// The current folder is not being monitored, so get steps the old fashioned way.
-	hr = m_lpStore->OpenEntry(lpEntryID->cb, reinterpret_cast<ENTRYID *>(lpEntryID->lpb), 0, MAPI_DEFERRED_ERRORS, &ulType, &~lpFolder);
+	hr = m_lpStore->OpenEntry(lpEntryID->cb, reinterpret_cast<ENTRYID *>(lpEntryID->lpb),
+	     &iid_of(lpFolder), MAPI_DEFERRED_ERRORS, &ulType, &~lpFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrGetSyncStatusStream(lpSourceKey, &~lpStream);
@@ -416,7 +371,7 @@ HRESULT ECSyncContext::HrUpdateChangeId(LPSTREAM lpStream)
 
 	if(m_lpChangeAdvisor) {
 		// Now inform the change advisor of our accomplishment
-		hr = m_lpChangeAdvisor->QueryInterface(ptrECA.iid(), &~ptrECA);
+		hr = m_lpChangeAdvisor->QueryInterface(iid_of(ptrECA), &~ptrECA);
 		if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED)
 			return hr;
 		hr = ptrECA->UpdateSyncState(ulSyncId, ulChangeId);
@@ -453,7 +408,7 @@ HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncSt
 		return MAPI_E_NOT_FOUND;
 
 	// update the sourcekey to syncid map.
-	m_mapStates.insert(SyncStateMap::value_type(strSourceKey, sSyncState));
+	m_mapStates.insert({strSourceKey, sSyncState});
 	*lpsSyncState = std::move(sSyncState);
 	return hrSuccess;
 }
@@ -508,7 +463,7 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 		if (ulSize < 8 || ulPos + ulSize > lpsSyncState->cb)
 			return MAPI_E_CORRUPT_DATA;
 
-		ZLOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s", ulStatusNumber, ulSize, bin2hex(strSourceKey.size(), (unsigned char*)strSourceKey.data()).c_str());
+		ZLOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s", ulStatusNumber, ulSize, bin2hex(strSourceKey.size(), strSourceKey.data()).c_str());
 
 		HRESULT hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, ulSize), true, &lpStream);
 		if (hr != hrSuccess)
@@ -554,7 +509,7 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 		ulSize = sStat.cbSize.LowPart;
 		strSyncStatus.append((char*)&ulSize, 4);
 		ZLOG_DEBUG(m_lpLogger, "  Stream: size=%u, sourcekey=%s", ulSize,
-			bin2hex(ssp.first.size(), reinterpret_cast<const unsigned char *>(ssp.first.data())).c_str());
+			bin2hex(ssp.first.size(), ssp.first.data()).c_str());
 		hr = ssp.second->Seek(liPos, STREAM_SEEK_SET, NULL);
 		if (hr != hrSuccess)
 			return hr;

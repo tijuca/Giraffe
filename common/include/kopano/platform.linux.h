@@ -34,7 +34,6 @@
 #include <cstddef>
 #include <libgen.h>
 #include <byteswap.h>
-#include <endian.h>
 #include <cerrno>
 #include <clocale>
 
@@ -71,11 +70,6 @@ inline int _vsnprintf_l(char *str, size_t size, const char *format, locale_t loc
 #include <sys/wait.h>
 #include <sys/times.h>
 
-/* compiler definitions */
-#define __stdcall
-#define __cdecl
-#define STDAPI_(__type) __type __stdcall
-
 /* base types */
 typedef void			VOID;
 typedef unsigned char	BYTE;
@@ -96,6 +90,7 @@ typedef int64_t		LONGLONG;
 typedef LONGLONG*		LPLONGLONG;
 typedef uint64_t	ULONGLONG;
 typedef ULONGLONG*		LPULONGLONG;
+typedef uintptr_t ULONG_PTR;
 
 typedef int	LONG;
 typedef int	BOOL;
@@ -253,9 +248,8 @@ typedef int				SCODE;
 #define E_ACCESSDENIED ((HRESULT)0x80070005)
 
 /* winerror.h definitions */
-#define _HRESULT_TYPEDEF_(_sc) ((HRESULT)_sc)
-#define STG_E_INVALIDFUNCTION            _HRESULT_TYPEDEF_(0x80030001L)
-
+#define KC_HRESULT_TYPEDEF_(_sc) ((HRESULT)_sc)
+#define STG_E_INVALIDFUNCTION KC_HRESULT_TYPEDEF_(0x80030001L)
 
 /*
  Values are 32 bit values layed out as follows:
@@ -305,10 +299,10 @@ typedef wchar_t 	WCHAR;
 
 #ifdef UNICODE
   typedef WCHAR		TCHAR;
-#define _T(x) L##x
+#define KC_T(x) L##x
 #else
   typedef char		TCHAR;
-#define _T(x) x
+#define KC_T(x) x
 #endif
 namespace KC {
 typedef std::basic_string<TCHAR> tstring;
@@ -376,32 +370,6 @@ struct SYSTEMTIME {
 };
 typedef struct SYSTEMTIME *PSYSTEMTIME;
 
-struct TZREG {
-	LONG bias;
-	LONG stdbias;
-	LONG dstbias;
-	SYSTEMTIME stStandardDate;
-	SYSTEMTIME stDaylightDate;
-};
-typedef struct TZREG *PTZREG;
-
-/* IUnknown Interface */
-class IUnknown {
-public:
-	virtual ~IUnknown(void) _kc_impdtor;
-    virtual ULONG AddRef() = 0;
-    virtual ULONG Release() = 0;
-    virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) = 0;
-};
-typedef IUnknown* LPUNKNOWN;
-
-/* IStream Interface */
-class ISequentialStream : public IUnknown {
-public:
-    virtual HRESULT Read(void *pv, ULONG cb, ULONG *pcbRead) = 0;
-    virtual HRESULT Write(const void *pv, ULONG cb, ULONG *pcbWritten) = 0;
-};
-
 struct STATSTG {
     LPSTR pwcsName;		// was LPOLESTR .. wtf is that?
     DWORD type;
@@ -429,56 +397,11 @@ enum STREAM_SEEK {
     STREAM_SEEK_END	= 2
 };
 
-enum LOCKTYPE {
-    LOCK_WRITE		= 1,
-    LOCK_EXCLUSIVE	= 2,
-    LOCK_ONLYONCE	= 4
-};
-
 enum STATFLAG {
     STATFLAG_DEFAULT	= 0,
     STATFLAG_NONAME	= 1,
     STATFLAG_NOOPEN	= 2
 };
-
-class IEnumSTATSTG : public IUnknown {
-public:
-	virtual HRESULT Next(ULONG celt, STATSTG *rgelt, ULONG *pceltFetched) = 0;
-	virtual HRESULT Skip(ULONG celt) = 0;
-	virtual HRESULT Reset(void) = 0;
-	virtual HRESULT Clone(IEnumSTATSTG **ppenum) = 0;
-};
-#if !defined(INITGUID) || defined(USES_IID_IEnumSTATSTG)
-  DEFINE_OLEGUID(IID_IEnumSTATSTG,0x0D,0,0);
-#endif
-
-class IStream : public ISequentialStream {
-public:
-    virtual HRESULT Seek(LARGE_INTEGER dlibMove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition) = 0;
-    virtual HRESULT SetSize(ULARGE_INTEGER libNewSize) = 0;
-    virtual HRESULT CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pcbRead, ULARGE_INTEGER *pcbWritten) = 0;
-    virtual HRESULT Commit(DWORD grfCommitFlags) = 0;
-    virtual HRESULT Revert(void) = 0;
-    virtual HRESULT LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType) = 0;
-    virtual HRESULT UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType) = 0;
-    virtual HRESULT Stat(STATSTG *pstatstg, DWORD grfStatFlag) = 0;
-    virtual HRESULT Clone(IStream **ppstm) = 0;
-};
-typedef IStream* LPSTREAM;
-extern "C" const IID IID_IStream;		/* and the contents are .... somewhere else */
-extern "C" const IID IID_ISequentialStream;
-extern "C" const IID IID_IStorage;
-
-class IMalloc : public IUnknown {
-public:
-    virtual void* Alloc(ULONG cb) = 0;
-    virtual void* Realloc(void* pv, ULONG cb) = 0;
-    virtual void Free(void* pv) = 0;
-    virtual ULONG GetSize(void* pv) = 0;
-    virtual int DidAlloc(void *pv) = 0;
-    virtual void HeapMinimize(void) = 0;
-};
-typedef IMalloc* LPMALLOC;
 
 // struct RemSNB {
 // unsigned long ulCntStr;
@@ -489,29 +412,6 @@ typedef IMalloc* LPMALLOC;
 typedef OLECHAR** SNB;
 
 
-class IStorage : public IUnknown {
-public:
-	virtual HRESULT CreateStream(const OLECHAR *pwcsName, DWORD grfMode, DWORD reserved1, DWORD reserved2, IStream **ppstm) = 0;
-
-	virtual HRESULT OpenStream(const OLECHAR *pwcsName, void *reserved1, DWORD grfMode, DWORD reserved2, IStream **ppstm) = 0;
-	virtual HRESULT CreateStorage(const OLECHAR *pwcsName, DWORD grfMode, DWORD reserved1, DWORD reserved2, IStorage **ppstg) = 0;
-	virtual HRESULT OpenStorage(const OLECHAR *pwcsName, IStorage *pstgPriority, DWORD grfMode, SNB snbExclude, DWORD reserved,
-								IStorage **ppstg) = 0;
-	virtual HRESULT CopyTo(DWORD ciidExclude, const IID *rgiidExclude, SNB snbExclude, IStorage *pstgDest) = 0;
-	virtual HRESULT MoveElementTo(const OLECHAR *pwcsName, IStorage *pstgDest, const OLECHAR *pwcsNewName, DWORD grfFlags) = 0;
-	virtual HRESULT Commit(DWORD grfCommitFlags) = 0; 
-	virtual HRESULT Revert(void) = 0;
-	virtual HRESULT EnumElements(DWORD reserved1, void *reserved2, DWORD reserved3, IEnumSTATSTG **ppenum) = 0; 
-	virtual HRESULT DestroyElement(const OLECHAR *pwcsName) = 0;
-	virtual HRESULT RenameElement(const OLECHAR *pwcsOldName, const OLECHAR *pwcsNewName) = 0;
-	virtual HRESULT SetElementTimes(const OLECHAR *pwcsName, const FILETIME *pctime, const FILETIME *patime, const FILETIME *pmtime) = 0;
-	virtual HRESULT SetClass(REFCLSID clsid) = 0;
-	virtual HRESULT SetStateBits(DWORD grfStateBits, DWORD grfMask) = 0;
-	virtual HRESULT Stat(STATSTG *pstatstg, DWORD grfStatFlag) = 0;
-};
-typedef IStorage* LPSTORAGE;
-
-
 /*
   extra typedefs used in following interfaces
   since these are not used, we can define them as void, instead of the large struct it is in WIN32
@@ -519,8 +419,8 @@ typedef IStorage* LPSTORAGE;
 typedef DWORD LCID;
 
 /* functions */
-extern _kc_export bool operator!=(const GUID &, const GUID &);
-extern _kc_export bool operator==(REFIID, const GUID &);
+extern _kc_export bool operator!=(const GUID &, const GUID &) noexcept;
+extern _kc_export bool operator==(REFIID, const GUID &) noexcept;
 
 extern "C" {
 
@@ -582,24 +482,7 @@ namespace KC {
 
 extern _kc_export time_t GetProcessTime(void);
 
-#ifndef ntohll
-	#if __BYTE_ORDER == __LITTLE_ENDIAN
-		#define ntohll(x) __bswap_64(x)
-	#else
-		#define ntohll(x) (x)
-	#endif
-#endif
-
-#ifndef htonll
-	#if __BYTE_ORDER == __LITTLE_ENDIAN
-		#define htonll(x) __bswap_64(x)
-	#else
-		#define htonll(x) (x)
-	#endif
-#endif
-
 #define OutputDebugStringA(dstr) fprintf(stderr,"%s",dstr)
-#define kc_threadid() static_cast<unsigned long>(pthread_self())
 #define GetTickCount() 0L
 
 #define TICKS_PER_SEC (sysconf(_SC_CLK_TCK))
@@ -614,7 +497,7 @@ extern _kc_export time_t GetProcessTime(void);
  * NOTE: For non-static methods the this pointer has index 1.
  * There is no wprintf attribute :-(
  */
-#define __LIKE_PRINTF(_fmt, _va) __attribute__((format(printf, _fmt, _va)))
+#define KC_LIKE_PRINTF(fmt, va) __attribute__((format(printf, fmt, va)))
 
 std::vector<std::string> get_backtrace();
 

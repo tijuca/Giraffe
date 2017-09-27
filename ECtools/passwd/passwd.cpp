@@ -18,6 +18,7 @@
 #include <kopano/platform.h>
 
 #include <iostream>
+#include <memory>
 #include <kopano/charset/convert.h>
 #include <climits>
 #include <cmath>
@@ -27,10 +28,7 @@
 #include <mapispi.h>
 #include <mapix.h>
 #include <mapiutil.h>
-
-#include <kopano/IECServiceAdmin.h>
-#include <kopano/IECUnknown.h>
-
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/ECTags.h>
 #include <kopano/ECGuid.h>
 #include <kopano/CommonUtil.h>
@@ -82,7 +80,7 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 {
 	HRESULT hr = hrSuccess;
 	object_ptr<IMAPISession> lpSession;
-	object_ptr<IECUnknown> lpECMsgStore;
+	object_ptr<IUnknown> lpECMsgStore;
 	object_ptr<IMsgStore> lpMsgStore;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ULONG cbUserId = 0;
@@ -102,7 +100,7 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 	else
 		lpLogger = new ECLogger_Null();
 	ec_log_set(lpLogger);
-	hr = HrOpenECSession(&~lpSession, "kopano-passwd", PROJECT_SVN_REV_STR,
+	hr = HrOpenECSession(&~lpSession, "passwd", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), lpPath,
 	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
 	     NULL, NULL);
@@ -119,7 +117,7 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 	hr = HrGetOneProp(lpMsgStore, PR_EC_OBJECT, &~lpPropValue);
 	if(hr != hrSuccess || !lpPropValue)
 		return hr;
-	lpECMsgStore.reset(reinterpret_cast<IECUnknown *>(lpPropValue->Value.lpszA), false);
+	lpECMsgStore.reset(reinterpret_cast<IUnknown *>(lpPropValue->Value.lpszA), false);
 	if(!lpECMsgStore)
 		return hr;
 	lpECMsgStore->AddRef();
@@ -135,7 +133,7 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 	// get old features. we need these, because not setting them would mean: remove them
 	hr = lpServiceAdmin->GetUser(cbUserId, lpUserId, 0, &~lpECUser);
 	if (hr != hrSuccess) {
-		cerr << "Unable to get user details, " << getMapiCodeString(hr, lpUsername) << endl;
+		cerr << "Unable to get user details: " << getMapiCodeString(hr, lpUsername) << endl;
 		return hr;
 	}
 
@@ -154,10 +152,8 @@ int main(int argc, char* argv[])
 	HRESULT hr = hrSuccess;
 	const char *username = NULL;
 	const char *newpassword = NULL;
-	char	szOldPassword[80];
-	char	szNewPassword[80];
+	std::string szOldPassword, szNewPassword;
 	const char *oldpassword = NULL;
-	const char *repassword = NULL;
 	const char *path = NULL;
 	modes	mode = MODE_INVALID;
 	int		passprompt = 1;
@@ -196,10 +192,7 @@ int main(int argc, char* argv[])
 			path = optarg;
 			break;
 		case 'V':
-			cout << "Product version:\t" <<
-			        PROJECT_VERSION_PASSWD_STR << endl <<
-			        "File version:\t\t" << PROJECT_SVN_REV_STR <<
-			        endl;
+			cout << "kopano-passwd " PROJECT_VERSION << endl;
 			return 1;			
 		case 'v':
 			verbose = true;
@@ -249,37 +242,32 @@ int main(int argc, char* argv[])
 		
 		if(passprompt)
 		{
-			oldpassword = get_password("Enter old password:");
-			if(oldpassword == NULL)
-			{
+			std::unique_ptr<char[], cstdlib_deleter> tmp(get_password("Enter old password:"));
+			if (tmp == nullptr) {
 				cerr << "Wrong old password" << endl;
 				goto exit;
 			}
 			
 			cout << endl;
-
-			strcpy(szOldPassword, oldpassword);
-
-			newpassword = get_password("Enter new password:");
-			if(oldpassword == NULL)
-			{
+			szOldPassword = tmp.get();
+			oldpassword = szOldPassword.c_str();
+			tmp.reset(get_password("Enter new password:"));
+			if (tmp == nullptr) {
 				cerr << "Wrong new password" << endl;
 				goto exit;
 			}
 
 			cout << endl;
-			
-			strcpy(szNewPassword, newpassword);
-
-			repassword = get_password("Re-Enter password:");
-			if(strcmp(newpassword, repassword) != 0) {
-				cerr << "Passwords don't match" << endl;
-				
+			szNewPassword = tmp.get();
+			newpassword = szNewPassword.c_str();
+			tmp.reset(get_password("Re-Enter password:"));
+			if (tmp == nullptr) {
+				cerr << "Wrong new password" << endl;
+				goto exit;
 			}
+			if (szNewPassword != tmp.get())
+				cerr << "Passwords don't match" << endl;
 			cout << endl;
-
-			oldpassword = szOldPassword;
-			newpassword = szNewPassword;
 		}
 
 		hr = UpdatePassword(path, username, oldpassword, newpassword);

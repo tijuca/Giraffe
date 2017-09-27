@@ -147,10 +147,7 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 	hr = lpECABProvider->QueryInterface(IID_IABProvider, (void **)&sProviderInfo.lpABProviderOnline);
 	if(hr != hrSuccess)
 		return hr;
-
-	//Add provider in map
-	lpmapProvider->insert(std::map<string, PROVIDER_INFO>::value_type(lpszProfileName, sProviderInfo));
-
+	lpmapProvider->insert({lpszProfileName, sProviderInfo});
 	*lpsProviderInfo = std::move(sProviderInfo);
 	return hrSuccess;
 }
@@ -162,9 +159,10 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 //  object is released, so we have to make sure that when the users has released
 //  all the msgstore objects, we also release the support object.
 //
-HRESULT CreateMsgStoreObject(char * lpszProfname, LPMAPISUP lpMAPISup, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags, WSTransport* lpTransport,
-							MAPIUID* lpguidMDBProvider, BOOL bSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore,
-							ECMsgStore** lppECMsgStore)
+HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
+    ULONG cbEntryID, ENTRYID *lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags,
+    WSTransport *lpTransport, const MAPIUID *lpguidMDBProvider, BOOL bSpooler,
+    BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
 {
 	HRESULT	hr = hrSuccess;
 	

@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <new>
 #include <stdexcept>
 #include <utility>
 #include <kopano/lockhelper.hpp>
@@ -21,6 +22,7 @@
 #include <mapispi.h>
 #include <mapix.h>
 #include <kopano/ECDebug.h>
+#include <kopano/ECLogger.h>
 #include "ECMsgStore.h"
 #include "ECNotifyClient.h"
 #include "ECSessionGroupManager.h"
@@ -63,8 +65,6 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
 	ECUnknown("ECNotifyClient"), m_lpSupport(lpSupport),
 	m_lpProvider(lpProvider), m_ulProviderType(ulProviderType)
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECNotifyClient::ECNotifyClient","");
-
 	ECSESSIONID ecSessionId;
 
 	if(m_ulProviderType == MAPI_STORE)
@@ -90,8 +90,6 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
 
 ECNotifyClient::~ECNotifyClient()
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECNotifyClient::~ECNotifyClient","");
-
 	if (m_lpNotifyMaster)
 		m_lpNotifyMaster->ReleaseSession(this);
 
@@ -124,18 +122,12 @@ ECNotifyClient::~ECNotifyClient()
 
 	m_mapChangeAdvise.clear();
 	biglock.unlock();
-	TRACE_MAPI(TRACE_RETURN, "ECNotifyClient::~ECNotifyClient","");
 }
 
 HRESULT ECNotifyClient::Create(ULONG ulProviderType, void *lpProvider, ULONG ulFlags, LPMAPISUP lpSupport, ECNotifyClient**lppNotifyClient)
 {
-	ECNotifyClient *lpNotifyClient = new ECNotifyClient(ulProviderType, lpProvider, ulFlags, lpSupport);
-
-	HRESULT hr = lpNotifyClient->QueryInterface(IID_ECNotifyClient, (void **)lppNotifyClient);
-	if (hr != hrSuccess)
-		delete lpNotifyClient;
-
-	return hr;
+	return alloc_wrap<ECNotifyClient>(ulProviderType, lpProvider, ulFlags,
+	       lpSupport).put(lppNotifyClient);
 }
 
 HRESULT ECNotifyClient::QueryInterface(REFIID refiid, void **lppInterface)
@@ -220,7 +212,7 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 
 	{
 		scoped_rlock biglock(m_hMutex);
-		m_mapAdvise.insert(ECMAPADVISE::value_type(ulConnection, pEcAdvise.release()));
+		m_mapAdvise.insert({ulConnection, pEcAdvise.release()});
 	}
 
 	// Since we're ready to receive notifications now, register ourselves with the master
@@ -263,7 +255,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
 	{
 		scoped_rlock biglock(m_hMutex);
 		lpChangeAdviseSink->AddRef();
-		m_mapChangeAdvise.insert(ECMAPCHANGEADVISE::value_type(ulConnection, pEcAdvise.release()));
+		m_mapChangeAdvise.insert({ulConnection, pEcAdvise.release()});
 	}
 
 	// Since we're ready to receive notifications now, register ourselves with the master
@@ -310,39 +302,26 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 
 HRESULT ECNotifyClient::Advise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection){
 
-	TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::Advise", "");
-
-	HRESULT		hr = MAPI_E_NO_SUPPORT;
 	ULONG		ulConnection = 0;
-
-	
-	hr = RegisterAdvise(cbKey, lpKey, ulEventMask, false, lpAdviseSink, &ulConnection);
+	auto hr = RegisterAdvise(cbKey, lpKey, ulEventMask, false, lpAdviseSink, &ulConnection);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	//Request the advice
 	hr = m_lpTransport->HrSubscribe(cbKey, lpKey, ulConnection, ulEventMask);
 	if(hr != hrSuccess) {
 		UnRegisterAdvise(ulConnection);
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
+		return MAPI_E_NO_SUPPORT;
 	} 
 	
 	// Set out value
 	*lpulConnection = ulConnection;
-	hr = hrSuccess;
-
-exit:
-	TRACE_NOTIFY(TRACE_RETURN, "ECNotifyClient::Advise", "hr=0x%08X connection=%d", hr, *lpulConnection);
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates,
     IECChangeAdviseSink *lpChangeAdviseSink, ECLISTCONNECTION *lplstConnections)
 {
-	TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::AdviseICS", "");
-
 	HRESULT				hr = MAPI_E_NO_SUPPORT;
 	ECLISTSYNCADVISE	lstAdvises;
 
@@ -384,36 +363,20 @@ exit:
 		     iSyncAdvise != lstAdvises.cend(); ++iSyncAdvise)
 			UnRegisterAdvise(iSyncAdvise->ulConnection);
 	}
-
-	TRACE_NOTIFY(TRACE_RETURN, "ECNotifyClient::AdviseICS", "hr=0x%08X", hr);
 	return hr;
 }
 
 HRESULT ECNotifyClient::Unadvise(ULONG ulConnection)
 {
-	TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::Unadvise", "%d", ulConnection);
-
-	HRESULT hr	= MAPI_E_NO_SUPPORT;
-
 	// Logoff the advisor
-	hr = m_lpTransport->HrUnSubscribe(ulConnection);
+	auto hr = m_lpTransport->HrUnSubscribe(ulConnection);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = UnRegisterAdvise(ulConnection);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	TRACE_NOTIFY(TRACE_RETURN, "ECNotifyClient::Unadvise", "hr=0x%08X", hr);
-
-	return hr;
+		return hr;
+	return UnRegisterAdvise(ulConnection);
 }
 
 HRESULT ECNotifyClient::Unadvise(const ECLISTCONNECTION &lstConnections)
 {
-	TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::Unadvise", "");
-
 	HRESULT hr	= MAPI_E_NO_SUPPORT;
 	HRESULT hrTmp;
 	bool bWithErrors = false;
@@ -437,9 +400,6 @@ HRESULT ECNotifyClient::Unadvise(const ECLISTCONNECTION &lstConnections)
 
 	if (SUCCEEDED(hr) && bWithErrors)
 		hr = MAPI_W_ERRORS_RETURNED;
-
-	TRACE_NOTIFY(TRACE_RETURN, "ECNotifyClient::Unadvise", "hr=0x%08X", hr);
-
 	return hr;
 }
 
@@ -488,7 +448,6 @@ typedef std::list<SBinary *> BINARYLIST;
 
 HRESULT ECNotifyClient::NotifyReload()
 {
-	HRESULT hr = hrSuccess;
 	struct notification notif;
 	struct notificationTable table;
 	NOTIFYLIST notifications;
@@ -513,7 +472,7 @@ HRESULT ECNotifyClient::NotifyReload()
 	for (const auto &p : m_mapAdvise)
 		if (p.second->cbKey == 4)
 			Notify(p.first, notifications);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotifications)
@@ -528,8 +487,6 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 		hr = CopySOAPNotificationToMAPINotification(m_lpProvider, notp, &tmp);
 		if (hr != hrSuccess)
 			continue;
-
-		TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::Notify", "id=%d\n%s", notp->ulConnection, NotificationToString(1, tmp).c_str());
 		notifications.push_back(tmp);
 	}
 
@@ -538,10 +495,8 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 	/* Search for the right connection */
 	iterAdvise = m_mapAdvise.find(ulConnection);
 	if (iterAdvise == m_mapAdvise.cend() ||
-	    iterAdvise->second->lpAdviseSink == NULL) {
-		TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::Notify", "Unknown Notification id %d", ulConnection);
+	    iterAdvise->second->lpAdviseSink == nullptr)
 		goto exit;
-	}
 
 	if (!notifications.empty()) {
 		/* Send notifications in batches of MAX_NOTIFS_PER_CALL notifications */
@@ -563,21 +518,19 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 			/* Send notification to the listener */
 			if (!iterAdvise->second->ulSupportConnection) {
 				if (iterAdvise->second->lpAdviseSink->OnNotify(i, lpNotifs) != 0)
-					TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::Notify", "Error by notify a client");
-			} else {
-				memory_ptr<NOTIFKEY> lpKey;
-				ULONG		ulResult = 0;
-
-				hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), &~lpKey);
-				if (hr != hrSuccess)
-					goto exit;
-
-				lpKey->cb = sizeof(GUID);
-				memcpy(lpKey->ab, &iterAdvise->second->guid, sizeof(GUID));
-
-				// FIXME log errors
-				m_lpSupport->Notify(lpKey, i, lpNotifs, &ulResult);
+					ec_log_debug("ECNotifyClient::Notify: Error by notify a client");
+				continue;
 			}
+			memory_ptr<NOTIFKEY> lpKey;
+			ULONG ulResult = 0;
+
+			hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), &~lpKey);
+			if (hr != hrSuccess)
+				goto exit;
+			lpKey->cb = sizeof(GUID);
+			memcpy(lpKey->ab, &iterAdvise->second->guid, sizeof(GUID));
+			// FIXME log errors
+			m_lpSupport->Notify(lpKey, i, lpNotifs, &ulResult);
 		}
 	}
 exit:
@@ -613,8 +566,6 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 		hr = CopySOAPChangeNotificationToSyncState(notp, &tmp, lpSyncStates);
 		if (hr != hrSuccess)
 			continue;
-
-		TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::NotifyChange", "id=%d\n%s", notp->ulConnection, bin2hex(tmp->cb, tmp->lpb).c_str());
 		syncStates.push_back(tmp);
 	}
 
@@ -622,29 +573,25 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 	biglock.lock();
 	iterAdvise = m_mapChangeAdvise.find(ulConnection);
 	if (iterAdvise == m_mapChangeAdvise.cend() ||
-	    iterAdvise->second->lpAdviseSink == NULL) {
-		TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::NotifyChange", "Unknown Notification id %d", ulConnection);
+	    iterAdvise->second->lpAdviseSink == nullptr)
 		return hr;
-	}
 
-	if (!syncStates.empty()) {
-		/* Send notifications in batches of MAX_NOTIFS_PER_CALL notifications */
-		auto iterSyncStates = syncStates.cbegin();
-		while (iterSyncStates != syncStates.cend()) {
-
-			lpSyncStates->cValues = 0;
-			while (iterSyncStates != syncStates.cend() &&
-			       lpSyncStates->cValues < MAX_NOTIFS_PER_CALL) {
-				/* We can do a straight memcpy here because pointers are still intact */
-				memcpy(&lpSyncStates->lpbin[lpSyncStates->cValues++], *iterSyncStates, sizeof *lpSyncStates->lpbin);
-				++iterSyncStates;
-			}
-
-			/* Send notification to the listener */
-			if (iterAdvise->second->lpAdviseSink->OnNotify(0, lpSyncStates) != 0)
-				TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::NotifyChange", "Error by notify a client");
-
+	if (syncStates.empty())
+		return hrSuccess;
+	/* Send notifications in batches of MAX_NOTIFS_PER_CALL notifications */
+	auto iterSyncStates = syncStates.cbegin();
+	while (iterSyncStates != syncStates.cend()) {
+		lpSyncStates->cValues = 0;
+		while (iterSyncStates != syncStates.cend() &&
+		       lpSyncStates->cValues < MAX_NOTIFS_PER_CALL) {
+			/* We can do a straight memcpy here because pointers are still intact */
+			memcpy(&lpSyncStates->lpbin[lpSyncStates->cValues++], *iterSyncStates, sizeof *lpSyncStates->lpbin);
+			++iterSyncStates;
 		}
+
+		/* Send notification to the listener */
+		if (iterAdvise->second->lpAdviseSink->OnNotify(0, lpSyncStates) != 0)
+			ec_log_debug("ECNotifyClient::NotifyChange: Error by notify a client");
 	}
 	return hrSuccess;
 }

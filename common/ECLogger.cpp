@@ -14,12 +14,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include "config.h"
 #include <kopano/platform.h>
 #include <kopano/ECLogger.h>
 #include <kopano/lockhelper.hpp>
 #include <mutex>
 #include <cassert>
+#include <climits>
 #include <clocale>
 #include <pthread.h>
 #include <cstdarg>
@@ -44,6 +45,8 @@
 using namespace std;
 
 namespace KC {
+
+static void ec_log_bt(unsigned int, const char *, ...);
 
 static const char *const ll_names[] = {
 	" notice",
@@ -202,7 +205,9 @@ ECLogger_File::~ECLogger_File() {
 	KC::shared_lock<KC::shared_mutex> lh(handle_lock);
 
 	if (prevcount > 1)
-		fnPrintf(log, "%sPrevious message logged %d times\n", DoPrefix().c_str(), prevcount);
+		fnPrintf(log, "%sLast message repeated %d times\n", DoPrefix().c_str(), prevcount);
+	else if (prevcount == 1)
+		fnPrintf(log, "%sLast message repeated 1 time\n", DoPrefix().c_str());
 	if (log && fnClose)
 		fnClose(log);
 }
@@ -300,11 +305,11 @@ std::string ECLogger_File::DoPrefix() {
 		char name[32] = { 0 };
 
 		if (pthread_getname_np(th, name, sizeof name))
-			out += format("[0x%lx] ", kc_threadid());
+			out += format("[T%lu] ", kc_threadid());
 		else
-			out += format("[%s|0x%lx] ", name, kc_threadid());
+			out += format("[%s|T%lu] ", name, kc_threadid());
 #else
-		out += format("[0x%lx] ", kc_threadid());
+		out += format("[T%lu] ", kc_threadid());
 #endif
 	}
 	else if (prefix == LP_PID) {
@@ -312,15 +317,6 @@ std::string ECLogger_File::DoPrefix() {
 	}
 
 	return out;
-}
-
-/**
- * Check if the ECLogger_File instance is logging to stderr.
- * @retval	true	This instance is logging to stderr.
- * @retval	false	This instance is not logging to stderr.
- */
-bool ECLogger_File::IsStdErr() {
-	return logname == "-";
 }
 
 bool ECLogger_File::DupFilter(const unsigned int loglevel, const std::string &message) {
@@ -385,6 +381,18 @@ void ECLogger_File::LogVA(unsigned int loglevel, const char *format, va_list& va
 	Log(loglevel, std::string(msgbuffer));
 }
 
+const int ECLogger_Syslog::levelmap[16] = {
+	/* EC_LOGLEVEL_NONE */    LOG_DEBUG,
+	/* EC_LOGLEVEL_CRIT */    LOG_CRIT,
+	/* EC_LOGLEVEL_ERROR */   LOG_WARNING,
+	/* EC_LOGLEVEL_WARNING */ LOG_WARNING,
+	/* EC_LOGLEVEL_NOTICE */  LOG_NOTICE,
+	/* EC_LOGLEVEL_INFO */    LOG_INFO,
+	/* EC_LOGLEVEL_DEBUG */   LOG_DEBUG,
+	/* 7-14 */ 0,0,0,0,0,0,0,0,
+	/* EC_LOGLEVEL_ALWAYS */  LOG_ALERT,
+};
+
 ECLogger_Syslog::ECLogger_Syslog(unsigned int max_ll, const char *ident, int facility) : ECLogger(max_ll) {
 	/*
 	 * Because @ident can go away, and openlog(3) does not make a copy for
@@ -397,14 +405,6 @@ ECLogger_Syslog::ECLogger_Syslog(unsigned int max_ll, const char *ident, int fac
 		m_ident = strdup(ident);
 		openlog(m_ident, LOG_PID, facility);
 	}
-	levelmap[EC_LOGLEVEL_NONE] = LOG_DEBUG;
-	levelmap[EC_LOGLEVEL_CRIT] = LOG_CRIT;
-	levelmap[EC_LOGLEVEL_ERROR] = LOG_ERR;
-	levelmap[EC_LOGLEVEL_WARNING] = LOG_WARNING;
-	levelmap[EC_LOGLEVEL_NOTICE] = LOG_NOTICE;
-	levelmap[EC_LOGLEVEL_INFO] = LOG_INFO;
-	levelmap[EC_LOGLEVEL_DEBUG] = LOG_DEBUG;
-	levelmap[EC_LOGLEVEL_ALWAYS] = LOG_ALERT;
 }
 
 ECLogger_Syslog::~ECLogger_Syslog() {
@@ -562,7 +562,7 @@ void ECLogger_Pipe::Log(unsigned int loglevel, const std::string &message) {
 
 	if (prefix == LP_TID)
 		len = snprintf(msgbuffer + off, sizeof(msgbuffer) - off,
-		      "[0x%lx] ", kc_threadid());
+		      "[T%lu] ", kc_threadid());
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%5d] ", getpid());
 
@@ -606,7 +606,7 @@ void ECLogger_Pipe::LogVA(unsigned int loglevel, const char *format, va_list& va
 	off += 1;
 
 	if (prefix == LP_TID)
-		len = snprintf(msgbuffer + off, sizeof(msgbuffer) - off, "[0x%lx] ", kc_threadid());
+		len = snprintf(msgbuffer + off, sizeof(msgbuffer) - off, "[T%lu] ", kc_threadid());
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%5d] ", getpid());
 
@@ -754,7 +754,7 @@ namespace PrivatePipe {
  * @return		ECLogger	Returns the same or new ECLogger object to use in your program.
  */
 ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
-	ECLogger_File *lpFileLogger = dynamic_cast<ECLogger_File*>(lpLogger);
+	auto lpFileLogger = dynamic_cast<ECLogger_File *>(lpLogger);
 	ECLogger_Pipe *lpPipeLogger = NULL;
 	int filefd;
 	int pipefds[2];
@@ -823,12 +823,16 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 	string prepend;
 	int loglevel = 0;
 	int syslog_facility = LOG_MAIL;
+	auto log_method = lpConfig->GetSetting("log_method");
+	auto log_file   = lpConfig->GetSetting("log_file");
 
 	if (bAudit) {
 #if 1 /* change to ifdef HAVE_LOG_AUTHPRIV */
 		if (!parseBool(lpConfig->GetSetting("audit_log_enabled")))
 			return NULL;
 		prepend = "audit_";
+		log_method = lpConfig->GetSetting("audit_log_method");
+		log_file   = lpConfig->GetSetting("audit_log_file");
 		syslog_facility = LOG_AUTHPRIV;
 #else
 		return NULL;    // No auditing in Windows, apparently.
@@ -837,25 +841,21 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 
 	loglevel = strtol(lpConfig->GetSetting((prepend+"log_level").c_str()), NULL, 0);
 
-	if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "syslog") == 0) {
+	if (strcasecmp(log_method, "syslog") == 0) {
 		char *argzero = strdup(argv0);
 		lpLogger = new ECLogger_Syslog(loglevel, basename(argzero), syslog_facility);
 		free(argzero);
-	} else if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "eventlog") == 0) {
+	} else if (strcasecmp(log_method, "eventlog") == 0) {
 		fprintf(stderr, "eventlog logging is only available on windows.\n");
-	} else if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "file") == 0) {
+	} else if (strcasecmp(log_method, "file") == 0) {
 		int ret = 0;
 		const struct passwd *pw = NULL;
 		const struct group *gr = NULL;
-		if (strcmp(lpConfig->GetSetting((prepend+"log_file").c_str()), "-")) {
-			if (lpConfig->GetSetting("run_as_user") && strcmp(lpConfig->GetSetting("run_as_user"),""))
-				pw = getpwnam(lpConfig->GetSetting("run_as_user"));
-			else
-				pw = getpwuid(getuid());
-			if (lpConfig->GetSetting("run_as_group") && strcmp(lpConfig->GetSetting("run_as_group"),""))
-				gr = getgrnam(lpConfig->GetSetting("run_as_group"));
-			else
-				gr = getgrgid(getgid());
+		if (strcmp(log_file, "-") != 0) {
+			auto s = lpConfig->GetSetting("run_as_user");
+			pw = s != nullptr && *s != '\0' ? getpwnam(s) : getpwuid(getuid());
+			s = lpConfig->GetSetting("run_as_group");
+			gr = s != nullptr && *s != '\0' ? getgrnam(s) : getgrgid(getgid());
 
 			// see if we can open the file as the user we're supposed to run as
 			if (pw || gr) {
@@ -867,10 +867,10 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 						setgid(gr->gr_gid);
 					if (pw)
 						setuid(pw->pw_uid);
-					FILE *test = fopen(lpConfig->GetSetting((prepend+"log_file").c_str()), "a");
+					auto test = fopen(log_file, "a");
 					if (!test) {
 						fprintf(stderr, "Unable to open logfile '%s' as user '%s'\n",
-								lpConfig->GetSetting((prepend+"log_file").c_str()), pw ? pw->pw_name : "???");
+						        log_file, pw != nullptr ? pw->pw_name : "???");
 						_exit(1);
 					}
 					else {
@@ -893,7 +893,7 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 			const char *log_buffer_size_str = lpConfig->GetSetting("log_buffer_size");
 			if (log_buffer_size_str)
 				log_buffer_size = strtoul(log_buffer_size_str, NULL, 0);
-			ECLogger_File *log = new ECLogger_File(loglevel, logtimestamp, lpConfig->GetSetting((prepend + "log_file").c_str()), false);
+			auto log = new ECLogger_File(loglevel, logtimestamp, log_file, false);
 			log->reinit_buffer(log_buffer_size);
 			lpLogger = log;
 			// chown file
@@ -904,10 +904,10 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 					uid = pw->pw_uid;
 				if (gr)
 					gid = gr->gr_gid;
-				chown(lpConfig->GetSetting((prepend+"log_file").c_str()), uid, gid);
+				chown(log_file, uid, gid);
 			}
 		} else {
-			fprintf(stderr, "Not enough permissions to append logfile '%s'. Reverting to stderr.\n", lpConfig->GetSetting((prepend+"log_file").c_str()));
+			fprintf(stderr, "Not enough permissions to append logfile '%s'. Reverting to stderr.\n", log_file);
 			bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));
 			lpLogger = new ECLogger_File(loglevel, logtimestamp, "-", false);
 		}
@@ -986,8 +986,12 @@ void generic_sigsegv_handler(ECLogger *lpLogger, const char *app_name,
 	ec_log_bt(EC_LOGLEVEL_CRIT, "Backtrace:");
 	ec_log_crit("Signal errno: %s, signal code: %d", strerror(si->si_errno), si->si_code);
 	ec_log_crit("Sender pid: %d, sender uid: %d, si_status: %d", si->si_pid, si->si_uid, si->si_status);
-	ec_log_crit("User time: %ld, system time: %ld, signal value: %d", si->si_utime, si->si_stime, si->si_value.sival_int);
-	ec_log_crit("Faulting address: %p, affected fd: %d", si->si_addr, si->si_fd);
+	ec_log_crit("User time: %ld, system time: %ld, signal value: %d",
+		static_cast<long>(si->si_utime), static_cast<long>(si->si_stime), si->si_value.sival_int);
+	ec_log_crit("Faulting address: %p", si->si_addr);
+#ifdef HAVE_SIGINFO_T_SI_FD
+	ec_log_crit("Affected fd: %d", si->si_fd);
+#endif
 	lpLogger->Log(EC_LOGLEVEL_FATAL, "When reporting this traceback, please include Linux distribution name (and version), system architecture and Kopano version.");
 	/* Reset to DFL to avoid recursion */
 	if (signal(signr, SIG_DFL) == SIG_ERR)
@@ -1043,7 +1047,7 @@ void ec_log(unsigned int level, const std::string &msg)
 	ec_log_target->Log(level, msg);
 }
 
-void ec_log_bt(unsigned int level, const char *fmt, ...)
+static void ec_log_bt(unsigned int level, const char *fmt, ...)
 {
 	if (!ec_log_target->Log(level))
 		return;

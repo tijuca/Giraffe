@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <utility>
 #include <kopano/platform.h>
 #include "icaluid.h"
 #include <mapix.h>
@@ -58,12 +58,11 @@ HRESULT HrGenerateUid(std::string *lpStrData)
 		return hr;
 	strBinUid = strByteArrayID;	// Outlook Guid
 	strBinUid += "00000000";	// InstanceDate
-	strBinUid += bin2hex(sizeof(FILETIME), (LPBYTE)&ftNow);
+	strBinUid += bin2hex(sizeof(FILETIME), &ftNow);
 	strBinUid += "0000000000000000"; // Padding
-	strBinUid += bin2hex(sizeof(ULONG), (LPBYTE)&ulSize); // always 1
-	strBinUid += bin2hex(sizeof(GUID), (LPBYTE)&sGuid);	// new guid
-
-	lpStrData->swap(strBinUid);
+	strBinUid += bin2hex(sizeof(ULONG), &ulSize); // always 1
+	strBinUid += bin2hex(sizeof(GUID), &sGuid); // new guid
+	*lpStrData = std::move(strBinUid);
 	return hrSuccess;
 }
 
@@ -77,6 +76,7 @@ HRESULT HrGenerateUid(std::string *lpStrData)
  */
 HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 {
+	void *origbase = base;
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropVal = NULL;
 	std::string strUid, strBinUid;
@@ -88,7 +88,7 @@ HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 		base = lpPropVal;
 	}
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpPropVal->ulPropTag = ulNamedTag;
 
@@ -109,7 +109,7 @@ HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 	*lppPropVal = lpPropVal;
 
 exit:
-	if (hr != hrSuccess && base == nullptr)
+	if (hr != hrSuccess && origbase == nullptr)
 		MAPIFreeBuffer(lpPropVal);
 
 	return hr;
@@ -135,8 +135,7 @@ HRESULT HrGetICalUidFromBinUid(const SBinary &sBin, std::string *lpStrUid)
 		strUid = (char*)sBin.lpb + 0x34;
 	else
 		strUid = bin2hex(sBin.cb, sBin.lpb);
-	lpStrUid->swap(strUid);
-
+	*lpStrUid = std::move(strUid);
 	return hr;
 }
 
@@ -144,7 +143,7 @@ HRESULT HrGetICalUidFromBinUid(const SBinary &sBin, std::string *lpStrUid)
  * Converts ical UID to Outlook compatible UIDs.
  *
  * Add a special Outlook GUID and marker to the Ical UID. This format
- * is used in Outlook for non-outlook UIDs send by other ICal clients.
+ * is used in Outlook for non-outlook UIDs sent by other ICal clients.
  *
  * @param[in]	strUid			ical UID
  * @param[out]	lpStrBinUid		returned outlook compatible string UID 
@@ -163,9 +162,7 @@ HRESULT HrMakeBinUidFromICalUid(const std::string &strUid, std::string *lpStrBin
 	strBinUid.append((char*)&len, 4);
 	strBinUid.append(strUid);
 	strBinUid.append("\x00", 1);
-
-	lpStrBinUid->swap(strBinUid);
-
+	*lpStrBinUid = std::move(strBinUid);
 	return hr;
 }
 

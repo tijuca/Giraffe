@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <new>
 #include "kcore.hpp"
 #include <kopano/lockhelper.hpp>
 #include <kopano/kcodes.h>
@@ -27,7 +28,7 @@
 #include <kopano/mapiext.h>
 
 #include <kopano/EMSAbTag.h>
-
+#include <kopano/Util.h>
 #include "SOAPUtils.h"
 #include "ECABObjectTable.h"
 #include "ECSecurity.h"
@@ -36,13 +37,14 @@
 #include "ECSessionManager.h"
 #include <kopano/stringutil.h>
 
+using namespace std;
 using namespace KCHL;
 
 namespace KC {
 
 ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, ulABType, ulFlags, locale)
 {
-	ECODAB* lpODAB = new ECODAB;
+	auto lpODAB = new ECODAB;
 	lpODAB->ulABId = ulABId;
 	lpODAB->ulABType = ulABType;
 	lpODAB->ulABParentId = ulABParentId;
@@ -58,35 +60,28 @@ ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsi
 	m_ulUserManagementFlags = USERMANAGEMENT_IDS_ONLY | USERMANAGEMENT_ADDRESSBOOK;
 
 	// Set the default sort order for Address Book entries
-	struct sortOrder sObjectType[] = {
-		{
-			/*
-			 * The Global Address Book must be the first entry
-			 * in getHierarchyTable() otherwise it will not
-			 * be set as default directory!
-			 *
-			 * To support future hierarchy additions like
-			 * company subcontainers, or other global containers
-			 * besides the GAB, we should sort the table using the
-			 * PR_EMS_AB_HIERARCHY_PATH property which is formatted
-			 * as followed for the GAB and Address Lists :
-			 *
-			 * 		/Global Address Book
-			 *		/Global Address Book/Company A
-			 *		/Global Address Book/Company B
-			 *		/Global Address Lists/Addresslist A
-			 *		/Global Address Lists/Addresslist B
-			 */
-			PR_EMS_AB_HIERARCHY_PATH,
-			EC_TABLE_SORT_ASCEND,
-		},
-	};
-
-	struct sortOrderArray sDefaultSortOrder = {
-		sObjectType,
-		ARRAY_SIZE(sObjectType),
-	};
-
+	/*
+	 * The Global Address Book must be the first entry in
+	 * getHierarchyTable() otherwise it will not be set as default
+	 * directory!
+	 *
+	 * To support future hierarchy additions like company subcontainers, or
+	 * other global containers besides the GAB, we should sort the table
+	 * using the PR_EMS_AB_HIERARCHY_PATH property which is formatted as
+	 * followed for the GAB and Address Lists:
+	 *
+	 * /Global Address Book
+	 * /Global Address Book/Company A
+	 * /Global Address Book/Company B
+	 * /Global Address Lists/Addresslist A
+	 * /Global Address Lists/Addresslist B
+	 */
+	struct sortOrder sObjectType;
+	sObjectType.ulPropTag = PR_EMS_AB_HIERARCHY_PATH;
+	sObjectType.ulOrder   = EC_TABLE_SORT_ASCEND;
+	struct sortOrderArray sDefaultSortOrder;
+	sDefaultSortOrder.__ptr = &sObjectType;
+	sDefaultSortOrder.__size = 1;
 	SetSortOrder(&sDefaultSortOrder, 0, 0);
 }
 
@@ -97,18 +92,13 @@ ECABObjectTable::~ECABObjectTable()
 
 ECRESULT ECABObjectTable::Create(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale, ECABObjectTable **lppTable)
 {
-	*lppTable = new ECABObjectTable(lpSession, ulABId, ulABType, ulABParentId, ulABParentType, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECABObjectTable>(lpSession, ulABId, ulABType,
+	       ulABParentId, ulABParentType, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 {
-	ECRESULT		er = erSuccess;
-	ECODAB *lpODAB = (ECODAB*)m_lpObjectData;
-	scoped_rlock lock(m_hLock);
+	auto lpODAB = static_cast<const ECODAB *>(m_lpObjectData);
 	assert(lplstProps != NULL);
 	
 	//List always empty
@@ -135,7 +125,7 @@ ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 	    // Contents table
 	    lplstProps->push_back(PR_SMTP_ADDRESS);
 	}
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECListInt* lplistMVPropTag)
@@ -148,15 +138,17 @@ ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECLis
 
 ECRESULT ECABObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount)
 {
-	scoped_rlock lock(m_hLock);
 	*lpulCount = 0;
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData, bool bTableLimit)
+ECRESULT ECABObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bTableData, bool bTableLimit)
 {
 	ECRESULT er = erSuccess;
-	ECODAB *lpODAB = (ECODAB*)lpObjectData;
+	auto lpODAB = static_cast<const ECODAB *>(lpObjectData);
 	struct rowSet	*lpsRowSet = NULL;
 	assert(lpRowList != NULL);
 
@@ -194,20 +186,19 @@ struct filter_objects {
 ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsigned int ulFlags,
 												   list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
 	if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_BOOK ||
 		ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_LISTS)
 	{
 		/* Global Address Book, load addresslist of the users own company */
-		er = lpSession->GetSecurity()->GetUserCompany(&ulObjectId);
+		auto er = lpSession->GetSecurity()->GetUserCompany(&ulObjectId);
 		if (er != erSuccess)
 			return er;
 	}
 
-	er = lpSession->GetUserManagement()->GetCompanyObjectListAndSync(CONTAINER_ADDRESSLIST,
-	     ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
+	auto er = lpSession->GetUserManagement()->GetCompanyObjectListAndSync(CONTAINER_ADDRESSLIST,
+	          ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
 	if (er != erSuccess)
 		return er;
 
@@ -222,11 +213,10 @@ ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsi
 ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId, unsigned int ulFlags,
 											   list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	ECSecurity *lpSecurity = lpSession->GetSecurity();
 
-	er = lpSecurity->GetViewableCompanyIds(m_ulUserManagementFlags, &unique_tie(lpObjects));
+	auto er = lpSecurity->GetViewableCompanyIds(m_ulUserManagementFlags, &unique_tie(lpObjects));
 	if (er != erSuccess)
 		return er;
 	/*
@@ -251,7 +241,6 @@ ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId, unsigned
 ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsigned int ulFlags,
 												 list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	objectid_t objectid;
 
@@ -263,11 +252,10 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		 * the second is the Global Address Lists container.
 		 */
 		lpObjects.reset(new std::list<localobjectdetails_t>());
-		lpObjects->push_back(localobjectdetails_t(KOPANO_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY));
+		lpObjects->push_back({KOPANO_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY});
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
 			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_BOOK);
-
-		lpObjects->push_back(localobjectdetails_t(KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST));
+		lpObjects->push_back({KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST});
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
 			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_LISTS);
 
@@ -286,13 +274,13 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		 *    in the hierarchy view. The user will not be allowed to open it, so it isn't a real security risk,
 		 *    but since we still have issue (1) open, we might as well disable the hierarchy view
 		 *    containers completely. */
-		er = LoadHierarchyCompany(ulObjectId, ulFlags, &unique_tie(lpObjects));
+		auto er = LoadHierarchyCompany(ulObjectId, ulFlags, &unique_tie(lpObjects));
 		if (er != erSuccess)
 			return er;
 	} else if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_LISTS) {
 		if (lpSession->GetSecurity()->GetUserId() == KOPANO_UID_SYSTEM)
 			return KCERR_INVALID_PARAMETER;
-		er = LoadHierarchyAddressList(ulObjectId, ulFlags, &unique_tie(lpObjects));
+		auto er = LoadHierarchyAddressList(ulObjectId, ulFlags, &unique_tie(lpObjects));
 		if (er != erSuccess)
 			return er;
 	} else {
@@ -310,11 +298,10 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId, unsigned int ulFlags,
 												  list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
-	er = lpSession->GetUserManagement()->GetSubObjectsOfObjectAndSync(OBJECTRELATION_ADDRESSLIST_MEMBER,
-	     ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
+	auto er = lpSession->GetUserManagement()->GetSubObjectsOfObjectAndSync(OBJECTRELATION_ADDRESSLIST_MEMBER,
+	          ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
 	if (er != erSuccess)
 		return er;
 
@@ -329,11 +316,10 @@ ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId, unsig
 ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId, unsigned int ulFlags,
 											  list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
-	er = lpSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN,
-	     ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
+	auto er = lpSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN,
+	          ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
 	if (er != erSuccess)
 		return er;
 
@@ -348,11 +334,10 @@ ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId, unsigned 
 ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId, unsigned int ulFlags,
 											   list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
-	er = lpSession->GetUserManagement()->GetSubObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
-	     ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
+	auto er = lpSession->GetUserManagement()->GetSubObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
+	          ulObjectId, &unique_tie(lpObjects), m_ulUserManagementFlags);
 	if (er != erSuccess)
 		return er;
 
@@ -366,8 +351,7 @@ ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId, unsigned
 
 ECRESULT ECABObjectTable::Load()
 {
-	ECRESULT er = erSuccess;
-	ECODAB *lpODAB = (ECODAB*)m_lpObjectData;
+	auto lpODAB = static_cast<const ECODAB *>(m_lpObjectData);
 	sObjectTableKey sRowItem;
 
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
@@ -377,9 +361,11 @@ ECRESULT ECABObjectTable::Load()
 	objectid_t objectid;
 
 	// If the GAB is disabled, don't show any entries except the top-level object
-	if(lpODAB->ulABParentId != 0 && parseBool(lpSession->GetSessionManager()->GetConfig()->GetSetting("enable_gab")) == false && lpSession->GetSecurity()->GetAdminLevel() == 0)
-		return er;
-	er = lpSession->GetSecurity()->IsUserObjectVisible(lpODAB->ulABParentId);
+	auto sesmgr = lpSession->GetSessionManager();
+	auto sec = lpSession->GetSecurity();
+	if (lpODAB->ulABParentId != 0 && parseBool(sesmgr->GetConfig()->GetSetting("enable_gab")) == false && sec->GetAdminLevel() == 0)
+		return erSuccess;
+	auto er = sec->IsUserObjectVisible(lpODAB->ulABParentId);
 	if (er != erSuccess)
 		return er;
 	/*
@@ -398,7 +384,7 @@ ECRESULT ECABObjectTable::Load()
 		/*
 		 * Load contents of Global Address Book
 		 */
-		er = lpSession->GetSecurity()->GetUserCompany(&ulObjectId);
+		er = sec->GetUserCompany(&ulObjectId);
 		if (er != erSuccess)
 			return er;
 		er = LoadContentsCompany(ulObjectId, AB_FILTER_ADDRESSLIST, &unique_tie(lpObjects));
@@ -410,7 +396,7 @@ ECRESULT ECABObjectTable::Load()
 		 * that one isn't visible.
 		 */
 		if (!ulObjectId)
-			lpObjects->push_front(localobjectdetails_t(ulObjectId, CONTAINER_COMPANY));
+			lpObjects->push_front({ulObjectId, CONTAINER_COMPANY});
 	} else if (lpODAB->ulABParentId == KOPANO_UID_GLOBAL_ADDRESS_LISTS && lpODAB->ulABParentType == MAPI_ABCONT) {
 		/*
 		 * Load contents of Global Address Lists
@@ -420,8 +406,9 @@ ECRESULT ECABObjectTable::Load()
 		/*
 		 * Load contents of distlist, company or addresslist
 		 */
-		if (!lpSession->GetUserManagement()->IsInternalObject(lpODAB->ulABParentId)) {
-			er = lpSession->GetUserManagement()->GetExternalId(lpODAB->ulABParentId, &objectid);
+		auto usrmgt = lpSession->GetUserManagement();
+		if (!usrmgt->IsInternalObject(lpODAB->ulABParentId)) {
+			er = usrmgt->GetExternalId(lpODAB->ulABParentId, &objectid);
 			if (er != erSuccess)
 				return er;
 
@@ -469,7 +456,7 @@ ECRESULT ECABObjectTable::Load()
 
 	for (const auto &obj : *lpObjects) {
 		/* Only add visible items */
-		if (lpSession->GetSecurity()->IsUserObjectVisible(obj.ulId) != erSuccess)
+		if (sec->IsUserObjectVisible(obj.ulId) != erSuccess)
 			continue;
 		lstObjects.push_back(obj.ulId);
 	}

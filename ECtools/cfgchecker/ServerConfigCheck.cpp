@@ -53,11 +53,8 @@ void ServerConfigCheck::loadChecks()
 
 	addCheck("enable_distributed_kopano", 0, &testBoolean);
 	addCheck("server_name", CONFIG_MULTI_USED);
-// 	addCheck("thread_stacksize", 0, &testMinInt, 25);
-
 	addCheck("enable_gab", 0, &testBoolean);
 	addCheck("enable_sso_ntlmauth", 0, &testBoolean);
-	addCheck("sync_log_all_changes", 0, &testBoolean);
 	addCheck("client_update_enabled", 0, &testBoolean);
 	addCheck("hide_everyone", 0, &testBoolean);
 	addCheck("index_services_enabled", 0, &testBoolean);
@@ -105,12 +102,6 @@ int ServerConfigCheck::testPlugin(const config_check_t *check)
 		printError(check->option1, "Unix plugin does not support multi-tenancy");
 		return CHECK_ERROR;
 	}
-
-	if (check->multi && check->value1 != "ldapms") {
-		printError(check->option1, check->value1 + " plugin does not support multiserver");
-		return CHECK_ERROR;
-	}
-
 	if (check->multi && check->value1 == "ldap") {
 		printError(check->option1, "Unix plugin does not support multiserver");
 		return CHECK_ERROR;

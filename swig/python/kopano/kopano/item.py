@@ -5,13 +5,16 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
-import codecs
 import datetime
 import email.parser
 import email.utils
 from functools import wraps
+import random
 import sys
+import struct
+import time
 import traceback
+import warnings
 
 try:
     import cPickle as pickle
@@ -27,12 +30,12 @@ from MAPI import (
     MAPI_CREATE, MAPI_MODIFY, MAPI_DEFERRED_ERRORS,
     ATTACH_BY_VALUE, ATTACH_EMBEDDED_MSG, STGM_WRITE, STGM_TRANSACTED,
     MAPI_UNICODE, MAPI_TO, MAPI_CC, MAPI_BCC, MAPI_E_NOT_FOUND,
-    MAPI_E_NOT_ENOUGH_MEMORY
+    MAPI_E_NOT_ENOUGH_MEMORY, PT_SYSTIME, MAPI_ASSOCIATED
 )
 from MAPI.Defs import HrGetOneProp, CHANGE_PROP_TYPE, bin2hex
 from MAPI.Struct import (
     SPropValue, MAPIErrorNotFound, MAPIErrorUnknownEntryid,
-    MAPIErrorInterfaceNotSupported, MAPIErrorUnconfigured,
+    MAPIErrorInterfaceNotSupported, MAPIErrorUnconfigured, MAPIErrorNoAccess,
 )
 from MAPI.Tags import (
     PR_BODY, PR_DISPLAY_NAME_W, PR_MESSAGE_CLASS_W,
@@ -50,40 +53,57 @@ from MAPI.Tags import (
     PR_SENT_REPRESENTING_ENTRYID, PR_MESSAGE_RECIPIENTS,
     PR_MESSAGE_ATTACHMENTS, PR_RECIPIENT_TYPE, PR_ADDRTYPE_W,
     PR_EMAIL_ADDRESS_W, PR_SMTP_ADDRESS_W, PR_NULL, PR_HTML,
-    PR_RTF_COMPRESSED
+    PR_RTF_COMPRESSED, PR_SEARCH_KEY, PR_SENDER_SEARCH_KEY,
+    PR_START_DATE, PR_END_DATE, PR_OWNER_APPT_ID, PR_RESPONSE_REQUESTED,
+    PR_SENT_REPRESENTING_SEARCH_KEY, PR_ATTACHMENT_FLAGS,
+    PR_ATTACHMENT_HIDDEN, PR_ATTACHMENT_LINKID, PR_ATTACH_FLAGS,
+    PR_NORMALIZED_SUBJECT_W,
 )
 
 from MAPI.Tags import IID_IAttachment, IID_IStream, IID_IMAPITable, IID_IMailUser, IID_IMessage
 
 from .compat import (
-    unhex as _unhex, is_str as _is_str, repr as _repr,
+    hex as _hex, unhex as _unhex, is_str as _is_str, repr as _repr,
     pickle_load as _pickle_load, pickle_loads as _pickle_loads,
-    fake_unicode as _unicode, is_file as _is_file
+    fake_unicode as _unicode, is_file as _is_file,
+    encode as _encode
 )
 
 from .defs import (
     NAMED_PROPS_ARCHIVER, NAMED_PROP_CATEGORY, ADDR_PROPS,
     PSETID_Archive
 )
-from .errors import Error
+from .errors import Error, NotFoundError, _DeprecationWarning
 
 from .attachment import Attachment
 from .body import Body
+from .base import Base
 from .recurrence import Recurrence, Occurrence
-from .prop import Property
+from .meetingrequest import MeetingRequest
 from .address import Address
 from .table import Table
 
 if sys.hexversion >= 0x03000000:
     from . import folder as _folder
-    from . import store as _store
-    from . import user as _user
-    from . import utils as _utils
+    try:
+        from . import store as _store
+    except ImportError:
+        _store = sys.modules[__package__+'.store']
+    try:
+        from . import user as _user
+    except ImportError:
+        _user = sys.modules[__package__+'.user']
+    try:
+        from . import utils as _utils
+    except ImportError:
+        _utils = sys.modules[__package__+'.utils']
+    from . import prop as _prop
 else:
     import folder as _folder
     import store as _store
     import user as _user
     import utils as _utils
+    import prop as _prop
 
 class PersistentList(list):
     def __init__(self, mapiobj, proptag, *args, **kwargs):
@@ -102,60 +122,56 @@ class PersistentList(list):
             return ret
         return _func
 
-class Item(object):
+class Item(Base):
     """Item class"""
 
-    def __init__(self, parent=None, eml=None, ics=None, vcf=None, load=None, loads=None, attachments=True, create=False, mapiobj=None):
-        # TODO: self.folder fix this!
-
-        if _is_file(eml):
-            eml = eml.read()
-        if _is_file(ics):
-            ics = ics.read()
-        if _is_file(vcf):
-            vcf = vcf.read()
-
-        self.emlfile = eml
+    def __init__(self, parent=None, eml=None, ics=None, vcf=None, load=None, loads=None, attachments=True, create=False, mapiobj=None, entryid=None, content_flag=None, save=True):
+        self.emlfile = None
+        self._architem = None
         self._folder = None
+        self.mapiobj = mapiobj
+        self._entryid = entryid
+        self._content_flag = content_flag or 0
 
         if isinstance(parent, _folder.Folder):
             self._folder = parent
-        # XXX
-        self._architem = None
-
-        if mapiobj:
-            self.mapiobj = mapiobj
-
-        if isinstance(parent, _store.Store):
-            self.store = parent
+            self.store = parent.store
             self.server = parent.server
+        elif isinstance(parent, _store.Store):
+            self.store = store
+            self.server = store.server
 
-        elif create:
-            self.mapiobj = self.folder.mapiobj.CreateMessage(None, 0)
+        if create:
+            self.mapiobj = self.folder.mapiobj.CreateMessage(None, MAPI_ASSOCIATED if self.folder.content_flag & MAPI_ASSOCIATED else 0)
             self.store = self.folder.store
             self.server = server = self.store.server # XXX
+
+            if _is_file(eml):
+                eml = eml.read()
+            if _is_file(ics):
+                ics = ics.read()
+            if _is_file(vcf):
+                vcf = vcf.read()
+
+            self.emlfile = eml
 
             if eml is not None:
                 # options for CreateMessage: 0 / MAPI_ASSOCIATED
                 dopt = inetmapi.delivery_options()
                 inetmapi.IMToMAPI(server.mapisession, self.folder.store.mapiobj, None, self.mapiobj, self.emlfile, dopt)
                 pass
-
             elif ics is not None:
                 icm = icalmapi.CreateICalToMapi(self.mapiobj, server.ab, False)
                 icm.ParseICal(ics, 'utf-8', '', None, 0)
                 icm.GetItem(0, 0, self.mapiobj)
-
             elif vcf is not None:
                 vcm = icalmapi.create_vcftomapi(self.mapiobj)
                 vcm.parse_vcf(vcf)
                 vcm.get_item(self.mapiobj)
-
             elif load is not None:
                 self.load(load, attachments=attachments)
             elif loads is not None:
                 self.loads(loads, attachments=attachments)
-
             else:
                 try:
                     container_class = HrGetOneProp(self.folder.mapiobj, PR_CONTAINER_CLASS).Value
@@ -166,8 +182,18 @@ class Item(object):
                         self.mapiobj.SetProps([SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Contact')]) # XXX set default props
                     elif container_class == 'IPF.Appointment':
                         self.mapiobj.SetProps([SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Appointment')]) # XXX set default props
+            if save:
+                self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
-            self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+    @property
+    def mapiobj(self):
+        if not self._mapiobj:
+            self.mapiobj = _utils.openentry_raw(self.store.mapiobj, self._entryid, self._content_flag)
+        return self._mapiobj
+
+    @mapiobj.setter
+    def mapiobj(self, mapiobj):
+        self._mapiobj = mapiobj
 
     @property
     def _arch_item(self): # open archive store explicitly so we can handle otherwise silenced errors (MAPI errors in mail bodies for example)
@@ -215,7 +241,7 @@ class Item(object):
 
         try:
             return self.prop(PR_SUBJECT_W).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             return u''
 
     @subject.setter
@@ -224,9 +250,19 @@ class Item(object):
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     @property
+    def normalized_subject(self):
+        """ Normalized item subject or *None* if no subject """
+
+        try:
+            return self.prop(PR_NORMALIZED_SUBJECT_W).value
+        except NotFoundError:
+            return u''
+
+    @property
     def body(self):
         """ Item :class:`body <Body>` """
 
+        warnings.warn('item.body is deprecated', _DeprecationWarning)
         return Body(self) # XXX return None if no body..?
 
     @property
@@ -263,7 +299,7 @@ class Item(object):
     def created(self):
         try:
             return self.prop(PR_CREATION_TIME).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             pass
 
     @property
@@ -272,14 +308,14 @@ class Item(object):
 
         try:
             return self.prop(PR_MESSAGE_DELIVERY_TIME).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             pass
 
     @property
     def last_modified(self):
         try:
             return self.prop(PR_LAST_MODIFICATION_TIME).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             pass
 
     @property
@@ -312,7 +348,7 @@ class Item(object):
         proptag = CHANGE_PROP_TYPE(proptag, PT_MV_STRING8)
         try:
             value = self.prop(proptag).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             value = []
         return PersistentList(self.mapiobj, proptag, value)
 
@@ -329,8 +365,8 @@ class Item(object):
         if self._folder:
             return self._folder
         try:
-            return _folder.Folder(self.store, HrGetOneProp(self.mapiobj, PR_PARENT_ENTRYID).Value)
-        except MAPIErrorNotFound:
+            return _folder.Folder(self.store, _hex(HrGetOneProp(self.mapiobj, PR_PARENT_ENTRYID).Value))
+        except (MAPIErrorNotFound, NotFoundError):
             pass
 
     @property
@@ -340,7 +376,7 @@ class Item(object):
         # TODO: userfriendly repr of value
         try:
             return self.prop(PR_IMPORTANCE).value
-        except MAPIErrorNotFound:
+        except NotFoundError:
             pass
 
     @importance.setter
@@ -355,20 +391,30 @@ class Item(object):
         self.mapiobj.SetProps([SPropValue(PR_IMPORTANCE, value)])
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
-    def create_prop(self, proptag, value, proptype=None):
-        return _utils.create_prop(self, self.mapiobj, proptag, value, proptype)
+    @property
+    def private(self):
+        """ PidLidPrivate - hint to hide the item from other users """
 
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def get_prop(self, proptag):
         try:
-            return self.prop(proptag)
-        except MAPIErrorNotFound:
-            pass
+            return self.prop('common:34054').value
+        except NotFoundError:
+            return False
 
-    def props(self, namespace=None):
-        return _utils.props(self.mapiobj, namespace)
+    @private.setter
+    def private(self, value):
+        return self.create_prop('common:34054', value, proptype=PT_BOOLEAN)
+
+    @property
+    def reminder(self):
+        """ PidLidReminderSet - Specifies whether a reminder is set on the object """
+        try:
+            return self.prop('common:34051').value
+        except NotFoundError:
+            return False
+
+    @reminder.setter
+    def reminder(self, value):
+        return self.create_prop('common:34051', value, proptype=PT_BOOLEAN)
 
     def attachments(self, embedded=False):
         """ Return item :class:`attachments <Attachment>`
@@ -385,8 +431,7 @@ class Item(object):
 
         for row in table.rows():
             if row[1].value == ATTACH_BY_VALUE or (embedded and row[1].value == ATTACH_EMBEDDED_MSG):
-                att = mapiitem.OpenAttach(row[0].value, IID_IAttachment, 0)
-                yield Attachment(att)
+                yield Attachment(mapiitem, row[0].value)
 
     def create_attachment(self, name, data):
         """Create a new attachment
@@ -405,7 +450,7 @@ class Item(object):
         stream.Commit(0)
         attach.SaveChanges(KEEP_OPEN_READWRITE)
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
-        return Attachment(attach)
+        return Attachment(mapiobj=attach)
 
     def header(self, name):
         """ Return transport message header with given name """
@@ -417,10 +462,56 @@ class Item(object):
 
         try:
             message_headers = self.prop(PR_TRANSPORT_MESSAGE_HEADERS_W)
-            headers = email.parser.Parser().parsestr(message_headers.value, headersonly=True)
+            headers = email.parser.Parser().parsestr(_encode(message_headers.value), headersonly=True)
             return headers
-        except MAPIErrorNotFound:
+        except NotFoundError:
             return {}
+
+    @property
+    def text(self):
+        """ Plain text representation """
+
+        try:
+            return _utils.stream(self._arch_item, PR_BODY_W) # under windows them be utf-16le?
+        except MAPIErrorNotFound:
+            return u''
+
+    @text.setter
+    def text(self, x):
+        self.create_prop(PR_BODY_W, _unicode(x))
+
+    @property
+    def html(self):
+        """ HTML representation """
+
+        try:
+            return _utils.stream(self._arch_item, PR_HTML)
+        except MAPIErrorNotFound:
+            return ''
+
+    @html.setter
+    def html(self, x):
+        self.create_prop(PR_HTML, x)
+
+    @property
+    def rtf(self):
+        """ RTF representation """
+
+        try:
+            return _utils.stream(self._arch_item, PR_RTF_COMPRESSED)
+        except MAPIErrorNotFound:
+            return ''
+
+    @property
+    def body_type(self):
+        """ original body type: 'text', 'html', 'rtf' or 'None' if it cannot be determined """
+        tag = _prop.bestbody(self.mapiobj)
+        if tag == PR_BODY_W:
+            return 'text'
+        elif tag == PR_HTML:
+            return 'html'
+        elif tag == PR_RTF_COMPRESSED:
+            return 'rtf'
 
     def eml(self, received_date=False):
         """ Return .eml version of item """
@@ -446,17 +537,95 @@ class Item(object):
         return data
 
     def send(self):
+        item = self
+        if self.message_class == 'IPM.Appointment':
+            # XXX: check if start/end is set
+            # XXX: Check if we can copy the calendar item.
+            # XXX: Update the calendar item, for tracking status
+            # XXX: Set the body of the message like WebApp / OL does.
+            item = self.store.outbox.create_item(subject=self.subject, to=self.to, start=self.start, end=self.end, body=self.body)
+            # Set meeting request props
+            item.message_class = 'IPM.Schedule.Meeting.Request'
+            item.create_prop(PR_START_DATE, self.start)
+            item.create_prop(PR_END_DATE, self.end)
+            item.create_prop(PR_RESPONSE_REQUESTED, True)
+            item.private = False
+            item.reminder = False
+            item.create_prop('appointment:33321', True, PT_BOOLEAN) # PidLidFInvited
+            item.create_prop('appointment:33320', self.start, PT_SYSTIME) # basedate????!
+            item.create_prop('appointment:33316', False, PT_BOOLEAN) # intendedbusystatus???
+            item.create_prop('appointment:33315', False, PT_BOOLEAN) # XXX item.recurring
+            item.create_prop('appointment:33303', 3, PT_LONG) # XXX meetingtype?!
+            item.create_prop('appointment:33301', False, PT_BOOLEAN) # XXX item.alldayevent?!
+            duration = int((self.end - self.start).total_seconds() / 60) # XXX: total time in minutes
+            item.create_prop('appointment:33293', self.start, PT_SYSTIME) # XXX start
+            item.create_prop('appointment:33294', self.end, PT_SYSTIME) # XXX end
+            item.create_prop('appointment:33299', duration, PT_LONG) # XXX item.alldayevent?!
+            item.create_prop('appointment:33285', 1, PT_LONG) # XXX busystatus???
+            item.create_prop('appointment:33281', 0, PT_LONG) # XXX updatecounter???
+            item.create_prop('appointment:33280', 0, PT_BOOLEAN) # XXX sendasical
+            item.create_prop(PR_OWNER_APPT_ID, random.randrange(2**32))
+            item.create_prop(PR_ICON_INDEX, 1026) # XXX: meeting request icon index.. const?
+            goid = self._generate_goid()
+            item.create_prop('meeting:3', goid, PT_BINARY)
+            item.create_prop('meeting:35', goid, PT_BINARY)
+
         props = []
-        props.append(SPropValue(PR_SENTMAIL_ENTRYID, _unhex(self.folder.store.sentmail.entryid)))
+        props.append(SPropValue(PR_SENTMAIL_ENTRYID, _unhex(item.folder.store.sentmail.entryid)))
         props.append(SPropValue(PR_DELETE_AFTER_SUBMIT, True))
-        self.mapiobj.SetProps(props)
-        self.mapiobj.SubmitMessage(0)
+        item.mapiobj.SetProps(props)
+        item.mapiobj.SubmitMessage(0)
+
+    def _generate_goid(self):
+        """
+        Generate a meeting request Global Object ID.
+
+        The Global Object ID is a MAPI property that any MAPI client uses to
+        correlate meeting updates and responses with a particular meeting on
+        the calendar. The Global Object ID is the same across all copies of the
+        item.
+
+        The Global Object ID consists of the following data:
+
+        * byte array id (16 bytes) - identifiers the BLOB as a GLOBAL Object ID.
+        * year (YH + YL) - original year of the instance represented by the
+        exception. The value is in big-endian format.
+        * M (byte) - original month of the instance represented by the exception.
+        * D (byte) - original day of the instance represented by the exception.
+        * Creation time - 8 byte date
+        * X - reversed byte array of size 8.
+        * size - LONG, the length of the data field.
+        * data - a byte array (16 bytes) that uniquely identifers the meeting object.
+        """
+
+        from MAPI.Time import NANOSECS_BETWEEN_EPOCH
+
+        # XXX: in MAPI.Time?
+        def mapi_time(t):
+            return int(t) * 10000000 + NANOSECS_BETWEEN_EPOCH
+
+        # byte array id
+        classid = '040000008200e00074c5b7101a82e008'
+        goid = _unhex(classid)
+        # YEARHIGH, YEARLOW, MONTH, DATE
+        goid += struct.pack('>H2B', 0, 0, 0)
+        # Creation time, lowdatetime, highdatetime
+        now = mapi_time(time.time())
+        goid += struct.pack('II', now & 0xffffffff, now >> 32)
+        # Reserved, 8 zeros
+        goid += struct.pack('L', 0)
+        # data size
+        goid += struct.pack('I', 16)
+        # Unique data
+        for _ in range(0, 16):
+            goid += struct.pack('B', random.getrandbits(8))
+        return goid
 
     @property
     def sender(self):
         """ Sender :class:`Address` """
 
-        addrprops = (PR_SENDER_ADDRTYPE_W, PR_SENDER_NAME_W, PR_SENDER_EMAIL_ADDRESS_W, PR_SENDER_ENTRYID)
+        addrprops = (PR_SENDER_ADDRTYPE_W, PR_SENDER_NAME_W, PR_SENDER_EMAIL_ADDRESS_W, PR_SENDER_ENTRYID, PR_SENDER_SEARCH_KEY)
         args = [self.get_prop(p).value if self.get_prop(p) else None for p in addrprops]
         return Address(self.server, *args)
 
@@ -464,7 +633,7 @@ class Item(object):
     def from_(self):
         """ From :class:`Address` """
 
-        addrprops = (PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, PR_SENT_REPRESENTING_ENTRYID)
+        addrprops = (PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_SEARCH_KEY)
         args = [self.get_prop(p).value if self.get_prop(p) else None for p in addrprops]
         return Address(self.server, *args)
 
@@ -492,7 +661,7 @@ class Item(object):
         for row in self.table(PR_MESSAGE_RECIPIENTS):
             row = dict([(x.proptag, x) for x in row])
             if not _type or row[PR_RECIPIENT_TYPE].value == _type:
-                args = [row[p].value if p in row else None for p in (PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_EMAIL_ADDRESS_W, PR_ENTRYID)]
+                args = [row[p].value if p in row else None for p in (PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_SEARCH_KEY)]
                 yield Address(self.server, *args)
 
     @property
@@ -511,9 +680,24 @@ class Item(object):
     def start(self): # XXX optimize, guid
         return self.prop('common:34070').value
 
+    @start.setter
+    def start(self, val):
+        return self.create_prop('common:34070', val, proptype=PT_SYSTIME).value
+
     @property
     def end(self): # XXX optimize, guid
         return self.prop('common:34071').value
+
+    @end.setter
+    def end(self, val):
+        return self.create_prop('common:34071', val, proptype=PT_SYSTIME).value
+
+    @property
+    def location(self):
+        try:
+            return self.prop('appointment:33288').value
+        except NotFoundError:
+            pass
 
     @property
     def recurring(self):
@@ -524,21 +708,16 @@ class Item(object):
         return Recurrence(self)
 
     def occurrences(self, start=None, end=None):
-        try:
-            if self.recurring:
-                recurrences = self.recurrence.recurrences
-                if start and end:
-                    recurrences = recurrences.between(start, end)
-                for d in recurrences:
-                    occ = Occurrence(self, d, d + datetime.timedelta(hours=1)) # XXX
-                    if (not start or occ.start >= start) and (not end or occ.end < end): # XXX slow for now; overlaps with start, end?
-                        yield occ
-            else:
-                occ = Occurrence(self, self.start, self.end)
-                if (not start or occ.start >= start) and (not end or occ.end < end):
-                    yield occ
-        except MAPIErrorNotFound: # XXX shouldn't happen
-            pass
+        if self.recurring:
+            for occ in self.recurrence.occurrences(start=start, end=end):
+                yield occ
+        else:
+            if (not start or self.end > start) and (not end or self.start < end):
+                yield Occurrence(self, max(self.start, start), min(self.end, end))
+
+    @property
+    def meetingrequest(self):
+        return MeetingRequest(self)
 
     def _addr_props(self, addr):
         if isinstance(addr, _user.User):
@@ -546,6 +725,11 @@ class Item(object):
             pr_dispname = addr.name
             pr_email = addr.email
             pr_entryid = _unhex(addr.userid)
+        elif isinstance(addr, Address):
+            pr_addrtype = addr.addrtype
+            pr_dispname = addr.name
+            pr_email = addr.email
+            pr_entryid = addr.entryid
         else:
             addr = _unicode(addr)
             pr_addrtype = 'SMTP'
@@ -573,19 +757,18 @@ class Item(object):
         self.mapiobj.ModifyRecipients(0, names)
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
 
-    def delete(self, items):
-        """Delete properties or attachments from an Item
+    def delete(self, objects):
+        """Delete properties or attachments from item.
 
-        :param items: The Attachments or Properties
+        :param objects: The object(s) to delete
         """
-
-        if isinstance(items, (Attachment, Property)):
-            items = [items]
+        if isinstance(objects, (Attachment, _prop.Property)):
+            objects = [objects]
         else:
-            items = list(items)
+            objects = list(objects)
 
-        attach_ids = [item.number for item in items if isinstance(item, Attachment)]
-        proptags = [item.proptag for item in items if isinstance(item, Property)]
+        attach_ids = [item.number for item in objects if isinstance(item, Attachment)]
+        proptags = [item.proptag for item in objects if isinstance(item, _prop.Property)]
         if proptags:
             self.mapiobj.DeleteProps(proptags)
         for attach_id in attach_ids:
@@ -636,7 +819,7 @@ class Item(object):
         # props
         props = []
         tag_data = {}
-        bestbody = _utils.bestbody(self.mapiobj)
+        bestbody = _prop.bestbody(self.mapiobj)
         for prop in self.props():
             if (bestbody != PR_NULL and prop.proptag in (PR_BODY_W, PR_HTML, PR_RTF_COMPRESSED) and prop.proptag != bestbody):
                 continue
@@ -671,19 +854,31 @@ class Item(object):
                 method = row[PR_ATTACH_METHOD] # XXX default
                 att = self.mapiobj.OpenAttach(num, IID_IAttachment, 0)
                 if method == ATTACH_EMBEDDED_MSG:
-                    msg = att.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_DEFERRED_ERRORS)
+                    try:
+                        msg = att.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_DEFERRED_ERRORS | MAPI_MODIFY)
+                    except MAPIErrorNoAccess:
+                        # XXX the following may fail for embedded items in certain public stores, while
+                        # the above does work (opening read-only doesn't work, but read-write works! wut!?)
+                        msg = att.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_DEFERRED_ERRORS)
                     item = Item(mapiobj=msg)
                     item.server = self.server # XXX
                     data = item._dump() # recursion
                     atts.append(([[a, b, None] for a, b in row.items()], data))
                 elif method == ATTACH_BY_VALUE and attachments:
-                    data = _utils.stream(att, PR_ATTACH_DATA_BIN)
+                    try:
+                        data = _utils.stream(att, PR_ATTACH_DATA_BIN)
+                    except MAPIErrorNotFound:
+                        service = self.server.service
+                        log = (service or self.server).log
+                        if log:
+                            log.warn("no data found for attachment of item with entryid %s" % self.entryid)
+                        data = ''
                     atts.append(([[a, b, None] for a, b in row.items()], data))
             except Exception as e: # XXX generalize so usable in more places
                 service = self.server.service
                 log = (service or self.server).log
                 if log:
-                    log.error('could not serialize attachment')
+                    log.error('could not serialize attachment for item with entryid %s' % self.entryid)
                 if skip_broken:
                     if log:
                         log.error(traceback.format_exc(e))
@@ -721,18 +916,20 @@ class Item(object):
 
         # attachments
         for props, data in d[b'attachments']:
-            props = [SPropValue(proptag, value) for (proptag, value, nameid) in props]
-            (id_, attach) = self.mapiobj.CreateAttach(None, 0)
-            attach.SetProps(props)
-            if isinstance(data, dict): # embedded message
-                msg = attach.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY)
-                item = Item(mapiobj=msg)
-                item._load(data, attachments) # recursion
-            elif attachments:
-                stream = attach.OpenProperty(PR_ATTACH_DATA_BIN, IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_MODIFY | MAPI_CREATE)
-                stream.Write(data)
-                stream.Commit(0)
-            attach.SaveChanges(KEEP_OPEN_READWRITE)
+            if attachments or isinstance(data, dict):
+                props = [SPropValue(proptag, value) for (proptag, value, nameid) in props]
+                (id_, attach) = self.mapiobj.CreateAttach(None, 0)
+                attach.SetProps(props)
+                if isinstance(data, dict): # embedded message
+                    msg = attach.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY)
+                    item = Item(mapiobj=msg)
+                    item._load(data, attachments) # recursion
+                else:
+                    stream = attach.OpenProperty(PR_ATTACH_DATA_BIN, IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_MODIFY | MAPI_CREATE)
+                    stream.Write(data)
+                    stream.Commit(0)
+                attach.SaveChanges(KEEP_OPEN_READWRITE)
+
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
 
     def load(self, f, attachments=True):
@@ -742,16 +939,53 @@ class Item(object):
         self._load(_pickle_loads(s), attachments)
 
     @property
-    def embedded(self): # XXX multiple?
+    def embedded(self): # XXX deprecate?
+        return next(self.items())
+
+    def create_item(self, message_flags=None):
+        """ Create embedded :class:`item <Item>` """
+
+        (id_, attach) = self.mapiobj.CreateAttach(None, 0)
+
+        attach.SetProps([
+            SPropValue(PR_ATTACH_METHOD, ATTACH_EMBEDDED_MSG),
+            SPropValue(PR_ATTACHMENT_FLAGS, 2),
+            SPropValue(PR_ATTACHMENT_HIDDEN, True),
+            SPropValue(PR_ATTACHMENT_LINKID, 0),
+            SPropValue(PR_ATTACH_FLAGS, 0),
+        ])
+
+        msg = attach.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY)
+        if message_flags is not None:
+            msg.SetProps([SPropValue(PR_MESSAGE_FLAGS, message_flags)])
+
+        msg.SaveChanges(KEEP_OPEN_READWRITE)
+        attach.SaveChanges(KEEP_OPEN_READWRITE)
+        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
+
+        item = Item(mapiobj=msg)
+        item.server = self.server
+        item._attobj = attach
+        return item
+
+    def items(self, recurse=True):
+        """ Return all embedded :class:`items <Item>` """
+
         for row in self.table(PR_MESSAGE_ATTACHMENTS).dict_rows(): # XXX should we use GetAttachmentTable?
             num = row[PR_ATTACH_NUM]
             method = row[PR_ATTACH_METHOD] # XXX default
             if method == ATTACH_EMBEDDED_MSG:
                 att = self.mapiobj.OpenAttach(num, IID_IAttachment, 0)
                 msg = att.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_MODIFY | MAPI_DEFERRED_ERRORS)
+
                 item = Item(mapiobj=msg)
+                item._attobj = att # XXX
                 item.server = self.server # XXX
-                return item
+                yield item
+
+                if recurse:
+                    for subitem in item.items():
+                        yield subitem
 
     @property
     def primary_item(self):
@@ -760,8 +994,8 @@ class Item(object):
         entryid = HrGetOneProp(self.mapiobj, PROP_REF_ITEM_ENTRYID).Value
 
         try:
-            return self.folder.primary_store.item(entryid=codecs.encode(entryid, 'hex'))
-        except MAPIErrorNotFound:
+            return self.folder.primary_store.item(entryid=_hex(entryid))
+        except NotFoundError:
             pass
 
     def restore(self):
@@ -804,13 +1038,40 @@ class Item(object):
             self.mapiobj.SetProps([SPropValue(PROP_REF_ITEM_ENTRYID, entryid)])
             self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
+    def copy(self, folder, _delete=False):
+        """ Copy item to folder; return copied item
+
+        :param folder: target folder
+        """
+
+        mapiobj = folder.mapiobj.CreateMessage(None, 0)
+        self.mapiobj.CopyTo([], [], 0, None, IID_IMessage, mapiobj, 0)
+        if _delete:
+            self.folder.delete(self)
+        item = Item(mapiobj=mapiobj)
+        item.store = self.store # XXX
+        item.server = self.server
+        return item
+
+    def move(self, folder):
+        """ Move item to folder; return moved item
+
+        :param folder: target folder
+        """
+
+        return self.copy(folder, _delete=True)
+
+    def __eq__(self, i): # XXX check same store?
+        if isinstance(i, Item):
+            return self.entryid == i.entryid
+        return False
+
+    def __ne__(self, i):
+        return not self == i
+
     def __iter__(self):
         return self.props()
 
     def __unicode__(self):
         return u'Item(%s)' % self.subject
-
-    def __repr__(self):
-        return _repr(self)
-
 

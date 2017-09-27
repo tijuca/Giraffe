@@ -22,8 +22,10 @@
 #include <mapidefs.h>
 #include "ECMAPIFolder.h"
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 
-class ECExchangeImportHierarchyChanges _kc_final : public ECUnknown {
+class ECExchangeImportHierarchyChanges _kc_final :
+    public ECUnknown, public IExchangeImportHierarchyChanges {
 protected:
 	ECExchangeImportHierarchyChanges(ECMAPIFolder *lpFolder);
 	virtual ~ECExchangeImportHierarchyChanges();
@@ -37,24 +39,13 @@ public:
 	virtual HRESULT ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray);
 	virtual HRESULT ImportFolderDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList);
 
-	class xExchangeImportHierarchyChanges _kc_final :
-	    public IExchangeImportHierarchyChanges {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-
-		// <kopano/xclsfrag/IExchangeImportHierarchyChanges.hpp>
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG flags, LPMAPIERROR *lppMAPIError) _kc_override;
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG flags) _kc_override;
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _kc_override;
-		virtual HRESULT __stdcall ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray) _kc_override;
-		virtual HRESULT __stdcall ImportFolderDeletion(ULONG flags, LPENTRYLIST lpSourceEntryList) _kc_override;
-	} m_xExchangeImportHierarchyChanges;
-
 private:
 	ECMAPIFolder *m_lpFolder = nullptr;
 	IStream *m_lpStream = nullptr;
 	ULONG m_ulFlags = 0;
 	ULONG m_ulSyncId = 0;
 	ULONG m_ulChangeId = 0;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // ECEXCHANGEIMPORTCHIERARCHYCHANGES_H

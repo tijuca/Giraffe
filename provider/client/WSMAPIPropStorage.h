@@ -21,6 +21,7 @@
 #include <kopano/zcdefs.h>
 #include <mutex>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include "IECPropStorage.h"
 
 #include <kopano/kcodes.h>
@@ -34,7 +35,7 @@ namespace KC {
 class convert_context;
 }
 
-class WSMAPIPropStorage _kc_final : public ECUnknown {
+class WSMAPIPropStorage _kc_final : public ECUnknown, public IECPropStorage {
 protected:
 	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *);
 	virtual ~WSMAPIPropStorage();
@@ -91,12 +92,6 @@ private:
 	/* ECParentStorage may access my functions (used to read PR_ATTACH_DATA_BIN chunks through HrLoadProp()) */
 	friend class ECParentStorage;
 
-public:
-	class xECPropStorage _kc_final : public IECPropStorage {
-		#include <kopano/xclsfrag/IECUnknown.hpp>
-		#include <kopano/xclsfrag/IECPropStorage.hpp>
-	} m_xECPropStorage;
-
 private:
 	entryId			m_sEntryId;
 	entryId			m_sParentEntryId;
@@ -109,6 +104,7 @@ private:
 	ULONG			m_ulSessionReloadCallback;
 	WSTransport		*m_lpTransport;
 	bool m_bSubscribed = false;
+	ALLOC_WRAP_FRIEND;
 };
 
 

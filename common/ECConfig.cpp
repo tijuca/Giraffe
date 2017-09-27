@@ -16,8 +16,11 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include "ECConfigImpl.h"
 #include <kopano/charset/convert.h>
+
+using namespace std;
 
 namespace KC {
 
@@ -27,10 +30,15 @@ ECConfig *ECConfig::Create(const configsetting_t *lpDefaults,
 	return new ECConfigImpl(lpDefaults, lpszDirectives);
 }
 
+ECConfig *ECConfig::Create(const std::nothrow_t &,
+    const configsetting_t *dfl, const char *const *direc)
+{
+	return new(std::nothrow) ECConfigImpl(dfl, direc);
+}
+
 bool ECConfig::LoadSettings(const wchar_t *szFilename)
 {
-	convert_context converter;
-	return LoadSettings(converter.convert_to<char*>(szFilename));
+	return LoadSettings(convert_context().convert_to<char *>(szFilename));
 }
 
 /**
@@ -61,8 +69,7 @@ const char* ECConfig::GetDefaultPath(const char* lpszBasename)
 
 	if (!lpszBasename)
 		lpszBasename = "";
-
-	auto result = s_mapPaths.insert(stringmap_t::value_type(lpszBasename, string()));
+	auto result = s_mapPaths.insert({lpszBasename, string()});
 	if (result.second == true) {		// New item added, so create the actual path
 		const char *lpszDirname = getenv("KOPANO_CONFIG_PATH");
 		if (!lpszDirname || lpszDirname[0] == '\0')

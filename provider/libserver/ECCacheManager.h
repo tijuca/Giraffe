@@ -38,11 +38,6 @@ struct soap;
 
 #include <unordered_map>
 
-template<typename Key, typename T>
-struct hash_map {
-	typedef std::unordered_map<Key, T, std::hash<Key>, std::equal_to<Key>> Type;
-};
-
 namespace KC {
 
 class ECSessionManager;
@@ -110,7 +105,7 @@ public:
 
 class ECsIndexObject _kc_final : public ECsCacheEntry {
 public:
-	inline bool operator==(const ECsIndexObject &other) const
+	inline bool operator==(const ECsIndexObject &other) const noexcept
 	{
 		if (ulObjId == other.ulObjId && ulTag == other.ulTag)
 			return true;
@@ -118,7 +113,7 @@ public:
 		return false;
 	}
 
-	inline bool operator<(const ECsIndexObject &other) const
+	inline bool operator<(const ECsIndexObject &other) const noexcept
 	{
 		if(ulObjId < other.ulObjId)
 			return true;
@@ -166,7 +161,7 @@ public:
     }
 
 	// @todo check this function, is this really ok?
-	inline bool operator<(const ECsIndexProp &other) const
+	inline bool operator<(const ECsIndexProp &other) const noexcept
 	{
 
 		if(cbData < other.cbData)
@@ -187,7 +182,7 @@ public:
 		return false;
 	}
 
-	inline bool operator==(const ECsIndexProp &other) const
+	inline bool operator==(const ECsIndexProp &other) const noexcept
 	{
 
 		if(cbData != other.cbData || ulTag != other.ulTag)
@@ -396,7 +391,7 @@ struct ECsSortKeyKey {
 };
 
 struct lessindexobjectkey {
-	bool operator()(const ECsIndexObject& a, const ECsIndexObject& b) const
+	bool operator()(const ECsIndexObject &a, const ECsIndexObject &b) const noexcept
 	{
 		if(a.ulObjId < b.ulObjId)
 			return true;
@@ -408,7 +403,7 @@ struct lessindexobjectkey {
 
 };
 
-inline unsigned int IPRSHash(const ECsIndexProp& _Keyval1)
+inline unsigned int IPRSHash(const ECsIndexProp &_Keyval1) noexcept
 {
 	unsigned int b    = 378551;
 	unsigned int a    = 63689;
@@ -429,14 +424,15 @@ namespace std {
 	template<>
 	struct hash<ECsIndexProp> {
 		public:
-			size_t operator() (const ECsIndexProp &value) const { return IPRSHash(value); }
+		size_t operator()(const ECsIndexProp &value) const noexcept { return IPRSHash(value); }
 	};
 
 	// hash function for type ECsIndexObject
 	template<>
 	struct hash<ECsIndexObject> {
 		public:
-			size_t operator() (const ECsIndexObject &value) const {
+		size_t operator()(const ECsIndexObject &value) const noexcept
+		{
 					hash<unsigned int> hasher;
 					// @TODO check the hash function!
 					return hasher(value.ulObjId * value.ulTag ) ;
@@ -446,19 +442,19 @@ namespace std {
 
 namespace KC {
 
-typedef hash_map<unsigned int, ECsObjects>::Type ECMapObjects;
-typedef hash_map<unsigned int, ECsStores>::Type ECMapStores;
-typedef hash_map<unsigned int, ECsACLs>::Type ECMapACLs;
-typedef hash_map<unsigned int, ECsQuota>::Type ECMapQuota;
-typedef hash_map<unsigned int, ECsUserObject>::Type ECMapUserObject; // userid to user object
+typedef std::unordered_map<unsigned int, ECsObjects> ECMapObjects;
+typedef std::unordered_map<unsigned int, ECsStores> ECMapStores;
+typedef std::unordered_map<unsigned int, ECsACLs> ECMapACLs;
+typedef std::unordered_map<unsigned int, ECsQuota> ECMapQuota;
+typedef std::unordered_map<unsigned int, ECsUserObject> ECMapUserObject; // userid to user object
 typedef std::map<ECsUEIdKey, ECsUEIdObject> ECMapUEIdObject; // user type + externid to user object
-typedef hash_map<unsigned int, ECsUserObjectDetails>::Type ECMapUserObjectDetails; // userid to user object data
+typedef std::unordered_map<unsigned int, ECsUserObjectDetails> ECMapUserObjectDetails; // userid to user object data
 typedef std::map<std::string, ECsServerDetails> ECMapServerDetails;
-typedef hash_map<unsigned int, ECsCells>::Type ECMapCells;
+typedef std::unordered_map<unsigned int, ECsCells> ECMapCells;
 
 // Index properties
 typedef std::map<ECsIndexObject, ECsIndexProp, lessindexobjectkey > ECMapObjectToProp;
-typedef hash_map<ECsIndexProp, ECsIndexObject>::Type ECMapPropToObject;
+typedef std::unordered_map<ECsIndexProp, ECsIndexObject> ECMapPropToObject;
 
 #define CACHE_NO_PARENT 0xFFFFFFFF
 
@@ -549,35 +545,27 @@ public:
 	
 private:
 	// cache functions
-	ECRESULT _GetACLs(unsigned int ulObjId, struct rightsArray **lppRights);
-	ECRESULT _DelACLs(unsigned int ulObjId);
-	
-	ECRESULT _GetObject(unsigned int ulObjId, unsigned int *ulParent, unsigned int *ulOwner, unsigned int *ulFlags, unsigned int *ulType);
-	ECRESULT _DelObject(unsigned int ulObjId);
-
-	ECRESULT _GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *ulType);
-	ECRESULT _DelStore(unsigned int ulObjId);
-
-	ECRESULT _AddUserObject(unsigned int ulUserId, const objectclass_t &ulClass, unsigned int ulCompanyId, const std::string &strExternId, const std::string &strSignature);
-	ECRESULT _GetUserObject(unsigned int ulUserId, objectclass_t* lpulClass, unsigned int *lpulCompanyId,
-							std::string* lpstrExternId, std::string* lpstrSignature);
-	ECRESULT _DelUserObject(unsigned int ulUserId);
-
-	ECRESULT _AddUEIdObject(const std::string &strExternId, const objectclass_t &ulClass, unsigned int ulCompanyId, unsigned int ulUserId, const std::string &strSignature);
-	ECRESULT _GetUEIdObject(const std::string &strExternId, objectclass_t ulClass, unsigned int *lpulCompanyId, unsigned int* lpulUserId, std::string* lpstrSignature);
-	ECRESULT _DelUEIdObject(const std::string &strExternId, objectclass_t ulClass);
-
-	ECRESULT _AddUserObjectDetails(unsigned int, const objectdetails_t *);
-	ECRESULT _GetUserObjectDetails(unsigned int ulUserId, objectdetails_t *details);
-	ECRESULT _DelUserObjectDetails(unsigned int ulUserId);
-
-	ECRESULT _DelCell(unsigned int ulObjId);
-
-	ECRESULT _GetQuota(unsigned int ulUserId, bool bIsDefaultQuota, quotadetails_t *quota);
-	ECRESULT _DelQuota(unsigned int ulUserId, bool bIsDefaultQuota);
+	ECRESULT I_GetACLs(unsigned int obj_id, struct rightsArray **);
+	ECRESULT I_DelACLs(unsigned int obj_id);
+	ECRESULT I_GetObject(unsigned int obj_id, unsigned int *parent, unsigned int *owner, unsigned int *flags, unsigned int *type);
+	ECRESULT I_DelObject(unsigned int obj_id);
+	ECRESULT I_GetStore(unsigned int obj_id, unsigned int *store, GUID *, unsigned int *type);
+	ECRESULT I_DelStore(unsigned int obj_id);
+	ECRESULT I_AddUserObject(unsigned int user_id, const objectclass_t &, unsigned int company_id, const std::string &ext_id, const std::string &signautre);
+	ECRESULT I_GetUserObject(unsigned int user_id, objectclass_t *, unsigned int *company_id, std::string *extern_id, std::string *signature);
+	ECRESULT I_DelUserObject(unsigned int user_id);
+	ECRESULT I_AddUEIdObject(const std::string &ext_id, const objectclass_t &, unsigned int company_id, unsigned int user_id, const std::string &signature);
+	ECRESULT I_GetUEIdObject(const std::string &ext_id, objectclass_t, unsigned int *company_id, unsigned int *user_id, std::string *signature);
+	ECRESULT I_DelUEIdObject(const std::string &ext_id, objectclass_t);
+	ECRESULT I_AddUserObjectDetails(unsigned int, const objectdetails_t *);
+	ECRESULT I_GetUserObjectDetails(unsigned int user_id, objectdetails_t *);
+	ECRESULT I_DelUserObjectDetails(unsigned int user_id);
+	ECRESULT I_DelCell(unsigned int obj_id);
+	ECRESULT I_GetQuota(unsigned int user_id, bool bIsDefaultQuota, quotadetails_t *quota);
+	ECRESULT I_DelQuota(unsigned int user_id, bool bIsDefaultQuota);
 
 	// Cache Index properties
-	ECRESULT _AddIndexData(const ECsIndexObject *lpObject, const ECsIndexProp *lpProp);
+	ECRESULT I_AddIndexData(const ECsIndexObject *, const ECsIndexProp *);
 
 	ECDatabaseFactory*	m_lpDatabaseFactory;
 	std::recursive_mutex m_hCacheMutex; /* Store, Object, User, ACL, server cache */

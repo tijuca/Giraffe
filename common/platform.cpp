@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#define _GNU_SOURCE 1
 #include <kopano/platform.h>
 #include <cerrno>
 #include <cstdlib>
@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/time.h> /* gettimeofday */
 #include <kopano/ECLogger.h>
 #include "TmpPath.h"
@@ -143,32 +144,31 @@ HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
  *
  * For dates, everything is 1-index (1st January is 1-1) and year is full (2008)
  */
- 
-bool operator ==(const FILETIME &a, const FILETIME &b)
+bool operator==(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a.dwLowDateTime == b.dwLowDateTime && a.dwHighDateTime == b.dwHighDateTime;
 }
 
-bool operator >(const FILETIME &a, const FILETIME &b)
+bool operator>(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return ((a.dwHighDateTime > b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime > b.dwLowDateTime)));
 }
 
-bool operator >=(const FILETIME &a, const FILETIME &b)
+bool operator>=(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a > b || a == b;
 }
 
-bool operator <(const FILETIME &a, const FILETIME &b)
+bool operator<(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return ((a.dwHighDateTime < b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime < b.dwLowDateTime)));
 }
 
-bool operator <=(const FILETIME &a, const FILETIME &b)
+bool operator<=(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a < b || a == b;
 }
@@ -303,7 +303,7 @@ void set_thread_name(pthread_t tid, const std::string & name)
 
 ssize_t read_retry(int fd, void *data, size_t len)
 {
-	char *buf = static_cast<char *>(data);
+	auto buf = static_cast<char *>(data);
 	size_t tread = 0;
 
 	while (len > 0) {
@@ -323,7 +323,7 @@ ssize_t read_retry(int fd, void *data, size_t len)
 
 ssize_t write_retry(int fd, const void *data, size_t len)
 {
-	const char *buf = static_cast<const char *>(data);
+	auto buf = static_cast<const char *>(data);
 	size_t twrote = 0;
 
 	while (len > 0) {
@@ -343,9 +343,7 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 
 bool force_buffers_to_disk(const int fd)
 {
-	if (fsync(fd) == -1)
-	    return false;
-	return true;
+	return fsync(fd) != -1;
 }
 
 void my_readahead(const int fd)
@@ -366,6 +364,31 @@ void give_filesize_hint(const int fd, const off_t len)
 	// pattern as it knows how much date is going to be
 	// inserted
 	posix_fallocate(fd, 0, len);
+#endif
+}
+
+void kcsrv_blocksigs(void)
+{
+	sigset_t m;
+	sigemptyset(&m);
+	sigaddset(&m, SIGINT);
+	sigaddset(&m, SIGHUP);
+	sigaddset(&m, SIGTERM);
+	pthread_sigmask(SIG_BLOCK, &m, nullptr);
+}
+
+/*
+ * Used for logging only. Can return anything as long as it is unique
+ * per thread.
+ */
+unsigned long kc_threadid(void)
+{
+#if defined(LINUX)
+	return syscall(SYS_gettid);
+#elif defined(OPENBSD)
+	return getthrid();
+#else
+	return pthread_self();
 #endif
 }
 

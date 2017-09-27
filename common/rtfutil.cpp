@@ -108,35 +108,21 @@ static HRESULT HrGetCharsetByRTFID(int id, const char **lpszCharset)
 	return MAPI_E_NOT_FOUND;
 }
 
-/** RTF ignore Commando's
- *
- * @param[in]	lpCommand	RTF command string, without leading \
- * @return	bool
- */
+class rtfstringcomp {
+	public:
+	bool operator()(const char *a, const char *b) const { return strcmp(a, b) < 0; }
+};
+
 static bool isRTFIgnoreCommand(const char *lpCommand)
 {
-	if(lpCommand == NULL)
-		return false;
-
-	if (strcmp(lpCommand,"stylesheet") == 0 ||
-			strcmp(lpCommand,"revtbl") == 0 || 
-			strcmp(lpCommand,"xmlnstbl") == 0 ||
-			strcmp(lpCommand,"rsidtbl") == 0 ||
-			strcmp(lpCommand,"fldinst") == 0 ||
-			strcmp(lpCommand,"shpinst") == 0 ||
-			strcmp(lpCommand,"wgrffmtfilter") == 0 ||
-			strcmp(lpCommand,"pnseclvl") == 0 ||
-			strcmp(lpCommand,"atrfstart") == 0 ||
-			strcmp(lpCommand,"atrfend") == 0 ||
-			strcmp(lpCommand,"atnauthor") == 0 ||
-			strcmp(lpCommand,"annotation") == 0 ||
-			strcmp(lpCommand,"sp") == 0 ||
-			strcmp(lpCommand,"atnid") == 0 ||
-			strcmp(lpCommand,"xmlopen") == 0
-			//strcmp(lpCommand,"fldrslt") == 0
-	   )
-		return true;
-	return false;
+	static const std::set<const char *, rtfstringcomp> rtf_ignore_cmds = {
+		"stylesheet", "revtbl", "xmlnstbl", "rsidtbl", "fldinst",
+		"shpinst", "wgrffmtfilter", "pnseclvl", "atrfstart", "atrfend",
+		"atnauthor", "annotation", "sp", "atnid", "xmlopen",
+		// "fldrslt"
+	};
+	return lpCommand != nullptr &&
+	       rtf_ignore_cmds.find(lpCommand) != rtf_ignore_cmds.cend();
 }
 
 /**
@@ -161,10 +147,10 @@ static std::wstring RTFFlushStateOutput(convert_context &convertContext,
 {
 	std::wstring wstrUnicode;
 
-	if (!sState[ulState].output.empty()) {
-		TryConvert(convertContext, sState[ulState].output, rawsize(sState[ulState].output), sState[ulState].szCharset, wstrUnicode);
-		sState[ulState].output.clear();
-	}
+	if (sState[ulState].output.empty())
+		return wstrUnicode;
+	TryConvert(convertContext, sState[ulState].output, rawsize(sState[ulState].output), sState[ulState].szCharset, wstrUnicode);
+	sState[ulState].output.clear();
 	return wstrUnicode;
 }
 
@@ -1061,9 +1047,12 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &rtf_unfilt,
  */
 bool isrtfhtml(const char *buf, unsigned int len)
 {
+	if (len < 9)
+		return false;
+	assert(buf != nullptr);
 	for (const char *c = buf; c < buf + len - 9; ++c)
-		if (strncmp(c, "\\from", 5) == 0)
-			return strncmp(c, "\\fromhtml", 9) == 0;
+		if (memcmp(c, "\\fromhtml", 9) == 0)
+			return true;
 	return false;
 }
 
@@ -1080,9 +1069,12 @@ bool isrtfhtml(const char *buf, unsigned int len)
  */
 bool isrtftext(const char *buf, unsigned int len)
 {
+	if (len < 9)
+		return false;
+	assert(buf != nullptr);
 	for (const char *c = buf; c < buf + len - 9; ++c)
-		if (strncmp(c, "\\from", 5) == 0)
-			return strncmp(c, "\\fromtext", 9) == 0;
+		if (memcmp(c, "\\fromtext", 9) == 0)
+			return true;
 	return false;
 }
 

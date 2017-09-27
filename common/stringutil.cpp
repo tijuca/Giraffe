@@ -20,6 +20,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <cctype>
 #include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
@@ -96,21 +97,12 @@ std::wstring wstringify(unsigned int x, bool usehex, bool _signed)
 	return s.str();
 }
 
-unsigned int xtoi(const char *lpszHex)
-{
-	unsigned int ulHex = 0;
-
-	sscanf(lpszHex, "%X", &ulHex);
-
-	return ulHex;
-}
-
 int memsubstr(const void* haystack, size_t haystackSize, const void* needle, size_t needleSize)
 {
 	size_t pos = 0;
 	size_t match = 0;
-	BYTE* searchbuf = (BYTE*)needle;
-	BYTE* databuf = (BYTE*)haystack;
+	auto searchbuf = static_cast<const BYTE *>(needle);
+	auto databuf = static_cast<const BYTE *>(haystack);
 
 	if(haystackSize < needleSize)
 		return (haystackSize-needleSize);
@@ -185,32 +177,6 @@ std::string GetServerPortFromPath(const char *szPath) {
 	if (pos != std::string::npos)
 		path.erase(pos, std::string::npos);
 	return path;
-}
-
-std::string shell_escape(const std::string &str)
-{
-	std::string escaped;
-	auto start = str.cbegin();
-	auto ptr   = start;
-	while (ptr != str.cend()) {
-		while (ptr != str.end() && *ptr != '\'')
-			++ptr;
-
-		escaped += std::string(start, ptr);
-		if (ptr == str.end())
-			break;
-
-		start = ++ptr;          // skip single quote
-		escaped += "'\\''";     // shell escape sequence
-	}
-
-	return escaped;
-}
-
-std::string shell_escape(const std::wstring &wstr)
-{
-	std::string strLocale = convert_to<std::string>(wstr);
-	return shell_escape(strLocale);
 }
 
 std::vector<std::wstring> tokenize(const std::wstring &strInput, const WCHAR sep, bool bFilterEmpty) {
@@ -316,19 +282,20 @@ std::string hex2bin(const std::wstring &input)
 	return buffer;
 }
 
-std::string bin2hex(unsigned int inLength, const unsigned char *input)
+std::string bin2hex(size_t inLength, const void *vinput)
 {
-	static const char digits[] = "0123456789ABCDEF";
 	std::string buffer;
-
-	if (!input)
+	if (vinput == nullptr)
 		return buffer;
 	if (inLength > 2048)
-		ec_log_warn("Unexpectedly large bin2hex call, %u bytes\n", inLength);
+		ec_log_warn("Unexpectedly large bin2hex call, %zu bytes\n", inLength);
 	else if (inLength > 64)
-		ec_log_debug("Unexpectedly large bin2hex call, %u bytes\n", inLength);
+		ec_log_debug("Unexpectedly large bin2hex call, %zu bytes\n", inLength);
+	static const char digits[] = "0123456789ABCDEF";
+	auto input = static_cast<const unsigned char *>(vinput);
+
 	buffer.reserve(inLength * 2);
-	for (unsigned int i = 0; i < inLength; ++i) {
+	for (size_t i = 0; i < inLength; ++i) {
 		buffer += digits[input[i]>>4];
 		buffer += digits[input[i]&0x0F];
 	}
@@ -338,32 +305,7 @@ std::string bin2hex(unsigned int inLength, const unsigned char *input)
 
 std::string bin2hex(const std::string &input)
 {
-    return bin2hex((unsigned int)input.size(), (const unsigned char*)input.c_str());
-}
-
-std::wstring bin2hexw(unsigned int inLength, const unsigned char *input)
-{
-	static const wchar_t digits[] = L"0123456789ABCDEF";
-	std::wstring buffer;
-
-	if (!input)
-		return buffer;
-	if (inLength > 2048)
-		ec_log_warn("Unexpectedly large bin2hex call, %u bytes\n", inLength);
-	else if (inLength > 64)
-		ec_log_debug("Unexpectedly large bin2hex call, %u bytes\n", inLength);
-	buffer.reserve(inLength * 2);
-	for (unsigned int i = 0; i < inLength; ++i) {
-		buffer += digits[input[i]>>4];
-		buffer += digits[input[i]&0x0F];
-	}
-
-	return buffer;
-}
-
-std::wstring bin2hexw(const std::string &input)
-{
-    return bin2hexw((unsigned int)input.size(), (const unsigned char*)input.c_str());
+	return bin2hex(input.size(), input.c_str());
 }
 
 /** 
@@ -380,7 +322,10 @@ std::string urlEncode(const std::string &input)
 {
 	std::string output;
 	static const char digits[] = "0123456789ABCDEF";
-
+	/*
+	 * Need at least this much, but otherwise have no strategy better
+	 * than the default for reallocs.
+	 */
 	output.reserve(input.length());
 	for (size_t i = 0; i < input.length(); ++i) {
 		if (static_cast<unsigned char>(input[i]) <= 33 ||
@@ -431,14 +376,12 @@ std::string urlEncode(const std::string &input)
  */
 std::string urlEncode(const std::wstring &input, const char* charset)
 {
-	std::string output = convert_to<std::string>(charset, input, rawsize(input), CHARSET_WCHAR);
-	return urlEncode(output);
+	return urlEncode(convert_to<std::string>(charset, input, rawsize(input), CHARSET_WCHAR));
 }
 
 std::string urlEncode(const WCHAR* input, const char* charset)
 {
-	std::string output = convert_to<std::string>(charset, input, rawsize(input), CHARSET_WCHAR);
-	return urlEncode(output);
+	return urlEncode(convert_to<std::string>(charset, input, rawsize(input), CHARSET_WCHAR));
 }
 
 /** 
@@ -512,7 +455,10 @@ void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsiz
 void StringTabtoSpaces(const std::wstring &strInput, std::wstring *lpstrOutput) {
 
 	std::wstring strOutput;
-
+	/*
+	 * With this reservation, at worst, when every input char is a tab,
+	 * at most two reallocs happen (with capacity doubling).
+	 */
 	strOutput.reserve(strInput.length());
 
 	for (auto c : strInput)
@@ -520,8 +466,7 @@ void StringTabtoSpaces(const std::wstring &strInput, std::wstring *lpstrOutput) 
 			strOutput.append(4, ' ');
 		else
 			strOutput.append(1, c);
-
-	lpstrOutput->swap(strOutput);
+	*lpstrOutput = std::move(strOutput);
 }
 
 /**
@@ -545,7 +490,7 @@ void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
 			strOutput.append(1, *iInput);
 		
 	}
-	lpstrOutput->swap(strOutput);
+	*lpstrOutput = std::move(strOutput);
 }
 
 /** 
@@ -557,7 +502,7 @@ void StringLFtoCRLF(std::string &strInOut)
 {
 	std::string strOutput;
 	std::string::const_iterator i;
-
+	/* Output at most double the size of input => one realloc normally */
 	strOutput.reserve(strInOut.size());
 
 	for (i = strInOut.begin(); i != strInOut.end(); ++i)
@@ -565,8 +510,7 @@ void StringLFtoCRLF(std::string &strInOut)
 			strOutput.append("\r\n");
 		else
 			strOutput.append(1, *i);
-
-	swap(strInOut, strOutput);
+	strInOut = std::move(strOutput);
 }
 
 std::string format(const char *const fmt, ...) {
@@ -615,11 +559,13 @@ static inline bool is_base64(unsigned char c)
 	return isalnum(c) || c == '+' || c == '/';
 }
 
-std::string base64_encode(const unsigned char *bytes_to_encode, unsigned int in_len)
+std::string base64_encode(const void *bte, unsigned int in_len)
 {
+	auto bytes_to_encode = static_cast<const unsigned char *>(bte);
 	unsigned char char_array_3[3], char_array_4[4];
 	int i = 0, j = 0;
 	std::string ret;
+	ret.reserve((in_len + 2) / 3 * 4);
 	
 	while (in_len--) {
 		char_array_3[i++] = *(bytes_to_encode++);
@@ -654,6 +600,7 @@ std::string base64_decode(const std::string &encoded_string)
 	int in_len = encoded_string.size(), i = 0, j = 0, in_ = 0;
 	unsigned char char_array_4[4], char_array_3[3];
 	std::string ret;
+	ret.reserve((in_len + 1) / 4 * 3);
 
 	while (in_len-- && encoded_string[in_] != '=' && is_base64(encoded_string[in_])) {
 		char_array_4[i++] = encoded_string[in_++];
@@ -701,6 +648,8 @@ std::string zcp_md5_final_hex(MD5_CTX *ctx)
 std::string string_strip_nuls(const std::string &i)
 {
 	std::string o;
+	/* Expectation: no NULs to begin with. Hence reserving the entire size. */
+	o.reserve(i.size());
 	std::copy_if(i.cbegin(), i.cend(), std::back_inserter(o),
 		[](char c) { return c != '\0'; });
 	return o;
@@ -709,8 +658,23 @@ std::string string_strip_nuls(const std::string &i)
 std::wstring string_strip_nuls(const std::wstring &i)
 {
 	std::wstring o;
+	o.reserve(i.size());
 	std::copy_if(i.cbegin(), i.cend(), std::back_inserter(o),
 		[](wchar_t c) { return c != L'\0'; });
+	return o;
+}
+
+std::string string_strip_crlf(const char *s)
+{
+	std::string o;
+	/*
+	 * Expectation: 2 bytes (CRLF) every 78 bytes; and an input usually not
+	 * longer than 480 bytes. Allocating the same length is therefore
+	 * acceptable.
+	 */
+	o.reserve(strlen(s));
+	std::copy_if(s, s + strlen(s), std::back_inserter(o),
+		[](char c) { return c != '\n' && c != '\r'; });
 	return o;
 }
 

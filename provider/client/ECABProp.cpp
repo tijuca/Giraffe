@@ -16,7 +16,6 @@
  */
 
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include "kcore.hpp"
 #include "ECABProp.h"
 #include "Mem.h"
@@ -37,16 +36,13 @@ ECABProp::ECABProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 HRESULT ECABProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECABProp, this);
-	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIProp);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIProp);
-	return MAPI_E_INTERFACE_NOT_SUPPORTED;
+	return ECGenericProp::QueryInterface(refiid, lppInterface);
 }
 
 HRESULT	ECABProp::DefaultABGetProp(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
 {
 	HRESULT		hr = hrSuccess;
-	ECABProp*	lpProp = (ECABProp *)lpParam;
+	auto lpProp = static_cast<ECABProp *>(lpParam);
 
 	switch(PROP_ID(ulPropTag)) {
 	case PROP_ID(PR_RECORD_KEY):
@@ -54,8 +50,9 @@ HRESULT	ECABProp::DefaultABGetProp(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 
 		if(lpProp->m_lpEntryId && lpProp->m_cbEntryId > 0) {
 			lpsPropValue->Value.bin.cb = lpProp->m_cbEntryId;
-
-			ECAllocateMore(lpsPropValue->Value.bin.cb, lpBase, (LPVOID *)&lpsPropValue->Value.bin.lpb);
+			hr = ECAllocateMore(lpsPropValue->Value.bin.cb, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
+			if (hr != hrSuccess)
+				break;
 			memcpy(lpsPropValue->Value.bin.lpb, lpProp->m_lpEntryId, lpsPropValue->Value.bin.cb);
 		} else {
 			hr = MAPI_E_NOT_FOUND;
@@ -91,7 +88,9 @@ HRESULT ECABProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSr
 	case PROP_TAG(PT_ERROR,PROP_ID(PR_AB_PROVIDER_ID)):
 		lpsPropValDst->ulPropTag = PR_AB_PROVIDER_ID;
 		lpsPropValDst->Value.bin.cb = sizeof(GUID);
-		ECAllocateMore(sizeof(GUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
+		hr = ECAllocateMore(sizeof(GUID), lpBase, reinterpret_cast<void **>(&lpsPropValDst->Value.bin.lpb));
+		if (hr != hrSuccess)
+			break;
 		memcpy(lpsPropValDst->Value.bin.lpb, &MUIDECSAB, sizeof(GUID));
 		break;
 	default:
@@ -106,19 +105,3 @@ ECABLogon* ECABProp::GetABStore()
 {
 	return (ECABLogon*)lpProvider;
 }
-
-// Interface IMAPIProp
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, QueryInterface, (REFIID, id), (void **, intf))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

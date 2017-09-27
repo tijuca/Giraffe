@@ -105,11 +105,9 @@ exit:
 		*lpulFlag = ulFlag;
 
 	if (lpstrUrlUser)
-		lpstrUrlUser->swap(strUrlUser);
-
+		*lpstrUrlUser = std::move(strUrlUser);
 	if (lpstrFolder)
-		lpstrFolder->swap(strFolder);
-
+		*lpstrFolder = std::move(strFolder);
 	return hr;
 }
 
@@ -592,7 +590,8 @@ HRESULT Http::HrFinalize()
 		hr = HrFlushHeaders();
 		if (hr != hrSuccess && hr != MAPI_E_END_OF_SESSION) {
 			ec_log_debug("Http::HrFinalize flush fail %d", hr);
-			goto exit;
+			m_ulRetCode = 0;
+			return hr;
 		}
 
 		if (!m_strRespBody.empty()) {
@@ -613,7 +612,8 @@ HRESULT Http::HrFinalize()
 		hr = HrFlushHeaders();
 		if (hr != hrSuccess && hr != MAPI_E_END_OF_SESSION) {
 			ec_log_debug("Http::HrFinalize flush fail(2) %d", hr);
-			goto exit;
+			m_ulRetCode = 0;
+			return hr;
 		}
 
 		while (szBodyWritten < szBodyLen)
@@ -638,19 +638,16 @@ HRESULT Http::HrFinalize()
 	}
 
 	// if http_log_enable?
-	{
-		char szTime[32];
-		time_t now = time(NULL);
-		tm local;
-		string strAgent;
-		localtime_r(&now, &local);
-		// @todo we're in C LC_TIME locale to get the correct (month) format, but the timezone will be GMT, which is not wanted.
-		strftime(szTime, arraySize(szTime), "%d/%b/%Y:%H:%M:%S %z", &local);
-		HrGetHeaderValue("User-Agent", &strAgent);
-		ec_log_debug("%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->peer_addr(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
-	}
+	char szTime[32];
+	time_t now = time(NULL);
+	tm local;
+	string strAgent;
+	localtime_r(&now, &local);
+	// @todo we're in C LC_TIME locale to get the correct (month) format, but the timezone will be GMT, which is not wanted.
+	strftime(szTime, ARRAY_SIZE(szTime), "%d/%b/%Y:%H:%M:%S %z", &local);
+	HrGetHeaderValue("User-Agent", &strAgent);
+	ec_log_notice("%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->peer_addr(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
 
-exit:
 	m_ulRetCode = 0;
 	return hr;
 }
@@ -730,11 +727,7 @@ HRESULT Http::HrRequestAuth(std::string strMsg)
 		return hr;
 
 	strMsg = "Basic realm=\"" + strMsg + "\"";
-	hr = HrResponseHeader("WWW-Authenticate", strMsg);
-	if (hr != hrSuccess)
-		return hr;
-
-	return hrSuccess;
+	return HrResponseHeader("WWW-Authenticate", strMsg);
 }
 
 /**

@@ -14,7 +14,10 @@ from .compat import repr as _repr
 from .errors import NotFoundError, DuplicateError
 
 if sys.hexversion >= 0x03000000:
-    from . import utils as _utils
+    try:
+        from . import utils as _utils
+    except ImportError:
+        _utils = sys.modules[__package__+'.utils']
 else:
     import utils as _utils
 
@@ -35,7 +38,7 @@ class Quota(object):
             self._hard_limit = quota.llHardSize
             # XXX: logical name for variable
             # Use default quota set in /etc/kopano/server.cfg
-            self._use_default_quota = quota.bUseDefaultQuota
+            self._use_default_quota = bool(quota.bUseDefaultQuota)
             # XXX: is this for multitenancy?
             self._isuser_default_quota = quota.bIsUserDefaultQuota
 
@@ -99,14 +102,14 @@ class Quota(object):
             for ecuser in self.server.sa.GetQuotaRecipients(self.userid, 0):
                 yield self.server.user(ecuser.Username)
 
-    def add_recipient(self, user, company=False):
+    def add_recipient(self, user, company=False): # XXX remove company flag
         objclass = CONTAINER_COMPANY if company else ACTIVE_USER
         try:
             self.server.sa.AddQuotaRecipient(self.userid, user._ecuser.UserID, objclass)
         except MAPIErrorCollision:
             raise DuplicateError("user '%s' already in %squota recipients" % (user.name, 'company' if company else 'user'))
 
-    def remove_recipient(self, user, company=False):
+    def remove_recipient(self, user, company=False): # XXX remove company flag
         objclass = CONTAINER_COMPANY if company else ACTIVE_USER
         try:
             self.server.sa.DeleteQuotaRecipient(self.userid, user._ecuser.UserID, objclass)
