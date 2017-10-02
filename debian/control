@@ -142,6 +142,7 @@ Architecture: any
 Multi-Arch: same
 Depends: ${shlibs:Depends},
  ${misc:Depends},
+ kopano-libs (= ${binary:Version}),
 Description: C++ Development files and libraries for Kopano Core
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
