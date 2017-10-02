@@ -199,6 +199,7 @@ Description: Complete and feature rich groupware solution - CalDAV and CalDAV ga
 
 Package: kopano-l10n
 Architecture: all
+Section: localization
 Depends: locales,
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - l10n files
