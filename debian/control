@@ -12,7 +12,7 @@ Build-Depends:
  autotools-dev,
  binutils (>= 2.12.90.0.9),
  bison,
- debhelper (>= 9.20160115),
+ debhelper (>= 10.8~),
  default-libmysqlclient-dev,
  dh-apparmor,
  dh-autoreconf,
