@@ -107,6 +107,11 @@ override_dh_makeshlibs:
 		-Xlibkccontacts \
 		-Xunixplugin
 
+override_dh_fixperms:
+	# don't ship zcontacts.inf in kopano-server, it's provided by kopano-contacts already
+	rm debian/kopano-server/usr/share/doc/kopano-server/example-config/zcontacts.inf
+	dh_fixperms
+
 override_dh_shlibdeps:
 	dh_shlibdeps -a -l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/kopano \
 			-l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
