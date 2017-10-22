@@ -1,3 +1,36 @@
+kopanocore (8.3.4-3) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [75a1b00] kopano-dev: Depend on kopano-libs (Closes: #877454)
+    Obviously needs the -dev package needs a depending on the library package.
+    Without those libraries no real development is possible. 
+  * [e2098a7] kopano-search: drop dependencies on essential packages
+    The dependencies on various now partially essential packages aren't needed
+    and can be dropped.
+    (Closes: #877549)
+  * [6d4dc9b] uscan: switch to https
+  * [cf57093] uscan: Match on beta versions and ignore .90 "betas"
+    Be more open for beta versions too, but ignore versions of *.90 which are
+    like final pre versions for the next release.
+
+  [ Carsten Schoenert ]
+  * [9414114] debian/control: increase Standards-Version to 4.1.1
+    No further changes are needed.
+  * [3e273da] debian/control: put l10n package into section localization
+  * [1e61e46] debian/watch: update due changed GitHub organization
+    Upstream has changed their team name on GitHub to 'Kopano-dev', adopt this
+    change into the watch file so uscan can reach valid content again.
+  * [4e8f2db] bump debhelper >= 10.8
+  * [3136c81] debian/control: remove obsolete B-D due debhelper 10.8
+    New debhelper versions have a automatic dependency on autotools-dev,
+    dh-{autoreconf,systemd} and we don't need them explicitly in B-D.
+  * [3ff17ac] debian/rules: remove zcontacts.inf from kopano-server
+    This configuration file is already used by kopano-contacts and we don't
+    need to ship it in kopano-server again.
+    (Closes: #876480)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sun, 22 Oct 2017 18:27:15 +0200
+
 kopanocore (8.3.4-2) unstable; urgency=medium
 
   * [a8cd857] Version libvmime build-dep (Closes: #875454)
