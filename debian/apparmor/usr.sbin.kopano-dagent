@@ -20,6 +20,8 @@
   /etc/gss/mech.d/*.conf r,
   /etc/kopano/dagent.cfg r,
 
+  /usr/sbin/kopano-dagent r,
+
   /usr/share/kopano-dagent/python/*.py{,c} r,
 
   /var/lib/kopano/dagent/plugins/ r,
