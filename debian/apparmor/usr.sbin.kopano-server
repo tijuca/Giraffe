@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-/usr/sbin/kopano-server {
+/usr/sbin/kopano-server flags=(attach_disconnected) {
   #include <abstractions/base>
   #include <abstractions/nameservice>
   #include <abstractions/user-tmp>
