@@ -16,6 +16,7 @@
 
   /etc/kopano/debian-db.cfg r,
   /etc/kopano/server.cfg r,
+  /usr/sbin/kopano-server r,
 
   @{PROC}/@{pid}/task/@{tid}/comm rw,
 
