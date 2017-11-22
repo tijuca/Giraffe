@@ -22,6 +22,8 @@
 
   /usr/sbin/kopano-dagent r,
 
+  /run/kopano/server.sock rw,
+
   /usr/share/kopano-dagent/python/*.py{,c} r,
 
   /var/lib/kopano/dagent/plugins/ r,
