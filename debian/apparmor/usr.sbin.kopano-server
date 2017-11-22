@@ -23,7 +23,7 @@
   /run/kopano/server.pid rw,
   /run/kopano/server.sock rw,
 
-  /usr/lib/x86_64-linux-gnu/kopano/*.so m,
+  /usr/lib/@{multiarch}/kopano/*.so m,
 
   /var/lib/kopano/attachments/ r,
   /var/lib/kopano/attachments/** rw,
