@@ -33,7 +33,7 @@
 
   # There's little we can do if the server is allowed to run
   # arbitrary scripts
-  profile kopano_userscripts {
+  profile kopano_userscripts flags=(attach_disconnected) {
     file,
     network,
   }
