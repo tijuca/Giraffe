@@ -15,6 +15,7 @@ PermissionsStartOnly=true
 ExecStartPre=/bin/mkdir -p /var/run/kopano
 ExecStartPre=/bin/chown kopano /var/run/kopano
 ExecStartPre=/bin/chown kopano /var/lib/kopano
+ExecStartPre=/bin/chown kopano /var/lib/kopano/attachments
 ExecStart=/usr/sbin/kopano-server -F -c /etc/kopano/server.cfg
 KillMode=process
 ExecReload=/bin/kill -HUP $MAINPID
