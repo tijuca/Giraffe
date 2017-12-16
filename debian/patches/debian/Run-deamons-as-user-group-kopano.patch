@@ -29,7 +29,7 @@ index 23e6157..dd05ab4 100644
  # control pid file
  #pid_file = /var/run/kopano/dagent.pid
 diff --git a/installer/linux/gateway.cfg b/installer/linux/gateway.cfg
-index b02f440..db1a3f4 100644
+index d7e8eb0..30f3c9e 100644
 --- a/installer/linux/gateway.cfg
 +++ b/installer/linux/gateway.cfg
 @@ -14,10 +14,10 @@ server_hostname =
@@ -46,7 +46,7 @@ index b02f440..db1a3f4 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file = /var/run/kopano/gateway.pid
 diff --git a/installer/linux/ical.cfg b/installer/linux/ical.cfg
-index d03671d..517fb8d 100644
+index 821da7b..1478808 100644
 --- a/installer/linux/ical.cfg
 +++ b/installer/linux/ical.cfg
 @@ -2,10 +2,10 @@
@@ -91,10 +91,10 @@ index ee20842..4075a90 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file = /var/run/kopano/monitor.pid
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 2c6990d..451cf16 100644
+index 719bdce..1c11c1e 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -46,10 +46,10 @@ owner_auto_full_access = true
+@@ -52,10 +52,10 @@ owner_auto_full_access = true
  system_email_address	= postmaster@localhost
  
  # drop privileges and run the process as this user
@@ -108,7 +108,7 @@ index 2c6990d..451cf16 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file		= /var/run/kopano/server.pid
 diff --git a/installer/linux/spooler.cfg b/installer/linux/spooler.cfg
-index 6067aef..cb74fbd 100644
+index b101901..fafbf57 100644
 --- a/installer/linux/spooler.cfg
 +++ b/installer/linux/spooler.cfg
 @@ -11,10 +11,10 @@ smtp_port = 25

@@ -1,4 +1,3 @@
 debian/Add-include-for-database-configuration.patch
 debian/Run-deamons-as-user-group-kopano.patch
-fixes/bash-completion-remove-shebang-from-file.patch
-debian/server.cfg-prepare-later-M-A-substition-while-built.patch
+debian/add-debian-to-with-distro-switch.patch
