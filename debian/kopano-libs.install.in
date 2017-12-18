@@ -12,6 +12,6 @@ usr/lib/@DEB_HOST_MULTIARCH@/libkcsoap.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcssl.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcutil.so.*
 # From libkopano-client
-etc/mapi/kopano.inf
+usr/lib/mapi.d/kopano.inf
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcclient.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcsync.so.*
