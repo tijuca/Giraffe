@@ -6,3 +6,5 @@ usr/lib/python*/*/icalmapi.py
 usr/lib/python*/*/_icalmapi.so
 usr/lib/python*/*/MAPI*.egg-info
 usr/lib/python*/*/MAPI/
+usr/lib/python*/*/libfreebusy.py
+usr/lib/python*/*/_libfreebusy.so
