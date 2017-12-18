@@ -223,6 +223,24 @@ Description: Complete and feature rich groupware solution - quota monitor
  This package contains the quota monitor that checks stores for total usage
  and alerts users by email.
 
+Package: kopano-presence
+Architecture: all
+Depends: ${misc:Depends},
+ kopano-common (>= ${binary:Version}),
+ lsb-base (>= 3.0-6),
+ python,
+ python-flask,
+ python-kopano (= ${binary:Version}),
+ python-sleekxmpp,
+Description: Complete and feature rich groupware solution - presence daemon
+ A daemon for collecting and exporting user presence information across
+ multiple protocols in a unified way.
+ Supports XMPP and Spreed. Clients can both query the daemon with presence
+ information (for example, the user is 'available' for XMPP and 'away' for
+ Spreed) and update presence information (for example, make a user 'available'
+ on Spreed). Queries and updates are performed with simple GET and PUT
+ requests, respectively, using a simple (and identical) JSON format.
+
 Package: kopano-search
 Architecture: all
 Depends: ${shlibs:Depends},

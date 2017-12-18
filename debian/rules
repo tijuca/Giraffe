@@ -96,6 +96,7 @@ override_dh_installinit:
 	dh_installinit --name kopano-gateway
 	dh_installinit --name kopano-monitor
 	dh_installinit --name kopano-ical
+	dh_installinit --name kopano-presence
 	dh_installinit --name kopano-search
 
 override_dh_compress:

@@ -1,0 +1,5 @@
+etc/kopano/presence.cfg
+usr/lib/python*/*/kopano_presence*
+# SystemD Unit file comes from the kopano-presence.service sequence file
+#usr/lib/systemd/system/kopano-presence.service
+usr/sbin/kopano-presence
