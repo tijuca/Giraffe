@@ -12,6 +12,13 @@ Copyright: 2005-2016, Zarafa B.V. and its licensors
   2015-2017, Carsten Schoenert <c.schoenert@t-online.de>
 License: AGPL-3
 
+Files: debian/*.service
+ debian/*.init
+Copyright: 2016 - 2017, Kopano B.V. and its licensors
+  2015-2017, Carsten Schoenert <c.schoenert@t-online.de>
+  2017, Guido Günther <agx@sigxcpu.org>
+License: AGPL-3
+
 Files: autoconf/php.m4
   autoconf/swig.m4
 Copyright: no-info-found
