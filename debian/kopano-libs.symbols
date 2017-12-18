@@ -1,127 +1,144 @@
 libkcarchiver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcarchivercore.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcfreebusy.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
-
-libkchl.so.0 kopano-libs #MINVER#
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcicalmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcinetmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
-libkcpyconv.so.0 kopano-libs #MINVER#
-#MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
-  _Z11DoExceptioni@Base 8.3.2
-  _Z13CopyPyUnicodePPwP7_objectPv@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_10wDayOfWeekEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_13wMillisecondsEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_4wDayEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_5wHourEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_5wYearEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_6wMonthEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_7wMinuteEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultI10SYSTEMTIMEtXadL_ZNS0_7wSecondEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSERENS0_13objectclass_tEXadL_ZNS1_10ulObjClassEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSERENS0_9ECENTRYIDEXadL_ZNS1_7sUserIdEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszFullNameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszPasswordEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszUsernameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_14lpszServernameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_15lpszMailAddressEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_10ulCapacityEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_9ulIsAdminEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECGROUPENS0_9ECENTRYIDEXadL_ZNS1_8sGroupIdEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_12lpszFullnameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_13lpszFullEmailEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_13lpszGroupnameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECGROUPEjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_16bUseDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_19bIsUserDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_10sCompanyIdEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_14sAdministratorEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC9ECCOMPANYEPwXadL_ZNS1_14lpszServernameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC9ECCOMPANYEPwXadL_ZNS1_15lpszCompanynameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC9ECCOMPANYEjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z17GetExceptionErrorP7_objectPi@Base 8.3.2
-  _Z17Object_is_list_ofP7_objectPFiS0_E@Base 8.3.2
-  _Z18Object_is_FILETIMEP7_object@Base 8.3.2
-  _Z19Object_to_MVPROPMAPIN2KC6ECUSEREEvP7_objectRPT_j@Base 8.3.2
-  _Z19Object_to_MVPROPMAPIN2KC7ECGROUPEEvP7_objectRPT_j@Base 8.3.2
-  _Z19Object_to_MVPROPMAPIN2KC9ECCOMPANYEEvP7_objectRPT_j@Base 8.3.2
-  _Z22Object_is_LPSPropValueP7_object@Base 8.3.2
-  _Z4Initv@Base 8.3.2
-  _ZN4priv8conv_outIN2KC13objectclass_tEEEvP7_objectPvjPT_@Base 8.3.2
-  _ZN4priv8conv_outIN2KC9ECENTRYIDEEEvP7_objectPvjPT_@Base 8.3.2
-  _ZN4priv8conv_outIPwEEvP7_objectPvjPT_@Base 8.3.2
-  _ZN4priv8conv_outIbEEvP7_objectPvjPT_@Base 8.3.2
-  _ZN4priv8conv_outIjEEvP7_objectPvjPT_@Base 8.3.2
-  (arch-bits=64)_ZN4priv8conv_outIlEEvP7_objectPvjPT_@Base 8.3.2
-  (arch-bits=32)_ZN4priv8conv_outIxEEvP7_objectPvjPT_@Base 8.3.3
-  _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.3.2
+libkcpyconv-2.7.so kopano-libs #MINVER#
+ *@KC_8.4.90 8.5.0~8.4.99
+ _Z11DoExceptioni@Base 8.5.0~8.4.99
+ _Z13CopyPyUnicodePPwP7_objectPv@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSERENS0_13objectclass_tEXadL_ZNS1_10ulObjClassEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSERENS0_9ECENTRYIDEXadL_ZNS1_7sUserIdEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszFullNameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszPasswordEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_12lpszUsernameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_14lpszServernameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREPwXadL_ZNS1_15lpszMailAddressEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_10ulCapacityEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC6ECUSEREjXadL_ZNS1_9ulIsAdminEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECGROUPENS0_9ECENTRYIDEXadL_ZNS1_8sGroupIdEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_12lpszFullnameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_13lpszFullEmailEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECGROUPEPwXadL_ZNS1_13lpszGroupnameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECGROUPEjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_16bUseDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_19bIsUserDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_10sCompanyIdEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_14sAdministratorEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC9ECCOMPANYEPwXadL_ZNS1_14lpszServernameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC9ECCOMPANYEPwXadL_ZNS1_15lpszCompanynameEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z16conv_out_defaultIN2KC9ECCOMPANYEjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
+ _Z17GetExceptionErrorP7_objectPi@Base 8.5.0~8.4.99
+ _Z19Object_to_MVPROPMAPIN2KC6ECUSEREEvP7_objectRPT_j@Base 8.5.0~8.4.99
+ _Z19Object_to_MVPROPMAPIN2KC7ECGROUPEEvP7_objectRPT_j@Base 8.5.0~8.4.99
+ _Z19Object_to_MVPROPMAPIN2KC9ECCOMPANYEEvP7_objectRPT_j@Base 8.5.0~8.4.99
+ _Z22Object_is_LPSPropValueP7_object@Base 8.5.0~8.4.99
+ _Z4Initv@Base 8.5.0~8.4.99
+ _ZN4priv8conv_outIN2KC13objectclass_tEEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ _ZN4priv8conv_outIN2KC9ECENTRYIDEEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ _ZN4priv8conv_outIPwEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ _ZN4priv8conv_outIbEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ _ZN4priv8conv_outIjEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ (arch-bits=64)_ZN4priv8conv_outIlEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
+ (arch-bits=32)_ZN4priv8conv_outIxEEvP7_objectPvjPT_@Base 8.3.3
+ _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
 
-libkcpydirector.so.0 kopano-libs #MINVER#
-#MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
- _Z21mark_call_from_pythonv@Base 8.3.2
- _Z22check_call_from_pythonv@Base 8.3.2
- _Z23unmark_call_from_pythonv@Base 8.3.2
+libkcpydirector-2.7.so kopano-libs #MINVER#
+ *@KC_8.4.90 8.5.0~8.4.99
+ _Z21mark_call_from_pythonv@Base 8.5.0~8.4.99
+ _Z22check_call_from_pythonv@Base 8.5.0~8.4.99
+ _Z23unmark_call_from_pythonv@Base 8.5.0~8.4.99
 
 libkcserver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcsoap.so.0 kopano-libs #MINVER#
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcssl.so.0 kopano-libs #MINVER#
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
 
 libkcsync.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
- *@KC_8.3 8.3.2
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ KC_8.4.90@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings13EnableSyncLogEb@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings14SetSyncOptionsEj@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings15SetSyncLogLevelEj@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings16SetStreamTimeoutEj@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings18SetStreamBatchSizeEj@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings19SetStreamBufferSizeEj@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings8instanceE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC14ECSyncSettings8s_hMutexE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC23HrDecodeSyncStateStreamEP7IStreamPjS2_PSt3setISt4pairIjNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEESt4lessISB_ESaISB_EE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC9ECSyncLog10s_lpLoggerE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC9ECSyncLog5xinitE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC9ECSyncLog8s_hMutexE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC9ECSyncLog9GetLoggerEPPNS_8ECLoggerE@KC_8.4.90 8.5.0~8.4.99
+ _ZN2KC9ECSyncLog9SetLoggerEPNS_8ECLoggerE@KC_8.4.90 8.5.0~8.4.99
+ _ZNK2KC14ECSyncSettings12SyncLogLevelEv@KC_8.4.90 8.5.0~8.4.99
 
 libkcutil.so.0 kopano-libs #MINVER#
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
  *@OLE32_1 8.3.2
  *@KERNEL32_1 8.3.2
- *@KC_8.3 8.3.2
 
 libmapi.so.1 kopano-libs #MINVER#
+#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
+ *@KC_8.4.90 8.5.0~8.4.99
  *@MAPI32_1 8.0.1
  *@MAPI32_1 8.3.2
  *@OLE32_1 8.0.1
  *@OLE32_1 8.3.2
- *@KC_8.3 8.3.2
