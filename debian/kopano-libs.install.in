@@ -1,7 +1,6 @@
 usr/lib/@DEB_HOST_MULTIARCH@/libkcarchiver.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcarchivercore.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcfreebusy.so.*
-usr/lib/@DEB_HOST_MULTIARCH@/libkchl.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcicalmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcinetmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libmapi.so.*
