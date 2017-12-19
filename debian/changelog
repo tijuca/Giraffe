@@ -1,15 +1,53 @@
-kopanocore (8.4.0~beta1-1~1.gbpbf4432) UNRELEASED; urgency=medium
+kopanocore (8.5.0~8.4.99-1) experimental; urgency=medium
 
-  ** SNAPSHOT build @bf44322a821ddd10ad1a2063cc3899ce1f449777 **
-
-  * [a8cd857] Version libvmime build-dep (Closes: #875454)
-  * [e8ba560] Add apparmor profiles for kopano-server and kopano-dagent
-  * [236d51a] apparmor: add initial policy for search
+  [ Guido Günther ]
   * [4133b28] uscan: switch to https
   * [a84434e] uscan: Match on beta versions and ignore .90 "betas"
   * [00bf6e9] New upstream version 8.4.0~beta1
+  * [5b3f0bd] Drop patches applied upstream
+  * [c747e30] Work around configs not being installed into /etc anymore
+  * [0a93d46] kopano-dev: Depend on kopano-libs (Closes: #877454)
 
- -- Guido Günther <agx@sigxcpu.org>  Wed, 27 Sep 2017 17:02:22 +0200
+  [ Carsten Schoenert ]
+  * [01c57cc] debian/control: increase Standards-Version to 4.1.1
+  * [e557347] debian/control: put l10n package into section localization
+  * [9b5661d] bump debhelper >= 10.8
+  * [94fa459] debian/control: remove obsolete B-D due debhelper 10.8
+  * [d811958] debian/watch: update due changed GitHub organisation
+  * [0658e79] New upstream version 8.5.0~8.4.99
+  * [ac0e580] rebuild patch queue from patch-queue branch
+  * [be1217a] d/rules: modify targets due changes by upstream
+    Upstream configures parts of the installation with a configure switch
+    --with-distro for version 8.5.x which we need to adopt a bit. Also there
+    is no file etc/kopano/server.cfg any longer which we need to adjust.
+  * [2398c56] debian/control: increase Standards-Version to 4.1.3
+  * [cc5f326] kopano-presence: add new binary package
+  * [0cbbb2e] additional copyright information for SysV and Systemd files
+    We need to use some own Systemd service and Sysv init files, adding them
+    to the copyright information.
+  * [e11dee9] remove references on non existing libkchl.so.0
+  * [6ca7d64] d/kopano-search.install: add extra folder for install
+  * [f14d688] d/kopano-backup.install: extend the scope for install
+  * [a521404] *.inf: some files have been moved inside the FS
+  * [2b1f151] adjust library name changes for installing
+    Some libraries names have changed and are renamed which we need to reflect
+    in the install sequencer files.
+  * [413e8ab] d/python-mapi.install: pick up also libfreebusy files here
+    Installing the libfreebusy Python related files into python-mapi.
+  * [a7b3ec7] remove no longer needed override_dh_fixperms-arch
+    The files zcontacts.inf isn't shipped any more and thus makes the override
+    here obsolete.
+  * [b130447] add small stupid QS tool
+    Adding a small scipt to check installed files within the packages.
+  * [bfba596] kopano-libs.symbols: update symbols to 8.5.0~8.4.99
+  * [fa985f4] Add .travis.yml from <http://travis.debian.net>
+  * [dd03c73] Add /.travis.yml to extend-diff-ignore in debian/source/options.
+  * [7a29d2a] d/copyright: small update due upstream changes
+  * [e860925] debian/control: remove unused variables in Depends fields
+  * [116925c] debian/control: remove X(B)-Python-Version Supported Versions
+  * [c9598d7] debian/control: adjust Vcs fields to salsa.debian.org
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Mon, 29 Jan 2018 19:31:46 +0100
 
 kopanocore (8.3.4-4) unstable; urgency=medium
 
