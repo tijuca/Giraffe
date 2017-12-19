@@ -58,6 +58,7 @@
 #include <list>
 #include <map>
 #include <mutex>
+#include <vector>
 
 #define BOOKMARK_LIMIT		100
 
@@ -68,50 +69,66 @@ struct sObjectTableKey {
 	sObjectTableKey(void) = default;
 	unsigned int ulObjId = 0;
 	unsigned int ulOrderId = 0;
-};
 
-struct ObjectTableKeyCompare {
-	bool operator()(const sObjectTableKey& a, const sObjectTableKey& b) const
+	bool operator()(const sObjectTableKey &o) const noexcept
 	{
-		return a.ulObjId < b.ulObjId || (a.ulObjId == b.ulObjId && a.ulOrderId < b.ulOrderId);
+		return ulObjId < o.ulObjId || (ulObjId == o.ulObjId && ulOrderId < o.ulOrderId);
 	}
 };
 
-bool operator!=(const sObjectTableKey& a, const sObjectTableKey& b);
-extern _kc_export bool operator==(const sObjectTableKey &, const sObjectTableKey &);
-extern _kc_export bool operator<(const sObjectTableKey &, const sObjectTableKey &);
-bool operator>(const sObjectTableKey& a, const sObjectTableKey& b);
+extern bool operator!=(const sObjectTableKey &, const sObjectTableKey &) noexcept;
+extern _kc_export bool operator==(const sObjectTableKey &, const sObjectTableKey &) noexcept;
+extern _kc_export bool operator<(const sObjectTableKey &, const sObjectTableKey &) noexcept;
+extern bool operator>(const sObjectTableKey &, const sObjectTableKey &) noexcept;
 
-typedef std::map<sObjectTableKey, unsigned int, ObjectTableKeyCompare>  ECObjectTableMap;
+typedef std::map<sObjectTableKey, unsigned int> ECObjectTableMap;
 typedef std::list<sObjectTableKey> ECObjectTableList;
 
 #define TABLEROW_FLAG_DESC		0x00000001
 #define TABLEROW_FLAG_FLOAT		0x00000002
 #define TABLEROW_FLAG_STRING	0x00000004
 
+struct ECSortCol {
+	public:
+	uint8_t flags = 0;
+	bool isnull = false; /* go use std::optional with C++17 */
+	std::string key;
+};
+
+class ECSortColView {
+	private:
+	const size_t m_off = 0, m_len = -1;
+	const std::vector<ECSortCol> &m_vec;
+
+	public:
+	ECSortColView(const std::vector<ECSortCol> &v, size_t o = 0, size_t l = -1) :
+		m_off(o), m_len(l), m_vec(v) {}
+	const ECSortCol &operator[](size_t i) const { return m_vec[m_off+i]; }
+	size_t size() const
+	{
+		if (m_len != -1)
+			return m_len;
+		size_t z = m_vec.size();
+		if (m_off <= z)
+			return z - m_off;
+		return 0;
+	}
+};
+
 class _kc_export ECTableRow _kc_final {
 public:
-	ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, const unsigned int *lpSortLen, const unsigned char *lpFlags, unsigned char **lppSortData, bool fHidden);
+	ECTableRow(const sObjectTableKey &, const std::vector<ECSortCol> &, bool hidden);
+	ECTableRow(const sObjectTableKey &, std::vector<ECSortCol> &&, bool hidden);
+	ECTableRow(sObjectTableKey &&, std::vector<ECSortCol> &&, bool hidden);
 	ECTableRow(const ECTableRow &other);
-	~ECTableRow();
 	_kc_hidden unsigned int GetObjectSize(void) const;
 	_kc_hidden static bool rowcompare(const ECTableRow *, const ECTableRow *);
-	_kc_hidden static bool rowcompare(unsigned int sortcols_a, const int *sortlen_a, unsigned char **sortkeys_a, const unsigned char *sortflags_a, unsigned int sortcols_b, const int *sortlen_b, unsigned char **sortkeys_b, const unsigned char *sortflags_b, bool ignore_order = false);
-	_kc_hidden static bool rowcompareprefix(unsigned int sortcolprefix, unsigned int sortcols_a, const int *sortlen_a, unsigned char **sortkeys_a, const unsigned char *sortflags_a, unsigned int sortcols_b, const int *sortlen_b, unsigned char **sortkeys_b, const unsigned char *sortflags_b);
+	_kc_hidden static bool rowcompare(const ECSortColView &, const ECSortColView &, bool ignore_order = false);
+	_kc_hidden static bool rowcompareprefix(size_t prefix, const std::vector<ECSortCol> &, const std::vector<ECSortCol> &);
 	bool operator < (const ECTableRow &other) const;
-	
 
-private:
-	_kc_hidden void initSortCols(unsigned int sortcols, const int *sortlen, const unsigned char *flags, unsigned char **sortdata);
-	_kc_hidden void freeSortCols(void);
-	_kc_hidden ECTableRow &operator=(const ECTableRow &);
-public:
 	sObjectTableKey	sKey;
-
-	unsigned int ulSortCols;
-	int *lpSortLen;
-	unsigned char **lppSortKeys;
-	unsigned char *lpFlags;
+	std::vector<ECSortCol> m_cols;
 
 	// b-tree data
 	ECTableRow *lpParent = nullptr;
@@ -124,7 +141,7 @@ public:
 	bool		fHidden;		// The row is hidden (is it non-existent for all purposes)
 };
 
-typedef std::map<sObjectTableKey, ECTableRow*, ObjectTableKeyCompare>  ECTableRowMap;
+typedef std::map<sObjectTableKey, ECTableRow *> ECTableRowMap;
 
 struct sBookmarkPosition {
 	unsigned int	ulFirstRowPosition;
@@ -148,8 +165,7 @@ public:
 	
 	ECKeyTable();
 	~ECKeyTable();
-
-	ECRESULT	UpdateRow(UpdateType ulType, const sObjectTableKey *lpsRowItem, unsigned int ulSortCols, const unsigned int *lpSortLen, const unsigned char *lpFlags, unsigned char **lppSortData, sObjectTableKey *lpsPrevRow, bool fHidden = false, UpdateType *lpulAction = NULL);
+	ECRESULT UpdateRow(UpdateType ulType, const sObjectTableKey *lpsRowItem, std::vector<ECSortCol> &&, sObjectTableKey *lpsPrevRow, bool fHidden = false, UpdateType *lpulAction = nullptr);
 	ECRESULT	GetPreviousRow(const sObjectTableKey *lpsRowItem, sObjectTableKey *lpsPrevItem);
 	ECRESULT	SeekRow(unsigned int ulBookmark, int lSeekTo, int *lplRowsSought);
 	ECRESULT	SeekId(const sObjectTableKey *lpsRowItem);
@@ -166,11 +182,9 @@ public:
 	ECRESULT	UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lpUnhiddenList);
 
 	// Returns the first row where the sort columns are not less than the specified sortkey
-	ECRESULT	LowerBound(unsigned int ulSortColPrefixLen, int *lpSortLen, unsigned char **lppSortData, unsigned char *lpFlags);
-	ECRESULT 	Find(unsigned int ulSortCols, int *lpSortLen, unsigned char **lppSortData, unsigned char *lpFlags, sObjectTableKey *lpsKey);
-
-	ECRESULT	UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned int ulColumn, unsigned char *lpSortData, unsigned int ulSortLen, unsigned char ulFlags, sObjectTableKey *lpsPrevRow,  bool *lpfHidden,  ECKeyTable::UpdateType *lpulAction);
-
+	ECRESULT LowerBound(const std::vector<ECSortCol> &);
+	ECRESULT Find(const std::vector<ECSortCol> &, sObjectTableKey *);
+	ECRESULT UpdatePartialSortKey(sObjectTableKey *lpsRowItem, size_t ulColumn, const ECSortCol &, sObjectTableKey *lpsPrevRow, bool *lpfHidden, ECKeyTable::UpdateType *lpulAction);
 	ECRESULT 	GetRow(sObjectTableKey *lpsRowItem, ECTableRow **lpRow);
 	
 

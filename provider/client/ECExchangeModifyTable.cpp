@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <new>
 #include <utility>
 #include <kopano/memory.hpp>
 #include "WSUtil.h"
@@ -34,14 +35,11 @@
 #include <edkguid.h>
 #include <kopano/ECGuid.h>
 #include <mapiguid.h>
-
-#include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
 
 #include "pcutil.hpp"
 #include <kopano/charset/convert.h>
 #include "utf8/unchecked.h"
-#include <kopano/ECInterfaceDefs.h>
 
 using namespace KCHL;
 
@@ -100,9 +98,10 @@ ECExchangeModifyTable::~ECExchangeModifyTable() {
 		m_lpParent->Release();
 }
 
-HRESULT __stdcall ECExchangeModifyTable::CreateACLTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj) {
+HRESULT ECExchangeModifyTable::CreateACLTable(ECMAPIProp *lpParent,
+    ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj)
+{
 	HRESULT hr = hrSuccess;
-	ECExchangeModifyTable *obj = NULL;
 	object_ptr<ECMemTable> lpecTable;
 	ULONG ulUniqueId = 1;
 	static constexpr const SizedSPropTagArray(4, sPropACLs) =
@@ -120,13 +119,15 @@ HRESULT __stdcall ECExchangeModifyTable::CreateACLTable(ECMAPIProp *lpParent, UL
 	hr = lpecTable->HrSetClean();
 	if(hr != hrSuccess)
 		return hr;
-	obj = new ECExchangeModifyTable(PR_MEMBER_ID, lpecTable, lpParent, ulUniqueId, ulFlags);
-	return obj->QueryInterface(IID_IExchangeModifyTable, reinterpret_cast<void **>(lppObj));
+	return alloc_wrap<ECExchangeModifyTable>(PR_MEMBER_ID, lpecTable,
+	       lpParent, ulUniqueId, ulFlags)
+	       .as(IID_IExchangeModifyTable, lppObj);
 }
 
-HRESULT __stdcall ECExchangeModifyTable::CreateRulesTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj) {
+HRESULT ECExchangeModifyTable::CreateRulesTable(ECMAPIProp *lpParent,
+    ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj)
+{
 	HRESULT hr = hrSuccess;
-	ECExchangeModifyTable *obj = NULL;
 	object_ptr<IStream> lpRulesData;
 	STATSTG statRulesData;
 	ULONG ulRead;
@@ -147,7 +148,9 @@ HRESULT __stdcall ECExchangeModifyTable::CreateRulesTable(ECMAPIProp *lpParent, 
 	if (lpParent != nullptr &&
 	    lpParent->OpenProperty(PR_RULES_DATA, &IID_IStream, 0, 0, &~lpRulesData) == hrSuccess) {
 		lpRulesData->Stat(&statRulesData, 0);
-		std::unique_ptr<char[]> szXML(new char [statRulesData.cbSize.LowPart+1]);
+		std::unique_ptr<char[]> szXML(new(std::nothrow) char[statRulesData.cbSize.LowPart+1]);
+		if (szXML == nullptr)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 		// TODO: Loop to read all data?
 		hr = lpRulesData->Read(szXML.get(), statRulesData.cbSize.LowPart, &ulRead);
 		if (hr != hrSuccess || ulRead == 0)
@@ -169,24 +172,27 @@ empty:
 	hr = ecTable->HrSetClean();
 	if(hr != hrSuccess)
 		return hr;
-	obj = new ECExchangeModifyTable(PR_RULE_ID, ecTable, lpParent, ulRuleId, ulFlags);
-	return obj->QueryInterface(IID_IExchangeModifyTable, reinterpret_cast<void **>(lppObj));
+	return alloc_wrap<ECExchangeModifyTable>(PR_RULE_ID, ecTable, lpParent,
+	       ulRuleId, ulFlags).as(IID_IExchangeModifyTable, lppObj);
 }
 
 HRESULT ECExchangeModifyTable::QueryInterface(REFIID refiid, void **lppInterface) {
 	REGISTER_INTERFACE2(ECExchangeModifyTable, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IECExchangeModifyTable, &this->m_xECExchangeModifyTable);
-	REGISTER_INTERFACE2(IExchangeModifyTable, &this->m_xExchangeModifyTable);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xExchangeModifyTable);
+	REGISTER_INTERFACE2(IECExchangeModifyTable, this);
+	REGISTER_INTERFACE2(IExchangeModifyTable, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT __stdcall ECExchangeModifyTable::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) {
+HRESULT ECExchangeModifyTable::GetLastError(HRESULT hResult, ULONG ulFlags,
+    LPMAPIERROR *lppMAPIError)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT __stdcall ECExchangeModifyTable::GetTable(ULONG ulFlags, LPMAPITABLE *lppTable) {
+HRESULT ECExchangeModifyTable::GetTable(ULONG ulFlags, LPMAPITABLE *lppTable)
+{
 	object_ptr<ECMemTableView> lpView;
 	HRESULT hr = m_ecTable->HrGetView(createLocaleFromName(""), m_ulFlags, &~lpView);
 	if(hr != hrSuccess)
@@ -195,7 +201,8 @@ HRESULT __stdcall ECExchangeModifyTable::GetTable(ULONG ulFlags, LPMAPITABLE *lp
 	       reinterpret_cast<void **>(lppTable));
 }
 
-HRESULT __stdcall ECExchangeModifyTable::ModifyTable(ULONG ulFlags, LPROWLIST lpMods) {
+HRESULT ECExchangeModifyTable::ModifyTable(ULONG ulFlags, LPROWLIST lpMods)
+{
 	HRESULT			hr = hrSuccess;
 	SPropValue		sRowId;
 	LPSPropValue	lpProps = NULL;
@@ -359,8 +366,7 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 	memory_ptr<ULONG> lpulStatus;
 	memory_ptr<ECPERMISSION> lpECPermissions;
 	ULONG			cECPerm = 0;
-
-	entryId sEntryId = {0};
+	entryId sEntryId;
 	object_ptr<IECSecurity> lpSecurity;
 
 	// Get the ACLS
@@ -390,10 +396,9 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 		else if (lpulStatus[i] == ECROW_MODIFIED)
 			lpECPermissions[cECPerm].ulState |= RIGHT_MODIFY;
 
-		auto lpMemberID = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_ID);
-		auto lpMemberEntryID = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_ENTRYID);
-		auto lpMemberRights = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_RIGHTS);
-
+		auto lpMemberID = lpRowSet[i].cfind(PR_MEMBER_ID);
+		auto lpMemberEntryID = lpRowSet[i].cfind(PR_MEMBER_ENTRYID);
+		auto lpMemberRights = lpRowSet[i].cfind(PR_MEMBER_RIGHTS);
 		if (lpMemberID == NULL || lpMemberRights == NULL || (lpMemberID->Value.ul != 0 && lpMemberEntryID == NULL))
 			continue;
 
@@ -470,9 +475,10 @@ HRESULT	ECExchangeModifyTable::HrSerializeTable(ECMemTable *lpTable, char **lppS
 	soap_begin(&soap);
 	soap.os = &os;
 	soap_serialize_rowSet(&soap, lpSOAPRowSet);
-	soap_begin_send(&soap);
-	soap_put_rowSet(&soap, lpSOAPRowSet,"tableData","rowSet");
-	soap_end_send(&soap);
+	if (soap_begin_send(&soap) != 0 ||
+	    soap_put_rowSet(&soap, lpSOAPRowSet, "tableData", "rowSet") != 0 ||
+	    soap_end_send(&soap) != 0)
+		return MAPI_E_NETWORK_ERROR;
 
 	// os now contains XML for row data
 	szXML = new char [ os.str().size()+1 ];
@@ -514,7 +520,10 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 		hr = MAPI_E_CORRUPT_DATA;
 		goto exit;
 	}
-	soap_end_recv(&soap); 
+	if (soap_end_recv(&soap) != 0) {
+		hr = MAPI_E_NETWORK_FAILURE;
+		goto exit;
+	}
 	hr = CopySOAPRowSetToMAPIRowSet(NULL, &sSOAPRowSet, &~lpsRowSet, 0);
 	if(hr != hrSuccess)
 		goto exit;
@@ -526,7 +535,7 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 		//       Information placed in the HighPart of this PT_I8 is lost!
 		sRowId.ulPropTag = PR_RULE_ID;
 		sRowId.Value.li.QuadPart = ulHighestRuleID++;
-		hr = Util::HrAddToPropertyArray(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, &sRowId, &~lpProps, &cValues);
+		hr = Util::HrAddToPropertyArray(lpsRowSet[i].lpProps, lpsRowSet[i].cValues, &sRowId, &~lpProps, &cValues);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -555,37 +564,15 @@ exit:
 	return hr;
 }
 
-// wrappers for ExchangeModifyTable
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, AddRef, (void))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, Release, (void))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, GetTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable)) 
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ExchangeModifyTable, ModifyTable, (ULONG, ulFlags), (LPROWLIST, lpMods))
-
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, AddRef, (void))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, Release, (void))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, GetTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, ModifyTable, (ULONG, ulFlags), (LPROWLIST, lpMods))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, DisablePushToServer, (void))
-
 // ExchangeRuleAction object
-
-HRESULT __stdcall ECExchangeRuleAction::ActionCount(ULONG *lpcActions) {
+HRESULT ECExchangeRuleAction::ActionCount(ULONG *lpcActions)
+{
 	*lpcActions = 0;
 	return hrSuccess;
 }
 
-HRESULT __stdcall ECExchangeRuleAction::GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction) {
+HRESULT ECExchangeRuleAction::GetAction(ULONG ulActionNumber,
+    LARGE_INTEGER *lpruleid, LPACTION *lppAction)
+{
 	return MAPI_E_NO_SUPPORT;
 }
-
-// wrappers for ExchageRuleAction class
-
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeRuleAction, ExchangeRuleAction, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeRuleAction, ExchangeRuleAction, AddRef, (void))
-DEF_ULONGMETHOD(TRACE_MAPI, ECExchangeRuleAction, ExchangeRuleAction, Release, (void))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeRuleAction, ExchangeRuleAction, ActionCount, (ULONG*, lpcActions))
-DEF_HRMETHOD(TRACE_MAPI, ECExchangeRuleAction, ExchangeRuleAction, GetAction, (ULONG, ulActionNumber), (LARGE_INTEGER*, lpruleid), (LPACTION *, lppAction))

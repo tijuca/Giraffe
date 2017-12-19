@@ -18,20 +18,15 @@
 #ifndef ECMONITORDEFS_H
 #define ECMONITORDEFS_H
 
+#include <memory>
 #include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
+#include <kopano/memory.hpp>
 
 struct ECTHREADMONITOR {
-	ECLogger*		lpLogger;
-	ECConfig*		lpConfig;
-	bool			bShutdown;
-
-	ECTHREADMONITOR(void)
-	{
-		lpLogger = NULL;
-		lpConfig = NULL;
-		bShutdown = false;
-	};
+	KCHL::object_ptr<ECLogger> lpLogger;
+	std::unique_ptr<ECConfig> lpConfig;
+	bool bShutdown = false;
 };
 
 #endif

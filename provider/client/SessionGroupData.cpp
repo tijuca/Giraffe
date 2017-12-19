@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
 #include <mapicode.h>
@@ -44,15 +44,8 @@ SessionGroupData::~SessionGroupData(void)
 
 HRESULT SessionGroupData::Create(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps, SessionGroupData **lppData)
 {
-	HRESULT hr = hrSuccess;
-	SessionGroupData *lpData = NULL;
-
-	lpData = new SessionGroupData(ecSessionGroupId, lpInfo, sProfileProps);
-	lpData->AddRef();
-
-	*lppData = lpData;
-
-	return hr;
+	return alloc_wrap<SessionGroupData>(ecSessionGroupId, lpInfo,
+	       sProfileProps).put(lppData);
 }
 
 HRESULT SessionGroupData::GetOrCreateNotifyMaster(ECNotifyMaster **lppMaster)
@@ -93,13 +86,11 @@ ECSESSIONGROUPID SessionGroupData::GetSessionGroupId()
 
 ULONG SessionGroupData::AddRef()
 {
-	scoped_rlock lock(m_hRefMutex);
 	return ++m_cRef;
 }
 
 ULONG SessionGroupData::Release()
 {
-	scoped_rlock lock(m_hRefMutex);
 	return --m_cRef;
 }
 

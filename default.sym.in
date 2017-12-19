@@ -4,6 +4,7 @@ global:
 		KC::*;
 		typeinfo*;
 		vtable*;
+		VTT*;
 		std::*::_S_*;
 	};
 local:

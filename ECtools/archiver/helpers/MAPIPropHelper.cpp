@@ -29,8 +29,6 @@
 #include <kopano/mapi_ptr.h>
 #include <kopano/mapiguidext.h>
 
-using namespace std;
-
 namespace KC { namespace helpers {
 
 /**
@@ -58,7 +56,7 @@ HRESULT MAPIPropHelper::Create(MAPIPropPtr ptrMapiProp, MAPIPropHelperPtr *lpptr
 }
 
 MAPIPropHelper::MAPIPropHelper(MAPIPropPtr ptrMapiProp) :
-    m_ptrMapiProp(ptrMapiProp), __propmap(8)
+    m_ptrMapiProp(ptrMapiProp), m_propmap(8)
 { }
 
 /**
@@ -168,7 +166,7 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 			hrTmp = ptrSession->OpenReadOnlyStore(arc.sStoreEntryId, &~ptrArchiveStore);
 			if (hrTmp != hrSuccess)
 				continue;
-			hrTmp = ptrArchiveStore->OpenEntry(arc.sItemEntryId.size(), arc.sItemEntryId, &ptrArchiveMsg.iid(), 0, &ulType, &~ptrArchiveMsg);
+			hrTmp = ptrArchiveStore->OpenEntry(arc.sItemEntryId.size(), arc.sItemEntryId, &iid_of(ptrArchiveMsg), 0, &ulType, &~ptrArchiveMsg);
 			if (hrTmp != hrSuccess)
 				continue;
 
@@ -195,7 +193,7 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 			if (hr != hrSuccess)
 				return hr;
 
-			hr = ptrStore->OpenEntry(refEntry.sItemEntryId.size(), refEntry.sItemEntryId, &ptrArchiveMsg.iid(), 0, &ulType, &~ptrMessage);
+			hr = ptrStore->OpenEntry(refEntry.sItemEntryId.size(), refEntry.sItemEntryId, &iid_of(ptrArchiveMsg), 0, &ulType, &~ptrMessage);
 			if (hr == hrSuccess) {
 				/*
 				 * One would expect that if the message was opened properly here, the message that's being
@@ -308,10 +306,9 @@ HRESULT MAPIPropHelper::GetArchiveList(ObjectEntryList *lplstArchives, bool bIgn
 	
 	for (ULONG i = 0; i < ptrPropArray[0].Value.MVbin.cValues; ++i) {
 		SObjectEntry objectEntry;
-		
-		objectEntry.sStoreEntryId.assign(ptrPropArray[IDX_ARCHIVE_STORE_ENTRYIDS].Value.MVbin.lpbin[i]);
-		objectEntry.sItemEntryId.assign(ptrPropArray[IDX_ARCHIVE_ITEM_ENTRYIDS].Value.MVbin.lpbin[i]);
-		lstArchives.push_back(std::move(objectEntry));
+		objectEntry.sStoreEntryId = ptrPropArray[IDX_ARCHIVE_STORE_ENTRYIDS].Value.MVbin.lpbin[i];
+		objectEntry.sItemEntryId = ptrPropArray[IDX_ARCHIVE_ITEM_ENTRYIDS].Value.MVbin.lpbin[i];
+		lstArchives.emplace_back(std::move(objectEntry));
 	}
 	
 	swap(*lplstArchives, lstArchives);
@@ -455,9 +452,8 @@ HRESULT MAPIPropHelper::GetReference(SObjectEntry *lpEntry)
 		return ptrMessageProps[IDX_REF_STORE_ENTRYID].Value.err;
 	if (PROP_TYPE(ptrMessageProps[IDX_REF_ITEM_ENTRYID].ulPropTag) == PT_ERROR)
 		return ptrMessageProps[IDX_REF_ITEM_ENTRYID].Value.err;
-
-	lpEntry->sStoreEntryId.assign(ptrMessageProps[IDX_REF_STORE_ENTRYID].Value.bin);
-	lpEntry->sItemEntryId.assign(ptrMessageProps[IDX_REF_ITEM_ENTRYID].Value.bin);
+	lpEntry->sStoreEntryId = ptrMessageProps[IDX_REF_STORE_ENTRYID].Value.bin;
+	lpEntry->sItemEntryId = ptrMessageProps[IDX_REF_ITEM_ENTRYID].Value.bin;
 	return hr;
 }
 
@@ -484,7 +480,9 @@ HRESULT MAPIPropHelper::OpenPrevious(ArchiverSessionPtr ptrSession, LPMESSAGE *l
 	if (hr != hrSuccess)
 		return hr;
 
-	hr = ptrSession->GetMAPISession()->OpenEntry(ptrEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrEntryID->Value.bin.lpb), &ptrMessage.iid(), MAPI_MODIFY, &ulType, &~ptrMessage);
+	hr = ptrSession->GetMAPISession()->OpenEntry(ptrEntryID->Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrEntryID->Value.bin.lpb),
+	     &iid_of(ptrMessage), MAPI_MODIFY, &ulType, &~ptrMessage);
 	if (hr == MAPI_E_NOT_FOUND) {
 		SPropValuePtr ptrStoreEntryID;
 		MsgStorePtr ptrStore;
@@ -495,7 +493,9 @@ HRESULT MAPIPropHelper::OpenPrevious(ArchiverSessionPtr ptrSession, LPMESSAGE *l
 		hr = ptrSession->OpenStore(ptrStoreEntryID->Value.bin, &~ptrStore);
 		if (hr != hrSuccess)
 			return hr;
-		hr = ptrStore->OpenEntry(ptrEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrEntryID->Value.bin.lpb), &ptrMessage.iid(), MAPI_MODIFY, &ulType, &~ptrMessage);
+		hr = ptrStore->OpenEntry(ptrEntryID->Value.bin.cb,
+		     reinterpret_cast<ENTRYID *>(ptrEntryID->Value.bin.lpb),
+		     &iid_of(ptrMessage), MAPI_MODIFY, &ulType, &~ptrMessage);
 	}
 	if (hr != hrSuccess)
 		return hr;
@@ -562,7 +562,7 @@ HRESULT MAPIPropHelper::GetParentFolder(ArchiverSessionPtr ptrSession, LPMAPIFOL
 	hr = ptrSession->OpenStore(ptrPropArray[1].Value.bin, &~ptrMsgStore);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrMsgStore->OpenEntry(ptrPropArray[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrPropArray[0].Value.bin.lpb), &ptrFolder.iid(), MAPI_BEST_ACCESS | fMapiDeferredErrors, &ulType, &~ptrFolder);
+	hr = ptrMsgStore->OpenEntry(ptrPropArray[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrPropArray[0].Value.bin.lpb), &iid_of(ptrFolder), MAPI_BEST_ACCESS | fMapiDeferredErrors, &ulType, &~ptrFolder);
 	if (hr != hrSuccess)
 		return hr;
 	
@@ -611,49 +611,35 @@ HRESULT MAPIPropHelper::GetArchiveList(MAPIPropPtr ptrMapiProp, LPSPropValue lpP
 		 * one exception: If PR_SOURCE_KEY is missing PROP_ORIGINAL_SOURCEKEY is not needed.
 		 **/
 		if (!lpPropStoreEIDs && !lpPropItemEIDs)
-		{
 			// No entry ids exist. So that's fine
-			hr = hrSuccess;
-			goto exitpm;
-		}
-		else if (lpPropStoreEIDs && lpPropItemEIDs)
-		{
-			// Both exist. So if PR_SOURCEKEY_EXISTS and PROP_ORIGINAL_SOURCEKEY doesn't
-			// the entry is corrupt
-			if (lpPropSourceKey) {
-				if (!lpPropOrigSK) {
-					hr = MAPI_E_CORRUPT_DATA;
-					goto exitpm;
-				}
-				// @todo: Create correct locale.
-				hr = Util::CompareProp(lpPropSourceKey, lpPropOrigSK, createLocaleFromName(""), &result);
-				if (hr != hrSuccess)
-					goto exitpm;
-				if (result != 0)
-					// The archive list was apparently copied into this message. So it's not valid (not an error).
-					goto exitpm;
-			} else
-				hr = hrSuccess;
-		}
-		else
-		{
+			return hrSuccess;
+		else if (lpPropStoreEIDs == nullptr || lpPropItemEIDs == nullptr)
 			// One exists, one doesn't.
-			hr = MAPI_E_CORRUPT_DATA;
-			goto exitpm;
-		}
+			return MAPI_E_CORRUPT_DATA;
+		// Both exist. So if PR_SOURCEKEY_EXISTS and PROP_ORIGINAL_SOURCEKEY doesn't
+		// the entry is corrupt
+		if (lpPropSourceKey) {
+			if (lpPropOrigSK == nullptr)
+				return MAPI_E_CORRUPT_DATA;
+			// @todo: Create correct locale.
+			hr = Util::CompareProp(lpPropSourceKey, lpPropOrigSK, createLocaleFromName(""), &result);
+			if (hr != hrSuccess)
+				return hr;
+			if (result != 0)
+				// The archive list was apparently copied into this message. So it's not valid (not an error).
+				return hr;
+		} else
+			hr = hrSuccess;
 	}
 
-	if (lpPropStoreEIDs->Value.MVbin.cValues != lpPropItemEIDs->Value.MVbin.cValues) {
-		hr = MAPI_E_CORRUPT_DATA;
-		goto exitpm;
-	}
+	if (lpPropStoreEIDs->Value.MVbin.cValues != lpPropItemEIDs->Value.MVbin.cValues)
+		return MAPI_E_CORRUPT_DATA;
 	
 	for (ULONG i = 0; i < lpPropStoreEIDs->Value.MVbin.cValues; ++i) {
 		SObjectEntry objectEntry;
-		
-		objectEntry.sStoreEntryId.assign(lpPropStoreEIDs->Value.MVbin.lpbin[i]);
-		objectEntry.sItemEntryId.assign(lpPropItemEIDs->Value.MVbin.lpbin[i]);
-		lstArchives.push_back(std::move(objectEntry));
+		objectEntry.sStoreEntryId = lpPropStoreEIDs->Value.MVbin.lpbin[i];
+		objectEntry.sItemEntryId = lpPropItemEIDs->Value.MVbin.lpbin[i];
+		lstArchives.emplace_back(std::move(objectEntry));
 	}
 	
 	swap(*lplstArchives, lstArchives);

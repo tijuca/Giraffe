@@ -47,7 +47,6 @@ struct AttachRendData {
 class ECTNEF _kc_final {
 public:
 	ECTNEF(ULONG ulFlags, IMessage *lpMessage, IStream *lpStream);
-	virtual ~ECTNEF();
     
 	// Add properties to the TNEF stream from the message
 	virtual HRESULT AddProps(ULONG ulFlags, const SPropTagArray *lpPropList);
@@ -68,15 +67,14 @@ private:
 	HRESULT HrReadDWord(IStream *lpStream, ULONG *ulData);
 	HRESULT HrReadWord(IStream *lpStream, unsigned short *ulData);
 	HRESULT HrReadByte(IStream *lpStream, unsigned char *ulData);
-	HRESULT HrReadData(IStream *lpStream, char *lpData, ULONG ulLen);
-    
+	HRESULT HrReadData(IStream *, void *, size_t);
 	HRESULT HrWriteDWord(IStream *lpStream, ULONG ulData);
 	HRESULT HrWriteWord(IStream *lpStream, unsigned short ulData);
 	HRESULT HrWriteByte(IStream *lpStream, unsigned char ulData);
-	HRESULT HrWriteData(IStream *, const char *buf, ULONG len);
-	HRESULT HrWritePropStream(IStream *lpStream, std::list<SPropValue *> &proplist);
+	HRESULT HrWriteData(IStream *, const void *, size_t);
+	HRESULT HrWritePropStream(IStream *lpStream, std::list<KCHL::memory_ptr<SPropValue>> &proplist);
 	HRESULT HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp);
-	HRESULT HrReadPropStream(const char *buf, ULONG size, std::list<SPropValue *> &proplist);
+	HRESULT HrReadPropStream(const char *buf, ULONG size, std::list<KCHL::memory_ptr<SPropValue>> &proplist);
 	HRESULT HrReadSingleProp(const char *buf, ULONG size, ULONG *have_read, LPSPropValue *out);
 	HRESULT HrGetChecksum(IStream *lpStream, ULONG *lpulChecksum);
 	ULONG GetChecksum(const char *data, unsigned int ulLen) const;
@@ -89,18 +87,15 @@ private:
 	ULONG ulFlags;
     
 	// Accumulator for properties from AddProps and SetProps
-	std::list<SPropValue *> lstProps;
+	std::list<KCHL::memory_ptr<SPropValue>> lstProps;
 
 	struct tnefattachment {
-		std::list<SPropValue *> lstProps;
-		ULONG size;
-		BYTE *data;
+		std::list<KCHL::memory_ptr<SPropValue>> lstProps;
+		ULONG size = 0;
+		KCHL::memory_ptr<unsigned char> data;
 		AttachRendData rdata;
 	};
-	std::list<tnefattachment*> lstAttachments;
-
-	void FreeAttachmentData(tnefattachment* lpTnefAtt);
-
+	std::list<std::unique_ptr<tnefattachment>> lstAttachments;
 };
 
 // Flags for constructor

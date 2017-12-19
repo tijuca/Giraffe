@@ -22,7 +22,7 @@
 #include <kopano/memory.hpp>
 #include "ECMsgStore.h"
 #include <kopano/ECGuid.h>
-
+#include <kopano/Util.h>
 #include <list>
 #include <vector>
 #include <map>
@@ -31,15 +31,15 @@ class ECMessage;
 
 class _kc_export_dycast ECArchiveAwareMsgStore _kc_final : public ECMsgStore {
 public:
-	_kc_hidden ECArchiveAwareMsgStore(char *profname, LPMAPISUP, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store);
-	_kc_hidden static HRESULT Create(char *profname, LPMAPISUP, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store, ECMsgStore **ret);
-	_kc_hidden virtual HRESULT OpenEntry(ULONG eid_size, LPENTRYID eid, LPCIID, ULONG flags, ULONG *obj_type, LPUNKNOWN *ret);
+	_kc_hidden ECArchiveAwareMsgStore(const char *profname, IMAPISupport *, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store);
+	_kc_hidden static HRESULT Create(const char *profname, IMAPISupport *, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store, ECMsgStore **ret);
+	_kc_hidden virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	_kc_hidden virtual HRESULT OpenItemFromArchive(LPSPropValue propstore_eids, LPSPropValue propitem_eids, ECMessage **ret);
 
 private:
 	typedef std::list<SBinary *> BinaryList;
 	typedef BinaryList::iterator	BinaryListIterator;
-	typedef KCHL::object_ptr<ECMsgStore, IID_ECMsgStore> ECMsgStorePtr;
+	typedef KCHL::object_ptr<ECMsgStore> ECMsgStorePtr;
 	typedef std::vector<BYTE>		EntryID;
 	typedef std::map<EntryID, ECMsgStorePtr>			MsgStoreMap;
 
@@ -47,6 +47,7 @@ private:
 	_kc_hidden HRESULT GetArchiveStore(LPSBinary store_eid, ECMsgStore **ret);
 
 	MsgStoreMap	m_mapStores;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // ndef ECARCHIVEAWAREMSGSTORE_H

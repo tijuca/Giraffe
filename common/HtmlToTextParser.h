@@ -83,10 +83,9 @@ protected:
 
 	struct _kc_hidden tagParser {
 		tagParser(void) = default;
-		tagParser(bool bParseAttrs, ParseMethodType parserMethod){
-			this->bParseAttrs = bParseAttrs;
-			this->parserMethod = parserMethod;
-		};
+		tagParser(bool pa, ParseMethodType mt) :
+			bParseAttrs(pa), parserMethod(mt)
+		{}
 		bool bParseAttrs = false;
 		ParseMethodType parserMethod = nullptr;
 	};
@@ -101,18 +100,12 @@ protected:
 		unsigned int count = 0;
 	};
 
-	typedef std::map<std::wstring, tagParser>		MapParser;
 	typedef std::map<std::wstring, std::wstring>	MapAttrs;
-
-	typedef std::stack<MapAttrs>	StackMapAttrs;
-	typedef std::stack<_TableRow>	StackTableRow;
-	typedef std::stack<ListInfo>	ListInfoStack;
-	
-	StackTableRow	stackTableRow;
-	MapParser		tagMap;
-	StackMapAttrs	stackAttrs;
+	std::stack<_TableRow> stackTableRow;
+	std::map<std::wstring, tagParser> tagMap;
+	std::stack<MapAttrs> stackAttrs;
 	ListInfo 		listInfo;
-	ListInfoStack	listInfoStack;
+	std::stack<ListInfo> listInfoStack;
 };
 
 } /* namespace */

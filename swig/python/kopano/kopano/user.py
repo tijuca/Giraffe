@@ -8,7 +8,7 @@ Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 import sys
 
 from MAPI import (
-    MAPI_UNICODE, MAPI_UNRESOLVED, ECSTORE_TYPE_PRIVATE,
+    MAPI_UNICODE, MAPI_UNRESOLVED, ECSTORE_TYPE_PRIVATE, ECSTORE_TYPE_ARCHIVE,
     WrapStoreEntryID
 )
 from MAPI.Defs import bin2hex, HrGetOneProp
@@ -24,32 +24,38 @@ from MAPI.Tags import (
 )
 
 from .store import Store
+from .properties import Properties
 from .group import Group
 from .quota import Quota
-from .defs import ACTIVE_USER, NONACTIVE_USER
-from .errors import NotFoundError, NotSupportedError, DuplicateError
+from .defs import (
+    ACTIVE_USER, NONACTIVE_USER,
+)
+from .errors import Error, NotFoundError, NotSupportedError, DuplicateError
 from .compat import (
-    hex as _hex, unhex as _unhex, repr as _repr, fake_unicode as _unicode
+    hex as _hex, unhex as _unhex, fake_unicode as _unicode
 )
 
 if sys.hexversion >= 0x03000000:
     from . import server as _server
     from . import company as _company
-    from . import utils as _utils
 else:
     import server as _server
     import company as _company
-    import utils as _utils
 
-class User(object):
+class User(Properties):
     """User class"""
 
-    def __init__(self, name=None, server=None, email=None, ecuser=None):
+    def __init__(self, name=None, server=None, email=None, ecuser=None,
+        userid=None
+    ):
         self.server = server or _server.Server()
 
         if ecuser:
             self._ecuser = ecuser
             self._name = ecuser.Username
+        elif userid:
+            self._ecuser = self.server.sa.GetUser(_unhex(userid), MAPI_UNICODE)
+            self._name = self._ecuser.Username
         else:
             if email:
                 try:
@@ -90,7 +96,8 @@ class User(object):
 
     @property
     def hidden(self):
-        return self._ecuser.IsHidden
+        """The user is hidden from the addressbook."""
+        return bool(self._ecuser.IsHidden)
 
     @property
     def name(self):
@@ -123,8 +130,8 @@ class User(object):
         self._update(email=_unicode(value))
 
     @property
-    def password(self): # XXX not coming through SWIG?
-        return self._ecuser.Password
+    def password(self):
+        raise Error('passwords are write-only')
 
     @password.setter
     def password(self, value):
@@ -222,7 +229,7 @@ class User(object):
         try:
             entryid = self.server.ems.CreateStoreEntryID(None, self._name, MAPI_UNICODE)
             return Store(entryid=_hex(entryid), server=self.server)
-        except MAPIErrorNotFound:
+        except (MAPIErrorNotFound, NotFoundError):
             pass
 
     # XXX deprecated? user.store = .., user.archive_store = ..
@@ -239,6 +246,18 @@ class User(object):
         except MAPIErrorNotFound:
             raise NotFoundError("user '%s' has no hooked store" % self.name)
 
+    def hook_archive(self, store):
+        try:
+            self.server.sa.HookStore(ECSTORE_TYPE_ARCHIVE, _unhex(self.userid), _unhex(store.guid))
+        except MAPIErrorCollision:
+            raise DuplicateError("user '%s' already has hooked archive store" % self.name)
+
+    def unhook_archive(self):
+        try:
+            self.server.sa.UnhookStore(ECSTORE_TYPE_ARCHIVE, _unhex(self.userid))
+        except MAPIErrorNotFound:
+            raise NotFoundError("user '%s' has no hooked archive store" % self.name)
+
     @property
     def active(self):
         return self._ecuser.Class == ACTIVE_USER
@@ -252,7 +271,7 @@ class User(object):
 
     @property
     def home_server(self):
-        return self._ecuser.Servername
+        return self._ecuser.Servername or self.server.name
 
     @property
     def archive_server(self):
@@ -260,12 +279,6 @@ class User(object):
             return HrGetOneProp(self.mapiobj, PR_EC_ARCHIVE_SERVERS).Value[0]
         except MAPIErrorNotFound:
             return
-
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def props(self):
-        return _utils.props(self.mapiobj)
 
     @property
     def quota(self):
@@ -307,9 +320,6 @@ class User(object):
     def __unicode__(self):
         return u"User('%s')" % self._name
 
-    def __repr__(self):
-        return _repr(self)
-
     def _update(self, **kwargs):
         username = kwargs.get('username', self.name)
         password = kwargs.get('password', self._ecuser.Password)
@@ -343,7 +353,16 @@ class User(object):
         )
         self._name = username
 
-    def __getattr__(self, x): # XXX add __setattr__, e.g. for 'user.archive_store = None'
+    def __getattr__(self, x):
         store = self.store
         if store:
-            return getattr(store, x)
+            try:
+                return getattr(store, x)
+            except AttributeError:
+                raise AttributeError("'User' object has no attribute '%s'" % x)
+
+    def __setattr__(self, x, val):
+        if x not in User.__dict__ and x in Store.__dict__:
+            setattr(self.store, x, val)
+        else:
+            super(User, self).__setattr__(x, val)

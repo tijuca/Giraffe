@@ -1,8 +1,8 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 from MAPI.Tags import (
@@ -15,6 +15,8 @@ from MAPI.Struct import SPropValue
 from MAPI import MAPI_MODIFY, KEEP_OPEN_READWRITE
 
 class AutoAccept(object):
+    """AutoAccept class"""
+
     def __init__(self, store):
         fbeid = store.root.prop(PR_FREEBUSY_ENTRYIDS).value[1]
         self._fb = store.mapiobj.OpenEntry(fbeid, None, MAPI_MODIFY)
@@ -22,6 +24,7 @@ class AutoAccept(object):
 
     @property
     def enabled(self):
+        """Auto-accept is enabled."""
         return HrGetOneProp(self._fb, PR_PROCESS_MEETING_REQUESTS).Value
 
     @enabled.setter
@@ -31,18 +34,24 @@ class AutoAccept(object):
 
     @property
     def conflicts(self):
-        return not HrGetOneProp(self._fb, PR_DECLINE_CONFLICTING_MEETING_REQUESTS).Value
+        """Conflicting appointments are accepted."""
+        prop = HrGetOneProp(self._fb, PR_DECLINE_CONFLICTING_MEETING_REQUESTS)
+        return not prop.Value
 
     @conflicts.setter
     def conflicts(self, b):
-        self._fb.SetProps([SPropValue(PR_DECLINE_CONFLICTING_MEETING_REQUESTS, not b)])
+        props = [SPropValue(PR_DECLINE_CONFLICTING_MEETING_REQUESTS, not b)]
+        self._fb.SetProps(props)
         self._fb.SaveChanges(KEEP_OPEN_READWRITE)
 
     @property
     def recurring(self):
-        return not HrGetOneProp(self._fb, PR_DECLINE_RECURRING_MEETING_REQUESTS).Value
+        """Recurring appointments are accepted."""
+        prop = HrGetOneProp(self._fb, PR_DECLINE_RECURRING_MEETING_REQUESTS)
+        return not prop.Value
 
     @recurring.setter
     def recurring(self, b):
-        self._fb.SetProps([SPropValue(PR_DECLINE_RECURRING_MEETING_REQUESTS, not b)])
+        props = [SPropValue(PR_DECLINE_RECURRING_MEETING_REQUESTS, not b)]
+        self._fb.SetProps(props)
         self._fb.SaveChanges(KEEP_OPEN_READWRITE)

@@ -43,7 +43,7 @@ enum FBStatus {
 };
 
 %apply (ULONG, MAPIARRAY) { (ULONG cMax, FBUser *rgfbuser), (ULONG cUsers, FBUser *lpUsers) };
-%apply (MAPIARRAY, ULONG) { (FBBlock_1 *lpBlocks, ULONG nBlocks), (FBBlock_1 *lpBlocks, ULONG nBlocks) }
+%apply (MAPIARRAY, ULONG) { (FBBlock_1 const *, ULONG), (FBBlock_1 *, ULONG) }
 
 %typemap(in) (LONG, FBBLOCK)
 {
@@ -66,45 +66,14 @@ enum FBStatus {
         %append_output(PyLong_FromUnsignedLong(*$1));
 }
 
-class IUnknown {
-public:
-virtual HRESULT QueryInterface(const IID& USE_IID_FOR_OUTPUT, void **OUTPUT_USE_IID) = 0;
-};
-
-%extend IUnknown {
-~IUnknown() { self->Release(); }
-};
-
 %init %{
 	InitFreebusy();
 %}
 
-%{
-swig_type_info *TypeFromIID(REFIID iid)
-{
-#define TYPECASE(x) if(iid == IID_##x) return SWIGTYPE_p_##x;
-    TYPECASE(IFreeBusyUpdate)
-    TYPECASE(IEnumFBBlock)
-    TYPECASE(IFreeBusySupport)
-    TYPECASE(IFreeBusyData)
-    return NULL;
-}
-
-LPCIID IIDFromType(const char *type)
-{
-#define IIDCASE(x) if(strstr(type, #x) != NULL) return &IID_##x;
-    IIDCASE(IFreeBusyUpdate)
-    IIDCASE(IEnumFBBlock)
-    IIDCASE(IFreeBusySupport)
-    IIDCASE(IFreeBusyData)
-    return &IID_IUnknown;
-}
-%}
-  
-class IFreeBusyUpdate : public IUnknown {
+class IFreeBusyUpdate {
 public:
         virtual HRESULT Reload() = 0;
-        virtual HRESULT PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks) = 0;
+	virtual HRESULT PublishFreeBusy(const FBBlock_1 *, ULONG nblks) = 0;
         virtual HRESULT RemoveAppt() = 0;
         virtual HRESULT ResetPublishedFreeBusy() = 0;
         virtual HRESULT ChangeAppt() = 0;
@@ -116,7 +85,7 @@ public:
         }
 };
 
-class IEnumFBBlock : public IUnknown {
+class IEnumFBBlock {
 
 public:
 
@@ -130,7 +99,7 @@ public:
         }
 };
 
-class IFreeBusyData : public IUnknown {
+class IFreeBusyData {
 public:
         virtual HRESULT Reload(void*) = 0;
         virtual HRESULT EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd) = 0;
@@ -148,7 +117,7 @@ public:
 
 %feature("notabstract") IFreeBusySupport;
 
-class IFreeBusySupport : public IUnknown {
+class IFreeBusySupport {
 public:
         virtual HRESULT Open(IMAPISession* lpMAPISession, IMsgStore* lpMsgStore, BOOL bStore) = 0;
         virtual HRESULT Close() = 0;
@@ -180,17 +149,12 @@ public:
 
                     hr = ECFreeBusySupport::Create(&~lpFreeBusySup);
                     if(hr != hrSuccess)
-                        goto exit;
-
+				return NULL;
                     hr = lpFreeBusySup->QueryInterface(IID_IFreeBusySupport, (void**)&lpFreeBusySupport);
-                    if(hr != hrSuccess)
-                        goto exit;
-
-                    exit:
                     return lpFreeBusySupport;
                 }
 
                 ~IFreeBusySupport() { self->Release(); }
-        }        
+        }
 
 };

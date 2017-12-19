@@ -22,7 +22,6 @@
 #include <mapicode.h>
 
 #include <list>
-
 #include "Mem.h"
 #include "ECNamedProp.h"
 #include "WSTransport.h"
@@ -85,6 +84,30 @@ static const struct _sLocalNames {
 
 #define SERVER_NAMED_OFFSET	0x8500
 
+/**
+ * Sort function
+ *
+ * It does not really matter *how* it sorts, as long as it is reproduceable.
+ */
+bool ltmap::operator()(const MAPINAMEID *a, const MAPINAMEID *b) const noexcept
+{
+	auto r = memcmp(a->lpguid, b->lpguid, sizeof(GUID));
+	if (r < 0)
+		return false;
+	if (r > 0)
+		return true;
+	if (a->ulKind != b->ulKind)
+		return a->ulKind > b->ulKind;
+	switch (a->ulKind) {
+	case MNID_ID:
+		return a->Kind.lID > b->Kind.lID;
+	case MNID_STRING:
+		return wcscmp(a->Kind.lpwstrName, b->Kind.lpwstrName) < 0;
+	default:
+		return false;
+	}
+}
+
 ECNamedProp::ECNamedProp(WSTransport *lpTransport)
 {
 	this->lpTransport = lpTransport;
@@ -102,27 +125,28 @@ ECNamedProp::~ECNamedProp()
 		lpTransport->Release();
 }
 
-HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
+HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
+    const GUID *lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames,
+    MAPINAMEID ***lpppPropNames)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i = 0;
 	LPSPropTagArray	lpsPropTags = NULL;
-	LPMAPINAMEID*	lppPropNames = NULL;
-	LPSPropTagArray	lpsUnresolved = NULL;
-	LPMAPINAMEID*	lppResolved = NULL;
+	ecmem_ptr<MAPINAMEID *> lppPropNames, lppResolved;
+	ecmem_ptr<SPropTagArray> lpsUnresolved;
 	ULONG			cResolved = 0;
 	ULONG			cUnresolved = 0;
 
 	// Exchange doesn't support this, so neither do we
-	if(lppPropTags == NULL || *lppPropTags == NULL) {
-		hr = MAPI_E_TOO_BIG;
-		goto exit;
-	}
+	if (lppPropTags == nullptr || *lppPropTags == nullptr)
+		return MAPI_E_TOO_BIG;
 
 	lpsPropTags = *lppPropTags;
 
 	// Allocate space for properties
-	ECAllocateBuffer(sizeof(LPMAPINAMEID) * lpsPropTags->cValues, (void **)&lppPropNames);
+	hr = ECAllocateBuffer(sizeof(LPMAPINAMEID) * lpsPropTags->cValues, &~lppPropNames);
+	if (hr != hrSuccess)
+		return hr;
 
 	// Pass 1, local reverse mapping (FAST)
 	for (i = 0; i < lpsPropTags->cValues; ++i)
@@ -141,7 +165,9 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpProp
 		// resolved internally. Looks like somebody's pulling our leg ... We just leave it unknown }
 	}
 
-	ECAllocateBuffer(CbNewSPropTagArray(lpsPropTags->cValues), (void **)&lpsUnresolved);
+	hr = ECAllocateBuffer(CbNewSPropTagArray(lpsPropTags->cValues), &~lpsUnresolved);
+	if (hr != hrSuccess)
+		return hr;
 
 	cUnresolved = 0;
 	// Pass 3, server reverse lookup (SLOW)
@@ -154,17 +180,13 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpProp
 	lpsUnresolved->cValues = cUnresolved;
 
 	if(cUnresolved > 0) {
-		hr = lpTransport->HrGetNamesFromIDs(lpsUnresolved, &lppResolved, &cResolved);
-
+		hr = lpTransport->HrGetNamesFromIDs(lpsUnresolved, &~lppResolved, &cResolved);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Put the resolved values from the server into the cache
-		if(cResolved != cUnresolved) { 
-			hr = MAPI_E_CALL_FAILED;
-			goto exit;
-		}
-
+		if (cResolved != cUnresolved)
+			return MAPI_E_CALL_FAILED;
 		for (i = 0; i < cResolved; ++i)
 			if(lppResolved[i] != NULL)
 				UpdateCache(lpsUnresolved->aulPropTag[i] + SERVER_NAMED_OFFSET, lppResolved[i]);
@@ -181,20 +203,8 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpProp
 		if(lppPropNames[i] == NULL)
 			hr = MAPI_W_ERRORS_RETURNED;
 
-	*lpppPropNames = lppPropNames;
+	*lpppPropNames = lppPropNames.release();
 	*lpcPropNames = lpsPropTags->cValues;
-	lppPropNames = NULL;
-
-exit:
-	if(lppPropNames)
-		ECFreeBuffer(lppPropNames);
-
-	if(lpsUnresolved)
-		ECFreeBuffer(lpsUnresolved);
-
-	if(lppResolved)
-		ECFreeBuffer(lppResolved);
-
 	return hr;
 }
 
@@ -202,29 +212,19 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropName
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i=0;
-	LPSPropTagArray	lpsPropTagArray = NULL;
+	ecmem_ptr<SPropTagArray> lpsPropTagArray;
 	std::unique_ptr<MAPINAMEID *[]> lppPropNamesUnresolved;
 	ULONG			cUnresolved = 0;
-	ULONG*			lpServerIDs = NULL;
+	ecmem_ptr<ULONG> lpServerIDs;
 
 	// Exchange doesn't support this, so neither do we
-	if(cPropNames == 0 || lppPropNames == NULL) {
-		hr = MAPI_E_TOO_BIG;
-		goto exit;
-	}
-
-	// Sanity check input
-	for (i = 0; i < cPropNames; ++i) {
-		if(lppPropNames[i] == NULL) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-	}
+	if (cPropNames == 0 || lppPropNames == nullptr)
+		return MAPI_E_TOO_BIG;
 
 	// Allocate memory for the return structure
-	hr = ECAllocateBuffer(CbNewSPropTagArray(cPropNames), (void **)&lpsPropTagArray);
+	hr = ECAllocateBuffer(CbNewSPropTagArray(cPropNames), &~lpsPropTagArray);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpsPropTagArray->cValues = cPropNames;
 
@@ -250,9 +250,9 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropName
 
 	if(cUnresolved) {
 		// Let the server resolve these names 
-		hr = lpTransport->HrGetIDsFromNames(lppPropNamesUnresolved.get(), cUnresolved, ulFlags, &lpServerIDs);
+		hr = lpTransport->HrGetIDsFromNames(lppPropNamesUnresolved.get(), cUnresolved, ulFlags, &~lpServerIDs);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Put the names into the local cache for all the IDs the server gave us
 		for (i = 0; i < cUnresolved; ++i)
@@ -275,15 +275,7 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropName
 			break;
 		}
 
-	*lppPropTags = lpsPropTagArray;
-	lpsPropTagArray = NULL;
-
-exit:
-	if(lpsPropTagArray)
-		ECFreeBuffer(lpsPropTagArray);
-	if(lpServerIDs)
-		ECFreeBuffer(lpServerIDs);
-
+	*lppPropTags = lpsPropTagArray.release();
 	return hr;
 }
 
@@ -306,7 +298,8 @@ HRESULT ECNamedProp::ResolveLocal(MAPINAMEID *lpName, ULONG *ulPropTag)
 	return MAPI_E_NOT_FOUND;
 }
 
-HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
+HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, const GUID *lpGuid,
+    ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	HRESULT hr = MAPI_E_NOT_FOUND;
 
@@ -325,7 +318,8 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 	return hr;
 }
 
-HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
+HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, const GUID *lpGuid,
+    ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	MAPINAMEID*	lpName = NULL; 
 
@@ -335,17 +329,22 @@ HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 
 	// Loop through the local names to see if we can reverse-map the id
 	for (size_t i = 0; i < ARRAY_SIZE(sLocalNames); ++i) {
-		if((lpGuid == NULL || memcmp(&sLocalNames[i].guid, lpGuid, sizeof(GUID)) == 0) && ulId >= sLocalNames[i].ulMappedId && ulId < sLocalNames[i].ulMappedId + (sLocalNames[i].ulMax - sLocalNames[i].ulMin + 1)) {
-			// Found it !
-			ECAllocateMore(sizeof(MAPINAMEID), lpBase, (void **)&lpName);
-			ECAllocateMore(sizeof(GUID), lpBase, (void **)&lpName->lpguid);
-
-			lpName->ulKind = MNID_ID;
-			memcpy(lpName->lpguid, &sLocalNames[i].guid, sizeof(GUID));
-			lpName->Kind.lID = sLocalNames[i].ulMin + (ulId - sLocalNames[i].ulMappedId);
-
-			break;
-		}
+		bool y = (lpGuid == nullptr || memcmp(&sLocalNames[i].guid, lpGuid, sizeof(GUID)) == 0) &&
+		         ulId >= sLocalNames[i].ulMappedId &&
+		         ulId < sLocalNames[i].ulMappedId + (sLocalNames[i].ulMax - sLocalNames[i].ulMin + 1);
+		if (!y)
+			continue;
+		// Found it !
+		auto hr = ECAllocateMore(sizeof(MAPINAMEID), lpBase, reinterpret_cast<void **>(&lpName));
+		if (hr != hrSuccess)
+			return hr;
+		hr = ECAllocateMore(sizeof(GUID), lpBase, reinterpret_cast<void **>(&lpName->lpguid));
+		if (hr != hrSuccess)
+			return hr;
+		lpName->ulKind = MNID_ID;
+		memcpy(lpName->lpguid, &sLocalNames[i].guid, sizeof(GUID));
+		lpName->Kind.lID = sLocalNames[i].ulMin + (ulId - sLocalNames[i].ulMappedId);
+		break;
 	}
 	if (lpName == NULL)
 		return MAPI_E_NOT_FOUND;
@@ -357,26 +356,16 @@ HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 HRESULT ECNamedProp::UpdateCache(ULONG ulId, MAPINAMEID *lpName)
 {
 	HRESULT		hr = hrSuccess;
-	MAPINAMEID*	lpNameCopy = NULL;
+	ecmem_ptr<MAPINAMEID> lpNameCopy;
 
-	if(mapNames.find(lpName) != mapNames.end()) {
+	if (mapNames.find(lpName) != mapNames.end())
 		// Already in the cache!
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	hr = HrCopyNameId(lpName, &lpNameCopy, NULL);
-
+		return MAPI_E_NOT_FOUND;
+	hr = HrCopyNameId(lpName, &~lpNameCopy, NULL);
 	if(hr != hrSuccess)
-		goto exit;
-
-	mapNames[lpNameCopy] = ulId;
-
-exit:
-	if(hr != hrSuccess && lpNameCopy)
-		ECFreeBuffer(lpNameCopy);
-
-	return hr;
+		return hr;
+	mapNames[lpNameCopy.release()] = ulId;
+	return hrSuccess;
 }
 
 HRESULT ECNamedProp::ResolveCache(MAPINAMEID *lpName, ULONG *lpulPropTag)
@@ -407,7 +396,7 @@ HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void
 		hr = ECAllocateMore(sizeof(MAPINAMEID), lpBase, (void **) &lpDst);
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpDst->ulKind = lpSrc->ulKind;
 
@@ -431,10 +420,13 @@ HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void
 		break;
 	case MNID_STRING:
 		if(lpBase)
-			ECAllocateMore(wcslen(lpSrc->Kind.lpwstrName) * sizeof(WCHAR) + sizeof(WCHAR), lpBase, (void **)&lpDst->Kind.lpwstrName);
+			hr = ECAllocateMore(wcslen(lpSrc->Kind.lpwstrName) * sizeof(wchar_t) + sizeof(wchar_t),
+			     lpBase, reinterpret_cast<void **>(&lpDst->Kind.lpwstrName));
 		else
-			ECAllocateMore(wcslen(lpSrc->Kind.lpwstrName) * sizeof(WCHAR) + sizeof(WCHAR), lpDst, (void **)&lpDst->Kind.lpwstrName);
-
+			hr = ECAllocateMore(wcslen(lpSrc->Kind.lpwstrName) * sizeof(wchar_t) + sizeof(wchar_t),
+			     lpDst, reinterpret_cast<void **>(&lpDst->Kind.lpwstrName));
+		if (hr != hrSuccess)
+			return hr;
 		wcscpy(lpDst->Kind.lpwstrName, lpSrc->Kind.lpwstrName);
 		break;
 	default:
@@ -445,7 +437,7 @@ HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void
 	*lppDst = lpDst;
 
 exit:
-	if(hr != hrSuccess && !lpBase && lpDst)
+	if (hr != hrSuccess && lpBase == nullptr)
 		ECFreeBuffer(lpDst);
 
 	return hr;

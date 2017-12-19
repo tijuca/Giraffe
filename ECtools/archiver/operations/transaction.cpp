@@ -76,14 +76,14 @@ HRESULT Transaction::PurgeDeletes(ArchiverSessionPtr ptrSession, TransactionPtr 
 		else {
 			ULONG ulType;
 
-			hrTmp = lpSession->OpenEntry(obj.objectEntry.sItemEntryId.size(), obj.objectEntry.sItemEntryId, &ptrMessage.iid(), 0, &ulType, &~ptrMessage);
+			hrTmp = lpSession->OpenEntry(obj.objectEntry.sItemEntryId.size(), obj.objectEntry.sItemEntryId, &iid_of(ptrMessage), 0, &ulType, &~ptrMessage);
 			if (hrTmp == MAPI_E_NOT_FOUND) {
 				MsgStorePtr ptrStore;
 
 				// Try to open the message on the store
 				hrTmp = ptrSession->OpenStore(obj.objectEntry.sStoreEntryId, &~ptrStore);
 				if (hrTmp == hrSuccess)
-					hrTmp = ptrStore->OpenEntry(obj.objectEntry.sItemEntryId.size(), obj.objectEntry.sItemEntryId, &ptrMessage.iid(), 0, &ulType, &~ptrMessage);
+					hrTmp = ptrStore->OpenEntry(obj.objectEntry.sItemEntryId.size(), obj.objectEntry.sItemEntryId, &iid_of(ptrMessage), 0, &ulType, &~ptrMessage);
 			}
 			if (hrTmp == hrSuccess)
 				hrTmp = Util::HrDeleteMessage(lpSession, ptrMessage);
@@ -102,7 +102,7 @@ HRESULT Transaction::Save(IMessage *lpMessage, bool bDeleteOnFailure, const Post
 	se.bDeleteOnFailure = bDeleteOnFailure;
 	se.ptrMessage.reset(lpMessage, false);
 	se.ptrPSAction = ptrPSAction;
-	m_lstSave.push_back(std::move(se));
+	m_lstSave.emplace_back(std::move(se));
 	return hrSuccess;
 }
 
@@ -111,7 +111,7 @@ HRESULT Transaction::Delete(const SObjectEntry &objectEntry, bool bDeferredDelet
 	DelEntry de;
 	de.objectEntry = objectEntry;
 	de.bDeferredDelete = bDeferredDelete;
-	m_lstDelete.push_back(std::move(de));
+	m_lstDelete.emplace_back(std::move(de));
 	return hrSuccess;
 }
 
@@ -131,12 +131,13 @@ HRESULT Rollback::Delete(ArchiverSessionPtr ptrSession, IMessage *lpMessage)
 	hr = lpMessage->GetProps(sptaMsgProps, 0, &cMsgProps, &~ptrMsgProps);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrSession->GetMAPISession()->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb), &entry.ptrFolder.iid(), MAPI_MODIFY, &ulType, &~entry.ptrFolder);
+	hr = ptrSession->GetMAPISession()->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb),
+	     &iid_of(entry.ptrFolder), MAPI_MODIFY, &ulType, &~entry.ptrFolder);
 	if (hr != hrSuccess)
 		return hr;
-
-	entry.eidMessage.assign(ptrMsgProps[IDX_ENTRYID].Value.bin);
-	m_lstDelete.push_back(entry);
+	entry.eidMessage = ptrMsgProps[IDX_ENTRYID].Value.bin;
+	m_lstDelete.emplace_back(std::move(entry));
 	return hrSuccess;
 }
 

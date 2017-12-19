@@ -33,7 +33,7 @@ struct soap;
 
 namespace KC {
 
-#define MAX_PROP_SIZE 8192	
+#define MAX_PROP_SIZE 32768
 #define MAX_QUERY 4096
 
 #define PROPCOL_ULONG	"val_ulong"
@@ -44,16 +44,16 @@ namespace KC {
 #define PROPCOL_HI		"val_hi"
 #define PROPCOL_LO		"val_lo"
 
-#define _PROPCOL_ULONG(_tab)	#_tab "." PROPCOL_ULONG
-#define _PROPCOL_STRING(_tab)	#_tab "." PROPCOL_STRING
-#define _PROPCOL_BINARY(_tab)	#_tab "." PROPCOL_BINARY
-#define _PROPCOL_DOUBLE(_tab)	#_tab "." PROPCOL_DOUBLE
-#define _PROPCOL_LONGINT(_tab)	#_tab "." PROPCOL_LONGINT
-#define _PROPCOL_HI(_tab)		#_tab "." PROPCOL_HI
-#define _PROPCOL_LO(_tab)		#_tab "." PROPCOL_LO
+#define I_PROPCOL_ULONG(_tab)	#_tab "." PROPCOL_ULONG
+#define I_PROPCOL_STRING(_tab)	#_tab "." PROPCOL_STRING
+#define I_PROPCOL_BINARY(_tab)	#_tab "." PROPCOL_BINARY
+#define I_PROPCOL_DOUBLE(_tab)	#_tab "." PROPCOL_DOUBLE
+#define I_PROPCOL_LONGINT(_tab)	#_tab "." PROPCOL_LONGINT
+#define I_PROPCOL_HI(_tab)	#_tab "." PROPCOL_HI
+#define I_PROPCOL_LO(_tab)	#_tab "." PROPCOL_LO
 
 #define PROPCOL_HILO		PROPCOL_HI "," PROPCOL_LO
-#define _PROPCOL_HILO(_tab)	PROPCOL_HI(_tab) "," PROPCOL_LO(_tab)
+#define I_PROPCOL_HILO(_tab)	PROPCOL_HI(_tab) "," PROPCOL_LO(_tab)
 
 /* make string of define value */
 #ifndef __STRING
@@ -62,15 +62,15 @@ namespace KC {
 #define STR(macro) __STRING(macro)
 
 // Warning! Code references the ordering of these values! Do not change unless you know what you're doing!
-#define PROPCOLVALUEORDER(_tab) 			_PROPCOL_ULONG(_tab) "," _PROPCOL_STRING(_tab) "," _PROPCOL_BINARY(_tab) "," _PROPCOL_DOUBLE(_tab) "," _PROPCOL_LONGINT(_tab) "," _PROPCOL_HI(_tab) "," _PROPCOL_LO(_tab)
-#define PROPCOLVALUEORDER_TRUNCATED(_tab) 	_PROPCOL_ULONG(_tab) ", LEFT(" _PROPCOL_STRING(_tab) "," STR(TABLE_CAP_STRING) "),LEFT(" _PROPCOL_BINARY(_tab) "," STR(TABLE_CAP_BINARY) ")," _PROPCOL_DOUBLE(_tab) "," _PROPCOL_LONGINT(_tab) "," _PROPCOL_HI(_tab) "," _PROPCOL_LO(_tab)
+#define PROPCOLVALUEORDER(_tab) I_PROPCOL_ULONG(_tab) "," I_PROPCOL_STRING(_tab) "," I_PROPCOL_BINARY(_tab) "," I_PROPCOL_DOUBLE(_tab) "," I_PROPCOL_LONGINT(_tab) "," I_PROPCOL_HI(_tab) "," I_PROPCOL_LO(_tab)
+#define PROPCOLVALUEORDER_TRUNCATED(_tab) I_PROPCOL_ULONG(_tab) ", LEFT(" I_PROPCOL_STRING(_tab) "," STR(TABLE_CAP_STRING) "),LEFT(" I_PROPCOL_BINARY(_tab) "," STR(TABLE_CAP_BINARY) ")," I_PROPCOL_DOUBLE(_tab) "," I_PROPCOL_LONGINT(_tab) "," I_PROPCOL_HI(_tab) "," I_PROPCOL_LO(_tab)
 enum { VALUE_NR_ULONG=0, VALUE_NR_STRING, VALUE_NR_BINARY, VALUE_NR_DOUBLE, VALUE_NR_LONGINT, VALUE_NR_HILO, VALUE_NR_MAX };
 
 #define PROPCOLORDER "0,properties.tag,properties.type," PROPCOLVALUEORDER(properties)
 #define PROPCOLORDER_TRUNCATED "0,properties.tag,properties.type," PROPCOLVALUEORDER_TRUNCATED(properties)
 #define MVPROPCOLORDER "count(*),mvproperties.tag,mvproperties.type,group_concat(length(mvproperties.val_ulong),':', mvproperties.val_ulong ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_string),':', mvproperties.val_string ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_binary),':', mvproperties.val_binary ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_double),':', mvproperties.val_double ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_longint),':', mvproperties.val_longint ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_hi),':', mvproperties.val_hi ORDER BY mvproperties.orderid SEPARATOR ''), group_concat(length(mvproperties.val_lo),':', mvproperties.val_lo ORDER BY mvproperties.orderid SEPARATOR '')"
-#define MVIPROPCOLORDER "0,mvproperties.tag,mvproperties.type | 0x2000," PROPCOLVALUEORDER(mvproperties)
-#define MVIPROPCOLORDER_TRUNCATED "0,mvproperties.tag,mvproperties.type | 0x2000," PROPCOLVALUEORDER_TRUNCATED(mvproperties)
+#define MVIPROPCOLORDER "0,mvproperties.tag,mvproperties.type | 8192," PROPCOLVALUEORDER(mvproperties)
+#define MVIPROPCOLORDER_TRUNCATED "0,mvproperties.tag,mvproperties.type | 8192," PROPCOLVALUEORDER_TRUNCATED(mvproperties)
 
 enum { FIELD_NR_ID=0, FIELD_NR_TAG, FIELD_NR_TYPE, FIELD_NR_ULONG, FIELD_NR_STRING, FIELD_NR_BINARY, FIELD_NR_DOUBLE, FIELD_NR_LONGINT, FIELD_NR_HI, FIELD_NR_LO, FIELD_NR_MAX };
 
@@ -88,9 +88,6 @@ ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize, unsigned int *lpulLast
 
 unsigned int NormalizeDBPropTag(unsigned int ulPropTag);
 bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2);
-
-ECRESULT GetDatabaseSettingAsInteger(ECDatabase *lpDatabase, const std::string &strSettings, unsigned int *lpulResult);
-ECRESULT SetDatabaseSetting(ECDatabase *lpDatabase, const std::string &strSettings, unsigned int ulValue);
 
 
 /**

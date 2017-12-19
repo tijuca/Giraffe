@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include "ECDatabase.h"
 
@@ -26,6 +26,7 @@
 #include "ECSession.h"
 #include "ECMAPI.h"
 #include <kopano/stringutil.h>
+#include <kopano/Util.h>
 
 namespace KC {
 
@@ -34,30 +35,20 @@ ECMultiStoreTable::ECMultiStoreTable(ECSession *lpSession, unsigned int ulObjTyp
 
 ECRESULT ECMultiStoreTable::Create(ECSession *lpSession, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale, ECMultiStoreTable **lppTable)
 {
-	*lppTable = new ECMultiStoreTable(lpSession, ulObjType, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECMultiStoreTable>(lpSession, ulObjType,
+	       ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECMultiStoreTable::SetEntryIDs(ECListInt *lplObjectList) {
-	ECRESULT er = erSuccess;
-	
 	m_lstObjects = *lplObjectList;
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECMultiStoreTable::Load() {
-	ECRESULT er = erSuccess;
-	ECListIntIterator i;
-	sObjectTableKey		sRowItem;
-
 	Clear();
-	for (i = m_lstObjects.begin(); i != m_lstObjects.end(); ++i)
+	for (auto i = m_lstObjects.begin(); i != m_lstObjects.end(); ++i)
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, *i, 0);
-	return er;
+	return erSuccess;
 }
 
 } /* namespace */

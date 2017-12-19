@@ -1,32 +1,52 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 import sys
 
 from MAPI.Tags import (
     PR_EC_HIERARCHYID, PR_ATTACH_NUM, PR_ATTACH_MIME_TAG_W,
-    PR_ATTACH_LONG_FILENAME_W, PR_ATTACH_SIZE, PR_ATTACH_DATA_BIN
+    PR_ATTACH_LONG_FILENAME_W, PR_ATTACH_SIZE, PR_ATTACH_DATA_BIN,
+    IID_IAttachment
 )
 from MAPI.Defs import HrGetOneProp
 from MAPI.Struct import MAPIErrorNotFound
 
-from .compat import repr as _repr
+from .properties import Properties
 
 if sys.hexversion >= 0x03000000:
-    from . import utils as _utils
+    try:
+        from . import utils as _utils
+    except ImportError:
+        _utils = sys.modules[__package__+'.utils']
 else:
     import utils as _utils
 
-class Attachment(object):
+class Attachment(Properties):
     """Attachment class"""
 
-    def __init__(self, mapiobj):
-        self.mapiobj = mapiobj
+    def __init__(self, mapiitem=None, entryid=None, mapiobj=None):
+        self._mapiitem = mapiitem
+        self._entryid = entryid
+        self._mapiobj = mapiobj
         self._data = None
+
+    @property
+    def mapiobj(self):
+        if self._mapiobj:
+            return self._mapiobj
+
+        self._mapiobj = self._mapiitem.OpenAttach(
+            self._entryid, IID_IAttachment, 0
+        )
+        return self._mapiobj
+
+    @mapiobj.setter
+    def mapiobj(self, mapiobj):
+        self._mapiobj = mapiobj
 
     @property
     def hierarchyid(self):
@@ -41,27 +61,27 @@ class Attachment(object):
 
     @property
     def mimetype(self):
-        """ Mime-type or *None* if not found """
-
+        """Mime-type"""
         try:
             return HrGetOneProp(self.mapiobj, PR_ATTACH_MIME_TAG_W).Value
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @property
     def filename(self):
-        """ Filename or *None* if not found """
-
+        """Filename"""
         try:
             return HrGetOneProp(self.mapiobj, PR_ATTACH_LONG_FILENAME_W).Value
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @property
     def size(self):
-        """ Size """
-        # XXX size of the attachment object, so more than just the attachment data
-        # XXX (useful when calculating store size, for example.. sounds interesting to fix here)
+        """Size"""
+        # XXX size of the attachment object, so more than just the attachment
+        #     data
+        # XXX (useful when calculating store size, for example.. sounds
+        #     interesting to fix here)
         try:
             return int(HrGetOneProp(self.mapiobj, PR_ATTACH_SIZE).Value)
         except MAPIErrorNotFound:
@@ -72,8 +92,7 @@ class Attachment(object):
 
     @property
     def data(self):
-        """ Binary data """
-
+        """Binary data"""
         if self._data is None:
             self._data = _utils.stream(self.mapiobj, PR_ATTACH_DATA_BIN)
         return self._data
@@ -86,14 +105,5 @@ class Attachment(object):
     def name(self):
         return self.filename
 
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def props(self):
-        return _utils.props(self.mapiobj)
-
     def __unicode__(self):
         return u'Attachment("%s")' % self.name
-
-    def __repr__(self):
-        return _repr(self)

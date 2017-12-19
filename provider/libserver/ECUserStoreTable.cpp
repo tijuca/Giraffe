@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include "ECDatabase.h"
 
@@ -27,6 +27,7 @@
 #include "ECGenProps.h"
 #include "ECSession.h"
 #include <kopano/stringutil.h>
+#include <kopano/Util.h>
 
 namespace KC {
 
@@ -40,23 +41,21 @@ ECUserStoreTable::ECUserStoreTable(ECSession *lpSession, unsigned int ulFlags, c
 
 ECRESULT ECUserStoreTable::Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECUserStoreTable **lppTable)
 {
-	*lppTable = new ECUserStoreTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECUserStoreTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
-ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
+ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	ECUserStoreTable *pThis = dynamic_cast<ECUserStoreTable*>(lpThis);
+	auto pThis = dynamic_cast<ECUserStoreTable *>(lpThis);
 	if (pThis == nullptr)
 		return KCERR_INVALID_PARAMETER;
-	struct rowSet *lpsRowSet = NULL;
 	gsoap_size_t i;
 	GUID sZeroGuid = {0};
 
-	lpsRowSet = s_alloc<rowSet>(soap);
+	auto lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -185,16 +184,11 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 }
 
 ECRESULT ECUserStoreTable::Load() {
-	ECRESULT er = erSuccess;
 	ECListIntIterator i;
     ECDatabase *lpDatabase = NULL;
 	DB_RESULT lpDBResult;
-    DB_ROW		lpDBRow = NULL;
-    DB_LENGTHS	lpDBLength = NULL;
-	std::string strQuery;
     std::list<unsigned int> lstObjIds;
 	ECUserStore sUserStore;
-	int iRowId;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	ECSecurity *lpSecurity = lpSession->GetSecurity();
 	objectdetails_t sUserDetails;
@@ -204,7 +198,7 @@ ECRESULT ECUserStoreTable::Load() {
 
 	enum cols { USERID = 0, EXTERNID, OBJCLASS, UCOMPANY, STOREGUID, STORETYPE, USERNAME, SCOMPANY, HIERARCHYID, STORESIZE, MODTIME_HI, MODTIME_LO };
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
 
@@ -218,30 +212,27 @@ ECRESULT ECUserStoreTable::Load() {
 	 * primary store, even if they do have an archive store attached, while the second query will
 	 * return all stores types.
 	 */
-	strQuery =
+	std::string strQuery =
 		" SELECT u.id, u.externid, u.objectclass, u.company, s.guid, s.type, s.user_name, s.company, s.hierarchy_id, p.val_longint, m.val_hi, m.val_lo FROM users AS u"
 		"  LEFT JOIN stores AS s ON s.user_id=u.id AND s.type=" + stringify(ECSTORE_TYPE_PRIVATE) + " LEFT JOIN hierarchy AS h ON h.id=s.hierarchy_id"
-		"  LEFT JOIN properties AS p ON p.hierarchyid=s.hierarchy_id and p.tag=0x0E08 and p.type=0x14"
-		"  LEFT JOIN properties AS m ON m.hierarchyid=s.hierarchy_id and m.tag=0x66A2 and m.type=0x40"
+		"  LEFT JOIN properties AS p ON p.hierarchyid=s.hierarchy_id and p.tag=3592 and p.type=20"
+		"  LEFT JOIN properties AS m ON m.hierarchyid=s.hierarchy_id and m.tag=26274 and m.type=64"
 		" UNION"
 		" SELECT u.id, u.externid, u.objectclass, u.company, s.guid, s.type, s.user_name, s.company, s.hierarchy_id, p.val_longint, m.val_hi, m.val_lo FROM users AS u"
 		"  RIGHT JOIN stores AS s ON s.user_id=u.id LEFT JOIN hierarchy AS h ON h.id=s.hierarchy_id"
-		"  LEFT JOIN properties AS p ON p.hierarchyid=s.hierarchy_id and p.tag=0x0E08 and p.type=0x14"
-		"  LEFT JOIN properties AS m ON m.hierarchyid=s.hierarchy_id and m.tag=0x66A2 and m.type=0x40";
+		"  LEFT JOIN properties AS p ON p.hierarchyid=s.hierarchy_id and p.tag=35928 and p.type=20"
+		"  LEFT JOIN properties AS m ON m.hierarchyid=s.hierarchy_id and m.tag=26274 and m.type=64";
 
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
 
-	iRowId = 0;
+	int iRowId = 0;
 	while(1) {
-		lpDBRow = lpDatabase->FetchRow(lpDBResult);
-
+		auto lpDBRow = lpDBResult.fetch_row();
 		if(lpDBRow == NULL)
 			break;
-
-		lpDBLength = lpDatabase->FetchRowLengths(lpDBResult);
-
+		auto lpDBLength = lpDBResult.fetch_row_lengths();
 		if (lpDBRow[OBJCLASS])
 			objclass = (objectclass_t)atoi(lpDBRow[OBJCLASS]);
 
@@ -316,9 +307,9 @@ ECRESULT ECUserStoreTable::Load() {
 			sUserStore.ullStoreSize = 0;
 
 		// add to table
-		lstObjIds.push_back(iRowId);
+		lstObjIds.emplace_back(iRowId);
 		// remember details
-		m_mapUserStoreData.insert(std::pair<unsigned int, ECUserStore>(iRowId++, sUserStore));
+		m_mapUserStoreData.emplace(iRowId++, sUserStore);
 	}
 
 	LoadRows(&lstObjIds, 0);

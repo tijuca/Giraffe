@@ -27,6 +27,8 @@
 #include <kopano/mapiguidext.h>
 #include "mapitovcf.hpp"
 
+using namespace KCHL;
+
 namespace KC {
 
 class mapitovcf_impl _kc_final : public mapitovcf {
@@ -54,50 +56,48 @@ HRESULT create_mapitovcf(mapitovcf **ret)
 VObject *mapitovcf_impl::to_prop(VObject *node, const char *prop,
     const SPropValue &s)
 {
-	char plain[128];
-	if (PROP_TYPE(s.ulPropTag) == PT_UNICODE)
-		wcstombs(plain, s.Value.lpszW, sizeof(plain));
-	else if (PROP_TYPE(s.ulPropTag) == PT_STRING8)
-		strncpy(plain, s.Value.lpszA, sizeof(plain));
-
 	auto newnode = addProp(node, prop);
 	if (newnode == nullptr)
 		return nullptr;
-	setVObjectStringZValue(newnode, plain);
+	if (PROP_TYPE(s.ulPropTag) == PT_UNICODE)
+		setVObjectUStringZValue_(newnode, wcsdup(s.Value.lpszW));
+	else if (PROP_TYPE(s.ulPropTag) == PT_STRING8)
+		setVObjectStringZValue(newnode, s.Value.lpszA);
 	return newnode;
 }
 
 VObject *mapitovcf_impl::to_prop(VObject *node, const char *prop,
     const wchar_t *value)
 {
-	char plain[128];
-	wcstombs(plain, value, sizeof(plain));
 	auto newnode = addProp(node, prop);
-	setVObjectStringZValue(newnode, plain);
+	if (newnode == nullptr)
+		return nullptr;
+	setVObjectUStringZValue_(newnode, wcsdup(value));
 	return newnode;
 }
 
 HRESULT mapitovcf_impl::add_message(IMessage *lpMessage)
 {
-	HRESULT hr = hrSuccess;
-	KCHL::memory_ptr<SPropValue> lpMessageClass;
+	memory_ptr<SPropValue> lpMessageClass;
 
 	if (lpMessage == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMessageClass);
+	auto hr = HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMessageClass);
 	if (hr != hrSuccess)
 		return hr;
 	if (strcasecmp(lpMessageClass->Value.lpszA, "IPM.Contact") != 0)
 		return MAPI_E_INVALID_PARAMETER;
 
 	auto root = newVObject(VCCardProp);
-	KCHL::memory_ptr<SPropValue> msgprop, msgprop2;
+	memory_ptr<SPropValue> msgprop, msgprop2;
 	hr = HrGetOneProp(lpMessage, PR_GIVEN_NAME, &~msgprop);
 	HRESULT hr2 = HrGetOneProp(lpMessage, PR_SURNAME, &~msgprop2);
 	if (hr == hrSuccess || hr2 == hrSuccess) {
 		auto node = addGroup(root, VCNameProp);
-		to_prop(node, VCGivenNameProp, *msgprop);
-		to_prop(node, VCFamilyNameProp, *msgprop2);
+		if (msgprop != nullptr)
+			to_prop(node, VCGivenNameProp, *msgprop);
+		if (msgprop2 != nullptr)
+			to_prop(node, VCFamilyNameProp, *msgprop2);
 	} else if (hr != MAPI_E_NOT_FOUND) {
 		return hr;
 	} else if (hr2 != MAPI_E_NOT_FOUND) {
@@ -107,6 +107,18 @@ HRESULT mapitovcf_impl::add_message(IMessage *lpMessage)
 	hr = HrGetOneProp(lpMessage, PR_DISPLAY_NAME, &~msgprop);
 	if (hr == hrSuccess)
 		to_prop(root, VCFullNameProp, *msgprop);
+	else if (hr != MAPI_E_NOT_FOUND)
+		return hr;
+
+	hr = HrGetOneProp(lpMessage, PR_TITLE, &~msgprop);
+	if (hr == hrSuccess)
+		to_prop(root, VCTitleProp, *msgprop);
+	else if (hr != MAPI_E_NOT_FOUND)
+		return hr;
+
+	hr = HrGetOneProp(lpMessage, PR_COMPANY_NAME, &~msgprop);
+	if (hr == hrSuccess)
+		to_prop(root, VCOrgProp, *msgprop);
 	else if (hr != MAPI_E_NOT_FOUND)
 		return hr;
 
@@ -127,23 +139,95 @@ HRESULT mapitovcf_impl::add_message(IMessage *lpMessage)
 	}
 
 	/* Email */
-	MAPINAMEID name;
-	MAPINAMEID *namep = &name;
-	name.lpguid = const_cast<GUID *>(&PSETID_Address);
-	name.ulKind = MNID_ID;
-	name.Kind.lID = 0x8083;
+	for (int lid = 0x8083; lid <= 0x80a3; lid += 0x10) {
+		MAPINAMEID name;
+		MAPINAMEID *namep = &name;
+		name.lpguid = const_cast<GUID *>(&PSETID_Address);
+		name.ulKind = MNID_ID;
+		name.Kind.lID = lid;
 
-	KCHL::memory_ptr<SPropTagArray> proptag;
-	hr = lpMessage->GetIDsFromNames(1, &namep, MAPI_CREATE, &~proptag);
+		memory_ptr<SPropTagArray> proptag;
+		hr = lpMessage->GetIDsFromNames(1, &namep, MAPI_BEST_ACCESS, &~proptag);
+		if (hr != hrSuccess)
+			continue;
+
+		ULONG proptype = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_UNICODE);
+		hr = HrGetOneProp(lpMessage, proptype, &~msgprop);
+		if (hr == hrSuccess)
+			to_prop(root, VCEmailAddressProp, *msgprop);
+		else if (hr != MAPI_E_NOT_FOUND)
+			continue;
+	}
+
+	static constexpr const SizedSPropTagArray(5, home_props) =
+		{5, {PR_HOME_ADDRESS_STREET, PR_HOME_ADDRESS_CITY,
+			 PR_HOME_ADDRESS_STATE_OR_PROVINCE, PR_HOME_ADDRESS_POSTAL_CODE,
+			 PR_HOME_ADDRESS_COUNTRY}};
+	memory_ptr<SPropValue> msgprop_array;
+	unsigned int count;
+
+	hr = lpMessage->GetProps(home_props, 0, &count, &~msgprop_array);
+	if (hr == hrSuccess) {
+		auto adrnode = addProp(root, VCAdrProp);
+		auto node = addProp(adrnode, "TYPE");
+		setVObjectStringZValue(node, "HOME");
+		to_prop(adrnode, "STREET", msgprop_array[0].Value.lpszW);
+		to_prop(adrnode, "L", msgprop_array[1].Value.lpszW);
+		to_prop(adrnode, "R", msgprop_array[2].Value.lpszW);
+		to_prop(adrnode, "PC", msgprop_array[3].Value.lpszW);
+		to_prop(adrnode, "C", msgprop_array[4].Value.lpszW);
+	}
+
+	static constexpr const SizedSPropTagArray(5, other_props) =
+		{5, {PR_OTHER_ADDRESS_STREET, PR_OTHER_ADDRESS_CITY,
+			 PR_OTHER_ADDRESS_STATE_OR_PROVINCE, PR_OTHER_ADDRESS_POSTAL_CODE,
+			 PR_OTHER_ADDRESS_COUNTRY}};
+
+	hr = lpMessage->GetProps(other_props, 0, &count, &~msgprop_array);
+	if (hr == hrSuccess) {
+		auto adrnode = addProp(root, VCAdrProp);
+		to_prop(adrnode, "STREET", msgprop_array[0].Value.lpszW);
+		to_prop(adrnode, "L", msgprop_array[1].Value.lpszW);
+		to_prop(adrnode, "R", msgprop_array[2].Value.lpszW);
+		to_prop(adrnode, "PC", msgprop_array[3].Value.lpszW);
+		to_prop(adrnode, "C", msgprop_array[4].Value.lpszW);
+	}
+
+	memory_ptr<MAPINAMEID> nameids;
+	hr = MAPIAllocateBuffer(5 * sizeof(MAPINAMEID), &~nameids);
 	if (hr != hrSuccess)
 		return hr;
 
-	ULONG proptype = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_UNICODE);
-	hr = HrGetOneProp(lpMessage, proptype, &~msgprop);
-	if (hr == hrSuccess)
-		to_prop(root, VCEmailAddressProp, *msgprop);
-	else if (hr != MAPI_E_NOT_FOUND)
+	memory_ptr<MAPINAMEID *> nameids_ptrs;
+	hr = MAPIAllocateBuffer(5 * sizeof(MAPINAMEID *), &~nameids_ptrs);
+	if (hr != hrSuccess)
 		return hr;
+
+	for (size_t i = 0; i < 5; ++i) {
+		nameids[i].lpguid = const_cast<GUID *>(&PSETID_Address);
+		nameids[i].ulKind = MNID_ID;
+		nameids[i].Kind.lID = 0x8045 + i;
+		nameids_ptrs[i] = &nameids[i];
+	}
+
+	memory_ptr<SPropTagArray> proptag;
+	hr = lpMessage->GetIDsFromNames(5, nameids_ptrs, MAPI_BEST_ACCESS, &~proptag);
+	if (hr == hrSuccess) {
+		for (size_t i = 0; i < 5; ++i)
+			proptag->aulPropTag[i] = CHANGE_PROP_TYPE(proptag->aulPropTag[i], PT_UNICODE);
+
+		hr = lpMessage->GetProps(proptag, 0, &count, &~msgprop_array);
+		if (hr == hrSuccess) {
+			auto adrnode = addProp(root, VCAdrProp);
+			auto node = addProp(adrnode, "TYPE");
+			setVObjectStringZValue(node, "WORK");
+			to_prop(adrnode, "STREET", msgprop_array[0].Value.lpszW);
+			to_prop(adrnode, "L", msgprop_array[1].Value.lpszW);
+			to_prop(adrnode, "R", msgprop_array[2].Value.lpszW);
+			to_prop(adrnode, "PC", msgprop_array[3].Value.lpszW);
+			to_prop(adrnode, "C", msgprop_array[4].Value.lpszW);
+		}
+	}
 
 	/* Write memobject */
 	int len = 0;

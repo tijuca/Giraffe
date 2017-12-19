@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
 #include "WSTableView.h"
 #include "Mem.h"
@@ -722,7 +723,7 @@ HRESULT WSTableView::UnLockSoap()
 
 HRESULT WSTableView::Reload(void *lpParam, ECSESSIONID sessionId)
 {
-	WSTableView *lpThis = (WSTableView *)lpParam;
+	auto lpThis = static_cast<WSTableView *>(lpParam);
 
 	lpThis->ecSessionId = sessionId;
 	// Since we've switched sessions, our table is no longer open or valid
@@ -745,12 +746,9 @@ HRESULT WSTableView::Reload(void *lpParam, ECSESSIONID sessionId)
 
 HRESULT WSTableView::SetReloadCallback(RELOADCALLBACK callback, void *lpParam)
 {
-	HRESULT hr = hrSuccess;
-
 	this->m_lpCallback = callback;
 	this->m_lpParam = lpParam;
-
-	return hr;
+	return hrSuccess;
 }
 
 // WSTableOutGoingQueue view
@@ -767,17 +765,8 @@ HRESULT WSTableOutGoingQueue::Create(KCmd *lpCmd,
     LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableOutGoingQueue **lppTableOutGoingQueue)
 {
-	HRESULT hr = hrSuccess;
-	WSTableOutGoingQueue *lpTableOutGoingQueue = NULL; 
-
-	lpTableOutGoingQueue = new WSTableOutGoingQueue(lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
-
-	hr = lpTableOutGoingQueue->QueryInterface(IID_ECTableOutGoingQueue, (void **) lppTableOutGoingQueue);
-	
-	if(hr != hrSuccess)
-		delete lpTableOutGoingQueue;
-
-	return hr;
+	return alloc_wrap<WSTableOutGoingQueue>(lpCmd, lpDataLock, ecSessionId,
+	       cbEntryId, lpEntryId, lpMsgStore, lpTransport).put(lppTableOutGoingQueue);
 }
 
 HRESULT	WSTableOutGoingQueue::QueryInterface(REFIID refiid, void **lppInterface)

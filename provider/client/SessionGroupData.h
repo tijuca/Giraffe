@@ -19,10 +19,12 @@
 #define ECSESSIONGROUPDATA_H
 
 #include <kopano/zcdefs.h>
+#include <atomic>
 #include <mutex>
 #include <mapispi.h>
 
 #include <kopano/kcodes.h>
+#include <kopano/Util.h>
 #include "ClientUtil.h"
 
 class ECNotifyMaster;
@@ -70,8 +72,7 @@ private:
 	sGlobalProfileProps m_sProfileProps;
 
 	/* Refcounting */
-	std::recursive_mutex m_hRefMutex;
-	ULONG m_cRef = 0;
+	std::atomic<unsigned int> m_cRef{0};
 
 public:
 	SessionGroupData(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps);
@@ -88,6 +89,7 @@ public:
 	BOOL IsOrphan();
 
 	ECSESSIONGROUPID GetSessionGroupId();
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif /* ECSESSIONGROUPDATA_H */

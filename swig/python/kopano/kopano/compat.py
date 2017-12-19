@@ -1,8 +1,8 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 try:
@@ -37,7 +37,7 @@ if sys.hexversion >= 0x03000000:
         return pickle.loads(s, encoding='bytes')
 
     def hex(s):
-        return codecs.encode(s, 'hex').upper()
+        return codecs.encode(s, 'hex').upper().decode('ascii')
 
     def unhex(s):
         return codecs.decode(s, 'hex')

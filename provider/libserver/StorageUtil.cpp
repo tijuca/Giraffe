@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
+#include <kopano/tie.hpp>
 #include "StorageUtil.h"
 #include "ECDatabase.h"
 #include "ECAttachmentStorage.h"
@@ -32,11 +33,6 @@ namespace KC {
 
 // External objects
 extern ECSessionManager *g_lpSessionManager;	// ECServerEntrypoint.cpp
-
-ECRESULT CreateAttachmentStorage(ECDatabase *lpDatabase, ECAttachmentStorage **lppAttachmentStorage)
-{
-	return ECAttachmentStorage::CreateAttachmentStorage(lpDatabase, g_lpSessionManager->GetConfig(), lppAttachmentStorage);
-}
 
 ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned int ulParentObjId, unsigned int ulParentType, unsigned int ulObjType, unsigned int ulFlags, unsigned int *lpulObjId) 
 {
@@ -91,13 +87,13 @@ ECRESULT GetObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned in
 	unsigned int	ulSize = 0;
 	std::string		strQuery;
 
-	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid="+stringify(ulObjId)+" AND ((tag="+stringify(PROP_ID(PR_MESSAGE_SIZE))+" AND type="+stringify(PROP_TYPE(PR_MESSAGE_SIZE))+") OR (tag="+stringify(PROP_ID(PR_ATTACH_SIZE))+" AND type="+stringify(PROP_TYPE(PR_ATTACH_SIZE))+") )";
+	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid="+stringify(ulObjId)+" AND ((tag="+stringify(PROP_ID(PR_MESSAGE_SIZE))+" AND type="+stringify(PROP_TYPE(PR_MESSAGE_SIZE))+") OR (tag="+stringify(PROP_ID(PR_ATTACH_SIZE))+" AND type="+stringify(PROP_TYPE(PR_ATTACH_SIZE))+") )" + " LIMIT 1";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-	if (lpDatabase->GetNumRows(lpDBResult) != 1)
+	if (lpDBResult.get_num_rows() != 1)
 		return KCERR_NOT_FOUND;
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
 		return KCERR_NOT_FOUND;
 	ulSize = atoi(lpDBRow[0]);
@@ -112,7 +108,6 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	DB_ROW			lpDBRow = NULL;
 	unsigned int	ulSize = 0;
 	std::string		strQuery;
-	object_ptr<ECAttachmentStorage> lpAttachmentStorage;
 	ECDatabaseAttachment *lpDatabaseStorage = NULL;
 
 	*lpulSize = 0;
@@ -123,16 +118,15 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if(lpDBRow == NULL || lpDBRow[0] == NULL)
 		ulSize = 0;
 	else
 		ulSize = atoui(lpDBRow[0])+ 28;// + hierarchy size
 
-	er = CreateAttachmentStorage(lpDatabase, &~lpAttachmentStorage);
-	if (er != erSuccess)
-		return er;
+	std::unique_ptr<ECAttachmentStorage> lpAttachmentStorage(g_lpSessionManager->get_atxconfig()->new_handle(lpDatabase));
+	if (lpAttachmentStorage == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 
 	// since we already did the length magic in the previous query, we only need the 
 	// extra size for filestorage and S3 storage, i.e. not database storage
@@ -150,7 +144,7 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if(lpDBRow != NULL && lpDBRow[0] != NULL)
 		ulSize += atoui(lpDBRow[0]); // Add the size
 
@@ -159,7 +153,7 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if(lpDBRow != NULL && lpDBRow[0] != NULL)
 		ulSize += atoui(lpDBRow[0]); // Add the size
 	*lpulSize = ulSize;
@@ -185,6 +179,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 		strField = "val_ulong";
 	}
 
+	auto gcache = g_lpSessionManager->GetCacheManager();
 	if (updateAction == UPDATE_SET) {
 		strQuery = "REPLACE INTO properties(hierarchyid, tag, type, "+strField+") VALUES(" + stringify(ulObjId) + "," + stringify(PROP_ID(ulPropTag)) + "," + stringify(PROP_TYPE(ulPropTag)) + "," + stringify_int64(llSize) + ")";
 		er = lpDatabase->DoInsert(strQuery);
@@ -202,8 +197,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 			sPropVal.ulPropTag = PR_MESSAGE_SIZE;
 			sPropVal.Value.ul = llSize;
 			sPropVal.__union = SOAP_UNION_propValData_ul;
-
-			er = g_lpSessionManager->GetCacheManager()->SetCell(&key, PR_MESSAGE_SIZE, &sPropVal);
+			er = gcache->SetCell(&key, PR_MESSAGE_SIZE, &sPropVal);
 			if(er != erSuccess)
 				return er;
 		}
@@ -226,9 +220,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 		
 		if(ulObjType == MAPI_MESSAGE) {
 			// Update cell cache
-			sObjectTableKey key;
-			
-			er = g_lpSessionManager->GetCacheManager()->UpdateCell(ulObjId, PR_MESSAGE_SIZE, (updateAction == UPDATE_ADD ? llSize : -llSize));
+			er = gcache->UpdateCell(ulObjId, PR_MESSAGE_SIZE, (updateAction == UPDATE_ADD ? llSize : -llSize));
 			if(er != erSuccess)
 				return er;
 		}

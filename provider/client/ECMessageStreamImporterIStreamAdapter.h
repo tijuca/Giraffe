@@ -21,6 +21,7 @@
 #include <kopano/zcdefs.h>
 #include <kopano/memory.hpp>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include "WSMessageStreamImporter.h"
 
 /**
@@ -30,7 +31,8 @@
  * On commit, the call thread will block until the asynchronous call has completed, and
  * the return value will be returned.
  */
-class ECMessageStreamImporterIStreamAdapter _kc_final : public ECUnknown {
+class ECMessageStreamImporterIStreamAdapter _kc_final :
+    public ECUnknown, public IStream {
 public:
 	static HRESULT Create(WSMessageStreamImporter *lpStreamImporter, IStream **lppStream);
 
@@ -56,21 +58,9 @@ private:
 	ECMessageStreamImporterIStreamAdapter(WSMessageStreamImporter *lpStreamImporter);
 	~ECMessageStreamImporterIStreamAdapter();
 
-	class xSequentialStream _kc_final : public ISequentialStream {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/ISequentialStream.hpp>
-	} m_xSequentialStream;
-
-	class xStream _kc_final : public IStream {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/ISequentialStream.hpp>
-		#include <kopano/xclsfrag/IStream.hpp>
-	} m_xStream;
-
 	WSMessageStreamImporterPtr	m_ptrStreamImporter;
-	WSMessageStreamSinkPtr		m_ptrSink;
+	KCHL::object_ptr<WSMessageStreamSink> m_ptrSink;
+	ALLOC_WRAP_FRIEND;
 };
-
-typedef KCHL::object_ptr<ECMessageStreamImporterIStreamAdapter> ECMessageStreamImporterIStreamAdapterPtr;
 
 #endif // ndef ECMessageStreamImporterIStreamAdapter_INCLUDED

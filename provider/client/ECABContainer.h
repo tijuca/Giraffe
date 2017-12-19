@@ -19,13 +19,12 @@
 #define ECABCONTAINER_H
 
 #include <kopano/zcdefs.h>
-#include "IECExportAddressbookChanges.h"
-#include "IECImportAddressbookChanges.h"
-
+#include <kopano/Util.h>
+#include <kopano/IECInterfaces.hpp>
 #include "ECABLogon.h"
 #include "ECABProp.h"
 
-class ECABContainer : public ECABProp {
+class ECABContainer : public ECABProp, public IABContainer {
 protected:
 	ECABContainer(void* lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName);
 	virtual ~ECABContainer();
@@ -39,7 +38,7 @@ public:
 	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	// IABContainer
-	virtual HRESULT CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry);
+	virtual HRESULT CreateEntry(ULONG eid_size, const ENTRYID *eid, ULONG flags, IMAPIProp **);
 	virtual HRESULT CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
 	virtual HRESULT DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags);
 	virtual HRESULT ResolveNames(const SPropTagArray *lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList);
@@ -47,7 +46,7 @@ public:
 	// From IMAPIContainer
 	virtual HRESULT GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable);
 	virtual HRESULT GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk);
+	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	virtual HRESULT SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags);
 	virtual HRESULT GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestriction, LPENTRYLIST *lppContainerList, ULONG *lpulSearchState);
 
@@ -56,15 +55,9 @@ public:
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 
-	class xABContainer _kc_final : public IABContainer {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IABContainer.hpp>
-		#include <kopano/xclsfrag/IMAPIContainer.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xABContainer;
-
 private:
 	IECImportAddressbookChanges *m_lpImporter = nullptr;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif

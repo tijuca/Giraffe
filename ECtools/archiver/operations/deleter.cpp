@@ -19,8 +19,6 @@
 #include "ECArchiverLogger.h"
 #include "deleter.h"
 
-using namespace std;
-
 namespace KC { namespace operations {
 
 /**
@@ -42,9 +40,9 @@ HRESULT Deleter::LeaveFolder()
 	return PurgeQueuedMessages();
 }
 
-HRESULT Deleter::DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps)
+HRESULT Deleter::DoProcessEntry(const SRow &proprow)
 {
-	auto lpEntryId = PCpropFindProp(lpProps, cProps, PR_ENTRYID);
+	auto lpEntryId = proprow.cfind(PR_ENTRYID);
 	if (lpEntryId == NULL) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
@@ -54,8 +52,7 @@ HRESULT Deleter::DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps)
 		if (hr != hrSuccess)
 			return hr;
 	}
-
-	m_lstEntryIds.push_back(lpEntryId->Value.bin);
+	m_lstEntryIds.emplace_back(lpEntryId->Value.bin);
 	return hrSuccess;
 }
 

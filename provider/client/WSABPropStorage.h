@@ -21,16 +21,19 @@
 #include <kopano/zcdefs.h>
 #include <mutex>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include "IECPropStorage.h"
 
 #include <kopano/kcodes.h>
+#include "ECABLogon.h"
+#include "WSTableView.h"
 #include "WSTransport.h"
 #include "soapKCmdProxy.h"
 
 #include <mapi.h>
 #include <mapispi.h>
 
-class WSABPropStorage _kc_final : public ECUnknown {
+class WSABPropStorage _kc_final : public ECUnknown, public IECPropStorage {
 protected:
 	WSABPropStorage(ULONG cbEntryId, LPENTRYID, KCmd *, std::recursive_mutex &, ECSESSIONID, WSTransport *);
 	virtual ~WSABPropStorage();
@@ -42,17 +45,8 @@ public:
 	
 private:
 
-	// Get a list of the properties
-	virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *ppValues);
-
 	// Get a single (large) property
 	virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
-
-	// Write all properties to disk (overwrites a property if it already exists)
-	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0);
-
-	// Delete properties from file
-	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray);
 
 	// Save complete object to disk
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
@@ -65,12 +59,6 @@ private:
 	virtual HRESULT LockSoap();
 	virtual HRESULT UnLockSoap();
 
-public:
-	class xECPropStorage _kc_final : public IECPropStorage {
-		#include <kopano/xclsfrag/IECUnknown.hpp>
-		#include <kopano/xclsfrag/IECPropStorage.hpp>
-	} m_xECPropStorage;
-
 private:
 	entryId			m_sEntryId;
 	KCmd*		lpCmd;
@@ -78,7 +66,17 @@ private:
 	ECSESSIONID		ecSessionId;
 	WSTransport*	m_lpTransport;
 	ULONG			m_ulSessionReloadCallback;
+	ALLOC_WRAP_FRIEND;
 };
 
+class WSABTableView _kc_final : public WSTableView {
+	public:
+	static HRESULT Create(ULONG ulType, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, ECABLogon *, WSTransport *, WSTableView **);
+	virtual	HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+
+	protected:
+	WSABTableView(ULONG ulType, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, ECABLogon *, WSTransport *);
+	ALLOC_WRAP_FRIEND;
+};
 
 #endif

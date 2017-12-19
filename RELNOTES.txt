@@ -1,10 +1,175 @@
-Release notes for 8.3.4
+Release notes for 8.5.0
+=======================
+Enhancements:
+* server: new "server_listen" directive replacing "server_bind" [KC-645]
+* server: stronger keep-alive [KC-888,KC-890]
+* server: further general performance improvements
+  [KC-62,KC-181,KC-889,KC-892,KC-893]
+* server: update PR_LOCAL_COMMIT_MAX on hard-deletes [KC-770]
+* server: speed up contact and search folder querying [KC-265,KC-941]
+* search: pass "limit_results" to xapian to improve performance [KC-786]
+* search: optionally index draft folders [KC-787]
+* unixplugin: support multiple non_login_shells [KC-824]
+* unixplugin: add /sbin/nologin as a non_login_shell
+  (new installs only) [KC-824]
+* gateway: RFC 6154 support [KC-857]
+* dagent: a Python version of kopano-autorespond is available [KC-861]
+* kopano-spamd: new program [KC-666]
+Changes:
+* Support for Debian 7 ended [KC-615]
+* server: remove support for upgrading databases older than ZCP 7.2 [KC-839]
+* gateway: use threaded mode for reduced memory usage on many-user systems
+  (new installs only) [KC-768]
+* spooler: the "always_send_utf8" config directive is removed [KC-901]
+* client: MAPI provider configuration moved from /etc/mapi to /usr/lib/mapi.d
+Packager notes:
+* libical 3.x support [KC-920]
+
+
+Release notes for 8.4.5
 =======================
 Fixes:
-* server: configurable shared reminders [KC-789]
+* treewide: avoid freeing ADRLIST garbage pointers [KC-927]
+* libserver: fix waiting for ntlm_auth forever [KC-916]
+* libserver: fix use after free in ECCacheManager::GetPropFromObject
+  [KC-60, KC-177, KC-355, KC-669, KC-754]
 
-Release notes for 8.3.3
-=======================
+
+Release notes for 8.4.4 (2017-11-23)
+====================================
+Fixes:
+* common: fix detection of local connections that need not use zlib compression
+* libserver: improve ECICS error reporting [KC-880]
+* inetmapi: overwrite recipients instead of appending [KC-419]
+
+
+Release notes for 8.4.3 (2017-11-07)
+====================================
+Enhancements:
+* dagent: enable automated backtraces when invoked with -f [KC-879]
+Fixes:
+* php5-ext: fix positive retval setting in error case [KC-875]
+* dagent: redirect rule led to crash [KC-868,KC-871]
+
+
+Release notes for 8.4.2 (2017-11-02)
+====================================
+* server: revert NO_UNSIGNED_SUBTRACTIONS [KC-841,KC-869]
+
+
+Release notes for 8.4.1 (2017-11-01)
+====================================
+Fixes:
+* Avoid calling srand with 1-second-granular time
+* inetmapi: handle empty/invalid Sender in RFC2822 mails [KC-263]
+* spooler: for send-later mails, check trash, not outbox [KC-848,KC-863]
+
+
+Release notes for 8.4.0 (2017-10-30)
+====================================
+Enhancements:
+* dagent, gateway: whitelist-based HTML filter [ZCP-13472]
+* New scripts/utilities: kopano-fix-ipm-subtree, kopano-localize-folders,
+  kopano-recreate-systemfolders, kopano-rules [KC-533]
+* server: drop excessive locking in ECABObjectTable/ECStoreObjectTable hot path
+* provider: speed up getIDsFromNames by reducing SQL queries
+* server: add LIMIT clauses to single-result SELECT statements [KC-5]
+* client: speedup from-scratch MAPI session creation by avoiding
+  extraneous logon-logoff cycles during provider initialization [KC-667]
+* client: add API for dump+restore of MAPI session profile data so libmapi
+  users can skip provider reinitialization at program startup [KC-67,KC-165]
+* gateway: add option to ignore commands during IDLE
+* gateway: will now warn about IMAP clients using wrong sequence ranges
+* php: copy back improvements from the Z-Push project's bundled copy [KC-463]
+* search: make searchfolder creation in shared stores configurable [KC-565]
+* mapi: disable very slow RTF compression [KC-622]
+* server: add entry cache for S3 backend [KC-702]
+* icalmapi: handle up to three email addresses in a vcard [KC-420]
+* inetmapi: add the right extension for attachments without filename [KC-624]
+* search: index embedded messages (recursively) [KC-151]
+* migration-pst: new options -S, --clean-folders option [KC-651,KC-485]
+* pyko: fall back to search-key to determine recipient email address [KC-566]
+* pyko: support processing basic cancellations [KC-612]
+* pyko: support cancellation of existing exception [KC-612]
+* icalmapi: support ADR, ORG, TITLE tags in VCF files
+* swig: lazy opening of folder objects [KC-632]
+* backup: the "backup_servers" option is back again [KC-364]
+* backup: save and restore store-level ACLs [KC-687]
+* backup: use store GUID for backup directory [KC-686]
+* backup: merge store-level metadata [KC-627]
+Fixes:
+* spooler: do not run mr-process before mr-accept [KC-498]
+* spooler: do not send deleted send-later mails [KC-848]
+* Coverity reports on absent return value checks [KC-595]
+* freebusy: avoid potential divison by zero when trying to determine the end
+  date of a non-recurring recurrence. [KC-595]
+* libserver: ensure same endianess for SOURCEKEYs [KC-628]
+* server plugins: more escaping in SQL commands [KC-620]
+* gateway: set PR_FOLLOWUP_ICON for WebApp [KC-653]
+* gateway: cure slow folder access [KC-853]
+* gateway: resolve accessing invalid pointer [KC-817]
+* server: avoid crash when NTLM subprocess gives no newline [KC-656]
+* pyko: avoid hang on shutdown of Python services with logging [KC-643]
+* server: disable reminders from shared stores [KC-728]
+* server: improved error reporting when users/groups/group members
+  are not found/not complete [KC-497]
+* backup: avoid emitting tracebacks [KC-411]
+Changes:
+* server: the underlying call for traditional-style fd monitoring was
+  changed from select(2) to poll(2) [ZCP-13065]
+* server: the sync_log_all_changes is obsolete [KC-527]
+* server: use SQL autocommit=0 during transactions
+* server: stop relying on NO_UNSIGNED_SUBTRACTIONS
+  and avoid use of hexadecimal numbers [KC-841]
+* server: avoid UB during hostname lookup when host is IPv6-only
+* gateway: ignore missing (lost) attachments [KC-363]
+* dagent: turn on PHP7 SCL on RHEL6 [KC-621]
+* pyko/backup: change error into warning for 'missing' attachments
+  [KC-545, KC-555, KC-575]
+* server: hide private messages' reminders from shared stores [KC-565]
+* server: drop ZCP client update support [KC-644]
+Packager notes:
+* libicu changed from optional to required build dependency
+* kopano-server S3 store required libs3 4.1 [KC-751]
+* python/swig is now optional [KC-753]
+
+
+Release notes for 8.3.5 (unreleased/state of 2017-10-31)
+========================================================
+Fixes:
+* server: complete signal blocking [KC-779]
+* ical: avoid freeing garbage pointers [KC-803]
+* caldav: fix unbounded copy/iteration past end [KC-792]
+* migration-pst: skip archiver properties [KC-812]
+* icalmapi: cure a NULL dereference when generating VCFs
+* inetmapi: cure a NULL dereference when parsing MDNs [KC-814]
+* inetmapi: support embedded messages once again [KC-540, KC-775]
+* inetmapi: stop generating <"@"@hostname> [KC-689, KC-772]
+* server: admin user is to always open shared reminders [KC-813]
+* gateway: fix infinite loop when UID ranges are inverted [KS-38641]
+* extra nullptr checks in Util::HrCopyProperty [KC-826]
+* server: removing user from folder permission broke [KC-844]
+* ldapplugin: fix out-of-bounds reads in SMD5 and SSHA password check
+* ldapplugin: avoid triggering crash in DES_fcrypt
+* ldapplugin: fix truncated SMD5 hash comparison
+* ldapplugin: fix out-of-bounds in b64_encode
+
+
+Release notes for 8.3.4 (2017-09-01)
+====================================
+Fixes:
+* server: configurable shared reminders [KC-789]
+* migration-pst: create unknown named-properties [KC-788]
+* server: filter private shared messages from search,
+  and filter private shared notifications [KC-565]
+* dagent: check quota on delivery
+* m4lcommon: ensure right condition for SRowSetPtr::empty [KC-773]
+Changes:
+* server: rename disable_shared_reminders option [KC-565]
+
+
+Release notes for 8.3.3 (2017-08-09)
+====================================
 Fixes:
 * gateway: fix another IMAP protocol error [KC-720]
 * server: fix depth level count for attachments [KC-745]

@@ -16,12 +16,16 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
 #include <mutex>
+#include <string>
 #include "ECThreadManager.h"
 
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <poll.h>
+#include <unistd.h>
 #include <kopano/lockhelper.hpp>
 #include <kopano/stringutil.h>
 
@@ -39,6 +43,8 @@
 #define RETURN_CASE(x) \
 	case x: \
 		return #x;
+
+using std::string;
 
 static string GetSoapError(int err)
 {
@@ -94,15 +100,6 @@ static string GetSoapError(int err)
 	return stringify(err);
 }
 
-static void kcsrv_blocksigs(void)
-{
-	sigset_t m;
-	sigemptyset(&m);
-	sigaddset(&m, SIGINT);
-	sigaddset(&m, SIGHUP);
-	sigaddset(&m, SIGTERM);
-}
-
 ECWorkerThread::ECWorkerThread(ECThreadManager *lpManager,
     ECDispatcher *lpDispatcher, bool bDoNotStart)
 {
@@ -125,7 +122,7 @@ ECPriorityWorkerThread::ECPriorityWorkerThread(ECThreadManager *lpManager,
     ECDispatcher *lpDispatcher) :
 	ECWorkerThread(lpManager, lpDispatcher, true)
 {
-    if (pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0)
+	if (pthread_create(&m_thread, NULL, ECWorkerThread::Work, static_cast<ECWorkerThread *>(this)) != 0)
 		ec_log_crit("Unable to start thread: %s", strerror(errno));
     else
 	set_thread_name(m_thread, "ECPriorityWorkerThread");
@@ -140,17 +137,17 @@ ECPriorityWorkerThread::~ECPriorityWorkerThread()
 void *ECWorkerThread::Work(void *lpParam)
 {
 	kcsrv_blocksigs();
-    ECWorkerThread *lpThis = (ECWorkerThread *)lpParam;
-	ECPriorityWorkerThread *lpPrio = dynamic_cast<ECPriorityWorkerThread*>(lpThis);
+	auto lpThis = static_cast<ECWorkerThread *>(lpParam);
+	auto lpPrio = dynamic_cast<ECPriorityWorkerThread *>(lpThis);
     WORKITEM *lpWorkItem = NULL;
     ECRESULT er = erSuccess;
     bool fStop = false;
 	int err = 0;
+	pthread_t thrself = pthread_self();
 
-	ec_log_debug("Started%sthread %08x", lpPrio ? " priority " : " ", (ULONG)pthread_self());
-    
+	ec_log_debug("Started%sthread %lu", lpPrio ? " priority " : " ", kc_threadid());
     while(1) {
-		set_thread_name(pthread_self(), "z-s: idle thread");
+		set_thread_name(thrself, "z-s: idle thread");
 
         // Get the next work item, don't wait for new items
         if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false, lpPrio != NULL) != erSuccess) {
@@ -159,7 +156,7 @@ void *ECWorkerThread::Work(void *lpParam)
             
             // We were requested to exit due to idle state
             if(fStop) {
-				ec_log_debug("Thread %08x idle and requested to exit", (ULONG)pthread_self());
+				ec_log_debug("Thread %lu idle and requested to exit", kc_threadid());
                 break;
             }
                 
@@ -170,7 +167,7 @@ void *ECWorkerThread::Work(void *lpParam)
                 continue;
         }
 
-		set_thread_name(pthread_self(), format("z-s: %s", lpWorkItem->soap->host).c_str());
+		set_thread_name(thrself, format("z-s: %s", lpWorkItem->soap->host).c_str());
 
 		// For SSL connections, we first must do the handshake and pass it back to the queue
 		if (lpWorkItem->soap->ctx && !lpWorkItem->soap->ssl) {
@@ -183,17 +180,16 @@ void *ECWorkerThread::Work(void *lpParam)
 			err = 0;
 
 			// Record start of handling of this request
-			double dblStart = GetTimeOfDay(), dblEnd = 0;
-			
+			auto dblStart = std::chrono::steady_clock::now();
 			// Reset last session ID so we can use it reliably after the call is done
-            ((SOAPINFO *)lpWorkItem->soap->user)->ulLastSessionId = 0;
+			auto info = soap_info(lpWorkItem->soap);
+			info->ulLastSessionId = 0;
             // Pass information on start time of the request into soap->user, so that it can be applied to the correct
             // session after XML parsing
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &((SOAPINFO *)lpWorkItem->soap->user)->threadstart);
-            ((SOAPINFO *)lpWorkItem->soap->user)->start = GetTimeOfDay();
-            ((SOAPINFO *)lpWorkItem->soap->user)->szFname = NULL;
-
-			((SOAPINFO *)lpWorkItem->soap->user)->fdone = NULL;
+			clock_gettime(CLOCK_THREAD_CPUTIME_ID, &info->threadstart);
+			info->start = decltype(dblStart)::clock::now();
+			info->szFname = nullptr;
+			info->fdone = NULL;
 
             // Do processing of work item
             soap_begin(lpWorkItem->soap);
@@ -238,20 +234,19 @@ void *ECWorkerThread::Work(void *lpParam)
             }
 
 done:	
-			if(((SOAPINFO *)lpWorkItem->soap->user)->fdone)
-				((SOAPINFO *)lpWorkItem->soap->user)->fdone(lpWorkItem->soap, ((SOAPINFO *)lpWorkItem->soap->user)->fdoneparam);
+			if (info->fdone != nullptr)
+				info->fdone(lpWorkItem->soap, info->fdoneparam);
 
-            dblEnd = GetTimeOfDay();
+			auto dblEnd = decltype(dblStart)::clock::now();
 
             // Tell the session we're done processing the request for this session. This will also tell the session that this
             // thread is done processing the item, so any time spent in this thread until now can be accounted in that session.
-            g_lpSessionManager->RemoveBusyState(((SOAPINFO *)lpWorkItem->soap->user)->ulLastSessionId, pthread_self());
+			g_lpSessionManager->RemoveBusyState(info->ulLastSessionId, thrself);
             
 		// Track cpu usage server-wide
 		g_lpStatsCollector->Increment(SCN_SOAP_REQUESTS);
-		g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, int64_t((dblEnd - dblStart) * 1000));
-		g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, int64_t((dblEnd - lpWorkItem->dblReceiveStamp) * 1000));
-
+			g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, std::chrono::duration_cast<std::chrono::milliseconds>(dblEnd - dblStart).count());
+			g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, std::chrono::duration_cast<std::chrono::milliseconds>(dblEnd - lpWorkItem->dblReceiveStamp).count());
         }
 
 	// Clear memory used by soap calls. Note that this does not actually
@@ -265,7 +260,9 @@ done:
     }
 
 	/** free ssl error data **/
-	ERR_remove_state(0);
+	#if OPENSSL_VERSION_NUMBER < 0x10100000L
+		ERR_remove_state(0);
+	#endif
 
     // We're detached, so we should clean up ourselves
 	if (lpPrio == NULL)
@@ -282,7 +279,7 @@ ECThreadManager::ECThreadManager(ECDispatcher *lpDispatcher,
     // Start our worker threads
 	m_lpPrioWorker = new ECPriorityWorkerThread(this, lpDispatcher);
 	for (unsigned int i = 0; i < ulThreads; ++i)
-		m_lstThreads.push_back(new ECWorkerThread(this, lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, lpDispatcher));
 }
 
 ECThreadManager::~ECThreadManager()
@@ -308,7 +305,7 @@ ECRESULT ECThreadManager::ForceAddThread(int nThreads)
 {
 	scoped_lock l_thr(m_mutexThreads);
 	for (int i = 0; i < nThreads; ++i)
-		m_lstThreads.push_back(new ECWorkerThread(this, m_lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, m_lpDispatcher));
 	return erSuccess;
 }
 
@@ -330,7 +327,7 @@ ECRESULT ECThreadManager::SetThreadCount(unsigned int ulThreads)
     m_ulThreads = ulThreads;
 
     while(ulThreads > m_lstThreads.size())
-		m_lstThreads.push_back(new ECWorkerThread(this, m_lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, m_lpDispatcher));
     // If we are OVER the number of threads, then the code in NotifyIdle() will bring this down
     return erSuccess;
 }
@@ -390,7 +387,7 @@ ECWatchDog::~ECWatchDog()
 
 void *ECWatchDog::Watch(void *lpParam)
 {
-    ECWatchDog *lpThis = (ECWatchDog *)lpParam;
+	auto lpThis = static_cast<ECWatchDog *>(lpParam);
     double dblAge;
 	kcsrv_blocksigs();
     
@@ -424,7 +421,6 @@ ECDispatcher::ECDispatcher(ECConfig *lpConfig,
 	m_lpConfig = lpConfig;
 
 	// Default socket settings
-	m_nMaxKeepAlive = atoi(m_lpConfig->GetSetting("server_max_keep_alive_requests"));
 	m_nRecvTimeout = atoi(m_lpConfig->GetSetting("server_recv_timeout"));
 	m_nReadTimeout = atoi(m_lpConfig->GetSetting("server_read_timeout"));
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
@@ -444,17 +440,15 @@ ECRESULT ECDispatcher::GetThreadCount(unsigned int *lpulThreads, unsigned int *l
 // Get the age (in seconds) of the next-in-line item in the queue, or 0 if the queue is empty
 ECRESULT ECDispatcher::GetFrontItemAge(double *lpdblAge)
 {
-    double dblNow = GetTimeOfDay();
-    double dblAge = 0;
+	auto now = std::chrono::steady_clock::now();
     
 	scoped_lock lock(m_mutexItems);
     if(m_queueItems.empty() && m_queuePrioItems.empty())
-        dblAge = 0;
+		*lpdblAge = 0;
     else if (m_queueItems.empty()) // normal items queue is more important when checking queue age
-        dblAge = dblNow - m_queuePrioItems.front()->dblReceiveStamp;
+		*lpdblAge = dur2dbl(now - m_queuePrioItems.front()->dblReceiveStamp);
 	else
-        dblAge = dblNow - m_queueItems.front()->dblReceiveStamp;
-    *lpdblAge = dblAge;
+		*lpdblAge = dur2dbl(now - m_queueItems.front()->dblReceiveStamp);
     return erSuccess;
 }
 
@@ -469,22 +463,19 @@ ECRESULT ECDispatcher::GetQueueLength(unsigned int *lpulLength)
 
 ECRESULT ECDispatcher::AddListenSocket(struct soap *soap)
 {
-	soap->max_keep_alive = m_nMaxKeepAlive;
 	soap->recv_timeout = m_nReadTimeout; // Use m_nReadTimeout, the value for timeouts during XML reads
 	soap->send_timeout = m_nSendTimeout;
-
-    m_setListenSockets.insert(std::make_pair(soap->socket, soap));
-    
+	m_setListenSockets.emplace(soap->socket, soap);
     return erSuccess;
 }
 
 ECRESULT ECDispatcher::QueueItem(struct soap *soap)
 {
-	WORKITEM *item = new WORKITEM;
+	auto item = new WORKITEM;
 	CONNECTION_TYPE ulType;
 
 	item->soap = soap;
-	item->dblReceiveStamp = GetTimeOfDay();
+	item->dblReceiveStamp = std::chrono::steady_clock::now();
 	ulType = SOAP_CONNECTION_TYPE(soap);
 
 	scoped_lock lock(m_mutexItems);
@@ -526,15 +517,11 @@ ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait, bool bPri
 		return KCERR_NOT_FOUND;
     } else {
         // No item waiting
-		ulock_normal l_idle(m_mutexIdle);
 		++m_ulIdle;
-		l_idle.unlock();
 
 		/* If requested, wait until item is available */
 		condItems.wait(l_item);
-		l_idle.lock();
 		--m_ulIdle;
-		l_idle.unlock();
 
         if (queue->empty() || m_bExit)
             // Condition fired, but still nothing there. Probably exit requested or wrong queue signal
@@ -555,31 +542,25 @@ ECRESULT ECDispatcher::NotifyDone(struct soap *soap)
     if(m_bExit) {	
 		kopano_end_soap_connection(soap);
         soap_free(soap);
-    } else {
-		--soap->max_keep_alive;
-		if (soap->max_keep_alive == 0)
-			soap->keep_alive = 0;
-        if(soap->socket != SOAP_INVALID_SOCKET) {
-			SOAP_SOCKET	socket;
-			socket = soap->socket;
-            ACTIVESOCKET sActive;
-            
-            sActive.soap = soap;
-            time(&sActive.ulLastActivity);
-            
-			ulock_normal l_sock(m_mutexSockets);
-			m_setSockets.insert(std::make_pair(soap->socket, sActive));
-			l_sock.unlock();
-            // Notify select restart, send socket number which is done
-			NotifyRestart(socket);
-        } else {
-            // SOAP has closed the socket, no need to requeue
-			kopano_end_soap_connection(soap);
-            soap_free(soap);
-        }
-    }
-    
-    return erSuccess;
+		return erSuccess;
+	}
+	if (soap->socket == SOAP_INVALID_SOCKET) {
+		// SOAP has closed the socket, no need to requeue
+		kopano_end_soap_connection(soap);
+		soap_free(soap);
+		return erSuccess;
+	}
+
+	SOAP_SOCKET socket = soap->socket;
+	ACTIVESOCKET sActive;
+	sActive.soap = soap;
+	time(&sActive.ulLastActivity);
+	ulock_normal l_sock(m_mutexSockets);
+	m_setSockets.emplace(soap->socket, sActive);
+	l_sock.unlock();
+	// Notify select restart, send socket number which is done
+	NotifyRestart(socket);
+	return erSuccess;
 }
 
 // Set the nominal thread count
@@ -602,7 +583,6 @@ ECRESULT ECDispatcher::SetThreadCount(unsigned int ulThreads)
 
 ECRESULT ECDispatcher::DoHUP()
 {
-	m_nMaxKeepAlive = atoi(m_lpConfig->GetSetting("server_max_keep_alive_requests"));
 	m_nRecvTimeout = atoi(m_lpConfig->GetSetting("server_recv_timeout"));
 	m_nReadTimeout = atoi(m_lpConfig->GetSetting("server_read_timeout"));
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
@@ -614,23 +594,23 @@ ECRESULT ECDispatcher::DoHUP()
 	for (auto const &p : m_setListenSockets) {
 		auto ulType = SOAP_CONNECTION_TYPE(p.second);
 
-		if (ulType == CONNECTION_TYPE_SSL) {
-			if (soap_ssl_server_context(p.second, SOAP_SSL_DEFAULT,
-						   m_lpConfig->GetSetting("server_ssl_key_file"),
-						   m_lpConfig->GetSetting("server_ssl_key_pass","",NULL),
-						   m_lpConfig->GetSetting("server_ssl_ca_file","",NULL),
-						   m_lpConfig->GetSetting("server_ssl_ca_path","",NULL),
-						   NULL, NULL, "EC")) {
-				ec_log_crit("K-3904: Unable to setup ssl context: %s", *soap_faultdetail(p.second));
-				return KCERR_CALL_FAILED;
-			}
-
-			char *server_ssl_protocols = strdup(m_lpConfig->GetSetting("server_ssl_protocols"));
-			er = kc_ssl_options(p.second, server_ssl_protocols,
-				m_lpConfig->GetSetting("server_ssl_ciphers"),
-				m_lpConfig->GetSetting("server_ssl_prefer_server_ciphers"));
-			free(server_ssl_protocols);
+		if (ulType != CONNECTION_TYPE_SSL)
+			continue;
+		if (soap_ssl_server_context(p.second, SOAP_SSL_DEFAULT,
+		    m_lpConfig->GetSetting("server_ssl_key_file"),
+		    m_lpConfig->GetSetting("server_ssl_key_pass", "", NULL),
+		    m_lpConfig->GetSetting("server_ssl_ca_file", "", NULL),
+		    m_lpConfig->GetSetting("server_ssl_ca_path", "", NULL),
+		    NULL, NULL, "EC")) {
+			ec_log_crit("K-3904: Unable to setup ssl context: %s", *soap_faultdetail(p.second));
+			return KCERR_CALL_FAILED;
 		}
+
+		char *server_ssl_protocols = strdup(m_lpConfig->GetSetting("server_ssl_protocols"));
+		er = kc_ssl_options(p.second, server_ssl_protocols,
+			m_lpConfig->GetSetting("server_ssl_ciphers"),
+			m_lpConfig->GetSetting("server_ssl_prefer_server_ciphers"));
+		free(server_ssl_protocols);
 	}
 	return erSuccess;
 }
@@ -658,12 +638,22 @@ ECRESULT ECDispatcherSelect::MainLoop()
 {
 	ECRESULT er = erSuccess;
 	ECWatchDog *lpWatchDog = NULL;
-    int maxfds = 0;
+	int maxfds = getdtablesize();
+	if (maxfds < 0)
+		throw std::runtime_error("getrlimit failed");
     char s = 0;
     time_t now;
-    struct timeval tv;
 	CONNECTION_TYPE ulType;
-	int n = 0;
+	std::unique_ptr<struct pollfd[]> pollfd(new struct pollfd[maxfds]);
+
+	for (size_t n = 0; n < maxfds; ++n) {
+		/*
+		 * Use an identity mapping, quite like fd_set, but without the
+		 * limits of FD_SETSIZE.
+		 */
+		pollfd[n].fd = n;
+		pollfd[n].events = 0;
+	}
 
     // This will start the threads
 	m_lpThreadManager = new ECThreadManager(this, atoui(m_lpConfig->GetSetting("threads")));
@@ -673,18 +663,17 @@ ECRESULT ECDispatcherSelect::MainLoop()
 
     // Main loop
     while(!m_bExit) {
+		int nfds = 0, pfd_begin_sock, pfd_begin_listen;
         time(&now);
         
-        fd_set readfds;
-        
-        FD_ZERO(&readfds);
-        
         // Listen on rescan trigger
-        FD_SET(m_fdRescanRead, &readfds);
-        maxfds = m_fdRescanRead;
+		pollfd[0].fd = m_fdRescanRead;
+		pollfd[0].events = POLLIN | POLLRDHUP;
+		++nfds;
 
         // Listen on active sockets
 		ulock_normal l_sock(m_mutexSockets);
+		pfd_begin_sock = nfds;
 		for (const auto &p : m_setSockets) {
 			ulType = SOAP_CONNECTION_TYPE(p.second.soap);
 			if (ulType != CONNECTION_TYPE_NAMED_PIPE &&
@@ -693,25 +682,24 @@ ECRESULT ECDispatcherSelect::MainLoop()
 				// Socket has been inactive for more than server_recv_timeout seconds, close the socket
 				shutdown(p.second.soap->socket, SHUT_RDWR);
             
-			FD_SET(p.second.soap->socket, &readfds);
-			maxfds = max(maxfds, p.second.soap->socket);
+			pollfd[nfds].fd = p.second.soap->socket;
+			pollfd[nfds++].events = POLLIN | POLLRDHUP;
         }
         // Listen on listener sockets
+		pfd_begin_listen = nfds;
 		for (const auto &p : m_setListenSockets) {
-			FD_SET(p.second->socket, &readfds);
-			maxfds = max(maxfds, p.second->socket);
+			pollfd[nfds].fd = p.second->socket;
+			pollfd[nfds++].events = POLLIN | POLLRDHUP;
         }
 		l_sock.unlock();
         		
         // Wait for at most 1 second, so that we can close inactive sockets
-        tv.tv_sec = 1;
-        tv.tv_usec = 0;
-        
         // Wait for activity
-        if(( n = select(maxfds+1, &readfds, NULL, NULL, &tv)) < 0)
+		auto n = poll(pollfd.get(), nfds, 1 * 1000);
+		if (n < 0)
             continue; // signal caught, restart
 
-        if(FD_ISSET(m_fdRescanRead, &readfds)) {
+		if (pollfd[0].revents & (POLLIN | POLLRDHUP)) {
             char s[128];
             // A socket rescan has been triggered, we don't need to do anything, just read the data, discard it
             // and restart the select call
@@ -721,36 +709,53 @@ ECRESULT ECDispatcherSelect::MainLoop()
         // Search for activity on active sockets
 		l_sock.lock();
 	auto iterSockets = m_setSockets.cbegin();
-	while (n != 0 && iterSockets != m_setSockets.cend()) {
-		if (!FD_ISSET(iterSockets->second.soap->socket, &readfds)) {
-			++iterSockets;
-			continue;
-		}
+		for (size_t i = pfd_begin_sock; i < pfd_begin_listen; ++i) {
+			if (!(pollfd[i].revents & (POLLIN | POLLRDHUP)))
+				continue;
+			/*
+			 * Forward to the data structure belonging to the pollfd.
+			 * (The order of pollfd and m_setSockets is the same,
+			 * so the element has to be there.)
+			 */
+			while (iterSockets != m_setSockets.cend() && iterSockets->second.soap->socket != pollfd[i].fd)
+				++iterSockets;
+			if (iterSockets == m_setSockets.cend()) {
+				ec_log_err("K-1577: socket lost");
+				/* something is very off - try again at next iteration */
+				break;
+			}
+
 		// Activity on a TCP/pipe socket
 		// First, check for EOF
-		if (recv(iterSockets->second.soap->socket, &s, 1, MSG_PEEK) == 0) {
+			if (recv(pollfd[i].fd, &s, 1, MSG_PEEK) == 0) {
 			// EOF occurred, just close the socket and remove it from the socket list
 			kopano_end_soap_connection(iterSockets->second.soap);
 			soap_free(iterSockets->second.soap);
-			m_setSockets.erase(iterSockets++);
-		} else {
+				iterSockets = m_setSockets.erase(iterSockets);
+				continue;
+			}
 			// Actual data waiting, push it on the processing queue
 			QueueItem(iterSockets->second.soap);
 			
 			// Remove socket from listen list for now, since we're already handling data there and don't
 			// want to interfere with the thread that is now handling that socket. It will be passed back
 			// to us when the request is done.
-			m_setSockets.erase(iterSockets++);
+			iterSockets = m_setSockets.erase(iterSockets);
 		}
-		// N holds the number of descriptors set in readfds, so decrease by one since we handled that one.
-		--n;
-	}
 		l_sock.unlock();
 
         // Search for activity on listen sockets
-		for (const auto &p : m_setListenSockets) {
-			if (!FD_ISSET(p.second->socket, &readfds))
+		auto sockiter = m_setListenSockets.cbegin();
+		for (size_t i = pfd_begin_listen; i < nfds; ++i) {
+			if (!(pollfd[i].revents & (POLLIN | POLLRDHUP)))
 				continue;
+			while (sockiter != m_setListenSockets.cend() && sockiter->second->socket != pollfd[i].fd)
+				++sockiter;
+			if (sockiter == m_setListenSockets.cend()) {
+				ec_log_err("K-1578: socket lost");
+				break;
+			}
+			const auto &p = *sockiter;
 			ACTIVESOCKET sActive;
 			auto newsoap = soap_copy(p.second);
 			if (newsoap == NULL) {
@@ -763,36 +768,36 @@ ECRESULT ECDispatcherSelect::MainLoop()
 			ulType = SOAP_CONNECTION_TYPE(p.second);
 			if (ulType == CONNECTION_TYPE_NAMED_PIPE ||
 			    ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
-				int socket = accept(newsoap->master, NULL, 0);
-				newsoap->socket = socket;
+				socklen_t socklen = sizeof(newsoap->peer.storage);
+				newsoap->socket = accept(newsoap->master, &newsoap->peer.addr, &socklen);
+				newsoap->peerlen = socklen;
+				if (newsoap->socket == SOAP_INVALID_SOCKET ||
+				    socklen > sizeof(newsoap->peer.storage)) {
+					newsoap->peerlen = 0;
+					memset(&newsoap->peer, 0, sizeof(newsoap->peer));
+				}
+				/* Do like gsoap's soap_accept would */
+				newsoap->keep_alive = -(((newsoap->imode | newsoap->omode) & SOAP_IO_KEEPALIVE) != 0);
 			} else {
 				soap_accept(newsoap);
 			}
 			if (newsoap->socket == SOAP_INVALID_SOCKET) {
 				if (ulType == CONNECTION_TYPE_NAMED_PIPE)
-					ec_log_debug("Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
+					ec_log_debug("Error accepting incoming connection from file://%s: %s", m_lpConfig->GetSetting("server_pipe_name"), strerror(newsoap->errnum));
 				else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
-					ec_log_debug("Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
+					ec_log_debug("Error accepting incoming connection from file://%s: %s", m_lpConfig->GetSetting("server_pipe_priority"), strerror(newsoap->errnum));
 				else
-					ec_log_debug("Error accepting incoming connection from network.");
+					ec_log_debug("Error accepting incoming connection from network: %s", *soap_faultstring(newsoap));
 				kopano_end_soap_connection(newsoap);
 				soap_free(newsoap);
 				continue;
 			}
-			if (ulType == CONNECTION_TYPE_NAMED_PIPE)
-				ec_log_debug("Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
-			else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
-				ec_log_debug("Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
-			else
-				ec_log_debug("Accepted incoming%sconnection from %s",
-					ulType == CONNECTION_TYPE_SSL ? " SSL ":" ",
-					newsoap->host);
 			newsoap->socket = ec_relocate_fd(newsoap->socket);
 			g_lpStatsCollector->Max(SCN_MAX_SOCKET_NUMBER, (LONGLONG)newsoap->socket);
 			g_lpStatsCollector->Increment(SCN_SERVER_CONNECTIONS);
 			sActive.soap = newsoap;
 			l_sock.lock();
-			m_setSockets.insert(std::make_pair(sActive.soap->socket, sActive));
+			m_setSockets.emplace(sActive.soap->socket, sActive);
 			l_sock.unlock();
 		}
 	}
@@ -857,12 +862,17 @@ ECDispatcherEPoll::ECDispatcherEPoll(ECConfig *lpConfig,
 	ECDispatcher(lpConfig, lpCallback, lpCallbackParam)
 {
 	m_fdMax = getdtablesize();
+	if (m_fdMax < 0)
+		throw std::runtime_error("getrlimit failed");
 	m_epFD = epoll_create(m_fdMax);
+	if (m_epFD < 0)
+		throw std::runtime_error("epoll_create failed");
 }
 
 ECDispatcherEPoll::~ECDispatcherEPoll()
 {
-	close(m_epFD);
+	if (m_epFD >= 0)
+		close(m_epFD);
 }
 
 ECRESULT ECDispatcherEPoll::MainLoop()
@@ -936,10 +946,13 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 				time(&sActive.ulLastActivity);
 
 				ulType = SOAP_CONNECTION_TYPE(iterListenSockets->second);
-				if (ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+				if (ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
 					newsoap->socket = accept(newsoap->master, NULL, 0);
-				else
+					/* Do like gsoap's soap_accept would */
+					newsoap->keep_alive = -(((newsoap->imode | newsoap->omode) & SOAP_IO_KEEPALIVE) != 0);
+				} else {
 					soap_accept(newsoap);
+				}
 
 				if(newsoap->socket == SOAP_INVALID_SOCKET) {
 					if (ulType == CONNECTION_TYPE_NAMED_PIPE)
@@ -966,8 +979,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 
 					// directly make worker thread active
                     sActive.soap = newsoap;
-                    m_setSockets.insert(std::make_pair(sActive.soap->socket, sActive));
-
+					m_setSockets.emplace(sActive.soap->socket, sActive);
 					NotifyRestart(newsoap->socket);
 				}
 

@@ -10,11 +10,15 @@ EXTRA_DIST = setup.py		\
 	kopano/daemon/version/version_info.py
 
 install-exec-local:
-	cd ${srcdir} && ${PYTHON} setup.py \
+	rm -Rf staging
+	${MKDIR_P} staging
+	cp -a ${srcdir}/setup.py ${srcdir}/kopano staging/
+	cp -a kopano/version.py staging/kopano/
+	cd staging/ && ${PYTHON} setup.py \
 		build --build-base="${abs_builddir}/build" \
 		install -f $${DESTDIR+--root=${DESTDIR}} \
 		--prefix="${prefix}" --install-purelib ${pythondir}
-	rm -Rf build
+	rm -Rf build staging
 
 uninstall-local:
 	rm -Rf ${DESTDIR}${pythondir}/kopano \

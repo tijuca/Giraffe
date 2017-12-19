@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <map>
+#include <new>
+#include <string>
 #include "ECConfigImpl.h"
 #include <kopano/charset/convert.h>
 
@@ -27,10 +30,15 @@ ECConfig *ECConfig::Create(const configsetting_t *lpDefaults,
 	return new ECConfigImpl(lpDefaults, lpszDirectives);
 }
 
+ECConfig *ECConfig::Create(const std::nothrow_t &,
+    const configsetting_t *dfl, const char *const *direc)
+{
+	return new(std::nothrow) ECConfigImpl(dfl, direc);
+}
+
 bool ECConfig::LoadSettings(const wchar_t *szFilename)
 {
-	convert_context converter;
-	return LoadSettings(converter.convert_to<char*>(szFilename));
+	return LoadSettings(convert_context().convert_to<char *>(szFilename));
 }
 
 /**
@@ -52,22 +60,19 @@ bool ECConfig::LoadSettings(const wchar_t *szFilename)
  */
 const char* ECConfig::GetDefaultPath(const char* lpszBasename)
 {
-	typedef map<string, string> stringmap_t;
-
 	// @todo: Check how this behaves with dlopen,dlclose,dlopen,etc...
 	// We use a static map here to store the strings we're going to return.
 	// This could have been a global, but this way everything is kept together.
-	static stringmap_t s_mapPaths;
+	static std::map<std::string, std::string> s_mapPaths;
 
 	if (!lpszBasename)
 		lpszBasename = "";
-
-	auto result = s_mapPaths.insert(stringmap_t::value_type(lpszBasename, string()));
+	auto result = s_mapPaths.emplace(lpszBasename, "");
 	if (result.second == true) {		// New item added, so create the actual path
 		const char *lpszDirname = getenv("KOPANO_CONFIG_PATH");
 		if (!lpszDirname || lpszDirname[0] == '\0')
 			lpszDirname = "/etc/kopano";
-		result.first->second = string(lpszDirname) + "/" + lpszBasename;
+		result.first->second = std::string(lpszDirname) + "/" + lpszBasename;
 	}
 	return result.first->second.c_str();
 }

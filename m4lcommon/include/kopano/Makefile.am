@@ -2,10 +2,8 @@
 
 nobase_pkginclude_HEADERS = \
 	CommonUtil.h \
-	ECDefs.h ECInterfaceDefs.h ECMemTable.h \
-	ECRestriction.h ECTags.h EMSAbTag.h \
-	IECLicense.h IECServiceAdmin.h IECSecurity.h \
-	IECSingleInstance.h \
-	IECUnknown.h RecurrenceState.h \
+	ECDefs.h ECFeatures.hpp ECInterfaceDefs.h ECMemTable.h \
+	ECRestriction.h ECTags.h EMSAbTag.h IECInterfaces.hpp \
+	RecurrenceState.h \
 	Util.h mapiext.h mapiguidext.h mapi_ptr.h namedprops.h \
 	userutil.h

@@ -23,9 +23,11 @@
 #define ECSESSION
 
 #include <kopano/zcdefs.h>
+#include <atomic>
 #include <condition_variable>
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <pthread.h>
 
@@ -61,7 +63,7 @@ enum { SESSION_STATE_PROCESSING, SESSION_STATE_SENDING };
 struct BUSYSTATE {
     const char *fname;
     struct timespec threadstart;
-    double start;
+	KC::time_point start;
     pthread_t threadid;
     int state;
 };
@@ -72,15 +74,15 @@ struct BUSYSTATE {
 class _kc_export BTSession {
 public:
 	_kc_hidden BTSession(const char *addr, ECSESSIONID, ECDatabaseFactory *, ECSessionManager *, unsigned int caps);
-	_kc_hidden virtual ~BTSession(void) _kc_impdtor;
+	_kc_hidden virtual ~BTSession(void) = default;
 	_kc_hidden virtual ECRESULT Shutdown(unsigned int timeout);
 	_kc_hidden virtual ECRESULT ValidateOriginator(struct soap *);
-	_kc_hidden virtual ECSESSIONID GetSessionId(void) const { return m_sessionID; }
-	_kc_hidden virtual time_t GetSessionTime(void) const { return m_sessionTime + m_ulSessionTimeout; }
+	_kc_hidden virtual ECSESSIONID GetSessionId(void) const _kc_final { return m_sessionID; }
+	_kc_hidden virtual time_t GetSessionTime(void) const _kc_final { return m_sessionTime + m_ulSessionTimeout; }
 	_kc_hidden virtual void UpdateSessionTime(void);
-	_kc_hidden virtual unsigned int GetCapabilities(void) const { return m_ulClientCapabilities; }
-	_kc_hidden virtual ECSessionManager *GetSessionManager(void) const { return m_lpSessionManager; }
-	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const { return m_lpUserManagement; }
+	_kc_hidden virtual unsigned int GetCapabilities(void) const _kc_final { return m_ulClientCapabilities; }
+	_kc_hidden virtual ECSessionManager *GetSessionManager(void) const _kc_final { return m_lpSessionManager; }
+	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const = 0;
 	virtual ECRESULT GetDatabase(ECDatabase **);
 	_kc_hidden virtual ECRESULT GetAdditionalDatabase(ECDatabase **);
 	_kc_hidden ECRESULT GetServerGUID(GUID *);
@@ -90,7 +92,7 @@ public:
 	_kc_hidden virtual void GetClientApplicationMisc(std::string *);
 	virtual void Lock(void);
 	virtual void Unlock(void);
-	_kc_hidden virtual bool IsLocked(void) const { return m_ulRefCount > 0; }
+	_kc_hidden virtual bool IsLocked(void) const _kc_final { return m_ulRefCount > 0; }
 	_kc_hidden virtual void RecordRequest(struct soap *);
 	_kc_hidden virtual unsigned int GetRequests(void);
 	_kc_hidden virtual void GetClientPort(unsigned int *);
@@ -105,8 +107,7 @@ public:
 	    METHOD_NONE, METHOD_USERPASSWORD, METHOD_SOCKET, METHOD_SSO, METHOD_SSL_CERT
 	};
 protected:
-	unsigned int		m_ulRefCount;
-
+	std::atomic<unsigned int> m_ulRefCount{0};
 	std::string		m_strSourceAddr;
 	ECSESSIONID		m_sessionID;
 	bool			m_bCheckIP;
@@ -116,8 +117,6 @@ protected:
 
 	ECDatabaseFactory	*m_lpDatabaseFactory;
 	ECSessionManager	*m_lpSessionManager;
-	ECUserManagement	*m_lpUserManagement;
-
 	unsigned int		m_ulClientCapabilities;
 
 	/*
@@ -142,10 +141,11 @@ protected:
 class _kc_export_dycast ECSession _kc_final : public BTSession {
 public:
 	_kc_hidden ECSession(const char *addr, ECSESSIONID, ECSESSIONGROUPID, ECDatabaseFactory *, ECSessionManager *, unsigned int caps, AUTHMETHOD, int pid, const std::string &cl_vers, const std::string &cl_app, const std::string &cl_app_ver, const std::string &cl_app_misc);
-	_kc_hidden virtual ECSESSIONGROUPID GetSessionGroupId(void) const { return m_ecSessionGroupId; }
-	_kc_hidden virtual int GetConnectingPid(void) const { return m_ulConnectingPid; }
+	_kc_hidden virtual ECSESSIONGROUPID GetSessionGroupId(void) const _kc_final { return m_ecSessionGroupId; }
+	_kc_hidden virtual int GetConnectingPid(void) const _kc_final { return m_ulConnectingPid; }
 	_kc_hidden virtual ~ECSession(void);
 	_kc_hidden virtual ECRESULT Shutdown(unsigned int timeout);
+	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const override final { return m_lpUserManagement.get(); }
 
 	/* Notification functions all wrap directly to SessionGroup */
 	_kc_hidden ECRESULT AddAdvise(unsigned int conn, unsigned int key, unsigned int event_mask);
@@ -153,14 +153,14 @@ public:
 	_kc_hidden ECRESULT DelAdvise(unsigned int conn);
 	_kc_hidden ECRESULT AddNotificationTable(unsigned int type, unsigned int obj_type, unsigned int table, sObjectTableKey *child_row, sObjectTableKey *prev_row, struct propValArray *row);
 	_kc_hidden ECRESULT GetNotifyItems(struct soap *, struct notifyResponse *notifications);
-	_kc_hidden ECTableManager *GetTableManager(void) const { return m_lpTableManager; }
-	_kc_hidden ECSecurity *GetSecurity(void) const { return m_lpEcSecurity; }
+	_kc_hidden ECTableManager *GetTableManager(void) const { return m_lpTableManager.get(); }
+	_kc_hidden ECSecurity *GetSecurity(void) const { return m_lpEcSecurity.get(); }
 	_kc_hidden ECRESULT GetObjectFromEntryId(const entryId *, unsigned int *obj_id, unsigned int *eid_flags = nullptr);
 	_kc_hidden ECRESULT LockObject(unsigned int obj_id);
 	_kc_hidden ECRESULT UnlockObject(unsigned int obj_id);
 	
 	/* for ECStatsSessionTable */
-	_kc_hidden void AddBusyState(pthread_t, const char *state, const struct timespec &threadstart, double start);
+	_kc_hidden void AddBusyState(pthread_t, const char *state, const struct timespec &threadstart, const KC::time_point &start);
 	_kc_hidden void UpdateBusyState(pthread_t, int state);
 	_kc_hidden void RemoveBusyState(pthread_t);
 	_kc_hidden void GetBusyStates(std::list<BUSYSTATE> *);
@@ -173,10 +173,7 @@ public:
 	_kc_hidden AUTHMETHOD GetAuthMethod(void) const { return m_ulAuthMethod; }
 
 private:
-	ECTableManager		*m_lpTableManager;
 	ECSessionGroup		*m_lpSessionGroup;
-	ECSecurity *m_lpEcSecurity = nullptr;
-
 	std::mutex m_hStateLock;
 	typedef std::map<pthread_t, BUSYSTATE> BusyStateMap;
 	BusyStateMap		m_mapBusyStates; /* which thread does what function */
@@ -192,6 +189,9 @@ private:
 	typedef std::map<unsigned int, ECObjectLock>	LockMap;
 	std::mutex m_hLocksLock;
 	LockMap			m_mapLocks;
+	std::unique_ptr<ECSecurity> m_lpEcSecurity;
+	std::unique_ptr<ECUserManagement> m_lpUserManagement;
+	std::unique_ptr<ECTableManager> m_lpTableManager;
 };
 
 
@@ -208,10 +208,11 @@ public:
 	_kc_hidden ECRESULT ValidateSSOData(struct soap *, const char *name, const char *imp_user, const char *cl_ver, const char *cl_app, const char *cl_app_ver, const char *cl_app_misc, const struct xsd__base64Binary *input, struct xsd__base64Binary **output);
 	_kc_hidden virtual ECRESULT CreateECSession(ECSESSIONGROUPID, const std::string &cl_ver, const std::string &cl_app, const std::string &cl_app_ver, const std::string &cl_app_misc, ECSESSIONID *retid, ECSession **ret);
 	_kc_hidden size_t GetObjectSize(void);
+	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const override final { return m_lpUserManagement.get(); }
 
 protected:
 	unsigned int m_ulUserID = 0;
-	unsigned int m_ulImpersonatorID = 0; // The ID of the user who's credentials were used to login when using impersonation
+	unsigned int m_ulImpersonatorID = 0; // The ID of the user whose credentials were used to login when using impersonation
 	bool m_bValidated = false;
 	AUTHMETHOD m_ulValidationMethod = METHOD_NONE;
 	int m_ulConnectingPid = 0;
@@ -235,6 +236,7 @@ private:
 	gss_cred_id_t m_gssServerCreds;
 	gss_ctx_id_t m_gssContext;
 #endif
+	std::unique_ptr<ECUserManagement> m_lpUserManagement;
 };
 
 } /* namespace */

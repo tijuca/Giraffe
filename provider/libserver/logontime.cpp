@@ -22,14 +22,14 @@ static ECRESULT ltm_sync_time(ECDatabase *db,
 {
 	FILETIME ft;
 	UnixTimeToFileTime(e.second, &ft);
-	std::string query = "SELECT hierarchy_id FROM stores WHERE stores.user_id=" + stringify(e.first);
+	std::string query = "SELECT hierarchy_id FROM stores WHERE stores.user_id=" + stringify(e.first) + " LIMIT 1";
 	DB_RESULT result;
 	ECRESULT ret = db->DoSelect(query, &result);
 	if (ret != erSuccess)
 		return ret;
-	if (db->GetNumRows(result) == 0)
+	if (result.get_num_rows() == 0)
 		return erSuccess;
-	DB_ROW row = db->FetchRow(result);
+	auto row = result.fetch_row();
 	if (row == nullptr)
 		return erSuccess;
 	unsigned int store_id = strtoul(row[0], NULL, 0);
@@ -50,14 +50,13 @@ void sync_logon_times(ECDatabase *db)
 	 */
 	bool failed = false;
 	ltm_ontime_mutex.lock();
-	decltype(ltm_ontime_cache) logon_time = std::move(ltm_ontime_cache);
+	decltype(ltm_ontime_cache) logon_time;
+	std::swap(ltm_ontime_cache, logon_time);
 	ltm_ontime_mutex.unlock();
 	ltm_offtime_mutex.lock();
-	decltype(ltm_offtime_cache) logoff_time = std::move(ltm_offtime_cache);
+	decltype(ltm_offtime_cache) logoff_time;
+	std::swap(ltm_offtime_cache, logoff_time);
 	ltm_offtime_mutex.unlock();
-	if (logon_time.size() > 0 || logoff_time.size() > 0)
-		ec_log_debug("Writing out logon/logoff time cache (%zu/%zu entries) to DB",
-			logon_time.size(), logoff_time.size());
 	for (const auto &i : logon_time)
 		failed |= ltm_sync_time(db, i, 0) != erSuccess;
 	for (const auto &i : logoff_time)

@@ -1,15 +1,20 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 import os
+import sys
 
 from .compat import decode as _decode
 from .errors import ConfigError
-from .utils import human_to_bytes as _human_to_bytes
+
+if sys.hexversion >= 0x03000000:
+    from . import utils as _utils
+else:
+    import utils as _utils
 
 class ConfigOption:
     def __init__(self, type_, **kwargs):
@@ -50,7 +55,7 @@ class ConfigOption:
         return {'no': False, 'yes': True, '0': False, '1': True, 'false': False, 'true': True}[value]
 
     def parse_size(self, key, value):
-        return _human_to_bytes(value)
+        return _utils.human_to_bytes(value)
 
 class Config:
     """
@@ -61,8 +66,8 @@ Configuration class
 Example::
 
     config = Config({
-        'some_str': Config.String(default='blah'),
-        'number': Config.Integer(),
+        'some_str': Config.string(default='blah'),
+        'number': Config.integer(),
         'filesize': Config.size(), # understands '5MB' etc
     })
 
@@ -151,7 +156,7 @@ Example::
 
 CONFIG = {
     'log_method': Config.string(options=['file', 'syslog'], default='file'),
-    'log_level': Config.string(options=[str(i) for i in range(7)] + ['info', 'debug', 'warning', 'error', 'critical'], default='info'),
+    'log_level': Config.string(options=[str(i) for i in range(7)] + ['info', 'debug', 'warning', 'error', 'critical'], default='warning'),
     'log_file': Config.string(default=None),
     'log_timestamp': Config.integer(options=[0, 1], default=1),
     'pid_file': Config.string(default=None),

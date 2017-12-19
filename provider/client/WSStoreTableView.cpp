@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
 #include "ECMsgStore.h"
 #include "WSStoreTableView.h"
@@ -44,17 +45,9 @@ HRESULT WSStoreTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
     LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableView **lppTableView)
 {
-	HRESULT hr = hrSuccess;
-	WSStoreTableView *lpTableView = NULL; 
-
-	lpTableView = new WSStoreTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
-
-	hr = lpTableView->QueryInterface(IID_ECTableView, (void **) lppTableView);
-	
-	if(hr != hrSuccess)
-		delete lpTableView;
-
-	return hr;
+	return alloc_wrap<WSStoreTableView>(ulType, ulFlags, lpCmd, lpDataLock,
+	       ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+	       .as(IID_ECTableView, lppTableView);
 }
 
 HRESULT WSStoreTableView::QueryInterface(REFIID refiid, void **lppInterface)
@@ -86,18 +79,9 @@ HRESULT WSTableMultiStore::Create(ULONG ulFlags, KCmd *lpCmd,
     LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableMultiStore **lppTableMultiStore)
 {
-	HRESULT hr = hrSuccess;
-	WSTableMultiStore *lpTableMultiStore = NULL; 
-
-	lpTableMultiStore = new WSTableMultiStore(ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
-
-	// interface ?!
-	hr = lpTableMultiStore->QueryInterface(IID_ECTableView, (void **) lppTableMultiStore);
-	
-	if(hr != hrSuccess)
-		delete lpTableMultiStore;
-
-	return hr;
+	return alloc_wrap<WSTableMultiStore>(ulFlags, lpCmd, lpDataLock,
+	       ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+	       .put(lppTableMultiStore);
 }
 
 HRESULT WSTableMultiStore::HrOpenTable()
@@ -164,16 +148,9 @@ HRESULT WSTableMisc::Create(ULONG ulTableType, ULONG ulFlags, KCmd *lpCmd,
     LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableMisc **lppTableMisc)
 {
-	HRESULT hr = hrSuccess;
-	WSTableMisc *lpTableMisc = NULL;
-
-	lpTableMisc = new WSTableMisc(ulTableType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
-
-	hr = lpTableMisc->QueryInterface(IID_ECTableView, (void **) lppTableMisc);
-	if (hr != hrSuccess)
-		delete lpTableMisc;
-
-	return hr;
+	return alloc_wrap<WSTableMisc>(ulTableType, ulFlags, lpCmd, lpDataLock,
+	       ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+	       .put(lppTableMisc);
 }
 
 HRESULT WSTableMisc::HrOpenTable()
@@ -219,16 +196,6 @@ HRESULT WSTableMailBox::Create(ULONG ulFlags, KCmd *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
     ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMailBox **lppTable)
 {
-	HRESULT hr = hrSuccess;
-	WSTableMailBox *lpTable = NULL; 
-
-	lpTable = new WSTableMailBox(ulFlags, lpCmd, lpDataLock, ecSessionId, lpMsgStore, lpTransport);
-
-	//@todo add a new interface
-	hr = lpTable->QueryInterface(IID_ECTableView, (void **) lppTable);
-	
-	if(hr != hrSuccess)
-		delete lpTable;
-
-	return hr;
+	return alloc_wrap<WSTableMailBox>(ulFlags, lpCmd, lpDataLock,
+	       ecSessionId, lpMsgStore, lpTransport).put(lppTable);
 }

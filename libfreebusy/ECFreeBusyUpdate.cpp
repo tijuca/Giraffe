@@ -14,10 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
-#include <kopano/ECInterfaceDefs.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusytags.h"
 
@@ -29,47 +28,28 @@ namespace KC {
 
 ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage *lpMessage) :
 	m_lpMessage(lpMessage)
-{
-	if(m_lpMessage)
-		m_lpMessage->AddRef();
-}
-
-ECFreeBusyUpdate::~ECFreeBusyUpdate(void)
-{
-	if(m_lpMessage)
-		m_lpMessage->Release();
-}
+{}
 
 HRESULT ECFreeBusyUpdate::Create(IMessage* lpMessage, ECFreeBusyUpdate **lppECFreeBusyUpdate)
 {
-	HRESULT hr = hrSuccess;
-	ECFreeBusyUpdate *lpECFreeBusyUpdate = NULL;
-
-	lpECFreeBusyUpdate = new ECFreeBusyUpdate(lpMessage);
-
-	hr = lpECFreeBusyUpdate->QueryInterface(IID_ECFreeBusyUpdate, (void **)lppECFreeBusyUpdate);
-
-	if(hr != hrSuccess)
-		delete lpECFreeBusyUpdate;
-
-	return hr;
+	return alloc_wrap<ECFreeBusyUpdate>(lpMessage).put(lppECFreeBusyUpdate);
 }
 
 HRESULT ECFreeBusyUpdate::QueryInterface(REFIID refiid, void** lppInterface)
 {
 	REGISTER_INTERFACE2(ECFreeBusyUpdate, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IFreeBusyUpdate, &this->m_xFreeBusyUpdate);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xFreeBusyUpdate);
+	REGISTER_INTERFACE2(IFreeBusyUpdate, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT ECFreeBusyUpdate::PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks)
+HRESULT ECFreeBusyUpdate::PublishFreeBusy(const FBBlock_1 *lpBlocks, ULONG nBlocks)
 {
 	if(nBlocks > 0 && lpBlocks == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	for (ULONG i = 0; i < nBlocks; ++i)
-		m_fbBlockList.Add(&lpBlocks[i]);
+		m_fbBlockList.Add(lpBlocks[i]);
 	return S_OK;
 }
 
@@ -199,17 +179,5 @@ exit:
 	m_fbBlockList.Reset();
 	return hr;
 }
-
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, QueryInterface, (REFIID, refiid), (void**, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Reload, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, PublishFreeBusy, (FBBlock_1 *, lpBlocks), (ULONG, nBlocks))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, RemoveAppt, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, ResetPublishedFreeBusy, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, ChangeAppt, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, SaveChanges, (FILETIME, ftBegin), (FILETIME, ftEnd))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, GetFBTimes, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Intersect, (void))
 
 } /* namespace */

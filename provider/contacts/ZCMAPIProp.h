@@ -25,20 +25,20 @@
 
 #include <map>
 
-class ZCMAPIProp _no_final : public ECUnknown {
+class ZCMAPIProp _no_final : public ECUnknown, public IMailUser {
 protected:
 	ZCMAPIProp(ULONG ulObjType, const char *szClassName = NULL);
 	virtual ~ZCMAPIProp();
 
 	HRESULT ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps, ULONG ulIndex);
-	HRESULT ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps);
-	HRESULT ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulIndex);
+	HRESULT ConvertDistList(ULONG cValues, LPSPropValue lpProps);
+	HRESULT ConvertProps(IMAPIProp *contact, ULONG eid_size, const ENTRYID *eid, ULONG index);
 
 	/* getprops helper */
 	HRESULT CopyOneProp(convert_context &converter, ULONG ulFlags, const std::map<short, SPropValue>::const_iterator &i, LPSPropValue lpProp, LPSPropValue lpBase);
 
 public:
-	static HRESULT Create(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ZCMAPIProp **lppZCMAPIProp);
+	static HRESULT Create(IMAPIProp *lpContact, ULONG eid_size, const ENTRYID *eid, ZCMAPIProp **);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	// From IMAPIProp
@@ -51,14 +51,8 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG * lpcPropNames, LPMAPINAMEID ** lpppPropNames);
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID * lppPropNames, ULONG ulFlags, LPSPropTagArray * lppPropTags);
-
-private:
-	class xMAPIProp _kc_final : public IMAPIProp {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xMAPIProp;
 
 private:
 	SPropValue *m_base = nullptr;

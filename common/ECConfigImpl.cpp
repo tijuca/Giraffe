@@ -17,8 +17,10 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
+#include <list>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 #include <cerrno>
 #include <climits>
@@ -35,10 +37,11 @@
 
 #include <kopano/charset/convert.h>
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
+
+using std::string;
 
 const directive_t ECConfigImpl::s_sDirectives[] = {
 	{ "include",	&ECConfigImpl::HandleInclude },
@@ -54,7 +57,7 @@ ECConfigImpl::ECConfigImpl(const configsetting_t *lpDefaults,
 {
 	// allowed directives in this config object
 	for (int i = 0; lpszDirectives != NULL && lpszDirectives[i] != NULL; ++i)
-		m_lDirectives.push_back(lpszDirectives[i]);
+		m_lDirectives.emplace_back(lpszDirectives[i]);
 
 	InitDefaults(LOADSETTING_INITIALIZING | LOADSETTING_UNKNOWN | LOADSETTING_OVERWRITE);
 }
@@ -63,11 +66,6 @@ bool ECConfigImpl::LoadSettings(const char *szFilename)
 {
 	m_szConfigFile = szFilename;	
 	return InitConfigFile(LOADSETTING_OVERWRITE);
-}
-
-static int tounderscore(int c)
-{
-	return c == '-' ? '_' : c;
 }
 
 /**
@@ -109,14 +107,15 @@ int ECConfigImpl::ParseParams(int argc, char **argv)
 		}
 		const char *eq = strchr(arg, '=');
 		if (eq == nullptr) {
-			errors.push_back("Commandline option '" + string(arg+2) + "' cannot be empty!");
+			errors.emplace_back("Commandline option '" + std::string(arg + 2) + "' cannot be empty!");
 			continue;
 		}
 		string strName(arg+2, eq-arg-2);
 		string strValue(eq+1);
 		strName = trim(strName, " \t\r\n");
 		strValue = trim(strValue, " \t\r\n");
-		std::transform(strName.begin(), strName.end(), strName.begin(), tounderscore);
+		std::transform(strName.begin(), strName.end(), strName.begin(),
+			[](int c) { return c == '-' ? '_' : c; });
 		configsetting_t setting = {strName.c_str(), strValue.c_str(), 0, 0};
 		// Overwrite an existing setting, and make sure it is not reloadable during HUP
 		AddSetting(&setting, LOADSETTING_OVERWRITE | LOADSETTING_CMDLINE_PARAM);
@@ -216,14 +215,14 @@ void ECConfigImpl::InsertOrReplace(settingmap_t *lpMap, const settingkey_t &s, c
 	if (i == lpMap->cend()) {
 		// Insert new value
 		data = new char[1024];
-		lpMap->insert(make_pair(s, data));
+		lpMap->insert({s, data});
 	} else {
 		// Actually remove and re-insert the map entry since we may be modifying
 		// ulFlags in the key (this is a bit of a hack, since you shouldn't be modifying
 		// stuff in the key, but this is the easiest)
 		data = i->second;
 		lpMap->erase(i);
-		lpMap->insert(make_pair(s, data));
+		lpMap->insert({s, data});
 	}
 	
 	if (bIsSize)
@@ -266,7 +265,7 @@ const char *ECConfigImpl::GetAlias(const char *szName)
 const char *ECConfigImpl::GetSetting(const char *szName, const char *equal,
     const char *other)
 {
-	const char *value = this->GetSetting(szName);
+	auto value = GetSetting(szName);
 	if (value == equal || (value && equal && !strcmp(value, equal)))
 		return other;
 	else
@@ -276,44 +275,43 @@ const char *ECConfigImpl::GetSetting(const char *szName, const char *equal,
 const wchar_t *ECConfigImpl::GetSettingW(const char *szName)
 {
 	const char *value = GetSetting(szName);
-	auto result = m_convertCache.insert(ConvertCache::value_type(value, L""));
+	auto result = m_convertCache.emplace(value, L"");
 	auto iter = result.first;
 	if (result.second)
-		iter->second = convert_to<wstring>(value);
-
+		iter->second = convert_to<std::wstring>(value);
 	return iter->second.c_str();
 }
 
 const wchar_t *ECConfigImpl::GetSettingW(const char *szName,
     const wchar_t *equal, const wchar_t *other)
 {
-	const wchar_t *value = this->GetSettingW(szName);
+	auto value = GetSettingW(szName);
 	if (value == equal || (value && equal && !wcscmp(value, equal)))
 		return other;
 	else
 		return value;
 }
 
-list<configsetting_t> ECConfigImpl::GetSettingGroup(unsigned int ulGroup)
+std::list<configsetting_t> ECConfigImpl::GetSettingGroup(unsigned int ulGroup)
 {
-	list<configsetting_t> lGroup;
+	std::list<configsetting_t> lGroup;
 	configsetting_t sSetting;
 
 	for (const auto &s : m_mapSettings)
 		if ((s.first.ulGroup & ulGroup) == ulGroup &&
 		    CopyConfigSetting(&s.first, s.second, &sSetting))
-			lGroup.push_back(std::move(sSetting));
+			lGroup.emplace_back(std::move(sSetting));
 	return lGroup;
 }
 
 std::list<configsetting_t> ECConfigImpl::GetAllSettings()
 {
-	list<configsetting_t> lSettings;
+	std::list<configsetting_t> lSettings;
 	configsetting_t sSetting;
 
 	for (const auto &s : m_mapSettings)
 		if (CopyConfigSetting(&s.first, s.second, &sSetting))
-			lSettings.push_back(std::move(sSetting));
+			lSettings.emplace_back(std::move(sSetting));
 	return lSettings;
 }
 
@@ -368,16 +366,16 @@ bool ECConfigImpl::ReadConfigFile(const std::string &file,
 
 	std::unique_ptr<char, cstdlib_deleter> normalized_file(realpath(file.c_str(), nullptr));
 	if (normalized_file == nullptr) {
-		errors.push_back("Cannot normalize path \"" + file + "\": " + strerror(errno));
+		errors.emplace_back("Cannot normalize path \"" + file + "\": " + strerror(errno));
 		return false;
 	}
 	struct stat sb;
 	if (stat(normalized_file.get(), &sb) < 0) {
-		errors.push_back("Config file \"" + file + "\" cannot be read: " + strerror(errno));
+		errors.emplace_back("Config file \"" + file + "\" cannot be read: " + strerror(errno));
 		return false;
 	}
 	if (!S_ISREG(sb.st_mode)) {
-		errors.push_back("Config file \"" + file + "\" is not a file");
+		errors.emplace_back("Config file \"" + file + "\" is not a file");
 		return false;
 	}
 
@@ -392,10 +390,10 @@ bool ECConfigImpl::ReadConfigFile(const std::string &file,
 		goto exit;
 	}
 
-	m_readFiles.insert(m_currentFile);
+	m_readFiles.emplace(m_currentFile);
 	fp = fopen(file.c_str(), "rt");
 	if (fp == nullptr) {
-		errors.push_back("Unable to open config file \"" + file + "\"");
+		errors.emplace_back("Unable to open config file \"" + file + "\"");
 		goto exit;
 	}
 
@@ -430,7 +428,7 @@ bool ECConfigImpl::ReadConfigFile(const std::string &file,
 		 * The line is build up like this:
 		 * config_name = bla bla
 		 *
-		 * Whe should clean it in such a way that it resolves to:
+		 * We should clean it in such a way that it resolves to:
 		 * config_name=bla bla
 		 *
 		 * Be careful _not_ to remove any whitespace characters
@@ -453,8 +451,7 @@ exit:
 		fclose(fp);
 
 	// Restore the path of the previous file.
-	m_currentFile.swap(prevFile);
-
+	m_currentFile = std::move(prevFile);
 	return bReturn;
 }
 
@@ -472,11 +469,11 @@ bool ECConfigImpl::HandleDirective(const string &strLine, unsigned int ulFlags)
 		if (f != m_lDirectives.cend())
 			return (this->*s_sDirectives[i].fExecute)(strLine.substr(pos).c_str(), ulFlags);
 
-		warnings.push_back("Unsupported directive '" + strName + "' found!");
+		warnings.emplace_back("Unsupported directive '" + strName + "' found!");
 		return true;
 	}
 
-	warnings.push_back("Unknown directive '" + strName + "' found!");
+	warnings.emplace_back("Unknown directive '" + strName + "' found!");
 	return true;
 }
 
@@ -548,7 +545,7 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	szAlias = GetAlias(lpsConfig->szName);
 	if (szAlias) {
 		if (!(ulFlags & LOADSETTING_INITIALIZING))
-			warnings.push_back("Option '" + string(lpsConfig->szName) + "' is deprecated! New name for option is '" + szAlias + "'.");
+			warnings.emplace_back("Option '" + std::string(lpsConfig->szName) + "' is deprecated! New name for option is '" + szAlias + "'.");
 		kc_strlcpy(s.s, szAlias, sizeof(s.s));
 	}
 
@@ -558,27 +555,27 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	if (iterSettings == m_mapSettings.cend()) {
 		// new items from file are illegal, add error
 		if (!(ulFlags & LOADSETTING_UNKNOWN)) {
-			errors.push_back("Unknown option '" + string(lpsConfig->szName) + "' found!");
+			errors.emplace_back("Unknown option '" + std::string(lpsConfig->szName) + "' found!");
 			return true;
 		}
 	} else {
 		// Check for permissions before overwriting
 		if (ulFlags & LOADSETTING_OVERWRITE_GROUP) {
 			if (iterSettings->first.ulGroup != lpsConfig->ulGroup) {
-				errors.push_back("option '" + string(lpsConfig->szName) + "' cannot be overridden (different group)!");
+				errors.emplace_back("option '" + std::string(lpsConfig->szName) + "' cannot be overridden (different group)!");
 				return false;
 			}
 		} else if (ulFlags & LOADSETTING_OVERWRITE_RELOAD) {
 			if (!(iterSettings->first.ulFlags & CONFIGSETTING_RELOADABLE))
 				return false;
 		} else if (!(ulFlags & LOADSETTING_OVERWRITE)) {
-			errors.push_back("option '" + string(lpsConfig->szName) + "' cannot be overridden!");
+			errors.emplace_back("option '" + std::string(lpsConfig->szName) + "' cannot be overridden!");
 			return false;
 		}
 
 		if (!(ulFlags & LOADSETTING_INITIALIZING) &&
 		    (iterSettings->first.ulFlags & CONFIGSETTING_UNUSED))
-			warnings.push_back("Option '" + string(lpsConfig->szName) + "' is not used anymore.");
+			warnings.emplace_back("Option '" + std::string(lpsConfig->szName) + "' is not used anymore.");
 
 		s.ulFlags = iterSettings->first.ulFlags;
 
@@ -592,14 +589,14 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	if (lpsConfig->szValue[0] == '$' && (s.ulFlags & CONFIGSETTING_EXACT) == 0) {
 		const char *szValue = getenv(lpsConfig->szValue + 1);
 		if (szValue == NULL) {
-			warnings.push_back("'" + string(lpsConfig->szValue + 1) + "' not found in environment, using '" + lpsConfig->szValue + "' for options '" + lpsConfig->szName + "'.");
+			warnings.emplace_back("'" + std::string(lpsConfig->szValue + 1) + "' not found in environment, using '" + lpsConfig->szValue + "' for options '" + lpsConfig->szName + "'.");
 			szValue = lpsConfig->szValue;
 		}
 
 		if (s.ulFlags & CONFIGSETTING_SIZE) {
 			strtoul(szValue, &valid, 10);
 			if (valid == szValue) {
-				errors.push_back("Option '" + string(lpsConfig->szName) + "' must be a size value (number + optional k/m/g multiplier).");
+				errors.emplace_back("Option '" + std::string(lpsConfig->szName) + "' must be a size value (number + optional k/m/g multiplier).");
 				return false;
 			}
 		}
@@ -610,7 +607,7 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	if (s.ulFlags & CONFIGSETTING_SIZE) {
 		strtoul(lpsConfig->szValue, &valid, 10);
 		if (valid == lpsConfig->szValue) {
-			errors.push_back("Option '" + string(lpsConfig->szName) + "' must be a size value (number + optional k/m/g multiplier).");
+			errors.emplace_back("Option '" + std::string(lpsConfig->szName) + "' must be a size value (number + optional k/m/g multiplier).");
 			return false;
 		}
 	}
@@ -640,7 +637,7 @@ bool ECConfigImpl::HasErrors() {
 	for (const auto &s : m_mapSettings)
 		if (s.first.ulFlags & CONFIGSETTING_NONEMPTY)
 			if (!s.second || strlen(s.second) == 0)
-				errors.push_back("Option '" + string(s.first.s) + "' cannot be empty!");
+				errors.emplace_back("Option '" + std::string(s.first.s) + "' cannot be empty!");
 	return !errors.empty();
 }
 

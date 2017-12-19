@@ -22,16 +22,14 @@
 #include <string>
 #include <list>
 #include <set>
-using namespace std;
-
 #include <kopano/zcdefs.h>
 #include <mapidefs.h>
 
 /*
  * Global configuration
  */
-extern string auto_fix;
-extern string auto_del;
+extern std::string auto_fix;
+extern std::string auto_del;
 
 class Fsck {
 private:
@@ -40,7 +38,7 @@ private:
 	virtual HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) = 0;
 
 public:
-	virtual ~Fsck(void) _kc_impdtor;
+	virtual ~Fsck(void) = default;
 	HRESULT ValidateMessage(LPMESSAGE lpMessage, const std::string &strName, const std::string &strClass);
 	HRESULT ValidateFolder(LPMAPIFOLDER lpFolder, const std::string &strName);
 

@@ -16,10 +16,6 @@
  *
  */
 
-?>
-<?php
-	require_once("class.baserecurrence.php");
-
 	class TaskRecurrence extends BaseRecurrence {
 		/**
 		 * Timezone info which is always false for task
@@ -300,13 +296,13 @@
 			mapi_savechanges($newMessage);
 
 			// Update body of original message
-			$msgbody = mapi_message_openproperty($this->message, PR_BODY);
+			$msgbody = mapi_openproperty($this->message, PR_BODY);
 			$msgbody = trim($msgbody, "\0");
 			$separator = "------------\r\n";
 
 			if (!empty($msgbody) && strrpos($msgbody, $separator) === false) {
 				$msgbody = $separator . $msgbody;
-				$stream = mapi_openproperty($this->message, PR_BODY, 0, MAPI_CREATE | MAPI_MODIFY);
+				$stream = mapi_openproperty($this->message, PR_BODY, IID_IStream, 0, MAPI_CREATE | MAPI_MODIFY);
 				mapi_stream_setsize($stream, strlen($msgbody));
 				mapi_stream_write($stream, $msgbody);
 				mapi_stream_commit($stream);
@@ -410,4 +406,3 @@
 			return $result;
 		}
 	}
-?>

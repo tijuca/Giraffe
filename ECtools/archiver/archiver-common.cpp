@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <mapicode.h>
 #include <kopano/platform.h>
 #include <kopano/archiver-common.h>
 #include <kopano/stringutil.h>
@@ -23,17 +23,17 @@ namespace KC {
 
 bool entryid_t::operator==(const entryid_t &other) const
 {
-	return getUnwrapped().m_vEntryId == other.getUnwrapped().m_vEntryId;
+	return getUnwrapped().m_eid == other.getUnwrapped().m_eid;
 }
 
 bool entryid_t::operator<(const entryid_t &other) const
 {
-	return getUnwrapped().m_vEntryId < other.getUnwrapped().m_vEntryId;
+	return getUnwrapped().m_eid < other.getUnwrapped().m_eid;
 }
 
 bool entryid_t::operator>(const entryid_t &other) const
 {
-	return getUnwrapped().m_vEntryId > other.getUnwrapped().m_vEntryId;
+	return getUnwrapped().m_eid > other.getUnwrapped().m_eid;
 }
 
 bool entryid_t::wrap(const std::string &strPath)
@@ -42,8 +42,8 @@ bool entryid_t::wrap(const std::string &strPath)
 	    !kc_istarts_with(strPath, "http://") &&
 	    !kc_istarts_with(strPath, "https://"))
 		return false;
-	
-	m_vEntryId.insert(m_vEntryId.begin(), (LPBYTE)strPath.c_str(), (LPBYTE)strPath.c_str() + strPath.size() + 1);	// Include NULL terminator
+	/* The '\0' from strPath is included; used as a separator in the wrapped EID. */
+	m_eid.insert(m_eid.begin(), strPath.c_str(), strPath.c_str() + strPath.size() + 1);
 	return true;
 }
 
@@ -51,26 +51,21 @@ bool entryid_t::unwrap(std::string *lpstrPath)
 {
 	if (!isWrapped())
 		return false;
-	
-	auto iter = std::find(m_vEntryId.begin(), m_vEntryId.end(), 0);
-	if (iter == m_vEntryId.end())
+	auto pos = m_eid.find('\0');
+	if (pos == std::string::npos)
 		return false;
-		
+	/* Extract and save away path; existing EID is unwrapped in place. */
 	if (lpstrPath)
-		lpstrPath->assign((char*)&m_vEntryId.front(), iter - m_vEntryId.cbegin());
-	
-	m_vEntryId.erase(m_vEntryId.begin(), ++iter);
+		lpstrPath->assign(m_eid, 0, pos);
+	m_eid.erase(0, pos + 1);
 	return true;
 }
 
 bool entryid_t::isWrapped() const
 {
-	// ba::istarts_with doesn't work well on unsigned char. So we use a temporary instead.
-	const std::string strEntryId((char*)&m_vEntryId.front(), m_vEntryId.size());
-
-	return kc_istarts_with(strEntryId, "file://") ||
-	       kc_istarts_with(strEntryId, "http://") ||
-	       kc_istarts_with(strEntryId, "https://");
+	return kc_istarts_with(m_eid, "file://") ||
+	       kc_istarts_with(m_eid, "http://") ||
+	       kc_istarts_with(m_eid, "https://");
 }
 
 entryid_t entryid_t::getUnwrapped() const
@@ -117,28 +112,15 @@ eResult MAPIErrorToArchiveError(HRESULT hr)
 
 const char* ArchiveResultString(eResult result)
 {
-    const char* retval = "Unknown result";
     switch (result)
     {
-        case Success:
-            retval = "Success";
-            break;
-        case OutOfMemory:
-            retval = "Out of memory";
-            break;
-        case InvalidParameter:
-            retval = "Invalid parameter";
-            break;
-        case PartialCompletion:
-            retval = "Partial completion";
-            break;
-        case Failure:
-            retval = "Failure";
-            break;
-        default:
-            /* do nothing */;
+	case Success: return "Success";
+	case OutOfMemory: return "Out of memory";
+	case InvalidParameter: return "Invalid parameter";
+	case PartialCompletion: return "Partial completion";
+	case Failure: return "Failure";
+	default: return "Unknown result";
     }
-    return retval;
 }
 
 } /* namespace */

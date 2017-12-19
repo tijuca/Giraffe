@@ -23,7 +23,7 @@
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <kopano/ECUnknown.h>
-#include <IECChangeAdvisor.h>
+#include <kopano/IECInterfaces.hpp>
 #include "ics_client.hpp"
 #include <kopano/kcodes.h>
 
@@ -39,7 +39,7 @@ class ECMsgStore;
  * ECChangeAdvisor: Implementation IECChangeAdvisor, which allows one to register for 
  *                  change notifications on folders.
  */
-class ECChangeAdvisor _kc_final : public ECUnknown {
+class ECChangeAdvisor _kc_final : public ECUnknown, public IECChangeAdvisor {
 protected:
 	/**
 	 * Construct the ChangeAdvisor.
@@ -94,15 +94,6 @@ private:
 	typedef std::map<syncid_t, changeid_t> SyncStateMap;
 
 	/**
-	 * Get the sync id from a ConnectionMap entry.
-	 *
-	 * @param[in]	sConnection
-	 *					The ConnectionMap entry from which to extract the sync id.
-	 * @return The sync id extracted from the the ConnectionMap entry.
-	 */
-	static ULONG					GetSyncId(const ConnectionMap::value_type &sConnection);
-
-	/**
 	 * Create a SyncStateMap entry from an SSyncState structure.
 	 *
 	 * @param[in]	sSyncState
@@ -138,19 +129,6 @@ private:
 	 * Purge all unused connections from advisor.
 	 */
 	HRESULT							PurgeStates();
-
-	class xECChangeAdvisor _kc_final : public IECChangeAdvisor {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-
-		// <kopano/xclsfrag/IECChangeAdvisor.hpp>
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG flags, LPMAPIERROR *lppMAPIError) _kc_override;
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, LPGUID lpGUID, IECChangeAdviseSink *lpAdviseSink, ULONG flags) _kc_override;
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _kc_override;
-		virtual HRESULT __stdcall AddKeys(LPENTRYLIST lpEntryList) _kc_override;
-		virtual HRESULT __stdcall RemoveKeys(LPENTRYLIST lpEntryList) _kc_override;
-		virtual HRESULT __stdcall IsMonitoringSyncId(ULONG ulSyncId) _kc_override;
-		virtual HRESULT __stdcall UpdateSyncState(ULONG ulSyncId, ULONG ulChangeId) _kc_override;
-	} m_xECChangeAdvisor;
 
 	ECMsgStore				*m_lpMsgStore;
 	IECChangeAdviseSink *m_lpChangeAdviseSink = nullptr;

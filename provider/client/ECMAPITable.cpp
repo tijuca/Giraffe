@@ -14,10 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
-#include <kopano/ECInterfaceDefs.h>
 #include <mapicode.h>
 #include <mapidefs.h>
 #include <mapitags.h>
@@ -31,25 +30,21 @@
 #include <kopano/Util.h>
 
 #include <kopano/ECDebug.h>
-#include <kopano/ECInterfaceDefs.h>
 
-ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")
+using namespace KCHL;
+
+ECMAPITable::ECMAPITable(const std::string &strName,
+    ECNotifyClient *lpNotifyClient, ULONG ulFlags) :
+	ECUnknown("IMAPITable")
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECMAPITable::ECMAPITable","");
-
 	this->lpNotifyClient = lpNotifyClient;
 	
 	if(this->lpNotifyClient)
 		this->lpNotifyClient->AddRef();
 
-	this->lpsSortOrderSet = NULL;
-	this->lpsPropTags = NULL;
 	this->ulFlags = ulFlags;
 	this->lpTableOps = NULL;
 	
-	m_lpSetColumns = NULL;
-	m_lpRestrict = NULL;
-	m_lpSortTable = NULL;
 	m_ulRowCount = 0;
 	m_ulFlags = 0;
 	m_ulDeferredFlags = 0;
@@ -58,9 +53,7 @@ ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, UL
 
 HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
 {
-	HRESULT hr;
-    
-	hr = lpTableOps->HrOpenTable();
+	auto hr = lpTableOps->HrOpenTable();
 	if(hr != hrSuccess)
 		return hr;
 
@@ -71,12 +64,9 @@ HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
 	hr = lpTableOps->HrMulti(m_ulDeferredFlags, m_lpSetColumns, m_lpRestrict, m_lpSortTable, m_ulRowCount, m_ulFlags, lppRowSet);
 
 	// Reset deferred items
-	MAPIFreeBuffer(m_lpSetColumns);
-	m_lpSetColumns = NULL;
-	MAPIFreeBuffer(m_lpRestrict);
-	m_lpRestrict = NULL;
-	MAPIFreeBuffer(m_lpSortTable);
-	m_lpSortTable = NULL;
+	m_lpSetColumns.reset();
+	m_lpRestrict.reset();
+	m_lpSortTable.reset();
 	m_ulRowCount = 0;
 	m_ulFlags = 0;
 	m_ulDeferredFlags = 0;
@@ -92,8 +82,6 @@ BOOL ECMAPITable::IsDeferred()
 
 ECMAPITable::~ECMAPITable()
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECMAPITable::~ECMAPITable","");
-
 	// Remove all advises	
 	auto iterMapInt = m_ulConnectionList.cbegin();
 	while (iterMapInt != m_ulConnectionList.cend()) {
@@ -102,31 +90,26 @@ ECMAPITable::~ECMAPITable()
 		Unadvise(*iterMapIntDel);
 	}
 
-	delete[] this->lpsPropTags;
-	MAPIFreeBuffer(m_lpRestrict);
-	MAPIFreeBuffer(m_lpSetColumns);
-	MAPIFreeBuffer(m_lpSortTable);
 	if(lpNotifyClient)
 		lpNotifyClient->Release();
 
 	if(lpTableOps)
 		lpTableOps->Release();	// closes the table on the server too
-	delete[] lpsSortOrderSet;
 }
 
-HRESULT ECMAPITable::Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
+HRESULT ECMAPITable::Create(const std::string &strName,
+    ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
 {
-	ECMAPITable *lpMAPITable = new ECMAPITable(strName, lpNotifyClient, ulFlags);
-	return lpMAPITable->QueryInterface(IID_ECMAPITable, reinterpret_cast<void **>(lppECMAPITable));
+	return alloc_wrap<ECMAPITable>(strName, lpNotifyClient, ulFlags)
+	       .put(lppECMAPITable);
 }
 
 HRESULT ECMAPITable::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECMAPITable, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IMAPITable, &this->m_xMAPITable);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPITable);
-	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
+	REGISTER_INTERFACE2(IMAPITable, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -157,7 +140,7 @@ HRESULT ECMAPITable::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, UL
 
 	// We lock the connection list separately
 	scoped_rlock l_conn(m_hMutexConnectionList);
-	m_ulConnectionList.insert(*lpulConnection);
+	m_ulConnectionList.emplace(*lpulConnection);
 	return hrSuccess;
 }
 
@@ -196,15 +179,8 @@ HRESULT ECMAPITable::SetColumns(const SPropTagArray *lpPropTagArray,
 		return MAPI_E_INVALID_PARAMETER;
 
 	scoped_rlock lock(m_hLock);
-	delete[] this->lpsPropTags;
-	lpsPropTags = (LPSPropTagArray) new BYTE[CbNewSPropTagArray(lpPropTagArray->cValues)];
 
-	lpsPropTags->cValues = lpPropTagArray->cValues;
-	memcpy(&lpsPropTags->aulPropTag, &lpPropTagArray->aulPropTag, lpPropTagArray->cValues * sizeof(ULONG));
-	MAPIFreeBuffer(m_lpSetColumns);
-	m_lpSetColumns = NULL;
-
-	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpPropTagArray->cValues), (void **)&m_lpSetColumns);
+	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpPropTagArray->cValues), &~m_lpSetColumns);
 	if (hr != hrSuccess)
 		return hr;
         
@@ -285,7 +261,8 @@ HRESULT ECMAPITable::QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *
 	return hr;
 }
 
-HRESULT ECMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags)
+HRESULT ECMAPITable::FindRow(const SRestriction *lpRestriction,
+    BOOKMARK bkOrigin, ULONG ulFlags)
 {
 	if (lpRestriction == NULL)
 		return MAPI_E_INVALID_PARAMETER;
@@ -297,14 +274,13 @@ HRESULT ECMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, UL
 	return this->lpTableOps->HrFindRow(lpRestriction, bkOrigin, ulFlags);
 }
 
-HRESULT ECMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags)
+HRESULT ECMAPITable::Restrict(const SRestriction *lpRestriction, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 
 	scoped_rlock lock(m_hLock);
-	MAPIFreeBuffer(m_lpRestrict);
     if(lpRestriction) {
-        if ((hr = MAPIAllocateBuffer(sizeof(SRestriction), (void **)&m_lpRestrict)) != hrSuccess)
+        if ((hr = MAPIAllocateBuffer(sizeof(SRestriction), &~m_lpRestrict)) != hrSuccess)
 			return hr;
         
         hr = Util::HrCopySRestriction(m_lpRestrict, lpRestriction, m_lpRestrict);
@@ -313,7 +289,7 @@ HRESULT ECMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags)
     } else {
 		// setting the restriction to NULL is not the same as not setting the restriction at all
 		m_ulDeferredFlags |= TABLE_MULTI_CLEAR_RESTRICTION;
-        m_lpRestrict = NULL;
+        m_lpRestrict.reset();
     }
 	if (!(ulFlags & TBL_BATCH))
 		hr = FlushDeferred();
@@ -348,13 +324,12 @@ HRESULT ECMAPITable::SortTable(const SSortOrderSet *lpSortCriteria,
 
 	scoped_rlock lock(m_hLock);
 
-	delete[] lpsSortOrderSet;
-	lpsSortOrderSet = (LPSSortOrderSet) new BYTE[CbSSortOrderSet(lpSortCriteria)];
+	HRESULT hr = MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria), &~lpsSortOrderSet);
+	if (hr != hrSuccess)
+		return hr;
 
 	memcpy(lpsSortOrderSet, lpSortCriteria, CbSSortOrderSet(lpSortCriteria));
-	MAPIFreeBuffer(m_lpSortTable);
-	HRESULT hr = MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria),
-		reinterpret_cast<void **>(&m_lpSortTable));
+	hr = MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria), &~m_lpSortTable);
 	if (hr != hrSuccess)
 		return hr;
     memcpy(m_lpSortTable, lpSortCriteria, CbSSortOrderSet(lpSortCriteria));
@@ -366,7 +341,7 @@ HRESULT ECMAPITable::SortTable(const SSortOrderSet *lpSortCriteria,
 
 HRESULT ECMAPITable::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 {
-	LPSSortOrderSet lpSortCriteria = NULL;
+	memory_ptr<SSortOrderSet> lpSortCriteria;
 	scoped_rlock lock(m_hLock);
 
 	HRESULT hr = FlushDeferred();
@@ -374,9 +349,9 @@ HRESULT ECMAPITable::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 		return hr;
 
 	if(lpsSortOrderSet)
-		hr = ECAllocateBuffer(CbSSortOrderSet(lpsSortOrderSet), (void **) &lpSortCriteria);
+		hr = ECAllocateBuffer(CbSSortOrderSet(lpsSortOrderSet), &~lpSortCriteria);
 	else
-		hr = ECAllocateBuffer(CbNewSSortOrderSet(0), (void **) &lpSortCriteria);
+		hr = ECAllocateBuffer(CbNewSSortOrderSet(0), &~lpSortCriteria);
 
 	if(hr != hrSuccess)
 		return hr;
@@ -385,7 +360,7 @@ HRESULT ECMAPITable::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 	else
 		memset(lpSortCriteria, 0, CbNewSSortOrderSet(0));
 
-	*lppSortCriteria = lpSortCriteria;
+	*lppSortCriteria = lpSortCriteria.release();
 	return hr;
 }
 
@@ -496,7 +471,7 @@ HRESULT ECMAPITable::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppRows
 
 HRESULT ECMAPITable::Reload(void *lpParam)
 {
-	ECMAPITable *lpThis = (ECMAPITable *)lpParam;
+	auto lpThis = static_cast<ECMAPITable *>(lpParam);
 
 	// Locking m_hLock is not allowed here since when we are called, the SOAP transport in lpTableOps  
 	// will be locked. Since normally m_hLock is locked before SOAP, locking m_hLock *after* SOAP here  
@@ -514,30 +489,3 @@ HRESULT ECMAPITable::Reload(void *lpParam)
 	}
 	return hrSuccess;
 }
-
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPITable, MAPITable, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPITable, MAPITable, Release, (void))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Unadvise, (ULONG, ulConnection))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetStatus, (ULONG *, lpulTableStatus), (ULONG *, lpulTableType))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SetColumns, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryColumns, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetRowCount, (ULONG, ulFlags), (ULONG *, lpulCount))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SeekRow, (BOOKMARK, bkOrigin), (LONG, lRowCount), (LONG *, lplRowsSought))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SeekRowApprox, (ULONG, ulNumerator), (ULONG, ulDenominator))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryPosition, (ULONG *, lpulRow), (ULONG *, lpulNumerator), (ULONG *, lpulDenominator))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), FindRow, (LPSRestriction, lpRestriction), (BOOKMARK, bkOrigin), (ULONG, ulFlags))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Restrict, (LPSRestriction, lpRestriction), (ULONG, ulFlags))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), CreateBookmark, (BOOKMARK *, lpbkPosition))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), FreeBookmark, (BOOKMARK, bkPosition))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SortTable, (const SSortOrderSet *, lpSortCriteria), (ULONG, ulFlags))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QuerySortOrder, (LPSSortOrderSet *, lppSortCriteria))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryRows, (LONG, lRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Abort, (void))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), ExpandRow, (ULONG, cbInstanceKey), (LPBYTE, pbInstanceKey), (ULONG, ulRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows), (ULONG *, lpulMoreRows))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), CollapseRow, (ULONG, cbInstanceKey), (LPBYTE, pbInstanceKey), (ULONG, ulFlags), (ULONG *, lpulRowCount))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), WaitForCompletion, (ULONG, ulFlags), (ULONG, ulTimeout), (ULONG *, lpulTableStatus))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetCollapseState, (ULONG, ulFlags), (ULONG, cbInstanceKey), (LPBYTE, lpbInstanceKey), (ULONG *, lpcbCollapseState), (LPBYTE *, lppbCollapseState))
-DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SetCollapseState, (ULONG, ulFlags), (ULONG, cbCollapseState), (LPBYTE, pbCollapseState), (BOOKMARK *, lpbkLocation))

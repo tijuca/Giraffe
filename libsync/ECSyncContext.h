@@ -25,13 +25,11 @@
 #include <map>
 #include <set>
 #include <string>
-
-#include <IECChangeAdvisor.h>
-#include <IECChangeAdviseSink.h>
+#include <kopano/IECInterfaces.hpp>
+#include <kopano/memory.hpp>
 
 namespace KC {
 
-typedef	std::map<std::string, IStream *> StatusStreamMap;
 typedef std::map<std::string,SSyncState>	SyncStateMap;
 typedef	std::map<ULONG,ULONG>				NotifiedSyncIdMap;
 
@@ -53,11 +51,6 @@ public:
 	 *					The logger to log to.
 	 */
 	ECSyncContext(LPMDB lpStore, ECLogger *lpLogger);
-
-	/**
-	 * Destructor.
-	 */
-	~ECSyncContext();
 
 	/**
 	 * Get a pointer to the message store on which this sync context operates.
@@ -153,7 +146,7 @@ public:
 	 * Send a new mail notification through the current sync context.
 	 *
 	 * @Param[in]	lpNotification
-	 *					Pointer to a NOTIFICATION structure that will be send as the
+	 *					Pointer to a NOTIFICATION structure that will be sent as the
 	 *					new mail notification.
 	 */
 	HRESULT HrNotifyNewMail(LPNOTIFICATION lpNotification);
@@ -193,7 +186,7 @@ public:
 	 *
 	 * @return true if sync status streams have been loaded, false otherwise.
 	 */
-	bool    SyncStatusLoaded() const;
+	bool SyncStatusLoaded() const { return !m_mapSyncStatus.empty(); }
 
 	/**
 	 * Clear the sync status streams.
@@ -316,12 +309,12 @@ private:	// methods
 	 */
 	HRESULT HrReleaseChangeAdvisor();
 
-	LPMDB					m_lpStore;
-	ECLogger				*m_lpLogger;
+	KCHL::object_ptr<ECLogger> m_lpLogger;
+	KCHL::object_ptr<IMsgStore> m_lpStore;
 	ECSyncSettings			*m_lpSettings;
-	IECChangeAdvisor *m_lpChangeAdvisor = nullptr;
-	IECChangeAdviseSink *m_lpChangeAdviseSink = nullptr;
-	StatusStreamMap			m_mapSyncStatus;
+	KCHL::object_ptr<IECChangeAdviseSink> m_lpChangeAdviseSink;
+	KCHL::object_ptr<IECChangeAdvisor> m_lpChangeAdvisor;
+	std::map<std::string, KCHL::object_ptr<IStream>> m_mapSyncStatus;
 	SyncStateMap			m_mapStates;
 	NotifiedSyncIdMap		m_mapNotifiedSyncIds;
 	std::mutex m_hMutex;

@@ -19,8 +19,8 @@
 #define KC_KCORE_HPP 1
 
 #include <mapi.h>
+#include <mapidefs.h>
 #include <kopano/ECTags.h>
-#include <kopano/Trace.h>
 
 // We have 2 types of entryids: those of objects, and those of stores.
 // Objects have a store-relative path, however they do have a GUID to make
@@ -46,8 +46,6 @@
 // When this is a store EID, the szServer field is also set, and the ulId
 // points to the top-level object for the store. The other fields are the same.
 
-
-#pragma pack(push,1)
 // Entryid from version 6
 // Entryid version 1 (48 bytes)
 struct EID {
@@ -118,8 +116,7 @@ struct EID_V0 {
 	}
 };
 
-#pragma pack(pop)
-
+/* 36 bytes */
 struct ABEID {
 	BYTE	abFlags[4];
 	GUID	guid;
@@ -149,15 +146,22 @@ struct ABEID {
 	}
 };
 typedef struct ABEID *PABEID;
-#define _CbABEID(p)	((sizeof(ABEID)+strlen((char*)(p)->szExId))&~3)
-#define CbABEID(p)	(sizeof(ABEID)>_CbABEID((p))?sizeof(ABEID):_CbABEID((p)))
+#define CbABEID_2(p) ((sizeof(ABEID) + strlen((char *)(p)->szExId)) & ~3)
+#define CbABEID(p) (sizeof(ABEID) > CbABEID_2(p) ? sizeof(ABEID) : CbABEID_2(p))
+#define CbNewABEID_2(p) ((sizeof(ABEID) + strlen((char *)(p))) & ~3)
+#define CbNewABEID(p) (sizeof(ABEID) > CbNewABEID_2(p) ? sizeof(ABEID) : CbNewABEID_2(p))
 
-#define _CbNewABEID(p) 	((sizeof(ABEID)+strlen((char*)(p)))&~3)
-#define CbNewABEID(p)	(sizeof(ABEID)>_CbNewABEID((p))?sizeof(ABEID):_CbNewABEID((p)))
+static inline ULONG ABEID_TYPE(const ABEID *p)
+{
+	return p != nullptr ? p->ulType : -1;
+}
 
-#define ABEID_TYPE(p)	((p) ? ((ABEID *)(p))->ulType : -1)
-#define ABEID_ID(p)		((p) ? ((ABEID *)(p))->ulId : 0)
+template<typename T> static inline ULONG ABEID_ID(const T *p)
+{
+	return p != nullptr ? reinterpret_cast<const ABEID *>(p)->ulId : 0;
+}
 
+/* 36 bytes */
 struct SIEID {
 	BYTE	abFlags[4];
 	GUID	guid;
@@ -204,9 +208,9 @@ enum
     NUM_IDENTITY_PROPS      // Array size
 };
 
-#define TRANSPORT_ADDRESS_TYPE_SMTP		_T("SMTP")
-#define TRANSPORT_ADDRESS_TYPE_ZARAFA	_T("ZARAFA")
-#define TRANSPORT_ADDRESS_TYPE_FAX		_T("FAX")
+#define TRANSPORT_ADDRESS_TYPE_SMTP KC_T("SMTP")
+#define TRANSPORT_ADDRESS_TYPE_ZARAFA KC_T("ZARAFA")
+#define TRANSPORT_ADDRESS_TYPE_FAX KC_T("FAX")
 
 typedef EID * PEID;
 
@@ -368,6 +372,8 @@ typedef EID * PEID;
 //
 // Don't allow uid based authentication (Unix socket only)
 #define KOPANO_LOGON_NO_UID_AUTH		0x0001
+// Don't register session after authentication
+#define KOPANO_LOGON_NO_REGISTER_SESSION	0x0002
 
 // MTOM IDs
 #define MTOM_ID_EXPORTMESSAGES			"idExportMessages"

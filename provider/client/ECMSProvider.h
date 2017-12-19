@@ -20,35 +20,47 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
+#include <kopano/memory.hpp>
 #include "WSTransport.h"
 
 #include <string>
 
-class ECMSProvider _kc_final : public ECUnknown {
+class ECMSProvider _kc_final : public ECUnknown, public IMSProvider {
 protected:
 	ECMSProvider(ULONG ulFlags, const char *szClassName);
-	virtual ~ECMSProvider();
 public:
 	static  HRESULT Create(ULONG ulFlags, ECMSProvider **lppECMSProvider);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT Shutdown(ULONG * lpulFlags);
-	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
-	virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG lpcbSpoolSecurity, LPBYTE lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
+	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
+	virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG lpcbSpoolSecurity, LPBYTE lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
 	virtual HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult);
 
 private:
-	static HRESULT LogonByEntryID(WSTransport **lppTransport, sGlobalProfileProps *lpsProfileProps, ULONG cbEntryID, LPENTRYID lpEntryID);
-
-	class xMSProvider _kc_final : public IMSProvider {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMSProvider.hpp>
-	} m_xMSProvider;
+	static HRESULT LogonByEntryID(KCHL::object_ptr<WSTransport> &, sGlobalProfileProps *, ULONG eid_size, ENTRYID *eid);
 
 	ULONG			m_ulFlags;
 	std::string		m_strLastUser;
 	std::string		m_strLastPassword;
+	ALLOC_WRAP_FRIEND;
 };
 
+class ECMSProviderSwitch _kc_final : public ECUnknown, public IMSProvider {
+protected:
+	ECMSProviderSwitch(ULONG ulFlags);
+public:
+	static  HRESULT Create(ULONG ulFlags, ECMSProviderSwitch **lppMSProvider);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual HRESULT Shutdown(ULONG * lpulFlags);
+	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
+	virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG lpcbSpoolSecurity, LPBYTE lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
+	virtual HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult);
 
+protected:
+	
+	ULONG			m_ulFlags;
+	ALLOC_WRAP_FRIEND;
+};
 
 #endif // MSPROVIDER_H

@@ -61,9 +61,8 @@ ECTPropsPurge::~ECTPropsPurge()
  */
 void * ECTPropsPurge::Thread(void *param)
 {
-	ECTPropsPurge *lpThis = (ECTPropsPurge *)param;
-	lpThis->PurgeThread();
-	
+	kcsrv_blocksigs();
+	static_cast<ECTPropsPurge *>(param)->PurgeThread();
 	return NULL;
 }
 
@@ -125,40 +124,34 @@ ECRESULT ECTPropsPurge::PurgeThread()
  */
 ECRESULT ECTPropsPurge::PurgeOverflowDeferred(ECDatabase *lpDatabase)
 {
-	ECRESULT er;
     unsigned int ulCount = 0;
     unsigned int ulFolderId = 0;
     unsigned int ulMaxDeferred = atoi(m_lpConfig->GetSetting("max_deferred_records"));
     
-    if(ulMaxDeferred > 0) {
-		while(!m_bExit) {
-			er = GetDeferredCount(lpDatabase, &ulCount);
-			if(er != erSuccess)
-				return er;
-				
-			if(ulCount < ulMaxDeferred)
-				break;
-				
-			er = lpDatabase->Begin();
-			if(er != erSuccess)
-				return er;
-			
-			er = GetLargestFolderId(lpDatabase, &ulFolderId);
-			if(er != erSuccess) {
-				lpDatabase->Rollback();
-				return er;
-			}
-				
-			er = PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
-			if(er != erSuccess) {
-				lpDatabase->Rollback();
-				return er;
-			}
-				
-			er = lpDatabase->Commit();
-			if(er != erSuccess)
-				return er;
+	if (ulMaxDeferred == 0)
+		return erSuccess;
+	while (!m_bExit) {
+		auto er = GetDeferredCount(lpDatabase, &ulCount);
+		if (er != erSuccess)
+			return er;
+		if (ulCount < ulMaxDeferred)
+			break;
+		er = lpDatabase->Begin();
+		if (er != erSuccess)
+			return er;
+		er = GetLargestFolderId(lpDatabase, &ulFolderId);
+		if (er != erSuccess) {
+			lpDatabase->Rollback();
+			return er;
 		}
+		er = PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
+		if (er != erSuccess) {
+			lpDatabase->Rollback();
+			return er;
+		}
+		er = lpDatabase->Commit();
+		if (er != erSuccess)
+			return er;
 	}
 	return erSuccess;
 }
@@ -174,14 +167,12 @@ ECRESULT ECTPropsPurge::PurgeOverflowDeferred(ECDatabase *lpDatabase)
  */
 ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int *lpulCount)
 {
-    ECRESULT er = erSuccess;
 	DB_RESULT lpResult;
-    DB_ROW lpRow = NULL;
     
-    er = lpDatabase->DoSelect("SELECT count(*) FROM deferredupdate", &lpResult);
+	auto er = lpDatabase->DoSelect("SELECT count(*) FROM deferredupdate", &lpResult);
     if(er != erSuccess)
 		return er;
-    lpRow = lpDatabase->FetchRow(lpResult);
+	auto lpRow = lpResult.fetch_row();
     if(!lpRow || !lpRow[0]) {
 	ec_log_err("ECTPropsPurge::GetDeferredCount(): row or column null");
 		return KCERR_DATABASE_ERROR;
@@ -203,15 +194,12 @@ ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int *l
  */
 ECRESULT ECTPropsPurge::GetLargestFolderId(ECDatabase *lpDatabase, unsigned int *lpulFolderId)
 {
-    ECRESULT er = erSuccess;
 	DB_RESULT lpResult;
-    DB_ROW lpRow = NULL;
     
-    er = lpDatabase->DoSelect("SELECT folderid, COUNT(*) as c FROM deferredupdate GROUP BY folderid ORDER BY c DESC LIMIT 1", &lpResult);
+	auto er = lpDatabase->DoSelect("SELECT folderid, COUNT(*) as c FROM deferredupdate GROUP BY folderid ORDER BY c DESC LIMIT 1", &lpResult);
     if(er != erSuccess)
 		return er;
-        
-    lpRow = lpDatabase->FetchRow(lpResult);
+	auto lpRow = lpResult.fetch_row();
 	if (lpRow == nullptr || lpRow[0] == nullptr)
 		// Could be that there are no deferred updates, so give an appropriate error
 		return KCERR_NOT_FOUND;
@@ -232,22 +220,20 @@ ECRESULT ECTPropsPurge::GetLargestFolderId(ECDatabase *lpDatabase, unsigned int 
 // @todo, multiple threads call this function, which will cause problems
 ECRESULT ECTPropsPurge::PurgeDeferredTableUpdates(ECDatabase *lpDatabase, unsigned int ulFolderId)
 {
-	ECRESULT er = erSuccess;
 	unsigned int ulAffected;
 	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
 
-	std::string strQuery;
 	std::string strIn;
 	
 	// This makes sure that we lock the record in the hierarchy *first*. This helps in serializing access and avoiding deadlocks.
-	strQuery = "SELECT hierarchyid FROM deferredupdate WHERE folderid=" + stringify(ulFolderId);
-	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	std::string strQuery = "SELECT hierarchyid FROM deferredupdate WHERE folderid=" + stringify(ulFolderId);
+	auto er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-	if(lpDatabase->GetNumRows(lpDBResult) == 0)
+	if (lpDBResult.get_num_rows() == 0)
 		return erSuccess;
-	while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		strIn += lpDBRow[0];
 		strIn += ",";
 	}
@@ -261,7 +247,7 @@ ECRESULT ECTPropsPurge::PurgeDeferredTableUpdates(ECDatabase *lpDatabase, unsign
 		return er;
 			
 	strQuery = "REPLACE INTO tproperties (folderid, hierarchyid, tag, type, val_ulong, val_string, val_binary, val_double, val_longint, val_hi, val_lo) ";
-	strQuery += "SELECT " + stringify(ulFolderId) + ", p.hierarchyid, p.tag, p.type, val_ulong, LEFT(val_string, " + stringify(TABLE_CAP_STRING) + "), LEFT(val_binary, " + stringify(TABLE_CAP_BINARY) + "), val_double, val_longint, val_hi, val_lo FROM properties AS p FORCE INDEX(primary) JOIN deferredupdate FORCE INDEX(folderid) ON deferredupdate.hierarchyid=p.hierarchyid WHERE tag NOT IN(0x1009, 0x1013) AND deferredupdate.folderid = " + stringify(ulFolderId);
+	strQuery += "SELECT " + stringify(ulFolderId) + ", p.hierarchyid, p.tag, p.type, val_ulong, LEFT(val_string, " + stringify(TABLE_CAP_STRING) + "), LEFT(val_binary, " + stringify(TABLE_CAP_BINARY) + "), val_double, val_longint, val_hi, val_lo FROM properties AS p FORCE INDEX(primary) JOIN deferredupdate FORCE INDEX(folderid) ON deferredupdate.hierarchyid=p.hierarchyid WHERE tag NOT IN(4105, 4115) AND deferredupdate.folderid = " + stringify(ulFolderId);
 
 	er = lpDatabase->DoInsert(strQuery);
 	if(er != erSuccess)
@@ -278,19 +264,14 @@ ECRESULT ECTPropsPurge::PurgeDeferredTableUpdates(ECDatabase *lpDatabase, unsign
 
 ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsigned int *lpulCount)
 {
-	ECRESULT er = erSuccess;
 	DB_RESULT lpDBResult;
-	DB_ROW lpDBRow = NULL;
 	unsigned int ulCount = 0;
-	std::string strQuery;
 	
-	strQuery = "SELECT count(*) FROM deferredupdate WHERE folderid = " + stringify(ulFolderId);
-	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	std::string strQuery = "SELECT count(*) FROM deferredupdate WHERE folderid = " + stringify(ulFolderId);
+	auto er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-		
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	
+	auto lpDBRow = lpDBResult.fetch_row();
 	if(!lpDBRow || !lpDBRow[0])
 		ulCount = 0;
 	else
@@ -314,9 +295,7 @@ ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int ul
  */
 ECRESULT ECTPropsPurge::AddDeferredUpdate(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulFolderId, unsigned int ulOldFolderId, unsigned int ulObjId)
 {
-	ECRESULT er;
-
-	er = AddDeferredUpdateNoPurge(lpDatabase, ulFolderId, ulOldFolderId, ulObjId);
+	auto er = AddDeferredUpdateNoPurge(lpDatabase, ulFolderId, ulOldFolderId, ulObjId);
 	if (er != erSuccess)
 		return er;
 	return NormalizeDeferredUpdates(lpSession, lpDatabase, ulFolderId);
@@ -359,24 +338,17 @@ ECRESULT ECTPropsPurge::AddDeferredUpdateNoPurge(ECDatabase *lpDatabase, unsigne
  */
 ECRESULT ECTPropsPurge::NormalizeDeferredUpdates(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulFolderId)
 {
-	ECRESULT er;
-	unsigned int ulMaxDeferred = 0;
 	unsigned int ulCount = 0;
-		
-	ulMaxDeferred = atoui(lpSession->GetSessionManager()->GetConfig()->GetSetting("max_deferred_records_folder"));
+	auto ulMaxDeferred = atoui(lpSession->GetSessionManager()->GetConfig()->GetSetting("max_deferred_records_folder"));
 	
-	if (ulMaxDeferred) {
-		er = GetDeferredCount(lpDatabase, ulFolderId, &ulCount);
-		if (er != erSuccess)
-			return er;
-			
-		if (ulCount >= ulMaxDeferred) {
-			er = PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
-			if (er != erSuccess)
-				return er;
-		}
-	}
-	return erSuccess;
+	if (ulMaxDeferred == 0)
+		return erSuccess;
+	auto er = GetDeferredCount(lpDatabase, ulFolderId, &ulCount);
+	if (er != erSuccess)
+		return er;
+	if (ulCount < ulMaxDeferred)
+		return erSuccess;
+	return PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
 }
 
 } /* namespace */

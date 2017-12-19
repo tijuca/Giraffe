@@ -21,24 +21,25 @@
 #include <kopano/zcdefs.h>
 #include <mutex>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include "WSTransport.h"
 #include "ECNotifyClient.h"
 #include <set>
+#include <kopano/memory.hpp>
 
 /*
  * This is the superclass which contains common code for the Hierarchy and Contents
  * tables implementations
  */
 
-class ECMAPITable _kc_final : public ECUnknown {
+class ECMAPITable _kc_final : public ECUnknown, public IMAPITable {
 protected:
-	ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags);
+	ECMAPITable(const std::string &name, ECNotifyClient *, ULONG flags);
 	virtual ~ECMAPITable();
 
 
 public:
-	static	HRESULT Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable);
-
+	static HRESULT Create(const std::string &name, ECNotifyClient *, ULONG flags, ECMAPITable **);
 	virtual HRESULT HrSetTableOps(WSTableView *lpTableOps, bool fLoad);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual BOOL IsDeferred();
@@ -54,8 +55,8 @@ public:
 	virtual HRESULT SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRowsSought) ;
 	virtual HRESULT SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator);
 	virtual HRESULT QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *lpulDenominator);
-	virtual HRESULT FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags);
-	virtual HRESULT Restrict(LPSRestriction lpRestriction, ULONG ulFlags);
+	virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) override;
+	virtual HRESULT Restrict(const SRestriction *, ULONG flags) override;
 	virtual HRESULT CreateBookmark(BOOKMARK* lpbkPosition);
 	virtual HRESULT FreeBookmark(BOOKMARK bkPosition);
 	virtual HRESULT SortTable(const SSortOrderSet *, ULONG flags);
@@ -70,30 +71,25 @@ public:
 
 	static HRESULT Reload(void *lpParam);
 
-	class xMAPITable _kc_final : public IMAPITable {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPITable.hpp>
-	} m_xMAPITable;
-
 private:
 	std::recursive_mutex m_hLock;
 	WSTableView			*lpTableOps;
 	ECNotifyClient		*lpNotifyClient;
-	LPSPropTagArray		lpsPropTags;
-	LPSSortOrderSet		lpsSortOrderSet;
+	KCHL::memory_ptr<SSortOrderSet> lpsSortOrderSet;
 	ULONG				ulFlags; // Currently unused
 	std::set<ULONG>		m_ulConnectionList;
 	std::recursive_mutex m_hMutexConnectionList;
 	
 	// Deferred calls
 	ULONG				m_ulDeferredFlags;
-	LPSPropTagArray 	m_lpSetColumns;
-	LPSRestriction		m_lpRestrict;
-	LPSSortOrderSet		m_lpSortTable;
+	KCHL::memory_ptr<SPropTagArray> m_lpSetColumns;
+	KCHL::memory_ptr<SRestriction> m_lpRestrict;
+	KCHL::memory_ptr<SSortOrderSet> m_lpSortTable;
 	ULONG				m_ulRowCount;
 	ULONG				m_ulFlags;		// Flags from queryrows
 	
 	std::string			m_strName;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // ECMAPITABLE_H

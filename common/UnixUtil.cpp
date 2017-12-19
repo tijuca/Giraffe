@@ -34,14 +34,13 @@
 #include <sys/resource.h>
 
 #include <string>
-using namespace std;
 
 namespace KC {
 
 static int unix_runpath(ECConfig *conf)
 {
 	const char *path = conf->GetSetting("running_path");
-	int ret;
+	int ret = 0;
 
 	if (path != NULL) {
 		ret = chdir(path);
@@ -139,19 +138,55 @@ int unix_chown(const char *filename, const char *username, const char *groupname
 	return chown(filename, uid, gid);
 }
 
-void unix_coredump_enable(void)
+static int linux_sysctl1(const char *tunable)
 {
-	struct rlimit limit;
+	/*
+	 * Read one byte from a sysctl file. No effect on non-Linux or
+	 * when procfs is not mounted.
+	 */
+	auto fp = fopen(tunable, "r");
+	if (fp == nullptr)
+		return -1; /* indeterminate */
+	auto c = fgetc(fp);
+	fclose(fp);
+	return c == EOF ? '\0' : c;
+}
 
+void unix_coredump_enable(const char *mode)
+{
+	if (strcasecmp(mode, "systemdefault") == 0) {
+		ec_log_info("Coredump status left at system default.");
+		return;
+	}
+	struct rlimit limit;
+	if (!parseBool(mode)) {
+		limit.rlim_cur = limit.rlim_max = 0;
+		if (setrlimit(RLIMIT_CORE, &limit) == 0)
+			ec_log_notice("Coredumps are disabled via configuration file.");
+		return;
+	}
+	if (linux_sysctl1("/proc/sys/fs/suid_dumpable") == '0')
+		ec_log_err("Coredumps will not be generated: kopano-server requires the fs.suid_dumpable sysctl to contain the value 2, not 0.");
+	else if (linux_sysctl1("/proc/sys/kernel/core_pattern") == '\0')
+		ec_log_err("Coredumps are not enabled in the OS: sysctl kernel.core_pattern is empty.");
 	limit.rlim_cur = RLIM_INFINITY;
 	limit.rlim_max = RLIM_INFINITY;
-	if (setrlimit(RLIMIT_CORE, &limit) < 0)
-		ec_log_err("Unable to raise coredump filesize limit: %s", strerror(errno));
+	if (setrlimit(RLIMIT_CORE, &limit) < 0) {
+		int err = errno;
+		limit.rlim_cur = 0;
+		limit.rlim_max = 0;
+		getrlimit(RLIMIT_CORE, &limit);
+		ec_log_err("Cannot set coredump limit to infinity: %s. Current limit: %llu bytes.",
+			strerror(err), static_cast<unsigned long long>(limit.rlim_cur));
+	}
 }
 
 int unix_create_pidfile(const char *argv0, ECConfig *lpConfig, bool bForce)
 {
-	string pidfilename = "/var/run/kopano/" + string(argv0) + ".pid";
+	auto progname = strrchr(argv0, '/');
+	if (progname == nullptr)
+		progname = argv0;
+	auto pidfilename = std::string("/var/run/kopano/") + progname + ".pid";
 	FILE *pidfile;
 	int oldpid;
 	char tmp[256];
@@ -378,6 +413,7 @@ bool unix_system(const char *lpszLogName, const std::vector<std::string> &cmd,
 	auto cmdtxt = "\"" + kc_join(cmd, "\" \"") + "\"";
 	int fdin = 0, fdout = 0;
 	int pid = unix_popen_rw(argv.get(), &fdin, &fdout, env);
+	ec_log_debug("Running command: %s", cmdtxt.c_str());
 	if (pid < 0) {
 		ec_log_debug("popen(%s) failed: %s", cmdtxt.c_str(), strerror(errno));
 		return false;
@@ -402,7 +438,7 @@ bool unix_system(const char *lpszLogName, const std::vector<std::string> &cmd,
 	if (waitpid(pid, &status, 0) < 0)
 		return false;
 	if (status == -1) {
-		ec_log_err(string("System call \"system\" failed: ") + strerror(errno));
+		ec_log_err(std::string("System call \"system\" failed: ") + strerror(errno));
 		return false;
 	}
 	bool rv = true;

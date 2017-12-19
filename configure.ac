@@ -1,8 +1,15 @@
 AC_PREREQ(2.60)
-m4_define([xm4_pkg_version], esyscmd([tr -d '\n' <version.in]))
-AC_INIT([kopano], [xm4_pkg_version], [development@kopano.io])
+AC_INIT([kopano], [8.4.90], [development@kopano.io])
+
+dnl ABI tags are used to prevent inadvertent mixing of wildly different
+dnl versions of KC components without knowing it.
+dnl Development cycle: ABI changes frequently, don't bother with the tag
+dnl  -> versions 8.4.90 through 8.4.99 use ABI tag "8.4.90"
+dnl Maintenance cycle: ABI ought to not change, hence no tag change
+dnl  -> versions 8.5 through 8.5.89 use ABI tag "8.5"
+PACKAGE_ABI=8.4.90
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
-AC_CONFIG_HEADERS([common/config.h common/include/kopano/zconfig.h])
+AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([autoconf])
 AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
@@ -21,9 +28,10 @@ AC_PROG_INSTALL
 AC_PROG_SED
 PKG_PROG_PKG_CONFIG
 
-PACKAGE_ABI=$($SED 's/\([[0-9]][[0-9]]*\.[[0-9]][[0-9]]*\).*/\1/' <"$srcdir/version.in")
+# configure may rerun as part of git-checking out a different version,
+# so remove stale version
+rm -f version
 AC_SUBST([PACKAGE_ABI])
-AS_IF([test -z "$PACKAGE_ABI"], [AC_MSG_ERROR([Something was not right with a sed call of ours])])
 abs_top_srcdir=`cd $srcdir; pwd`
 abs_top_builddir=`pwd`
 
@@ -74,7 +82,8 @@ ZCPPFLAGS="$ZCPPFLAGS \
 	-I\${top_srcdir}/ECtools/archiver/include \
 	-I\${top_srcdir}/inetmapi/include \
 	-I\${top_srcdir}/swig/include \
-	-I\${top_srcdir}/swig/python/include"
+	-I\${top_srcdir}/swig/python/include \
+	-I\${top_srcdir}"
 ZCXXFLAGS="-Wall -Wmissing-declarations"
 
 # programs that use files >2GB need 64-bit file support
@@ -113,12 +122,10 @@ if test "$want_release" = "yes"; then
     ZCPPFLAGS="$ZCPPFLAGS -DNDEBUG"
     ZCXXFLAGS="$ZCXXFLAGS -O2 -fno-strict-aliasing"
 else
-# -fPIC must be present on x86_64 when -O2 isn't used
-    ZCXXFLAGS="$ZCXXFLAGS -fPIC"
-    ZCXXFLAGS="$ZCXXFLAGS -pedantic -Wno-long-long"
+    ZCXXFLAGS="$ZCXXFLAGS -Wno-long-long"
 fi
 
-AC_ARG_ENABLE([unicode], AS_HELP_STRING([--enable-unicode], [enable unicode mode (compile flags -DUNICODE)]),
+AC_ARG_ENABLE([unicode], AS_HELP_STRING([--disable-unicode], [enable unicode mode (compile flag -DUNICODE)]),
   [want_unicode=${enableval}],[want_unicode=yes])
 SWIG_FLAGS=""
 if test "$want_unicode" = "yes"; then
@@ -132,11 +139,10 @@ AC_MSG_CHECKING([specified Linux distribution name])
 AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, suse or sles]),
   [with_distro=${withval}],[with_distro=rhel])
 if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a \
-   "$with_distro" != "sles" -a "$with_distro" != "cbs4" -a \
-   "$with_distro" != "debian"; then
-	AC_MSG_ERROR([unknown distro])
+   "$with_distro" != "sles"; then
+	AC_MSG_ERROR([no initscript for $with_distro known])
 else
-	AC_MSG_RESULT([using $with_distro])
+	AC_MSG_RESULT([$with_distro])
 fi
 DISTRO=$with_distro
 ],
@@ -147,10 +153,15 @@ AC_SUBST(DISTRO)
 dnl These are the only two I will allow to edit LIBS
 AC_ARG_WITH([asan], AS_HELP_STRING([--with-asan], [Activate Address Sanitizer]),
 	[ZCXXFLAGS="$ZCXXFLAGS -fsanitize=address"])
+dnl Cannot reliably mix hidden visibility with UBSAN currently
+dnl [https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80963]
+NO_VSYM=""
 AC_ARG_WITH([ubsan], AS_HELP_STRING([--with-ubsan], [Activate Undefined Behavior Sanitizer]),
-	[ZCXXFLAGS="$ZCXXFLAGS -fsanitize=undefined"])
+	[ZCXXFLAGS="$ZCXXFLAGS -fsanitize=undefined"; VISCXXFLAGS=""; NO_VSYM=1],
+	[ZCXXFLAGS="$ZCXXFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"])
+AC_SUBST([NO_VSYM])
 
-AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debug mode (Adds debug code)]),
+AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [Enable debug mode (adds debug code, not the -g flag)]),
   [want_debug=${enableval}],[want_debug=no])
 if test "$want_debug" = "yes"; then
     DEBUGFLAGS="-DDEBUG"
@@ -177,12 +188,6 @@ AC_ARG_ENABLE(coverage,
 		ZLDFLAGS="$ZLDFLAGS -lgcov"
 	  fi
     ])
-
-# MAPI config files
-AC_ARG_WITH(mapi-configdir,
-  AS_HELP_STRING([--with-mapi-configdir=PATH], [path to install the libmapi config (provider) files (default /etc/mapi)]),
-  [MAPICONFIGDIR=${withval}],[MAPICONFIGDIR='${sysconfdir}/mapi'])
-AC_SUBST(MAPICONFIGDIR)
 
 # user create scripts location
 AC_ARG_WITH(userscript-prefix,
@@ -264,7 +269,7 @@ LIBNCURSES_WITH_CONFIG
 
 AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h malloc.h])
 AC_CHECK_FUNCS([mallinfo timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
-
+AC_CHECK_MEMBERS([siginfo_t.si_fd siginfo_t.si_utime], [], [], [#include <csignal>])
 
 #
 # find required/optional libraries
@@ -285,68 +290,20 @@ AS_IF([test "$with_php" != "no"], [
 AM_CONDITIONAL([WITH_PHP5], [test "$with_php" = 5])
 AM_CONDITIONAL([WITH_PHP7], [test "$with_php" = 7])
 
-# Checks for libxml2
-AC_DEFUN([LIBXML_WITH_XML2_CONFIG],[
-  AC_ARG_WITH([xml2-config], AS_HELP_STRING([--with-xml2-config=PATH], [path to the xml2-config script of libxml2]),
-    [XML2_CONFIG=${withval}],[XML2_CONFIG=xml2-config])
-
-  AC_MSG_CHECKING([for xml2-config presence])
-  XML2_CONFIG=`which $XML2_CONFIG 2>/dev/null`
-  if ! test -x "$XML2_CONFIG"; then
-    AC_MSG_ERROR([cannot execute $XML2_CONFIG, install libxml2-dev])
-  else
-    AC_MSG_RESULT([$XML2_CONFIG])
-
-    XML2_CFLAGS=`$XML2_CONFIG --cflags`
-    XML2_LIBS=`$XML2_CONFIG --libs`
-
-    AC_SUBST(XML2_CFLAGS)
-    AC_SUBST(XML2_LIBS)
-
-    dnl check correctness of lib
-    CXXFLAGS="$CXXFLAGS $XML2_CFLAGS"
-    LIBS="$LIBS $XML2_LIBS"
-    AC_MSG_CHECKING([acquired XML2 settings])
-    AC_LINK_IFELSE([
-      AC_LANG_SOURCE([
-#include <libxml/xmlwriter.h>
-int main() {
-   	xmlNewTextWriterMemory(NULL, 0);
-}
-      ]) ], [ AC_MSG_RESULT([ok]) ], [ AC_MSG_ERROR([broken])
-    ])
-    LIBS=$LIBS_system
-    CXXFLAGS=$CXXFLAGS_system
-  fi
-])
-LIBXML_WITH_XML2_CONFIG
-AM_CONDITIONAL([WITH_XML2], [test "$XML2_CONFIG" != "" -a -x "`which $XML2_CONFIG 2>/dev/null`"])
+PKG_CHECK_MODULES([XML2], [libxml-2.0])
 
 # Checks for MySQL 4.1 or better
 AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
   AC_PATH_PROGS([MYSQL_CONFIG], [mysql_config mariadb_config])
-  AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
+  AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql]),
     [MYSQL_CONFIG="$withval"])
-
-  AC_ARG_ENABLE([embedded-mysql], AS_HELP_STRING([--enable-embedded-mysql], [Compile server with the embedded MySQL server]),
-  [
-	EMBEDDED=1
-	ZCPPFLAGS="$ZCPPFLAGS -DEMBEDDED_MYSQL"
-  ],[
-	EMBEDDED=0
-  ])
-
+  AS_IF([test -z "$MYSQL_CONFIG"], [AC_MSG_ERROR([mysql config program not found])])
   MYSQL_INCLUDES=`$MYSQL_CONFIG --include`
-  if test "$EMBEDDED" -eq 1; then
-    MYSQL_LIBS=`$MYSQL_CONFIG --libmysqld-libs`
-  else
-    MYSQL_LIBS=`$MYSQL_CONFIG --libs`
-  fi
-  
-  MYSQL_VERSION=`$MYSQL_CONFIG --version`
+  MYSQL_LIBS=`$MYSQL_CONFIG --libs`
+  MYSQL_VERSION=`$MYSQL_CONFIG --version` # see if it's there
 
   if test -z "$MYSQL_VERSION"; then
-    AC_MSG_ERROR(Cannot find mysql_config. Please use --with-mysql-config=PATH or install libmysqlclient-dev)
+    AC_MSG_ERROR([Cannot find a mysql installation. Please use --with-mysql-config=PATH or install libmysqlclient-dev.])
   fi
 
   AC_SUBST(MYSQL_INCLUDES)
@@ -360,10 +317,11 @@ AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
 ])
 MYSQL_WITH_MYSQL_CONFIG
 
-# test for precense of mysql 5.0.7 function
 CXXFLAGS="$CXXFLAGS $MYSQL_INCLUDES"
 LIBS="$LIBS $MYSQL_LIBS"
-AC_CHECK_FUNCS([mysql_set_character_set])
+dnl get_option: mysql 5.7.0
+dnl set_character_set: mysql 5.0.7
+AC_CHECK_FUNCS([mysql_get_option mysql_set_character_set])
 LIBS=$LIBS_system
 CXXFLAGS=$CXXFLAGS_system
 
@@ -429,26 +387,27 @@ CXXFLAGS="$CXXFLAGS_system $ZCXXFLAGS"
 LDFLAGS="$LDFLAGS_system $ZLDFLAGS"
 AC_CHECK_FUNCS([pthread_getname_np])
 
+AC_MSG_CHECKING([for soapcpp2])
+mkdir "conftest.d$$"
+if ! soapcpp2 -d "conftest.d$$" -z1 "${srcdir}/autoconf/1126.h" 2>"conftest.d$$/fail.log"; then
+	cat "conftest.d$$/fail.log" || :
+	AC_MSG_ERROR([Failed to run soapcpp])
+	exit 1
+fi
+if grep -Fq "int foo" "conftest.d$$/soapStub.h" 2>/dev/null; then
+	AC_MSG_ERROR([ERROR: gsoap generator is too old -- version 2.8.49 or higher is required. http://sf.net/p/gsoap2/bugs/1126/])
+	exit 1
+fi
+AC_MSG_RESULT([ok])
+rm -Rf "conftest.d$$"
+
 dnl Stupid gsoap not abstracting properly! If our -Ds do not match with what
 dnl gsoap was compiled with, we are in trouble.
 GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -DHAVE_OPENSSL_SSL_H -DHAVE_ZLIB_H"
 GSOAP_LIBS="-lgsoapssl++"
 AC_SUBST(GSOAP_CFLAGS)
 AC_SUBST(GSOAP_LIBS)
-
-ICAL_CFLAGS=""
-ICAL_LIBS="-lical -licalss -licalvcal"
-AC_ARG_WITH(ical-prefix,
-  AS_HELP_STRING([--with-ical-prefix=PATH], [libical prefix, e.g. /usr/local, default /usr]),
-  [
-  ICAL_PREFIX="${withval}"
-  ICAL_CFLAGS="$ICAL_CFLAGS -I$ICAL_PREFIX/include"
-  # Hardcoding directories is bad… they may contain libraries of mismatching archictecture
-  ICAL_LIBS="$ICAL_LIBS -L$ICAL_PREFIX/lib -L$ICAL_PREFIX/lib64 -R$ICAL_PREFIX/lib -R$ICAL_PREFIX/lib64"
-  ])
-AC_SUBST(ICAL_CFLAGS)
-AC_SUBST(ICAL_LIBS)
-
+PKG_CHECK_MODULES([ICAL], [libical >= 0.42])
 PKG_CHECK_MODULES([curl], [libcurl], [], [:])
 CPPFLAGS="$CPPFLAGS $curl_CFLAGS"
 AC_CHECK_HEADERS([curl/curl.h])
@@ -536,8 +495,16 @@ iconv_t i; i = iconv_open("", "");
 AC_SUBST(ICONV_LIBS)
 LIBS=$LIBS_system
 
-AC_SEARCH_LIBS([crypt_r], [crypt], [CRYPT_LIBS="-lcrypt"; LIBS="$LIBS_system"])
+AC_SEARCH_LIBS([crypt_r], [crypt], [
+	AS_IF([test "$LIBS" = "$LIBS_system"], [CRYPT_LIBS=""], [CRYPT_LIBS="-lcrypt"])
+])
+LIBS="$LIBS_system"
+AC_SEARCH_LIBS([clock_gettime], [rt], [
+	AS_IF([test "$LIBS" = "$LIBS_system"], [clock_LIBS=""], [clock_LIBS="-lrt"])
+])
+LIBS="$LIBS_system"
 AC_SUBST([CRYPT_LIBS])
+AC_SUBST([clock_LIBS])
 PKG_CHECK_EXISTS([libssl],
 	[
 		PKG_CHECK_MODULES([SSL], [libssl], [], [ssl_LIBS=-lssl])
@@ -614,12 +581,6 @@ AC_DEFUN([LIBKRB5_WITH_KRB5_CONFIG],[
 LIBKRB5_WITH_KRB5_CONFIG
 AM_CONDITIONAL([WITH_KRB5], [test "$KRB5_LIBS" != ""])
 
-# libcurl for report
-if ! test "$want_oss" = "yes"; then
-AC_CHECK_LIB([curl], [curl_easy_perform], [CURL_LIBS="-lcurl"], AC_MSG_ERROR([required library libcurl missing or unusable]))
-AC_SUBST(CURL_LIBS)
-fi # oss only
-
 # Check for libs3 amazon s3 availability
 LIBS_system="$LIBS"
 AC_CHECK_HEADERS([libs3.h])
@@ -664,11 +625,17 @@ AC_CHECK_FUNCS([epoll_create])
 ZCPPFLAGS="$ZCPPFLAGS -DUSE_EPOLL"
 fi
 
+tidy_CPPFLAGS="-I/usr/include/tidy"
+CPPFLAGS="$CPPFLAGS $tidy_CPPFLAGS"
+AC_CHECK_HEADERS([tidy.h])
+AM_CONDITIONAL([HAVE_TIDY], [test "x$ac_cv_header_tidy_h" = "xyes"])
+AC_SUBST([tidy_CPPFLAGS])
+CPPFLAGS="$CPPFLAGS_system"
+
 dnl The "Locale" class is in icu-uc.
 dnl The "CollationKey" class is in icu-i18n.
 req_icu_uc="icu-uc"
 req_icu_i18n="icu-i18n"
-AC_ARG_ENABLE([icu], AS_HELP_STRING([--enable-icu], [enable icu support]), [want_icu=${enableval}], [want_icu=auto])
 PKG_CHECK_EXISTS([icu-uc], [have_icu=1], [have_icu=0])
 PKG_CHECK_EXISTS([icu-i18n], [have_icu=1], [have_icu=0])
 AS_IF([test "$have_icu" = 1], [AC_MSG_RESULT([Found ICU with modern pkg-config files])])
@@ -702,13 +669,9 @@ AS_IF([test "$have_icu" = 2], [
 	AC_SUBST([icu_uc_LIBS])
 	AC_SUBST([icu_i18n_LIBS])
 ])
-AS_IF([test "$want_icu" = "yes" && test "$have_icu" = 0], [
-	AC_MSG_ERROR([ICU was requested but not found])
+AS_IF([test "$have_icu" = 0], [
+	AC_MSG_ERROR([ICU is required but not found])
 ])
-AS_IF([test "$have_icu" != 0], [
-	AC_DEFINE([KC_USES_ICU], [1], [Defined if KC was built with ICU])
-])
-AM_CONDITIONAL([HAVE_ICU], [test "$have_icu" -ne 0])
 ZCPPFLAGS="$ZCPPFLAGS $icu_uc_CFLAGS $icu_i18n_CFLAGS"
 
 # all libs for programs, because functions are in static common stuff
@@ -725,15 +688,21 @@ AC_SUBST([ZCXXFLAGS])
 AC_SUBST([AM_CXXFLAGS])
 AC_SUBST([AM_LDFLAGS])
 
-
-AC_PATH_PROG(PROG_ANT, ant)		# not an error if not found, no 'make dist' (waxt package)
-AC_PATH_PROG([SWIG_EXEC], [swig])
-AS_IF([test "x$SWIG_EXEC" = "x"], [AC_MSG_ERROR([Cannot find swig binary])])
-AM_PATH_PYTHON([2.5])
-PYTHON_LIBS=$("$PYTHON" -c "import sys; import distutils.sysconfig as x; print('-lpython' + x.get_config_var('VERSION') + getattr(sys, 'abiflags', '') + ' ' + x.get_config_var('LIBS') + ' ' + x.get_config_var('SYSLIBS'))")
-PYTHON_INCLUDES=$("$PYTHON" -c "import distutils.sysconfig as x; print('-I' + x.get_python_inc())")
-AC_SUBST([PYTHON_LIBS])
-AC_SUBST([PYTHON_INCLUDES])
+AH_TEMPLATE([ENABLE_PYTHON], [Build dagent/spooler with Python plugin support])
+AC_ARG_ENABLE([python], [AS_HELP_STRING([--enable-python], [Enable building of Python bindings (default: auto)])],
+	[want_python="$enableval"], [want_python=auto])
+AS_IF([test "$want_python" != no], [
+	PKG_CHECK_MODULES([PYTHON], [python], [], [:])
+	AS_IF([test -n "$PYTHON_LIBS"], [
+		AC_PATH_PROG([SWIG_EXEC], [swig])
+		AM_PATH_PYTHON([2.5])
+		AS_IF([test -z "$SWIG_EXEC"], [AC_MSG_ERROR([swig is required for Python])])
+		AC_DEFINE([ENABLE_PYTHON], [1])
+	], [test "$want_python" = yes], [
+		AC_MSG_ERROR([python requested but not satisfiable])
+	])
+])
+AM_CONDITIONAL([ENABLE_PYTHON], [test "$want_python" != no -a -n "$PYTHON_LIBS"])
 
 
 #
@@ -749,6 +718,7 @@ AC_CONFIG_FILES([Makefile
 		common/include/kopano/Makefile
 		ECtools/archiver/include/kopano/Makefile
 		ECtools/backup/Makefile
+		ECtools/cli/Makefile
 		ECtools/presence/Makefile
 		ECtools/search/Makefile
 		ECtools/migration-pst/Makefile
@@ -782,22 +752,30 @@ AC_CONFIG_FILES([Makefile
 		mapi4linux/src/libkchl.sym
 		provider/plugin.sym provider/provider.sym
 		provider/libkcserver.sym provider/libkcsoap.sym
-		version
 ])
 
 # Python tools
 
 AC_CONFIG_FILES([ECtools/search/kopano-search], [chmod +x ECtools/search/kopano-search])
 AC_CONFIG_FILES([ECtools/backup/kopano-backup], [chmod +x ECtools/backup/kopano-backup])
+AC_CONFIG_FILES([ECtools/cli/kopano-cli], [chmod +x ECtools/cli/kopano-cli])
 AC_CONFIG_FILES([ECtools/presence/kopano-presence], [chmod +x ECtools/presence/kopano-presence])
 AC_CONFIG_FILES([ECtools/migration-pst/kopano-migration-pst], [chmod +x ECtools/migration-pst/kopano-migration-pst])
+AC_CONFIG_FILES([ECtools/spamd/kopano-spamd], [chmod +x ECtools/spamd/kopano-spamd])
+AC_CONFIG_FILES([installer/linux/kopano-mr-accept.py], [chmod +x installer/linux/kopano-mr-accept.py])
+AC_CONFIG_FILES([installer/linux/kopano-mr-process.py], [chmod +x installer/linux/kopano-mr-process.py])
+AC_CONFIG_FILES([installer/linux/kopano-autorespond.py], [chmod +x installer/linux/kopano-autorespond.py])
+AC_CONFIG_FILES([ECtools/search/kopano_search/version.py], [])
+AC_CONFIG_FILES([ECtools/backup/kopano_backup/version.py], [])
+AC_CONFIG_FILES([ECtools/cli/kopano_cli/version.py], [])
+AC_CONFIG_FILES([ECtools/spamd/kopano_spamd/version.py], [])
+AC_CONFIG_FILES([swig/python/kopano/kopano/version.py], [])
 
 AC_OUTPUT
 $LN_TFSV "$abs_top_srcdir" "@"
 
 AC_MSG_RESULT([
 Install prefix	:	$prefix
-Mapiconfig dir	:	$MAPICONFIGDIR
 Userscript dir	:	$USERSCRIPTDIR
 Quota dir	:	$QUOTATEMPLATEDIR
 Search scripts dir	:	$SEARCHSCRIPTSDIR
@@ -827,12 +805,12 @@ Clients libs	:	$PROG_LIBS
 LDAP support	:	$want_ldap
 LDAP flags	:	$LDAP_FLAGS
 LDAP libs	:	$LDAP_LIBS
-Curl libs	:	$CURL_LIBS
+Curl libs	:	$curl_LIBS
 Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
 S3 lib		:	$s3_LIBS
 ICU libs	:	$icu_uc_LIBS $icu_i18n_LIBS
-Python flags	:	$PYTHON_INCLUDES
+Python flags	:	$PYTHON_CFLAGS
 Python libs	:	$PYTHON_LIBS
 ])

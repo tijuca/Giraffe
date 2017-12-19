@@ -22,8 +22,6 @@
 #include <kopano/mapiext.h>
 #include "nameids.h"
 
-using namespace std;
-
 namespace KC {
 
 /** 
@@ -39,12 +37,10 @@ namespace KC {
  */
 HRESULT HrGetFbInfo(icalcomponent *lpFbcomp, time_t *lptStart, time_t *lptEnd, std::string *lpstrUID, std::list<std::string> *lstUsers)
 {
-	HRESULT hr = hrSuccess;
-	icalproperty *lpicProp = NULL;
 	std::string strEmail;
 
 	// DTSTART
-	lpicProp = icalcomponent_get_first_property(lpFbcomp, ICAL_DTSTART_PROPERTY);
+	auto lpicProp = icalcomponent_get_first_property(lpFbcomp, ICAL_DTSTART_PROPERTY);
 	if (lpicProp)
 		*lptStart = icaltime_as_timet (icalproperty_get_dtstart (lpicProp));
 
@@ -59,17 +55,16 @@ HRESULT HrGetFbInfo(icalcomponent *lpFbcomp, time_t *lptStart, time_t *lptEnd, s
 		*lpstrUID = icalproperty_get_uid(lpicProp);
 
 	// ATTENDEE
-	lpicProp = icalcomponent_get_first_property(lpFbcomp, ICAL_ATTENDEE_PROPERTY);
-	while (lpicProp) {
+	for (lpicProp = icalcomponent_get_first_property(lpFbcomp, ICAL_ATTENDEE_PROPERTY);
+	     lpicProp != nullptr;
+	     lpicProp = icalcomponent_get_next_property(lpFbcomp, ICAL_ATTENDEE_PROPERTY))
+	{
 		strEmail = icalproperty_get_attendee(lpicProp);
-		if (strncasecmp(strEmail.c_str(), "mailto:", 7) == 0) {
+		if (strncasecmp(strEmail.c_str(), "mailto:", 7) == 0)
 			strEmail.erase(0, 7);
-		}
-		lstUsers->push_back(std::move(strEmail));
-		lpicProp = icalcomponent_get_next_property(lpFbcomp, ICAL_ATTENDEE_PROPERTY);
+		lstUsers->emplace_back(std::move(strEmail));
 	}
-
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -88,22 +83,17 @@ HRESULT HrGetFbInfo(icalcomponent *lpFbcomp, time_t *lptStart, time_t *lptEnd, s
  */
 HRESULT HrFbBlock2ICal(FBBlock_1 *lpsFbblk, LONG ulBlocks, time_t tDtStart, time_t tDtEnd, const std::string &strOrganiser, const std::string &strUser, const std::string &strUID, icalcomponent **lpicFbComponent)
 {
-	icalcomponent *lpFbComp = NULL;
-	icaltimetype ittStamp;
-	icalproperty *lpicProp = NULL;
 	icalperiodtype icalPeriod;
-	icalparameter *icalParam = NULL;
 	time_t tStart = 0;
 	time_t tEnd = 0;
-	std::string strEmail;
 
-	lpFbComp = icalcomponent_new(ICAL_VFREEBUSY_COMPONENT);
+	auto lpFbComp = icalcomponent_new(ICAL_VFREEBUSY_COMPONENT);
 	if (lpFbComp == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	
 	//DTSTART
-	ittStamp = icaltime_from_timet_with_zone(tDtStart, false, icaltimezone_get_utc_timezone());	
-	lpicProp = icalproperty_new(ICAL_DTSTART_PROPERTY);
+	auto ittStamp = icaltime_from_timet_with_zone(tDtStart, false, icaltimezone_get_utc_timezone());
+	auto lpicProp = icalproperty_new(ICAL_DTSTART_PROPERTY);
 	if (lpicProp == NULL)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	icalproperty_set_value(lpicProp, icalvalue_new_datetime(ittStamp));
@@ -140,13 +130,13 @@ HRESULT HrFbBlock2ICal(FBBlock_1 *lpsFbblk, LONG ulBlocks, time_t tDtStart, time
 	icalcomponent_add_property(lpFbComp, lpicProp);
 	
 	//ATTENDEE
-	strEmail = "mailto:" + strUser;
+	auto strEmail = "mailto:" + strUser;
 	lpicProp = icalproperty_new_attendee(strEmail.c_str());
 	if (lpicProp == NULL)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	
 	// param PARTSTAT
-	icalParam = icalparameter_new_partstat(ICAL_PARTSTAT_ACCEPTED);
+	auto icalParam = icalparameter_new_partstat(ICAL_PARTSTAT_ACCEPTED);
 	icalproperty_add_parameter(lpicProp, icalParam);
 	
 	// param CUTYPE

@@ -23,8 +23,7 @@
 #include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 #include "ECPropertyEntry.h"
-#include <kopano/IECSingleInstance.h>
-
+#include <kopano/IECInterfaces.hpp>
 #include <list>
 #include <map>
 #include <set>
@@ -41,7 +40,7 @@ struct PROPCALLBACK {
 	BOOL			fRemovable;
 	BOOL			fHidden; // hidden from GetPropList
 
-	bool operator==(const PROPCALLBACK &callback) const
+	bool operator==(const PROPCALLBACK &callback) const noexcept
 	{
 		return callback.ulPropTag == this->ulPropTag;
 	}
@@ -52,7 +51,8 @@ typedef ECPropCallBackMap::iterator				ECPropCallBackIterator;
 typedef std::map<short, ECPropertyEntry>		ECPropertyEntryMap;
 typedef ECPropertyEntryMap::iterator			ECPropertyEntryIterator;
 
-class ECGenericProp : public ECUnknown {
+class ECGenericProp :
+    public ECUnknown, public virtual IMAPIProp, public IECSingleInstance {
 protected:
 	ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName = NULL);
 	virtual ~ECGenericProp();
@@ -61,8 +61,7 @@ public:
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	HRESULT SetProvider(void* lpProvider);
-	HRESULT SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId);
-
+	HRESULT SetEntryId(ULONG eid_size, const ENTRYID *eid);
 	static HRESULT		DefaultGetPropGetReal(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);	
 	static HRESULT		DefaultGetPropNotFound(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
 	static HRESULT DefaultSetPropComputed(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
@@ -96,8 +95,8 @@ protected: ///?
 	virtual HRESULT HrRemoveModifications(MAPIOBJECT *lpsMapiObject, ULONG ulPropTag);
 
 	// For IECSingleInstance
-	virtual HRESULT GetSingleInstanceId(ULONG *lpcbInstanceID, LPSIEID *lppInstanceID);
-	virtual HRESULT SetSingleInstanceId(ULONG cbInstanceID, LPSIEID lpInstanceID);
+	virtual HRESULT GetSingleInstanceId(ULONG *id_size, ENTRYID **id);
+	virtual HRESULT SetSingleInstanceId(ULONG id_size, ENTRYID *id);
 
 public:
 	// From IMAPIProp
@@ -122,20 +121,8 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames);
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags);
-
-	class xMAPIProp _kc_final : public IMAPIProp {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xMAPIProp;
-
-	class xECSingleInstance _kc_final : public IECSingleInstance {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		// <kopano/xclsfrag/IECSingleInstance.hpp>
-		virtual HRESULT __stdcall GetSingleInstanceId(ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID) _kc_override;
-		virtual HRESULT __stdcall SetSingleInstanceId(ULONG cbInstanceID, LPENTRYID lpInstanceID) _kc_override;
-	} m_xECSingleInstance;
 
 protected:
 	ECPropertyEntryMap *lstProps = nullptr;

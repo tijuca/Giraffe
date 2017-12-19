@@ -24,8 +24,6 @@
 #include <iostream>
 #include "icalmem.hpp"
 
-using namespace std;
-
 namespace KC {
 
 /** 
@@ -60,7 +58,7 @@ HRESULT VTodoConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *l
  * The properties set here are all required base properties for
  * different todo items and task requests.
  *
- * Finds the status of the message (eg. complete, cancelled) according
+ * Finds the status of the message (e.g. complete, cancelled) according
  * to the matching properties, or possebly the completion (in percent)
  * of the task. Lastly, the icon index (outlook icon displayed in list
  * view) is set.
@@ -76,7 +74,6 @@ HRESULT VTodoConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *l
 HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalcomponent *lpicEvent, void *base, bool bIsException, std::list<SPropValue> *lplstMsgProps)
 {
 	SPropValue sPropVal;
-	icalproperty *lpicProp = NULL;
 	bool bComplete = false;
 	ULONG ulStatus = 0;
 
@@ -85,7 +82,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 	if (hr != hrSuccess)
 		return hr;
 	sPropVal.ulPropTag = PR_MESSAGE_CLASS_W;
-	lplstMsgProps->push_back(sPropVal);
+	lplstMsgProps->emplace_back(sPropVal);
 
 	// STATUS == COMPLETED
 	// 0: olTaskNotStarted
@@ -93,7 +90,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 	// 2: olTaskComplete
 	// 3: olTaskWaiting (on someone else)
 	// 4: olTaskDeferred
-	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_STATUS_PROPERTY);
+	auto lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_STATUS_PROPERTY);
 	if (lpicProp) {
 		switch (icalproperty_get_status(lpicProp)) {
 		case ICAL_STATUS_NEEDSACTION:
@@ -127,7 +124,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 	else
 		sPropVal.Value.dbl = 0.0;
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_PERCENTCOMPLETE], PT_DOUBLE);
-	lplstMsgProps->push_back(sPropVal);
+	lplstMsgProps->emplace_back(sPropVal);
 
 	if (sPropVal.Value.dbl == 1.0) {
 		bComplete = true;
@@ -136,11 +133,11 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETE], PT_BOOLEAN);
 	sPropVal.Value.b = bComplete;
-	lplstMsgProps->push_back(sPropVal);
+	lplstMsgProps->emplace_back(sPropVal);
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_STATUS], PT_LONG);
 	sPropVal.Value.ul = ulStatus;
-	lplstMsgProps->push_back(sPropVal);
+	lplstMsgProps->emplace_back(sPropVal);
 
 	sPropVal.ulPropTag = PR_ICON_INDEX;
 	// 1280: task
@@ -148,7 +145,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 	// 1282: delegate accepted task (?)
 	// 1283: delegated task
 	sPropVal.Value.ul = 1280;
-	lplstMsgProps->push_back(sPropVal);
+	lplstMsgProps->emplace_back(sPropVal);
 
 	// TODO: task delegation
 	//if (icalcomponent_get_first_property(lpicEvent, ICAL_ATTENDEE_PROPERTY) == NULL)
@@ -167,16 +164,14 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
  */
 HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *lpicEventRoot, icalcomponent *lpicEvent, bool bIsAllday, icalitem *lpIcalItem)
 {
-	HRESULT hr = hrSuccess;
 	SPropValue sPropVal;
-	icalproperty* lpicProp = NULL;
 	time_t timeDTStart = 0;
 	time_t timeDue = 0;
 
-	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
+	auto lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
 	if (lpicProp) {
 		// Take the timezone from DTSTART and set that as the item timezone
-		hr = HrAddTimeZone(lpicProp, lpIcalItem);
+		auto hr = HrAddTimeZone(lpicProp, lpIcalItem);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -186,7 +181,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Set 0x820D / TaskStartDate
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_STARTDATE], PT_SYSTIME);
 		UnixTimeToFileTime(timeDTStart, &sPropVal.Value.ft);
-		lpIcalItem->lstMsgProps.push_back(sPropVal);
+		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 		
 		// utc starttime
 		timeDTStart = ICalTimeTypeToUTC(lpicEventRoot, lpicProp);
@@ -194,13 +189,13 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Set 0x8516 / CommonStart
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME);
 		UnixTimeToFileTime(timeDTStart, &sPropVal.Value.ft);
-		lpIcalItem->lstMsgProps.push_back(sPropVal);
+		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	}
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DUE_PROPERTY);
 	if (lpicProp) {
 		// Take the timezone from DUE and set that as the item timezone
-		hr = HrAddTimeZone(lpicProp, lpIcalItem);
+		auto hr = HrAddTimeZone(lpicProp, lpIcalItem);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -210,7 +205,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Set 0x820D / TaskDueDate
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_DUEDATE], PT_SYSTIME);
 		UnixTimeToFileTime(timeDue, &sPropVal.Value.ft);
-		lpIcalItem->lstMsgProps.push_back(sPropVal);
+		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 		
 		// utc duetime
 		timeDue = ICalTimeTypeToUTC(lpicEventRoot, lpicProp);
@@ -218,7 +213,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Set 0x8516 / CommonEnd
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME);
 		UnixTimeToFileTime(timeDue, &sPropVal.Value.ft);
-		lpIcalItem->lstMsgProps.push_back(sPropVal);
+		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	}
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_COMPLETED_PROPERTY);
@@ -226,7 +221,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETED_DATE], PT_SYSTIME);
 		UnixTimeToFileTime(timeDue, &sPropVal.Value.ft);
-		lpIcalItem->lstMsgProps.push_back(sPropVal);
+		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	}
 	return hrSuccess;
 }
@@ -324,7 +319,6 @@ HRESULT VTodoConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsg
  */
 HRESULT VTodoConverter::HrSetItemSpecifics(ULONG ulProps, LPSPropValue lpProps, icalcomponent *lpicEvent)
 {
-	HRESULT hr = hrSuccess;
 	double pc = 0.0;
 	ULONG ulStatus = 0;
 
@@ -351,8 +345,7 @@ HRESULT VTodoConverter::HrSetItemSpecifics(ULONG ulProps, LPSPropValue lpProps, 
 		icalcomponent_add_property(lpicEvent, icalproperty_new_status(ICAL_STATUS_CANCELLED));
 		break;
 	}
-
-	return hr;
+	return hrSuccess;
 }
 
 } /* namespace */

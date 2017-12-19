@@ -21,7 +21,8 @@
 #include <mutex>
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
-#include <IECChangeAdviseSink.h>
+#include <kopano/IECInterfaces.hpp>
+#include <kopano/Util.h>
 #include "ics_client.hpp"
 #include "ECNotifyMaster.h"
 #include <map>
@@ -77,6 +78,7 @@ private:
 	ULONG					m_ulProviderType;
 	std::recursive_mutex m_hMutex;
 	ECSESSIONGROUPID		m_ecSessionGroupId;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // #ifndef ECNOTIFYCLIENT_H

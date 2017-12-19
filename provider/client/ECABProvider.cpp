@@ -13,10 +13,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include <mapi.h>
+#include <kopano/charset/convstring.h>
 #include <kopano/mapiext.h>
 #include <mapispi.h>
 #include <mapiutil.h>
@@ -33,13 +34,10 @@
 #include "WSTransport.h"
 #include "ClientUtil.h"
 #include "EntryPoint.h"
+#include "ProviderUtil.h"
 #include "pcutil.hpp"
-
-typedef KCHL::memory_ptr<ECUSER> ECUserPtr;
-
 #include <kopano/ECGetText.h>
 
-using namespace std;
 using namespace KCHL;
 
 ECABProvider::ECABProvider(ULONG ulFlags, const char *szClassName) :
@@ -50,25 +48,14 @@ ECABProvider::ECABProvider(ULONG ulFlags, const char *szClassName) :
 
 HRESULT ECABProvider::Create(ECABProvider **lppECABProvider)
 {
-	HRESULT hr = hrSuccess;
-
-	ECABProvider *lpECABProvider = new ECABProvider(0, "ECABProvider");
-
-	hr = lpECABProvider->QueryInterface(IID_ECABProvider, (void **)lppECABProvider);
-
-	if(hr != hrSuccess)
-		delete lpECABProvider;
-
-	return hr;
+	return alloc_wrap<ECABProvider>(0, "ECABProvider").put(lppECABProvider);
 }
 
 HRESULT ECABProvider::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE2(ECABProvider, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IABProvider, &this->m_xABProvider);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xABProvider);
-	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
+	REGISTER_INTERFACE2(IABProvider, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -77,7 +64,9 @@ HRESULT ECABProvider::Shutdown(ULONG * lpulFlags)
 	return hrSuccess;
 }
 
-HRESULT ECABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon)
+HRESULT ECABProvider::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
+    const TCHAR *lpszProfileName, ULONG ulFlags, ULONG *lpulcbSecurity,
+    LPBYTE *lppbSecurity, LPMAPIERROR *lppMAPIError, LPABLOGON *lppABLogon)
 {
 	HRESULT			hr = hrSuccess;
 	object_ptr<ECABLogon> lpABLogon;
@@ -101,7 +90,7 @@ HRESULT ECABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	hr = lpTransport->HrLogon(sProfileProps);
 	if(hr != hrSuccess)
 		return hr;
-	hr = ECABLogon::Create(lpMAPISup, lpTransport, sProfileProps.ulProfileFlags, (GUID *)lpGuid, &~lpABLogon);
+	hr = ECABLogon::Create(lpMAPISup, lpTransport, sProfileProps.ulProfileFlags, reinterpret_cast<const GUID *>(lpGuid), &~lpABLogon);
 	if(hr != hrSuccess)
 		return hr;
 	AddChild(lpABLogon);
@@ -120,8 +109,79 @@ HRESULT ECABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	return hrSuccess;
 }
 
-DEF_HRMETHOD1(TRACE_MAPI, ECABProvider, ABProvider, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABProvider, ABProvider, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABProvider, ABProvider, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProvider, ABProvider, Shutdown, (ULONG *, lpulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECABProvider, ABProvider, Logon, (LPMAPISUP, lpMAPISup), (ULONG, ulUIParam), (LPTSTR, lpszProfileName), (ULONG, ulFlags), (ULONG *, lpulcbSecurity), (LPBYTE *, lppbSecurity), (LPMAPIERROR *, lppMAPIError), (LPABLOGON *, lppABLogon))
+ECABProviderSwitch::ECABProviderSwitch(void) : ECUnknown("ECABProviderSwitch")
+{
+}
+
+HRESULT ECABProviderSwitch::Create(ECABProviderSwitch **lppECABProvider)
+{
+	return alloc_wrap<ECABProviderSwitch>().put(lppECABProvider);
+}
+
+HRESULT ECABProviderSwitch::QueryInterface(REFIID refiid, void **lppInterface)
+{
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABProvider, this);
+	REGISTER_INTERFACE2(IUnknown, this);
+	return MAPI_E_INTERFACE_NOT_SUPPORTED;
+}
+
+HRESULT ECABProviderSwitch::Shutdown(ULONG * lpulFlags)
+{
+	return hrSuccess;
+}
+
+HRESULT ECABProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
+    const TCHAR *lpszProfileName, ULONG ulFlags, ULONG *lpulcbSecurity,
+    LPBYTE *lppbSecurity, LPMAPIERROR *lppMAPIError, LPABLOGON *lppABLogon)
+{
+	HRESULT hr = hrSuccess;
+	PROVIDER_INFO sProviderInfo;
+	ULONG ulConnectType = CT_UNSPECIFIED;
+	object_ptr<IABLogon> lpABLogon;
+	object_ptr<IABProvider> lpOnline;
+
+	convstring tstrProfileName(lpszProfileName, ulFlags);
+	hr = GetProviders(&g_mapProviders, lpMAPISup, convstring(lpszProfileName, ulFlags).c_str(), ulFlags, &sProviderInfo);
+	if (hr != hrSuccess)
+		return hr;
+	hr = sProviderInfo.lpABProviderOnline->QueryInterface(IID_IABProvider, &~lpOnline);
+	if (hr != hrSuccess)
+		return hr;
+
+	// Online
+	hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, ulFlags, nullptr, nullptr, nullptr, &~lpABLogon);
+	ulConnectType = CT_ONLINE;
+
+	// Set the provider in the right connection type
+	if (SetProviderMode(lpMAPISup, &g_mapProviders,
+	    convstring(lpszProfileName, ulFlags).c_str(), ulConnectType) != hrSuccess)
+		return MAPI_E_INVALID_PARAMETER;
+
+	if(hr != hrSuccess) {
+		if (hr == MAPI_E_NETWORK_ERROR)
+			/* for disable public folders, so you can work offline */
+			return MAPI_E_FAILONEPROVIDER;
+		else if (hr == MAPI_E_LOGON_FAILED)
+			return MAPI_E_UNCONFIGURED; /* Linux error ?? */
+			//hr = MAPI_E_LOGON_FAILED;
+		else
+			return MAPI_E_LOGON_FAILED;
+	}
+
+	hr = lpMAPISup->SetProviderUID((LPMAPIUID)&MUIDECSAB, 0);
+	if(hr != hrSuccess)
+		return hr;
+	hr = lpABLogon->QueryInterface(IID_IABLogon, (void **)lppABLogon);
+	if(hr != hrSuccess)
+		return hr;
+	if(lpulcbSecurity)
+		*lpulcbSecurity = 0;
+
+	if(lppbSecurity)
+		*lppbSecurity = NULL;
+
+	if (lppMAPIError)
+		*lppMAPIError = NULL;
+	return hrSuccess;
+}

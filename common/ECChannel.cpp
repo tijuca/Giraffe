@@ -18,12 +18,14 @@
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
+#include <cstdint>
+#include <cstdlib>
 #include <kopano/ECChannel.h>
 #include <kopano/stringutil.h>
 #include <csignal>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/types.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -65,8 +67,10 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 	}
 
 	HRESULT hr = hrSuccess;
-	const char *szFile = NULL;
-	const char *szPath = NULL;
+	const char *szFile = nullptr, *szPath = nullptr;;
+	auto cert_file = lpConfig->GetSetting("ssl_certificate_file");
+	auto key_file = lpConfig->GetSetting("ssl_private_key_file");
+
 	std::unique_ptr<char> ssl_protocols(strdup(lpConfig->GetSetting("ssl_protocols")));
 	const char *ssl_ciphers = lpConfig->GetSetting("ssl_ciphers");
  	char *ssl_name = NULL;
@@ -74,6 +78,25 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 #if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
 	EC_KEY *ecdh;
 #endif
+
+	if (cert_file == nullptr || key_file == nullptr) {
+		ec_log_err("ECChannel::HrSetCtx(): no cert or key file");
+		return MAPI_E_CALL_FAILED;
+	}
+
+	auto key_fh = fopen(key_file, "r");
+	if (key_fh == nullptr) {
+		ec_log_err("ECChannel::HrSetCtx(): cannot open key file");
+		return MAPI_E_CALL_FAILED;
+	}
+	fclose(key_fh);
+
+	auto cert_fh = fopen(cert_file, "r");
+	if (cert_fh == nullptr) {
+		ec_log_err("ECChannel::HrSetCtx(): cannot open cert file");
+		return MAPI_E_CALL_FAILED;
+	}
+	fclose(cert_fh);
 
 	if (lpCTX) {
 		SSL_CTX_free(lpCTX);
@@ -128,11 +151,9 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 		ssl_name = strtok(NULL, " ");
 	}
 
-	if (ssl_include != 0) {
+	if (ssl_include != 0)
 		// Exclude everything, except those that are included (and let excludes still override those)
 		ssl_exclude |= 0x1f & ~ssl_include;
-	}
-
 	if ((ssl_exclude & 0x01) != 0)
 		ssl_op |= SSL_OP_NO_SSLv2;
 	if ((ssl_exclude & 0x02) != 0)
@@ -147,10 +168,8 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 	if ((ssl_exclude & 0x10) != 0)
 		ssl_op |= SSL_OP_NO_TLSv1_2;
 #endif
-
-	if (ssl_protocols) {
+	if (ssl_protocols)
 		SSL_CTX_set_options(lpCTX, ssl_op);
-	}
 
 #if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
 	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
@@ -174,13 +193,13 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 
 	SSL_CTX_set_default_verify_paths(lpCTX);
 
-	if (SSL_CTX_use_certificate_chain_file(lpCTX, lpConfig->GetSetting("ssl_certificate_file")) != 1) {
+	if (SSL_CTX_use_certificate_chain_file(lpCTX, cert_file) != 1) {
 		ec_log_err("SSL CTX certificate file error: %s", ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 
-	if (SSL_CTX_use_PrivateKey_file(lpCTX, lpConfig->GetSetting("ssl_private_key_file"), SSL_FILETYPE_PEM) != 1) {
+	if (SSL_CTX_use_PrivateKey_file(lpCTX, key_file, SSL_FILETYPE_PEM) != 1) {
 		ec_log_err("SSL CTX private key file error: %s", ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
@@ -223,14 +242,12 @@ HRESULT ECChannel::HrFreeCtx() {
 	return hrSuccess;
 }
 
-ECChannel::ECChannel(int fd) {
+ECChannel::ECChannel(int inputfd) :
+	fd(inputfd), peer_atxt(), peer_sockaddr()
+{
 	int flag = 1;
-    
-	this->fd = fd;
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&flag), sizeof(flag)) < 0)
 		/* silence Coverity */;
-	*peer_atxt = '\0';
-	memset(&peer_sockaddr, 0, sizeof(peer_sockaddr));
 }
 
 ECChannel::~ECChannel() {
@@ -350,10 +367,10 @@ HRESULT ECChannel::HrWriteString(const char *szBuffer)
 
 	if (lpSSL) {
 		if (SSL_write(lpSSL, szBuffer, (int)strlen(szBuffer)) < 1)
-			hr = MAPI_E_CALL_FAILED;
+			hr = MAPI_E_NETWORK_ERROR;
 	}
 	else if (send(fd, szBuffer, (int)strlen(szBuffer), 0) < 1) {
-		hr = MAPI_E_CALL_FAILED;
+		hr = MAPI_E_NETWORK_ERROR;
 	}
 	return hr;
 }
@@ -363,9 +380,9 @@ HRESULT ECChannel::HrWriteString(const std::string & strBuffer) {
 
 	if (lpSSL) {
 		if (SSL_write(lpSSL, strBuffer.c_str(), (int)strBuffer.size()) < 1)
-			hr = MAPI_E_CALL_FAILED;
+			hr = MAPI_E_NETWORK_ERROR;
 	} else if (send(fd, strBuffer.c_str(), (int)strBuffer.size(), 0) < 1) {
-		hr = MAPI_E_CALL_FAILED;
+		hr = MAPI_E_NETWORK_ERROR;
 	}
 	return hr;
 }
@@ -486,19 +503,11 @@ HRESULT ECChannel::HrReadBytes(std::string * strBuffer, ULONG ulByteCount) {
 }
 
 HRESULT ECChannel::HrSelect(int seconds) {
-	fd_set fds;
-	int res = 0;
-	struct timeval timeout = { seconds, 0 };
+	struct pollfd pollfd = {fd, POLLIN | POLLRDHUP, 0};
 
-	if(fd >= FD_SETSIZE)
-	    return MAPI_E_NOT_ENOUGH_MEMORY;
 	if(lpSSL && SSL_pending(lpSSL))
 		return hrSuccess;
-
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-
-	res = select(fd + 1, &fds, NULL, NULL, &timeout);
+	int res = poll(&pollfd, 1, seconds * 1000);
 	if (res == -1) {
 		if (errno == EINTR)
 			/*
@@ -653,7 +662,7 @@ static int peer_is_local2(int rsk, const struct nlmsghdr *nlh)
 	nlh = reinterpret_cast<const struct nlmsghdr *>(rspbuf);
 	if (!NLMSG_OK(nlh, nlh->nlmsg_len))
 		return -EIO;
-	const struct rtmsg *rtm = reinterpret_cast<const struct rtmsg *>(NLMSG_DATA(nlh));
+	auto rtm = reinterpret_cast<const struct rtmsg *>(NLMSG_DATA(nlh));
 	return rtm->rtm_type == RTN_LOCAL;
 }
 #endif
@@ -698,7 +707,7 @@ int zcp_peeraddr_is_local(const struct sockaddr *peer_sockaddr,
 	req.rth.rtm_type     = RTN_UNSPEC;
 	req.rth.rtm_scope    = RT_SCOPE_UNIVERSE;
 	req.rth.rtm_table    = RT_TABLE_UNSPEC;
-	struct rtattr *rta = reinterpret_cast<struct rtattr *>(reinterpret_cast<char *>(&req) + NLMSG_ALIGN(req.nh.nlmsg_len));
+	auto rta = reinterpret_cast<struct rtattr *>(reinterpret_cast<char *>(&req) + NLMSG_ALIGN(req.nh.nlmsg_len));
 	rta->rta_type        = RTA_DST;
 
 	int ret = -ENODATA;
@@ -735,8 +744,8 @@ int zcp_peeraddr_is_local(const struct sockaddr *peer_sockaddr,
 int zcp_peerfd_is_local(int fd)
 {
 	struct sockaddr_storage peer_sockaddr;
-	socklen_t peer_socklen = sizeof(sockaddr);
-	struct sockaddr *sa = reinterpret_cast<struct sockaddr *>(&peer_sockaddr);
+	socklen_t peer_socklen = sizeof(peer_sockaddr);
+	auto sa = reinterpret_cast<struct sockaddr *>(&peer_sockaddr);
 	int ret = getsockname(fd, sa, &peer_socklen);
 	if (ret < 0)
 		return -errno;
@@ -781,57 +790,6 @@ static struct addrinfo *reorder_addrinfo_ipv6(struct addrinfo *node)
 	return v6head.ai_next;
 }
 
-HRESULT HrListen(const char *szPath, int *lpulListenSocket)
-{
-	HRESULT hr = hrSuccess;
-	int fd = -1;
-	struct sockaddr_un sun_addr;
-	mode_t prevmask = 0;
-
-	if (szPath == NULL || strlen(szPath) >= sizeof(sun_addr.sun_path) ||
-	    lpulListenSocket == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	memset(&sun_addr, 0, sizeof(sun_addr));
-	sun_addr.sun_family = AF_UNIX;
-	kc_strlcpy(sun_addr.sun_path, szPath, sizeof(sun_addr.sun_path));
-
-	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
-		ec_log_crit("Unable to create AF_UNIX socket");
-		hr = MAPI_E_NETWORK_ERROR;
-		goto exit;
-	}
-
-	unlink(szPath);
-
-	// make files with permissions 0666
-	prevmask = umask(0111);
-
-	if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
-		ec_log_crit("Unable to bind to socket %s (%s). This is usually caused by another process (most likely another kopano-server) already using this port. This program will terminate now.", szPath, strerror(errno));
-                kill(0, SIGTERM);
-                exit(1);
-        }
-
-	// TODO: backlog of SOMAXCONN should be configurable
-	if (listen(fd, SOMAXCONN) == -1) {
-		ec_log_crit("Unable to start listening on socket \"%s\".", szPath);
-		hr = MAPI_E_NETWORK_ERROR;
-		goto exit;
-	}
-
-	*lpulListenSocket = fd;
-
-exit:
-	if (prevmask)
-		umask(prevmask);
-	if (hr != hrSuccess && fd != -1)
-		close(fd);
-	return hr;
-}
-
 int zcp_bindtodevice(int fd, const char *i)
 {
 	if (i == NULL || strcmp(i, "any") == 0 || strcmp(i, "all") == 0 ||
@@ -856,10 +814,8 @@ HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
 	const struct addrinfo *sock_addr, *sock_last = NULL;
 	char port_string[sizeof("65535")];
 
-	if (lpulListenSocket == NULL || ulPort == 0 || szBind == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpulListenSocket == nullptr || ulPort == 0 || szBind == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	snprintf(port_string, sizeof(port_string), "%u", ulPort);
 	memset(&sock_hints, 0, sizeof(sock_hints));
@@ -872,9 +828,8 @@ HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
 	ret = getaddrinfo(*szBind == '\0' ? NULL : szBind,
 	      port_string, &sock_hints, &sock_res);
 	if (ret != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
 		ec_log_err("getaddrinfo(%s,%u): %s", szBind, ulPort, gai_strerror(ret));
-		goto exit;
+		return MAPI_E_INVALID_PARAMETER;
 	}
 	sock_res = reorder_addrinfo_ipv6(sock_res);
 
@@ -980,6 +935,42 @@ HRESULT HrAccept(int ulListenFD, ECChannel **lppChannel)
 	ec_log_info("Accepted connection from %s", lpChannel->peer_addr());
 	*lppChannel = lpChannel.release();
 	return hrSuccess;
+}
+
+std::set<std::pair<std::string, uint16_t>>
+kc_parse_bindaddrs(const char *longline, uint16_t defport)
+{
+	std::set<std::pair<std::string, uint16_t>> socks;
+
+	for (auto &&spec : tokenize(longline, ' ', true)) {
+		std::string host;
+		uint16_t port;
+		char *e = nullptr;
+		auto x = spec.find('[');
+		auto y = spec.find(']', x + 1);
+		if (x == 0 && y != std::string::npos) {
+			host = spec.substr(x + 1, y - x - 1);
+			y = spec.find(':', y);
+			if (y != std::string::npos) {
+				port = strtoul(spec.c_str() + y + 1, &e, 10);
+				if (e == nullptr || *e != '\0')
+					port = defport;
+			}
+		} else {
+			y = spec.find(':');
+			if (y != std::string::npos) {
+				port = strtoul(spec.c_str() + y + 1, &e, 10);
+				if (e == nullptr || *e != '\0')
+					port = defport;
+				spec.erase(y);
+			}
+			host = std::move(spec);
+			if (host == "*")
+				host.clear();
+		}
+		socks.emplace(std::move(host), port);
+	}
+	return socks;
 }
 
 } /* namespace */

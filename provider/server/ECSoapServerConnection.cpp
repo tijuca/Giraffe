@@ -16,7 +16,10 @@
  */
 
 #include <kopano/platform.h>
+#include <cerrno>
+#include <cstdlib>
 #include <ctime>
+#include <sys/socket.h>
 #include <kopano/ECLogger.h>
 
 #ifdef HAVE_SYS_STAT_H
@@ -28,7 +31,6 @@
 
 #include "ECSoapServerConnection.h"
 #include "ECServerEntrypoint.h"
-#include "ECClientUpdate.h"
 #	include <dirent.h>
 #	include <fcntl.h>
 #	include <unistd.h>
@@ -90,39 +92,13 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 		close(s);
 		return -1;
 	}
-	
-	if (listen(s, SOMAXCONN) == -1) {
-		ec_log_crit("Can't listen on unix socket %s", unix_socket);
+	if (listen(s, INT_MAX) < 0) {
+		ec_log_crit("Can't listen on unix socket %s: %s", unix_socket, strerror(errno));
 		close(s);
 		return -1;
 	}
 
 	return s;
-}
-
-/*
- * Handles the HTTP GET command from soap, only the client update install may be downloaded.
- *
- * This function can only be called when client_update_enabled is set to yes.
- */
-static int http_get(struct soap *soap) 
-{
-	int nRet = 404;
-
-	if (soap == NULL)
-		goto exit;
-
-	if (strncmp(soap->path, "/autoupdate", strlen("/autoupdate")) == 0) {
-		ec_log_debug("Client update request '%s'.", soap->path);
-		nRet = HandleClientUpdate(soap);
-	} else {
-		ec_log_debug("Unrecognized GET url '%s'.", soap->path);
-	}
-
-exit:
-	soap_end_send(soap); 
-
-	return nRet;
 }
 
 int kc_ssl_options(struct soap *soap, char *protos, const char *ciphers,
@@ -231,25 +207,23 @@ ECSoapServerConnection::~ECSoapServerConnection(void)
 	delete m_lpDispatcher;
 }
 
-ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServerPort, bool bEnableGET)
+ECRESULT ECSoapServerConnection::ListenTCP(const char *lpServerName, int nServerPort)
 {
-	ECRESULT	er = erSuccess;
 	int			socket = SOAP_INVALID_SOCKET;
 	struct soap	*lpsSoap = NULL;
 
-	if(lpServerName == NULL) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpServerName == nullptr)
+		return KCERR_INVALID_PARAMETER;
 
 	//init soap
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
 	kopano_new_soap_listener(CONNECTION_TYPE_TCP, lpsSoap);
-
-	if (bEnableGET)
-		lpsSoap->fget = http_get;
 	lpsSoap->sndbuf = lpsSoap->rcvbuf = 0;
 	lpsSoap->bind_flags = SO_REUSEADDR;
+#if GSOAP_VERSION >= 20857
+	/* The v6only field exists in 2.8.56, but has no effect. */
+	lpsSoap->bind_v6only = strcmp(lpServerName, "*") != 0;
+#endif
 	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
                 ec_log_crit("Unable to bind to port %d: %s. This is usually caused by another process (most likely another server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
@@ -259,35 +233,29 @@ ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServer
 
 	m_lpDispatcher->AddListenSocket(lpsSoap);
     
-	// Manually check for attachments, independant of streaming support
+	/* Manually check for attachments, independent of streaming support. */
 	soap_post_check_mime_attachments(lpsSoap);
 	ec_log_notice("Listening for TCP connections on port %d", nServerPort);
-exit:
-	if (er != erSuccess && lpsSoap)
-		soap_free(lpsSoap);
-
-	return er;
+	return erSuccess;
 }
 
-ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServerPort, bool bEnableGET, const char* lpszKeyFile, const char* lpszKeyPass, const char* lpszCAFile, const char* lpszCAPath)
+ECRESULT ECSoapServerConnection::ListenSSL(const char *lpServerName,
+    int nServerPort, const char *lpszKeyFile, const char *lpszKeyPass,
+    const char *lpszCAFile, const char *lpszCAPath)
 {
 	ECRESULT	er = erSuccess;
 	int			socket = SOAP_INVALID_SOCKET;
 	struct soap	*lpsSoap = NULL;
+
+	if (lpServerName == nullptr)
+		return KCERR_INVALID_PARAMETER;
+
 	char *server_ssl_protocols = strdup(m_lpConfig->GetSetting("server_ssl_protocols"));
 	const char *server_ssl_ciphers = m_lpConfig->GetSetting("server_ssl_ciphers");
 	auto pref_ciphers = m_lpConfig->GetSetting("server_ssl_prefer_server_ciphers");
 
-	if(lpServerName == NULL) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
-
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
 	kopano_new_soap_listener(CONNECTION_TYPE_SSL, lpsSoap);
-
-	if (bEnableGET)
-		lpsSoap->fget = http_get;
 	lpsSoap->sndbuf = lpsSoap->rcvbuf = 0;
 
 	if (soap_ssl_server_context(
@@ -311,6 +279,9 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	if (er != erSuccess)
 		goto exit;
 	lpsSoap->bind_flags = SO_REUSEADDR;
+#if GSOAP_VERSION >= 20857
+	lpsSoap->bind_v6only = strcmp(lpServerName, "*") != 0;
+#endif
 	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
                 ec_log_crit("Unable to bind to port %d: %s (SSL). This is usually caused by another process (most likely another server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
@@ -320,12 +291,12 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 
 	m_lpDispatcher->AddListenSocket(lpsSoap);
 
-	// Manually check for attachments, independant of streaming support
+	/* Manually check for attachments, independent of streaming support. */
 	soap_post_check_mime_attachments(lpsSoap);
 	ec_log_notice("Listening for SSL connections on port %d", nServerPort);
 exit:
 	free(server_ssl_protocols);
-	if (er != erSuccess && lpsSoap != nullptr)
+	if (er != erSuccess)
 		soap_free(lpsSoap);
 	return er;
 }
@@ -335,11 +306,10 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 	ECRESULT	er = erSuccess;
 	int			sPipe = -1;
 	struct soap	*lpsSoap = NULL;
+	socklen_t socklen;
 
-	if(lpPipeName == NULL) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpPipeName == nullptr)
+		return KCERR_INVALID_PARAMETER;
 
 	//init soap
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
@@ -362,24 +332,31 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 	}
 
 	lpsSoap->master = sPipe;
-	lpsSoap->peerlen = 0;
-	memset(&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
+	socklen = sizeof(lpsSoap->peer.storage);
+	if (getsockname(lpsSoap->socket, &lpsSoap->peer.addr, &socklen) != 0) {
+		ec_log_warn("getsockname %s: %s", m_strPipeName.c_str(), strerror(errno));
+		socklen = 0;
+	} else if (socklen > sizeof(lpsSoap->peer.storage)) {
+		socklen = 0;
+	}
+	lpsSoap->peerlen = socklen;
+	if (socklen == 0)
+		memset(&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
 	m_lpDispatcher->AddListenSocket(lpsSoap);
 
-	// Manually check for attachments, independant of streaming support
+	/* Manually check for attachments, independent of streaming support. */
 	soap_post_check_mime_attachments(lpsSoap);
 	ec_log_notice("Listening for %spipe connections on %s", bPriority ? "priority " : "", lpPipeName);
 exit:
-	if (er != erSuccess && lpsSoap != nullptr)
+	if (er != erSuccess)
 		soap_free(lpsSoap);
 	return er;
 }
 
 SOAP_SOCKET ECSoapServerConnection::CreatePipeSocketCallback(void *lpParam)
 {
-	ECSoapServerConnection *lpThis = (ECSoapServerConnection *)lpParam;
-
-	return (SOAP_SOCKET)create_pipe_socket(lpThis->m_strPipeName.c_str(), lpThis->m_lpConfig, false, 0666);
+	auto lpThis = static_cast<ECSoapServerConnection *>(lpParam);
+	return create_pipe_socket(lpThis->m_strPipeName.c_str(), lpThis->m_lpConfig, false, 0666);
 }
 
 ECRESULT ECSoapServerConnection::ShutDown()
@@ -394,20 +371,12 @@ ECRESULT ECSoapServerConnection::DoHUP()
 
 ECRESULT ECSoapServerConnection::MainLoop()
 {	
-    ECRESULT er = erSuccess;
-    
-    er = m_lpDispatcher->MainLoop();
-    
-	return er;
+	return m_lpDispatcher->MainLoop();
 }
 
 ECRESULT ECSoapServerConnection::NotifyDone(struct soap *soap)
 {
-    ECRESULT er = erSuccess;
-    
-    er = m_lpDispatcher->NotifyDone(soap);
-    
-    return er;
+	return m_lpDispatcher->NotifyDone(soap);
 }
 
 ECRESULT ECSoapServerConnection::GetStats(unsigned int *lpulQueueLength, double *lpdblAge,unsigned int *lpulThreadCount, unsigned int *lpulIdleThreads)
@@ -419,10 +388,5 @@ ECRESULT ECSoapServerConnection::GetStats(unsigned int *lpulQueueLength, double 
     er = m_lpDispatcher->GetFrontItemAge(lpdblAge);
     if(er != erSuccess)
 		return er;
-        
-    er = m_lpDispatcher->GetThreadCount(lpulThreadCount, lpulIdleThreads);
-    if(er != erSuccess)
-		return er;
-
-	return erSuccess;
+	return m_lpDispatcher->GetThreadCount(lpulThreadCount, lpulIdleThreads);
 }

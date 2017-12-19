@@ -19,11 +19,11 @@
 #define ECUNKNOWN_H
 
 #include <kopano/zcdefs.h>
-#include <kopano/IECUnknown.h>
-
+#include <atomic>
 #include <list>
 #include <mutex>
 #include <mapi.h>
+#include <mapidefs.h>
 
 namespace KC {
 
@@ -74,7 +74,7 @@ namespace KC {
 		} \
 	} while (false)
 
-class _kc_export ECUnknown : public IECUnknown {
+class _kc_export ECUnknown : public virtual IUnknown {
 public:
 	ECUnknown(const char *szClassName = NULL);
 	virtual ~ECUnknown(void);
@@ -84,14 +84,10 @@ public:
 	virtual HRESULT AddChild(ECUnknown *lpChild);
 	virtual HRESULT RemoveChild(ECUnknown *lpChild);
 
-	class xUnknown _kc_final : public IUnknown {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-	} m_xUnknown;
-
 	// lpParent is public because it is always thread-safe and valid
 	ECUnknown *lpParent = nullptr;
-	virtual BOOL IsParentOf(const ECUnknown *lpObject);
-	virtual BOOL IsChildOf(const ECUnknown *lpObject);
+	virtual BOOL IsParentOf(const ECUnknown *) const;
+	virtual BOOL IsChildOf(const ECUnknown *) const;
 
 protected:
 	// Called by AddChild
@@ -100,7 +96,7 @@ protected:
 	// Kills itself when lstChildren.empty() AND m_cREF == 0
 	virtual HRESULT			Suicide();
 
-	ULONG m_cRef = 0;
+	std::atomic<unsigned int> m_cRef{0};
 	const char *szClassName;
 	std::list<ECUnknown *>	lstChildren; 
 	std::mutex mutex;

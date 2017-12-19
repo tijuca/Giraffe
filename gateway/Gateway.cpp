@@ -17,8 +17,11 @@
 
 #include "config.h"
 #include <kopano/platform.h>
+#include <new>
 #include <climits>
 #include <csignal>
+#include <netdb.h>
+#include <poll.h>
 #include <inetmapi/inetmapi.h>
 
 #include <mapi.h>
@@ -52,15 +55,17 @@
 
 #include "TmpPath.h"
 #include <kopano/UnixUtil.h>
-#ifdef KC_USES_ICU
 #include <unicode/uclean.h>
-#endif
 #include <openssl/ssl.h>
+#include <kopano/hl.hpp>
 
 /**
  * @defgroup gateway Gateway for IMAP and POP3 
  * @{
  */
+
+using std::cout;
+using std::endl;
 
 static int daemonize = 1;
 int quit = 0;
@@ -83,25 +88,24 @@ static void sighup(int sig)
 		return;
 	if (g_lpConfig != nullptr && !g_lpConfig->ReloadSettings() &&
 	    g_lpLogger != nullptr)
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to reload configuration file, continuing with current settings.");
+		ec_log_err("Unable to reload configuration file, continuing with current settings.");
 	if (g_lpLogger == nullptr || g_lpConfig == nullptr)
 		return;
-	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Got SIGHUP config was reloaded");
+	ec_log_info("Got SIGHUP config was reloaded");
 
 	const char *ll = g_lpConfig->GetSetting("log_level");
 	int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
 	g_lpLogger->SetLoglevel(new_ll);
 
-	bool listen_pop3s = strcmp(g_lpConfig->GetSetting("pop3s_enable"), "yes") == 0;
-	bool listen_imaps = strcmp(g_lpConfig->GetSetting("imaps_enable"), "yes") == 0;
-	if (listen_pop3s || listen_imaps) {
+	if (strlen(g_lpConfig->GetSetting("ssl_private_key_file")) > 0 &&
+		strlen(g_lpConfig->GetSetting("ssl_certificate_file")) > 0) {
 		if (ECChannel::HrSetCtx(g_lpConfig) != hrSuccess)
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error reloading SSL context");
+			ec_log_err("Error reloading SSL context");
 		else
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Reloaded SSL context");
+			ec_log_info("Reloaded SSL context");
 	}
 	g_lpLogger->Reset();
-	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Log connection was reset");
+	ec_log_info("Log connection was reset");
 }
 
 static void sigchld(int)
@@ -114,8 +118,7 @@ static void sigchld(int)
 // SIGSEGV catcher
 static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(g_lpLogger, "Gateway",
-		PROJECT_VERSION_GATEWAY_STR, signr, si, uc);
+	generic_sigsegv_handler(g_lpLogger, "kopano-gateway", PROJECT_VERSION, signr, si, uc);
 }
 
 static HRESULT running_service(const char *szPath, const char *servicename);
@@ -143,11 +146,11 @@ struct HandlerArgs {
 
 static void *Handler(void *lpArg)
 {
-	HandlerArgs *lpHandlerArgs = (HandlerArgs *) lpArg;
-	ECChannel *lpChannel = lpHandlerArgs->lpChannel;
-	ECLogger *lpLogger = lpHandlerArgs->lpLogger;
-	ECConfig *lpConfig = lpHandlerArgs->lpConfig;
-	bool bUseSSL = lpHandlerArgs->bUseSSL;
+	auto lpHandlerArgs = static_cast<HandlerArgs *>(lpArg);
+	auto lpChannel = lpHandlerArgs->lpChannel;
+	auto lpLogger = lpHandlerArgs->lpLogger;
+	auto lpConfig = lpHandlerArgs->lpConfig;
+	auto bUseSSL = lpHandlerArgs->bUseSSL;
 
 	// szPath is global, pointing to argv variable, or lpConfig variable
 	ClientProto *client;
@@ -228,8 +231,14 @@ static void *Handler(void *lpArg)
 			continue;
 		}
 
-		// Process IMAP command
-		hr = client->HrProcessCommand(inBuffer);
+		HRESULT hr = hrSuccess;
+		try {
+			/* Process IMAP command */
+			hr = client->HrProcessCommand(inBuffer);
+		} catch (const KCHL::KMAPIError &e) {
+			hr = e.code();
+		}
+
 		if (hr == MAPI_E_NETWORK_ERROR) {
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Connection error.");
 			bQuit = true;
@@ -253,12 +262,50 @@ exit:
 	}
 
 	/** free SSL error data **/
-	ERR_remove_state(0);
+	#if OPENSSL_VERSION_NUMBER < 0x10100000L
+		ERR_remove_state(0);
+	#endif
 
 	if (bThreads)
 		--nChildren;
 
 	return NULL;
+}
+
+static void *Handler_Threaded(void *a)
+{
+	/*
+	 * Steer the control signals to the main thread for consistency with
+	 * the forked mode.
+	 */
+	kcsrv_blocksigs();
+	return Handler(a);
+}
+
+static std::string GetServerFQDN()
+{
+	std::string retval = "localhost";
+	char hostname[256] = {0};
+	struct addrinfo *result = nullptr;
+
+	auto rc = gethostname(hostname, sizeof(hostname));
+	if (rc != 0)
+		return retval;
+	retval = hostname;
+	rc = getaddrinfo(hostname, nullptr, nullptr, &result);
+	if (rc != 0 || result == nullptr)
+		return retval;
+	/* Name lookup is required, so set that flag */
+	rc = getnameinfo(result->ai_addr, result->ai_addrlen, hostname,
+	     sizeof(hostname), nullptr, 0, NI_NAMEREQD);
+	if (rc != 0)
+		goto exit;
+	if (hostname[0] != '\0')
+		retval = hostname;
+ exit:
+	if (result)
+		freeaddrinfo(result);
+	return retval;
 }
 
 int main(int argc, char *argv[]) {
@@ -274,23 +321,23 @@ int main(int argc, char *argv[]) {
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/gateway.pid" },
 		{ "running_path", "/var/lib/kopano" },
-		{ "process_model", "fork" },
-		{ "coredump_enabled", "no" },
-		{ "pop3_enable", "yes" },
-		{ "pop3_port", "110" },
-		{ "pop3s_enable", "no" },
-		{ "pop3s_port", "995" },
-		{ "imap_enable", "yes" },
-		{ "imap_port", "143" },
-		{ "imaps_enable", "no" },
-		{ "imaps_port", "993" },
+		{ "process_model", "thread" },
+		{"coredump_enabled", "systemdefault"},
+		{"pop3_enable", "yes", CONFIGSETTING_NONEMPTY},
+		{"pop3_port", "110", CONFIGSETTING_NONEMPTY},
+		{"pop3s_enable", "no", CONFIGSETTING_NONEMPTY},
+		{"pop3s_port", "995", CONFIGSETTING_NONEMPTY},
+		{"imap_enable", "yes", CONFIGSETTING_NONEMPTY},
+		{"imap_port", "143", CONFIGSETTING_NONEMPTY},
+		{"imaps_enable", "no", CONFIGSETTING_NONEMPTY},
+		{"imaps_port", "993", CONFIGSETTING_NONEMPTY},
 		{ "imap_only_mailfolders", "yes", CONFIGSETTING_RELOADABLE },
 		{ "imap_public_folders", "yes", CONFIGSETTING_RELOADABLE },
 		{ "imap_capability_idle", "yes", CONFIGSETTING_RELOADABLE },
 		{ "imap_always_generate", "no", CONFIGSETTING_UNUSED },
 		{ "imap_max_fail_commands", "10", CONFIGSETTING_RELOADABLE },
 		{ "imap_max_messagesize", "128M", CONFIGSETTING_RELOADABLE | CONFIGSETTING_SIZE },
-		{ "imap_generate_utf8", "no", CONFIGSETTING_RELOADABLE },
+		{ "imap_generate_utf8", "no", CONFIGSETTING_UNUSED },
 		{ "imap_expunge_on_delete", "no", CONFIGSETTING_RELOADABLE },
 		{ "imap_store_rfc822", "yes", CONFIGSETTING_RELOADABLE },
 		{ "imap_cache_folders_time_limit", "0", CONFIGSETTING_RELOADABLE },
@@ -311,13 +358,14 @@ int main(int argc, char *argv[]) {
 #endif
 		{"ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL", CONFIGSETTING_RELOADABLE},
 		{"ssl_prefer_server_ciphers", "no", CONFIGSETTING_RELOADABLE},
-		{ "log_method", "file" },
-		{ "log_file", "-" },
-		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
+		{"log_method", "file", CONFIGSETTING_NONEMPTY},
+		{"log_file", "-", CONFIGSETTING_NONEMPTY},
+		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 		{ "log_timestamp", "1" },
 		{ "log_buffer_size", "0" },
 		{ "tmp_path", "/tmp" },
 		{"bypass_auth", "no"},
+		{"html_safety_filter", "no"},
 		{ NULL, NULL },
 	};
 	enum {
@@ -363,8 +411,7 @@ int main(int argc, char *argv[]) {
 			bIgnoreUnknownConfigOptions = true;
 			break;
 		case 'V':
-			cout << "Product version:\t" <<  PROJECT_VERSION_GATEWAY_STR << endl
-				 << "File version:\t\t" << PROJECT_SVN_REV_STR << endl;
+			cout << "kopano-gateway " PROJECT_VERSION << endl;
 			return 1;
 		case OPT_HELP:
 		default:
@@ -379,6 +426,10 @@ int main(int argc, char *argv[]) {
 	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);	// create logger without a timestamp to stderr
+		if (g_lpLogger == nullptr) {
+			hr = MAPI_E_NOT_ENOUGH_MEMORY;
+			goto exit;
+		}
 		ec_log_set(g_lpLogger);
 		LogConfigErrors(g_lpConfig);
 		hr = E_FAIL;
@@ -391,13 +442,10 @@ int main(int argc, char *argv[]) {
 
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
-
-	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
-
+	if (!TmpPath::instance.OverridePath(g_lpConfig))
+		ec_log_err("Ignoring invalid path-setting!");
 	if (parseBool(g_lpConfig->GetSetting("bypass_auth")))
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Gateway is started with bypass_auth=yes meaning username and password will not be checked.");
-
+		ec_log_warn("Gateway is started with bypass_auth=yes meaning username and password will not be checked.");
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0) {
 		bThreads = true;
 		g_lpLogger->SetLogprefix(LP_TID);
@@ -412,8 +460,7 @@ int main(int argc, char *argv[]) {
 	g_strHostString = g_lpConfig->GetSetting("server_hostname", NULL, "");
 	if (g_strHostString.empty())
 		g_strHostString = GetServerFQDN();
-	g_strHostString = string(" on ") + g_strHostString;
-
+	g_strHostString.insert(0, " on ");
 	hr = running_service(szPath, argv[0]);
 
 exit:
@@ -467,7 +514,8 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	bool bListenIMAP, bListenIMAPs;
 	int pCloseFDs[4] = {0};
 	size_t nCloseFDs = 0;
-	fd_set readfds;
+	struct pollfd pollfd[4];
+	int nfds = 0, pfd_pop3 = -1, pfd_pop3s = -1, pfd_imap = -1, pfd_imaps = -1;
 	int err = 0;
 	pthread_attr_t ThreadAttr;
 	const char *const interface = g_lpConfig->GetSetting("server_bind");
@@ -482,12 +530,12 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	if (bThreads) {
 		pthread_attr_init(&ThreadAttr);
 		if (pthread_attr_setdetachstate(&ThreadAttr, PTHREAD_CREATE_DETACHED) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread attribute to detached");
+			ec_log_err("Can't set thread attribute to detached");
 			goto exit;
 		}
 		// 1Mb of stack space per thread
 		if (pthread_attr_setstacksize(&ThreadAttr, 1024 * 1024)) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread stack size to 1Mb");
+			ec_log_err("Can't set thread stack size to 1Mb");
 			goto exit;
 		}
 	}
@@ -500,13 +548,13 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	// Setup SSL context
 	if ((bListenPOP3s || bListenIMAPs) &&
 	    ECChannel::HrSetCtx(g_lpConfig) != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error loading SSL context, POP3S and IMAPS will be disabled");
+		ec_log_err("Error loading SSL context, POP3S and IMAPS will be disabled");
 		bListenPOP3s = false;
 		bListenIMAPs = false;
 	}
 	
 	if (!bListenPOP3 && !bListenPOP3s && !bListenIMAP && !bListenIMAPs) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "POP3, POP3S, IMAP and IMAPS are all four disabled");
+		ec_log_crit("POP3, POP3S, IMAP and IMAPS are all four disabled");
 		hr = E_FAIL;
 		goto exit;
 	}
@@ -557,18 +605,13 @@ static HRESULT running_service(const char *szPath, const char *servicename)
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGABRT, &act, NULL);
 
-    // Set max open file descriptors to FD_SETSIZE .. higher than this number
-    // is a bad idea, as it will start breaking select() calls.
     struct rlimit file_limit;
-    file_limit.rlim_cur = FD_SETSIZE;
-    file_limit.rlim_max = FD_SETSIZE;
+	file_limit.rlim_cur = KC_DESIRED_FILEDES;
+	file_limit.rlim_max = KC_DESIRED_FILEDES;
     
-    if(setrlimit(RLIMIT_NOFILE, &file_limit) < 0) {
-        g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: setrlimit(RLIMIT_NOFILE, %d) failed, you will only be able to connect up to %d sockets. Either start the process as root, or increase user limits for open file descriptors", FD_SETSIZE, getdtablesize());
-    }        
-
-	if (parseBool(g_lpConfig->GetSetting("coredump_enabled")))
-		unix_coredump_enable();
+	if (setrlimit(RLIMIT_NOFILE, &file_limit) < 0)
+		ec_log_warn("setrlimit(RLIMIT_NOFILE, %d) failed, you will only be able to connect up to %d sockets. Either start the process as root, or increase user limits for open file descriptors", KC_DESIRED_FILEDES, getdtablesize());
+	unix_coredump_enable(g_lpConfig->GetSetting("coredump_enabled"));
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
@@ -585,37 +628,40 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 
 	hr = MAPIInitialize(NULL);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI: %s (%x)",
+		ec_log_crit("Unable to initialize MAPI: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-gateway version " PROJECT_VERSION " (pid %d)", getpid());
+	if (bListenPOP3) {
+		pfd_pop3 = nfds;
+		pollfd[nfds++].fd = ulListenPOP3;
+	}
+	if (bListenPOP3s) {
+		pfd_pop3s = nfds;
+		pollfd[nfds++].fd = ulListenPOP3s;
+	}
+	if (bListenIMAP) {
+		pfd_imap = nfds;
+		pollfd[nfds++].fd = ulListenIMAP;
+	}
+	if (bListenIMAPs) {
+		pfd_imaps = nfds;
+		pollfd[nfds++].fd = ulListenIMAPs;
+	}
+	for (size_t i = 0; i < nfds; ++i)
+		pollfd[i].events = POLLIN | POLLRDHUP;
 
 	// Mainloop
 	while (!quit) {
-		FD_ZERO(&readfds);
-		if (bListenPOP3)
-			FD_SET(ulListenPOP3, &readfds);
-		if (bListenPOP3s)
-			FD_SET(ulListenPOP3s, &readfds);
-		if (bListenIMAP)
-			FD_SET(ulListenIMAP, &readfds);
-		if (bListenIMAPs)
-			FD_SET(ulListenIMAPs, &readfds);
+		for (size_t i = 0; i < nfds; ++i)
+			pollfd[i].revents = 0;
 
-		struct timeval timeout;
-		timeout.tv_sec = 10;
-		timeout.tv_usec = 0;
-
-		int maxfd = 0;
-		maxfd = std::max(maxfd, ulListenPOP3);
-		maxfd = std::max(maxfd, ulListenIMAP);
-		maxfd = std::max(maxfd, ulListenIMAPs);
-		err = select(maxfd + 1, &readfds, NULL, NULL, &timeout);
+		err = poll(pollfd, nfds, 10 * 1000);
 		if (err < 0) {
 			if (errno != EINTR) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Socket error: %s", strerror(errno));
+				ec_log_err("Socket error: %s", strerror(errno));
 				quit = 1;
 				hr = MAPI_E_NETWORK_ERROR;
 			}
@@ -625,19 +671,19 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 		}
 
 		// One socket has signalled a new incoming connection
-
-		HandlerArgs *lpHandlerArgs = new HandlerArgs;
-
+		std::unique_ptr<HandlerArgs> lpHandlerArgs(new HandlerArgs);
 		lpHandlerArgs->lpLogger = g_lpLogger;
 		lpHandlerArgs->lpConfig = g_lpConfig;
 
-		if ((bListenPOP3 && FD_ISSET(ulListenPOP3, &readfds)) || (bListenPOP3s && FD_ISSET(ulListenPOP3s, &readfds))) {
+		bool pop3_event = pfd_pop3 >= 0 && pollfd[pfd_pop3].revents & (POLLIN | POLLRDHUP);
+		bool pop3s_event = pfd_pop3s >= 0 && pollfd[pfd_pop3s].revents & (POLLIN | POLLRDHUP);
+		if (pop3_event || pop3s_event) {
 			bool usessl;
 
 			lpHandlerArgs->type = ST_POP3;
 
 			// Incoming POP3(s) connection
-			if (bListenPOP3s && FD_ISSET(ulListenPOP3s, &readfds)) {
+			if (pop3s_event) {
 				usessl = true;
 				hr = HrAccept(ulListenPOP3s, &lpHandlerArgs->lpChannel);
 			} else {
@@ -645,9 +691,8 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 				hr = HrAccept(ulListenPOP3, &lpHandlerArgs->lpChannel);
 			}
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to accept POP3 socket connection.");
+				ec_log_err("Unable to accept POP3 socket connection.");
 				// just keep running
-				delete lpHandlerArgs;
 				hr = hrSuccess;
 				continue;
 			}
@@ -657,42 +702,44 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			pthread_t POP3Thread;
 			const char *method = usessl ? "POP3s" : "POP3";
 			const char *model = bThreads ? "thread" : "process";
-			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting worker %s for %s request", model, method);
+			ec_log_notice("Starting worker %s for %s request", model, method);
 			if (bThreads) {
-				if (pthread_create(&POP3Thread, &ThreadAttr, Handler, lpHandlerArgs) != 0) {
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't create %s %s.", method, model);
+				if (pthread_create(&POP3Thread, &ThreadAttr, Handler_Threaded, lpHandlerArgs.get()) != 0) {
+					ec_log_err("Can't create %s %s.", method, model);
 					// just keep running
 					delete lpHandlerArgs->lpChannel;
-					delete lpHandlerArgs;
+					lpHandlerArgs.reset();
 					hr = hrSuccess;
 				}
 				else {
+					lpHandlerArgs.release();
 					++nChildren;
 				}
 
 				set_thread_name(POP3Thread, "ZGateway " + std::string(method));
 			}
 			else {
-				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0)
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't create %s %s.", method, model);
+				if (unix_fork_function(Handler, lpHandlerArgs.get(), nCloseFDs, pCloseFDs) < 0)
+					ec_log_err("Can't create %s %s.", method, model);
 					// just keep running
 				else
 					++nChildren;
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
-				delete lpHandlerArgs;
 				hr = hrSuccess;
 			}
 			continue;
 		}
 
-		if ((bListenIMAP && FD_ISSET(ulListenIMAP, &readfds)) || (bListenIMAPs && FD_ISSET(ulListenIMAPs, &readfds))) {
+		bool imap_event = pfd_imap >= 0 && pollfd[pfd_imap].revents & (POLLIN | POLLRDHUP);
+		bool imaps_event = pfd_imaps >= 0 && pollfd[pfd_imaps].revents & (POLLIN | POLLRDHUP);
+		if (imap_event || imaps_event) {
 			bool usessl;
 
 			lpHandlerArgs->type = ST_IMAP;
 
 			// Incoming IMAP(s) connection
-			if (bListenIMAPs && FD_ISSET(ulListenIMAPs, &readfds)) {
+			if (imaps_event) {
 				usessl = true;
 				hr = HrAccept(ulListenIMAPs, &lpHandlerArgs->lpChannel);
 			} else {
@@ -700,9 +747,8 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 				hr = HrAccept(ulListenIMAP, &lpHandlerArgs->lpChannel);
 			}
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to accept IMAP socket connection.");
+				ec_log_err("Unable to accept IMAP socket connection.");
 				// just keep running
-				delete lpHandlerArgs;
 				hr = hrSuccess;
 				continue;
 			}
@@ -712,41 +758,40 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			pthread_t IMAPThread;
 			const char *method = usessl ? "IMAPs" : "IMAP";
 			const char *model = bThreads ? "thread" : "process";
-			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting worker %s for %s request", model, method);
+			ec_log_notice("Starting worker %s for %s request", model, method);
 			if (bThreads) {
-				if (pthread_create(&IMAPThread, &ThreadAttr, Handler, lpHandlerArgs) != 0) {
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
+				if (pthread_create(&IMAPThread, &ThreadAttr, Handler_Threaded, lpHandlerArgs.get()) != 0) {
+					ec_log_err("Could not create %s %s.", method, model);
 					// just keep running
 					delete lpHandlerArgs->lpChannel;
-					delete lpHandlerArgs;
+					lpHandlerArgs.reset();
 					hr = hrSuccess;
 				}
 				else {
+					lpHandlerArgs.release();
 					++nChildren;
 				}
 
 				set_thread_name(IMAPThread, "ZGateway " + std::string(method));
 			}
 			else {
-				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0)
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
+				if (unix_fork_function(Handler, lpHandlerArgs.get(), nCloseFDs, pCloseFDs) < 0)
+					ec_log_err("Could not create %s %s.", method, model);
 					// just keep running
 				else
 					++nChildren;
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
-				delete lpHandlerArgs;
 				hr = hrSuccess;
 			}
 			continue;
 		}
 
 		// should not be able to get here because of continues
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Incoming traffic was not for me??");
+		ec_log_warn("Incoming traffic was not for me??");
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "POP3/IMAP Gateway will now exit");
-
+	ec_log(EC_LOGLEVEL_ALWAYS, "POP3/IMAP Gateway will now exit");
 	// in forked mode, send all children the exit signal
 	if (bThreads == false) {
 		signal(SIGTERM, SIG_IGN);
@@ -756,15 +801,14 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	// wait max 10 seconds (init script waits 15 seconds)
 	for (int i = 10; nChildren != 0 && i != 0; --i) {
 		if (i % 5 == 0)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Waiting for %d processes to exit", nChildren);
+			ec_log_warn("Waiting for %d processes to exit", nChildren);
 		sleep(1);
 	}
 
 	if (nChildren)
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Forced shutdown with %d processes left", nChildren);
+		ec_log_warn("Forced shutdown with %d processes left", nChildren);
 	else
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "POP3/IMAP Gateway shutdown complete");
-
+		ec_log_notice("POP3/IMAP Gateway shutdown complete");
 	MAPIUninitialize();
 
 exit:
@@ -773,11 +817,8 @@ exit:
 	if (bThreads)
 		pthread_attr_destroy(&ThreadAttr);
 	free(st.ss_sp);
-#ifdef KC_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
-#endif
-
 	return hr;
 }
 

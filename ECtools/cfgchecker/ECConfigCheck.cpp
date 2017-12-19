@@ -17,60 +17,50 @@
 
 #include <iostream>
 #include <algorithm>
-
+#include <string>
+#include <utility>
 #include <sys/stat.h>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <iconv.h>
 #include <kopano/stringutil.h>
-
-using namespace std;
-
 #include "ECConfigCheck.h"
 
-ECConfigCheck::ECConfigCheck(const char *lpszName, const char *lpszConfigFile)
-{
-	m_lpszName = lpszName;
-	m_lpszConfigFile = lpszConfigFile;
-	m_bDirty = false;
-	m_bHosted = false;
-	m_bMulti = false;
+using std::cerr;
+using std::cout;
+using std::endl;
 
+ECConfigCheck::ECConfigCheck(const char *lpszName, const char *lpszConfigFile) :
+	m_lpszName(lpszName), m_lpszConfigFile(lpszConfigFile)
+{
 	readConfigFile(lpszConfigFile);
 }
 
-static string clearCharacters(string s, const string &whitespaces)
+static void clearCharacters(std::string &s, const std::string &whitespaces)
 {
-	size_t pos = 0;
-
 	/*
 	 * The line is build up like this:
 	 * config_name = bla bla
 	 *
-	 * Whe should clean it in such a way that it resolves to:
+	 * We should clean it in such a way that it resolves to:
 	 * config_name=bla bla
 	 *
 	 * Be careful _not_ to remove any whitespace characters
 	 * within the configuration value itself.
 	 */
-	pos = s.find_first_not_of(whitespaces);
+	auto pos = s.find_first_not_of(whitespaces);
 	s.erase(0, pos);
 
 	pos = s.find_last_not_of(whitespaces);
-	if (pos != string::npos)
-		s.erase(pos + 1, string::npos);
-
-	return s;
+	if (pos != std::string::npos)
+		s.erase(pos + 1, std::string::npos);
 }
 
 void ECConfigCheck::readConfigFile(const char *lpszConfigFile)
 {
 	FILE *fp = NULL;
 	char cBuffer[1024];
-	string strLine;
-	string strName;
-	string strValue;
-	size_t pos;
 
 	if (!lpszConfigFile) {
 		m_bDirty = true;
@@ -88,23 +78,22 @@ void ECConfigCheck::readConfigFile(const char *lpszConfigFile)
 		if (!fgets(cBuffer, sizeof(cBuffer), fp))
 			continue;
 
-		strLine = string(cBuffer);
+		std::string strLine = cBuffer, strName, strValue;
 
 		/* Skip empty lines any lines which start with # */
 		if (strLine.empty() || strLine[0] == '#')
 			continue;
 
 		/* Get setting name */
-		pos = strLine.find('=');
-		if (pos != string::npos) {
+		auto pos = strLine.find('=');
+		if (pos != std::string::npos) {
 			strName = strLine.substr(0, pos);
 			strValue = strLine.substr(pos + 1);
 		} else
 			continue;
 
-		strName = clearCharacters(strName, " \t\r\n");
-		strValue = clearCharacters(strValue, " \t\r\n");
-
+		clearCharacters(strName, " \t\r\n");
+		clearCharacters(strValue, " \t\r\n");
 		if(!strName.empty())
 			m_mSettings[strName] = strValue;
 	}
@@ -112,7 +101,7 @@ void ECConfigCheck::readConfigFile(const char *lpszConfigFile)
 	fclose(fp);
 }
 
-bool ECConfigCheck::isDirty()
+bool ECConfigCheck::isDirty() const
 {
 	if (m_bDirty)
 		cerr << "Validation of " << m_lpszName << " failed: file could not be read (" << m_lpszConfigFile << ")" << endl;
@@ -240,33 +229,14 @@ int ECConfigCheck::testUsedWithoutMultiServer(const config_check_t *check)
 
 int ECConfigCheck::testCharset(const config_check_t *check)
 {
-	FILE *fp = NULL;
-
-	/* When grepping iconv output, all lines have '//' appended,
-	 * additionally all charsets are uppercase */
-	auto v1 = strToUpper(check->value1);
-	fp = popen(("iconv -l | grep -x \"" + v1 + "//\"").c_str(), "r");
-
-	if (fp == nullptr) {
-		printWarning(check->option1, "Failed to validate charset");
-		return CHECK_WARNING;
-	}
-
-	char buffer[50];
-	string output;
-
-	memset(buffer, 0, sizeof(buffer));
-	if (fgets(buffer, sizeof(buffer), fp) == nullptr) {
-		printWarning(check->option1, "unable to validate charset: \"" + v1 + "\"");
-		pclose(fp);
-		return CHECK_WARNING;
-	}
-	output = buffer;
-	pclose(fp);
-	if (output.find(v1) == string::npos) {
-		printError(check->option1, "contains unknown chartype \"" + v1 + "\"");
+	iconv_t cd = iconv_open("WCHAR_T", check->value1.c_str());
+	if (cd == reinterpret_cast<iconv_t>(-1)) {
+		printError(check->option1, "contains unknown charset \"" + check->value1 + "\"");
+		iconv_close(cd);
 		return CHECK_ERROR;
 	}
+
+	iconv_close(cd);
 	return CHECK_OK;
 }
 
@@ -324,7 +294,7 @@ void ECConfigCheck::addCheck(const config_check_t &check, unsigned int flags)
 			addCheck(check.option2, 0, &testUsedWithMultiServer);
 	}
 
-	m_lChecks.push_back(check);
+	m_lChecks.emplace_back(check);
 }
 
 void ECConfigCheck::addCheck(const std::string &option, unsigned int flags,
@@ -333,10 +303,9 @@ void ECConfigCheck::addCheck(const std::string &option, unsigned int flags,
 	config_check_t config_check;
 
 	config_check.option1 = option;
-	config_check.option2 = "";
+	config_check.option2.clear();
 	config_check.check = check;
-
-	addCheck(config_check, flags);
+	addCheck(std::move(config_check), flags);
 }
 
 void ECConfigCheck::addCheck(const std::string &option1,
@@ -348,8 +317,7 @@ void ECConfigCheck::addCheck(const std::string &option1,
 	config_check.option1 = option1;
 	config_check.option2 = option2;
 	config_check.check = check;
-
-	addCheck(config_check, flags);
+	addCheck(std::move(config_check), flags);
 }
 
 const std::string &ECConfigCheck::getSetting(const std::string &option)
@@ -367,4 +335,61 @@ void ECConfigCheck::printWarning(const std::string &option,
     const std::string &message)
 {
 	cerr << "[WARNING] " << option << ": " << message << endl;
+}
+
+DAgentConfigCheck::DAgentConfigCheck(const char *lpszConfigFile) : ECConfigCheck("DAgent Configuration file", lpszConfigFile)
+{
+}
+
+void DAgentConfigCheck::loadChecks()
+{
+	addCheck("lmtp_max_threads", 0, &testNonZero);
+}
+
+MonitorConfigCheck::MonitorConfigCheck(const char *lpszConfigFile) :
+	ECConfigCheck("Monitor Configuration file", lpszConfigFile)
+{}
+
+void MonitorConfigCheck::loadChecks()
+{
+	addCheck("companyquota_warning_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
+	addCheck("companyquota_soft_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
+	addCheck("companyquota_hard_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
+	addCheck("userquota_warning_template", CONFIG_MANDATORY, &testFile);
+	addCheck("userquota_soft_template", CONFIG_MANDATORY, &testFile);
+	addCheck("userquota_hard_template", CONFIG_MANDATORY, &testFile);
+}
+
+SpoolerConfigCheck::SpoolerConfigCheck(const char *lpszConfigFile) :
+	ECConfigCheck("Spooler Configuration file", lpszConfigFile)
+{}
+
+void SpoolerConfigCheck::loadChecks()
+{
+	addCheck("max_threads", 0, &testNonZero);
+	addCheck("always_send_delegates", 0, &testBoolean);
+	addCheck("allow_redirect_spoofing", 0, &testBoolean);
+	addCheck("copy_delegate_mails", 0, &testBoolean);
+	addCheck("always_send_tnef", 0, &testBoolean);
+}
+
+UnixConfigCheck::UnixConfigCheck(const char *lpszConfigFile) :
+	ECConfigCheck("Unix Configuration file", lpszConfigFile)
+{}
+
+void UnixConfigCheck::loadChecks()
+{
+	addCheck("default_domain", CONFIG_MANDATORY);
+	addCheck("fullname_charset", 0, &testCharset);
+	addCheck("min_user_uid", "max_user_uid", CONFIG_MANDATORY, &testId);
+	addCheck("min_group_gid", "max_group_gid", CONFIG_MANDATORY, &testId);
+}
+
+int UnixConfigCheck::testId(const config_check_t *check)
+{
+	if (atoi(check->value1.c_str()) < atoi(check->value2.c_str()))
+		return CHECK_OK;
+	printError(check->option1, "is equal or greater then \"" + check->option2 +
+		"\" (" + check->value1 + ">=" + check->value2 + ")");
+	return CHECK_ERROR;
 }

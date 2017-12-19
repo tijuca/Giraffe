@@ -18,6 +18,7 @@
 #ifndef ECNOTIFYMASTER_H
 #define ECNOTIFYMASTER_H
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <mutex>
@@ -26,6 +27,7 @@
 #include <kopano/zcdefs.h>
 #include "ECSessionGroupManager.h"
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include <kopano/kcodes.h>
 
 class ECNotifyClient;
@@ -83,13 +85,14 @@ private:
 	/* Connection settings */
 	SessionGroupData *m_lpSessionGroupData;
 	WSTransport *m_lpTransport = nullptr;
-	ULONG m_ulConnection = 0;
+	std::atomic<unsigned int> m_ulConnection{1};
 
 	/* Threading information */
 	std::recursive_mutex m_hMutex;
 	pthread_t					m_hThread;
 	BOOL m_bThreadRunning = false;
 	BOOL m_bThreadExit = false;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif /* ECNOTIFYMASTER_H */
