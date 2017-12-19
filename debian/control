@@ -227,13 +227,10 @@ Package: kopano-search
 Architecture: all
 Depends: ${shlibs:Depends},
  ${misc:Depends},
- bash (>= 3.0),
  catdoc,
- coreutils (>= 5.93),
  file,
  gawk,
  lsb-base,
- mktemp (>= 1.5),
  poppler-utils,
  python,
  python-dateutil,
