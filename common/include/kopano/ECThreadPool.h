@@ -39,7 +39,6 @@ private:	// types
 	struct STaskInfo {
 		ECTask			*lpTask;
 		bool			bDelete;
-		struct timeval	tvQueueTime;
 	};
 
 	typedef std::set<pthread_t> ThreadSet;
@@ -90,7 +89,7 @@ inline unsigned ECThreadPool::threadCount() const {
  */
 class _kc_export ECTask {
 public:
-	_kc_hidden virtual ~ECTask(void) _kc_impdtor;
+	_kc_hidden virtual ~ECTask(void) = default;
 	_kc_hidden virtual void execute(void);
 	_kc_hidden bool dispatchOn(ECThreadPool *, bool transfer_ownership = false);
 	

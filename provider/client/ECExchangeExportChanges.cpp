@@ -49,56 +49,21 @@
 
 using namespace KCHL;
 
-ECExchangeExportChanges::ECExchangeExportChanges(ECMsgStore *lpStore, const std::string &sk, const wchar_t * szDisplay, unsigned int ulSyncType)
-: m_iidMessage(IID_IMessage)
+ECExchangeExportChanges::ECExchangeExportChanges(ECMsgStore *lpStore,
+    const std::string &sk, const wchar_t *szDisplay, unsigned int ulSyncType) :
+	m_ulSyncType(ulSyncType), m_sourcekey(sk),
+	m_strDisplay(szDisplay != nullptr ? szDisplay : L"<Unknown>"),
+	/* In server-side sync, only use a batch size of 1. */
+	m_ulBatchSize(sk.empty() ? 1 : 256), m_iidMessage(IID_IMessage),
+	m_lpStore(lpStore)
 {
-	ECSyncLog::GetLogger(&m_lpLogger);
-
-	m_lpStore = lpStore;
-	m_sourcekey = sk;
-	m_strDisplay = szDisplay ? szDisplay : L"<Unknown>";
-	m_ulSyncType = ulSyncType;
-
-	// In server-side sync, only use a batch size of 1.
-	if (m_sourcekey.empty())
-		m_ulBatchSize = 1;
-	else
-		m_ulBatchSize = 256;
+	ECSyncLog::GetLogger(&~m_lpLogger);
 	memset(&m_tmsStart, 0, sizeof(m_tmsStart));
-
-	m_lpStore->AddRef();
-}
-
-ECExchangeExportChanges::~ECExchangeExportChanges(){
-	MAPIFreeBuffer(m_lpChanges);
-	if(m_lpStore)
-		m_lpStore->Release();
-
-	if(m_lpStream)
-		m_lpStream->Release();
-
-	if(m_lpImportContents)
-		m_lpImportContents->Release();
-
-	if(m_lpImportStreamedContents)
-		m_lpImportStreamedContents->Release();
-
-	if(m_lpImportHierarchy)
-		m_lpImportHierarchy->Release();
-	MAPIFreeBuffer(m_lpRestrict);
-	if(m_lpLogger)
-		m_lpLogger->Release();
 }
 
 HRESULT ECExchangeExportChanges::SetLogger(ECLogger *lpLogger)
 {
-	if(m_lpLogger)
-		m_lpLogger->Release();
-
-	m_lpLogger = lpLogger;
-	if (m_lpLogger != NULL)
-		m_lpLogger->AddRef();
-
+	m_lpLogger.reset(lpLogger);
 	return hrSuccess;
 }
 
@@ -173,8 +138,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	BOOL		bCanStream = FALSE;
 
 	bool		bForceImplicitStateUpdate = false;
-	ECSyncSettings *lpSyncSettings = ECSyncSettings::GetInstance();
-
+	auto lpSyncSettings = &ECSyncSettings::instance;
 	typedef std::map<SBinary, ChangeListIter, Util::SBinaryLess>	ChangeMap;
 	typedef ChangeMap::iterator					ChangeMapIter;
 	ChangeMap		mapChanges;
@@ -188,13 +152,13 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	}
 
 	if(lpRestriction) {
-		hr = Util::HrCopySRestriction(&m_lpRestrict, lpRestriction);
+		hr = Util::HrCopySRestriction(&~m_lpRestrict, lpRestriction);
 		if(hr != hrSuccess) {
 			ZLOG_DEBUG(m_lpLogger, "Invalid restriction");
 			return hr;
 		}
 	} else {
-		m_lpRestrict = NULL;
+		m_lpRestrict.reset();
 	}
 
 	m_ulFlags = ulFlags;
@@ -207,12 +171,12 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 
 		// We don't need the importer when doing SYNC_CATCHUP
 		if(m_ulSyncType == ICS_SYNC_CONTENTS){
-			hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, (LPVOID*) &m_lpImportContents);
+			hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, &~m_lpImportContents);
 			if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
 				m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 				if (bCanStream == TRUE) {
 					ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
-					hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, (LPVOID*) &m_lpImportStreamedContents);
+					hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, &~m_lpImportStreamedContents);
 					if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED) {
 						assert(m_lpImportStreamedContents == NULL);
 						hr = hrSuccess;
@@ -223,7 +187,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 					ZLOG_DEBUG(m_lpLogger, "Exporter doesn't support enhanced ICS");
 			}
 		}else if(m_ulSyncType == ICS_SYNC_HIERARCHY){
-			hr = lpCollector->QueryInterface(IID_IExchangeImportHierarchyChanges, (LPVOID*) &m_lpImportHierarchy);
+			hr = lpCollector->QueryInterface(IID_IExchangeImportHierarchyChanges, &~m_lpImportHierarchy);
 		}else{
 			hr = MAPI_E_INVALID_PARAMETER;
 		}
@@ -237,7 +201,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 		ULONG ulSize = 0;
 
 		ZLOG_DEBUG(m_lpLogger, "Creating new exporter stream");
-		hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, sizeof(tmp)), true, &m_lpStream);
+		hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, sizeof(tmp)), true, &~m_lpStream);
 		if (hr != hrSuccess) {
 			ZLOG_DEBUG(m_lpLogger, "Unable to create new exporter stream");
 			return hr;
@@ -246,7 +210,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 		m_lpStream->Seek(lint, STREAM_SEEK_SET, NULL);
 		m_lpStream->Write(tmp, sizeof(tmp), &ulSize);
 	} else {
-		hr = lpStream->QueryInterface(IID_IStream, (LPVOID*)&m_lpStream);
+		hr = lpStream->QueryInterface(IID_IStream, &~m_lpStream);
 		if (hr != hrSuccess) {
 			ZLOG_DEBUG(m_lpLogger, "Passed state stream does not support IStream interface");
 			return hr;
@@ -262,7 +226,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	ZLOG_DEBUG(m_lpLogger, "Decoded state stream: syncid=%u, changeid=%u, processed changes=%lu", ulSyncId, ulChangeId, (long unsigned int)m_setProcessedChanges.size());
 
 	if(ulSyncId == 0) {
-		ZLOG_DEBUG(m_lpLogger, "Getting new sync id for %s folder '%ls'...", (m_lpStore->IsOfflineStore() ? "offline" : "online"), m_strDisplay.c_str());
+		ZLOG_DEBUG(m_lpLogger, "Getting new sync id for folder '%ls'...", m_strDisplay.c_str());
 
 		// Ignore any trailing garbage in the stream
 		if (m_sourcekey.size() < 24 && (m_sourcekey[m_sourcekey.size()-1] & 0x80)) {
@@ -283,15 +247,13 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 			return hr;
 		}
 
-		ZLOG_DEBUG(m_lpLogger, "New sync id for %s folder '%ls': %u", (m_lpStore->IsOfflineStore() ? "offline" : "online"), m_strDisplay.c_str(), ulSyncId);
+		ZLOG_DEBUG(m_lpLogger, "New sync id for folder '%ls': %u", m_strDisplay.c_str(), ulSyncId);
 
 		bForceImplicitStateUpdate = true;
 	}
 
 	MAPIFreeBuffer(m_lpChanges);
-	m_lpChanges = NULL;
-
-	hr = m_lpStore->lpTransport->HrGetChanges(sourcekey, ulSyncId, ulChangeId, m_ulSyncType, ulFlags, m_lpRestrict, &m_ulMaxChangeId, &m_ulChanges, &m_lpChanges);
+	hr = m_lpStore->lpTransport->HrGetChanges(sourcekey, ulSyncId, ulChangeId, m_ulSyncType, ulFlags, m_lpRestrict, &m_ulMaxChangeId, &m_ulChanges, &~m_lpChanges);
 	if(hr != hrSuccess) {
 		ZLOG_DEBUG(m_lpLogger, "Unable to get changes from server, hr=0x%08x", hr);
 		return hr;
@@ -300,7 +262,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	m_ulSyncId = ulSyncId;
 	m_ulChangeId = ulChangeId;
 
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "%s folder: %ls changes: %u syncid: %u changeid: %u", (m_lpStore->IsOfflineStore() ? "offline" : "online"), m_strDisplay.c_str(), m_ulChanges, m_ulSyncId, m_ulChangeId);
+	m_lpLogger->Log(EC_LOGLEVEL_INFO, "folder: %ls changes: %u syncid: %u changeid: %u", m_strDisplay.c_str(), m_ulChanges, m_ulSyncId, m_ulChangeId);
 
 	/**
 	 * Filter the changes.
@@ -316,7 +278,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	 */
 	for (ulStep = 0; ulStep < m_ulChanges; ++ulStep) {
 		// First check if this change hasn't been processed yet
-		if (m_setProcessedChanges.find(std::pair<unsigned int, std::string>(m_lpChanges[ulStep].ulChangeId, std::string((char *)m_lpChanges[ulStep].sSourceKey.lpb, m_lpChanges[ulStep].sSourceKey.cb))) != m_setProcessedChanges.end())
+		if (m_setProcessedChanges.find({m_lpChanges[ulStep].ulChangeId, std::string(reinterpret_cast<const char *>(m_lpChanges[ulStep].sSourceKey.lpb), m_lpChanges[ulStep].sSourceKey.cb)}) != m_setProcessedChanges.end())
 			continue;
 
 		iterLastChange = mapChanges.find(m_lpChanges[ulStep].sSourceKey);
@@ -324,16 +286,16 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 			switch (ICS_ACTION(m_lpChanges[ulStep].ulChangeType)) {
 			case ICS_NEW:
 			case ICS_CHANGE:
-				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, lstChange.insert(lstChange.end(), m_lpChanges[ulStep])});
+				mapChanges.emplace(m_lpChanges[ulStep].sSourceKey, lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]));
 				break;
 			case ICS_FLAG:
-				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstFlag.insert(m_lstFlag.end(), m_lpChanges[ulStep])});
+				mapChanges.emplace(m_lpChanges[ulStep].sSourceKey, m_lstFlag.emplace(m_lstFlag.end(), m_lpChanges[ulStep]));
 				break;
 			case ICS_SOFT_DELETE:
-				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep])});
+				mapChanges.emplace(m_lpChanges[ulStep].sSourceKey, m_lstSoftDelete.emplace(m_lstSoftDelete.end(), m_lpChanges[ulStep]));
 				break;
 			case ICS_HARD_DELETE:
-				mapChanges.insert({m_lpChanges[ulStep].sSourceKey, m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep])});
+				mapChanges.emplace(m_lpChanges[ulStep].sSourceKey, m_lstHardDelete.emplace(m_lstHardDelete.end(), m_lpChanges[ulStep]));
 				break;
 			default:
 				break;
@@ -345,7 +307,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 				// However, if an object gets moved to another folder and back, we'll get a delete followed by an add. If that happens
 				// we skip the delete and morph the current add to a change.
 				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
-					ChangeListIter iterNewChange = lstChange.insert(lstChange.end(), *iterLastChange->second);
+					auto iterNewChange = lstChange.emplace(lstChange.end(), *iterLastChange->second);
 					iterNewChange->ulChangeType = (iterNewChange->ulChangeType & ~ICS_ACTION_MASK) | ICS_CHANGE;
 					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
 						m_lstSoftDelete.erase(iterLastChange->second);
@@ -353,36 +315,44 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 						m_lstHardDelete.erase(iterLastChange->second);
 					iterLastChange->second = iterNewChange;
 
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for a previously deleted object. I converted it to a change. sourcekey=%s", bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for a previously deleted object. I converted it to a change. sourcekey=%s",
+						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				} else
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for an object we've seen before. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for an object we've seen before. prev_change=%04x, sourcekey=%s",
+						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				break;
 
 			case ICS_CHANGE:
 				// Any change is allowed as the previous change except a change.
 				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE on an object for which we just saw an ICS_CHANGE. sourcekey=%s", bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE on an object for which we just saw an ICS_CHANGE. sourcekey=%s",
+						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				// A previous delete is allowed for the same reason as in ICS_NEW.
 				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
 					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
 						m_lstSoftDelete.erase(iterLastChange->second);
 					else
 						m_lstHardDelete.erase(iterLastChange->second);
-					iterLastChange->second = lstChange.insert(lstChange.end(), m_lpChanges[ulStep]);
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE change for a previously deleted object. sourcekey=%s", bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE change for a previously deleted object. sourcekey=%s",
+						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				} else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG) {
 					m_lstFlag.erase(iterLastChange->second);
-					iterLastChange->second = lstChange.insert(lstChange.end(), m_lpChanges[ulStep]);
-					ZLOG_DEBUG(m_lpLogger, "Upgraded a previous ICS_FLAG to ICS_CHANGED. sourcekey=%s", bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
+					ZLOG_DEBUG(m_lpLogger, "Upgraded a previous ICS_FLAG to ICS_CHANGED. sourcekey=%s",
+						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				} else
-					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_CHANGE due to a previous change. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_CHANGE due to a previous change. prev_change=%04x, sourcekey=%s",
+						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				break;
 
 			case ICS_FLAG:
 				// This is only allowed after an ICS_NEW and ICS_CHANGE. It will be ignored in any case.
 				if (ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_NEW && ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_CHANGE)
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_FLAG with something else than a ICS_NEW or ICS_CHANGE as the previous changes. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
-				ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_FLAG due to previous ICS_NEW or ICS_CHANGE. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_FLAG with something else than a ICS_NEW or ICS_CHANGE as the previous changes. prev_change=%04x, sourcekey=%s",
+						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_FLAG due to previous ICS_NEW or ICS_CHANGE. prev_change=%04x, sourcekey=%s",
+					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				break;
 
 			case ICS_SOFT_DELETE:
@@ -390,7 +360,8 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 				// We'll ignore the previous change and replace it with this delete. We won't write it now as
 				// we could get an add for the same object. But because of the reordering (deletes after all adds/changes) we would delete
 				// the new object. Therefore we'll make a change out of a delete - add/change.
-				ZLOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s",
+					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_NEW || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
 					lstChange.erase(iterLastChange->second);
 				else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG)
@@ -401,12 +372,13 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 					m_lstHardDelete.erase(iterLastChange->second);
 
 				if (ICS_ACTION(m_lpChanges[ulStep].ulChangeType) == ICS_SOFT_DELETE)
-					iterLastChange->second = m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
+					iterLastChange->second = m_lstSoftDelete.emplace(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
 				else
-					iterLastChange->second = m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep]);
+					iterLastChange->second = m_lstHardDelete.emplace(m_lstHardDelete.end(), m_lpChanges[ulStep]);
 				break;
 			default:
-				ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s", m_lpChanges[ulStep].ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
+					m_lpChanges[ulStep].ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
 				break;
 			}
 		}
@@ -423,7 +395,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	m_bConfiged = true;
 
 	if (bForceImplicitStateUpdate) {
-		ZLOG_DEBUG(m_lpLogger, "Forcing state update for %s folder '%ls'", (m_lpStore->IsOfflineStore() ? "offline" : "online"), m_strDisplay.c_str());
+		ZLOG_DEBUG(m_lpLogger, "Forcing state update for folder '%ls'", m_strDisplay.c_str());
 		if (m_ulChangeId == 0)
 			UpdateState(NULL);
 	}
@@ -580,7 +552,7 @@ HRESULT ECExchangeExportChanges::GetChangeCount(ULONG *lpcChanges) {
 HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize)
 {
 	HRESULT hr;
-	ECSyncSettings *lpSyncSettings = ECSyncSettings::GetInstance();
+	auto lpSyncSettings = &ECSyncSettings::instance;
 	BOOL bCanStream = false;
 	BOOL bSupportsPropTag = false;
 	
@@ -610,12 +582,12 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 		return MAPI_E_NO_SUPPORT;
 
 	// Select an importer interface
-	hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, (LPVOID*) &m_lpImportContents);
+	hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, &~m_lpImportContents);
 	if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
 		m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 		if (bCanStream == TRUE) {
 			ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
-			hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, (LPVOID*) &m_lpImportStreamedContents);
+			hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, &~m_lpImportStreamedContents);
 			if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED) {
 				assert(m_lpImportStreamedContents == NULL);
 				hr = hrSuccess;
@@ -629,7 +601,7 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 	m_ulEntryPropTag = ulPropTag;
 
 	// Fill m_lpChanges with items from lpEntries
-	hr = MAPIAllocateBuffer(sizeof(ICSCHANGE) * lpEntries->cValues, (void **)&m_lpChanges);
+	hr = MAPIAllocateBuffer(sizeof(ICSCHANGE) * lpEntries->cValues, &~m_lpChanges);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -654,7 +626,7 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 		m_lpChanges[i].ulChangeType = ICS_MESSAGE_NEW;
 
 		// Since all changes are 'change' modifications, duplicate all data in m_lpChanges in m_lstChange
-		m_lstChange.push_back(m_lpChanges[i]);
+		m_lstChange.emplace_back(m_lpChanges[i]);
 	}
 	
 	m_bConfiged = true;
@@ -715,10 +687,10 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 				hr = hrSuccess;
 				goto next;
 			}
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey.cb, m_lstChange.at(m_ulStep).sSourceKey.lpb).c_str());
+			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
 
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Error while getting entryid from sourcekey %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey.cb, m_lstChange.at(m_ulStep).sSourceKey.lpb).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Error while getting entryid from sourcekey %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
 				goto exit;
 			}
 			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpSourceMessage);
@@ -841,9 +813,9 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 		}
 
 		for (ulCount = 0; ulCount < lpRows->cRows; ++ulCount) {
-			hr = lpDestMessage->DeleteAttach(lpRows->aRow[ulCount].lpProps[0].Value.ul, 0, NULL, 0);
+			hr = lpDestMessage->DeleteAttach(lpRows[ulCount].lpProps[0].Value.ul, 0, nullptr, 0);
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to delete destination's attachment number %d", lpRows->aRow[ulCount].lpProps[0].Value.ul);
+				ZLOG_DEBUG(m_lpLogger, "Unable to delete destination's attachment number %d", lpRows[ulCount].lpProps[0].Value.ul);
 				goto exit;
 			}
 		}
@@ -861,9 +833,9 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 
 		for (ulCount = 0; ulCount < lpRows->cRows; ++ulCount) {
 			object_ptr<IAttach> lpSourceAttach, lpDestAttach;
-			hr = lpSourceMessage->OpenAttach(lpRows->aRow[ulCount].lpProps[0].Value.ul, &IID_IAttachment, 0, &~lpSourceAttach);
+			hr = lpSourceMessage->OpenAttach(lpRows[ulCount].lpProps[0].Value.ul, &IID_IAttachment, 0, &~lpSourceAttach);
 			if(hr !=  hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to open attachment %d in source message", lpRows->aRow[ulCount].lpProps[0].Value.ul);
+				ZLOG_DEBUG(m_lpLogger, "Unable to open attachment %d in source message", lpRows[ulCount].lpProps[0].Value.ul);
 				goto exit;
 			}
 			hr = lpDestMessage->CreateAttach(&IID_IAttachment, 0, &ulObjType, &~lpDestAttach);
@@ -906,8 +878,8 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 
 next:
 		// Mark this change as processed, even if we skipped it due to SYNC_E_IGNORE or because the item was deleted on the source server
-
-		m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(m_lstChange.at(m_ulStep).ulChangeId, std::string((char *)m_lstChange.at(m_ulStep).sSourceKey.lpb, m_lstChange.at(m_ulStep).sSourceKey.cb)));
+		const auto &sk = m_lstChange.at(m_ulStep).sSourceKey;
+		m_setProcessedChanges.emplace(m_lstChange.at(m_ulStep).ulChangeId, std::string(reinterpret_cast<const char *>(sk.lpb), sk.cb));
 		++m_ulStep;
 		++ulSteps;
 	}
@@ -1023,7 +995,7 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 	}
 
 skip:
-	m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(m_lstChange.at(m_ulStep).ulChangeId, std::string((char *)m_lstChange.at(m_ulStep).sSourceKey.lpb, m_lstChange.at(m_ulStep).sSourceKey.cb)));
+	m_setProcessedChanges.emplace(m_lstChange.at(m_ulStep).ulChangeId, std::string(reinterpret_cast<const char *>(m_lstChange.at(m_ulStep).sSourceKey.lpb), m_lstChange.at(m_ulStep).sSourceKey.cb));
 	if (++m_ulStep < m_lstChange.size())
 		hr = SYNC_W_PROGRESS;
 
@@ -1068,7 +1040,7 @@ HRESULT ECExchangeExportChanges::ExportMessageFlags(){
 
 		// Mark the flag changes as processed
 		for (const auto &change : m_lstFlag)
-			m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(change.ulChangeId, std::string(reinterpret_cast<const char *>(change.sSourceKey.lpb), change.sSourceKey.cb)));
+			m_setProcessedChanges.emplace(change.ulChangeId, std::string(reinterpret_cast<const char *>(change.sSourceKey.lpb), change.sSourceKey.cb));
 	}
 
 exit:
@@ -1151,7 +1123,7 @@ HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 				hr = hrSuccess;
 				goto next;
 			}
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey.cb, m_lstChange.at(m_ulStep).sSourceKey.lpb).c_str());
+			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
 			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
 			if(hr != hrSuccess){
 				hr = hrSuccess;
@@ -1177,12 +1149,10 @@ HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 			hr = m_lpImportHierarchy->ImportFolderChange(ulCount, lpPropArray);
 		} else {
 			// Server-wide ICS
-			SPropValue sProps[1];
-
-			sProps[0].ulPropTag = PR_SOURCE_KEY;
-			sProps[0].Value.bin = m_lstChange.at(m_ulStep).sSourceKey;
-
-			hr = m_lpImportHierarchy->ImportFolderChange(1, sProps);
+			SPropValue sProps;
+			sProps.ulPropTag = PR_SOURCE_KEY;
+			sProps.Value.bin = m_lstChange.at(m_ulStep).sSourceKey;
+			hr = m_lpImportHierarchy->ImportFolderChange(1, &sProps);
 		}
 
 		if (hr == SYNC_E_IGNORE){
@@ -1205,7 +1175,8 @@ HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 		}
 next:
 		// Mark this change as processed
-		m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(m_lstChange.at(m_ulStep).ulChangeId, std::string((char *)m_lstChange.at(m_ulStep).sSourceKey.lpb, m_lstChange.at(m_ulStep).sSourceKey.cb)));
+		const auto &sk = m_lstChange.at(m_ulStep).sSourceKey;
+		m_setProcessedChanges.emplace(m_lstChange.at(m_ulStep).ulChangeId, std::string(reinterpret_cast<const char *>(sk.lpb), sk.cb));
 		++ulSteps;
 		++m_ulStep;
 	}
@@ -1370,8 +1341,8 @@ HRESULT ECExchangeExportChanges::ChangesToEntrylist(std::list<ICSCHANGE> * lpLst
 HRESULT ECExchangeExportChanges::AddProcessedChanges(ChangeList &lstChanges)
 {
 	for (const auto &i : lstChanges)
-		m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(i.ulChangeId,
-			std::string(reinterpret_cast<const char *>(i.sSourceKey.lpb), i.sSourceKey.cb)));
+		m_setProcessedChanges.emplace(i.ulChangeId,
+			std::string(reinterpret_cast<const char *>(i.sSourceKey.lpb), i.sSourceKey.cb));
 	return hrSuccess;
 }
 
@@ -1389,6 +1360,6 @@ void ECExchangeExportChanges::LogMessageProps(int loglevel, ULONG cValues, LPSPr
 		lpPropHierarchyId != NULL ? lpPropHierarchyId->Value.ul : 0,
 		lpPropParentId != NULL ? lpPropParentId->Value.ul : 0,
 		lpPropFlags != NULL ? lpPropFlags->Value.ul : 0,
-		lpPropEntryID != NULL ? bin2hex(lpPropEntryID->Value.bin.cb, lpPropEntryID->Value.bin.lpb).c_str() : "<Unknown>",
-		lpPropSK != NULL ? bin2hex(lpPropSK->Value.bin.cb, lpPropSK->Value.bin.lpb).c_str() : "<Unknown>");
+		lpPropEntryID != NULL ? bin2hex(lpPropEntryID->Value.bin).c_str() : "<Unknown>",
+		lpPropSK != NULL ? bin2hex(lpPropSK->Value.bin).c_str() : "<Unknown>");
 }

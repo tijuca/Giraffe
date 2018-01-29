@@ -17,6 +17,7 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
+#include <string>
 #include <utility>
 #include <mapi.h>
 #include <mapiutil.h>
@@ -36,8 +37,6 @@
 #include <kopano/mapi_ptr.h>
 #include <kopano/mapiguidext.h>
 #include <kopano/Util.h>
-
-using namespace std;
 
 namespace KC {
 
@@ -62,21 +61,12 @@ public:
 	}
 
 private:
-	wstring	m_strName;
+	std::wstring m_strName;
 };
 
 static HRESULT GetMailboxDataPerServer(const char *lpszPath, const char *lpSSLKey, const char *lpSSLPass, DataCollector *lpCollector);
 static HRESULT GetMailboxDataPerServer(IMAPISession *lpSession, const char *lpszPath, DataCollector *lpCollector);
 static HRESULT UpdateServerList(IABContainer *lpContainer, std::set<servername> &listServers);
-
-class UserCountCollector _kc_final : public DataCollector {
-public:
-	virtual HRESULT CollectData(LPMAPITABLE store_table) _kc_override;
-	unsigned int result() const;
-
-private:
-	unsigned int m_ulUserCount = 0;
-};
 
 template <typename string_type, ULONG prAccount>
 class UserListCollector _kc_final : public DataCollector {
@@ -122,20 +112,6 @@ HRESULT DataCollector::GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRest
 	return hr;
 }
 
-HRESULT UserCountCollector::CollectData(LPMAPITABLE lpStoreTable) {
-	ULONG ulCount = 0;
-	HRESULT hr = lpStoreTable->GetRowCount(0, &ulCount);
-	if (hr != hrSuccess)
-		return hr;
-
-	m_ulUserCount += ulCount;
-	return hrSuccess;
-}
-
-inline unsigned int UserCountCollector::result() const {
-	return m_ulUserCount;
-}
-
 template<typename string_type, ULONG prAccount>
 UserListCollector<string_type, prAccount>::UserListCollector(IMAPISession *lpSession): m_ptrSession(lpSession, true) {}
 
@@ -151,7 +127,7 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 	while (true) {
 		SRowSetPtr ptrRows;
 
-		HRESULT hr = lpStoreTable->QueryRows(50, 0, &ptrRows);
+		HRESULT hr = lpStoreTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -283,7 +259,7 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 		}
 
 		/* multi-tenancy, loop through all subcontainers to find all users */
-		hr = ptrHierarchyTable->QueryRows(ulCompanyCount, 0, &ptrRows);
+		hr = ptrHierarchyTable->QueryRows(ulCompanyCount, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 		
@@ -490,7 +466,7 @@ HRESULT UpdateServerList(IABContainer *lpContainer,
 	}
 
 	while (true) {
-		hr = ptrTable->QueryRows(50, 0, &ptrRows);
+		hr = ptrTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 		if (ptrRows.empty())
@@ -499,7 +475,7 @@ HRESULT UpdateServerList(IABContainer *lpContainer,
 		for (unsigned int i = 0; i < ptrRows.size(); ++i) {
 			if (ptrRows[i].lpProps[0].ulPropTag != PR_EC_HOMESERVER_NAME_W)
 				continue;
-			listServers.insert(ptrRows[i].lpProps[0].Value.lpszW);
+			listServers.emplace(ptrRows[i].lpProps[0].Value.lpszW);
 			if (ptrRows[i].lpProps[1].ulPropTag == PR_DISPLAY_NAME_W)
 				ec_log_info("User: %ls on server \"%ls\"", ptrRows[i].lpProps[1].Value.lpszW, ptrRows[i].lpProps[0].Value.lpszW);
 		}

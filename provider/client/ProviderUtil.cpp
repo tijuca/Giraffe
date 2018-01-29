@@ -35,13 +35,11 @@
 #include "ECArchiveAwareMsgStore.h"
 #include "ECMsgStorePublic.h"
 #include <kopano/charset/convstring.h>
-#include "DLLGlobal.h"
 #include "EntryPoint.h"
 #include "ProviderUtil.h"
 
 #include <kopano/charset/convert.h>
 
-using namespace std;
 using namespace KCHL;
 
 HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
@@ -141,10 +139,10 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 	//Init only the firsttime the flags
 	sProviderInfo.ulProfileFlags = sProfileProps.ulProfileFlags;
 	sProviderInfo.ulConnectType = CT_ONLINE;
-	hr = lpECMSProvider->QueryInterface(IID_IMSProvider, (void **)&sProviderInfo.lpMSProviderOnline);
+	hr = lpECMSProvider->QueryInterface(IID_IMSProvider, &~sProviderInfo.lpMSProviderOnline);
 	if(hr != hrSuccess)
 		return hr;
-	hr = lpECABProvider->QueryInterface(IID_IABProvider, (void **)&sProviderInfo.lpABProviderOnline);
+	hr = lpECABProvider->QueryInterface(IID_IABProvider, &~sProviderInfo.lpABProviderOnline);
 	if(hr != hrSuccess)
 		return hr;
 	lpmapProvider->insert({lpszProfileName, sProviderInfo});

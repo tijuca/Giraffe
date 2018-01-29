@@ -71,33 +71,15 @@ public:
 		m_ulCounts[ucContact]		= ulContact;
 	}
 
-	usercount_t(const usercount_t &other): m_bValid(other.m_bValid) {
-		memcpy(m_ulCounts, other.m_ulCounts, sizeof(m_ulCounts));
-	}
-
-	void swap(usercount_t &other) noexcept
-	{
-		std::swap(m_bValid, other.m_bValid);
-		for (unsigned i = 0; i < ucMAX; ++i)
-			std::swap(m_ulCounts[i], other.m_ulCounts[i]);
-	}
+	usercount_t(const usercount_t &) = default;
+	usercount_t(usercount_t &&) = default;
 
 	void assign(unsigned int ulActiveUser, unsigned int ulNonActiveUser, unsigned int ulRoom, unsigned int ulEquipment, unsigned int ulContact) {
-		usercount_t tmp(ulActiveUser, ulNonActiveUser, ulRoom, ulEquipment, ulContact);
-		swap(tmp);
+		*this = usercount_t(ulActiveUser, ulNonActiveUser, ulRoom, ulEquipment, ulContact);
 	}
 
-	void assign(const usercount_t &other) {
-		if (&other != this) {
-			usercount_t tmp(other);
-			swap(tmp);
-		}
-	}
-
-	usercount_t& operator=(const usercount_t &other) {
-		assign(other);
-		return *this;
-	}
+	usercount_t &operator=(const usercount_t &) = default;
+	usercount_t &operator=(usercount_t &&) = default;
 
 	bool isValid() const {
 		return m_bValid;
@@ -129,45 +111,32 @@ private:
 #define USERMANAGEMENT_FORCE_SYNC		0x4		// Force sync with external database
 #define USERMANAGEMENT_SHOW_HIDDEN		0x8		// Show hidden entries
 
-// Use for ulLicenseStatus in CheckUserLicense()
-#define USERMANAGEMENT_LIMIT_ACTIVE_USERS		0x1	/* Limit reached, but not yet exceeded */
-#define USERMANAGEMENT_LIMIT_NONACTIVE_USERS	0x2 /* Limit reached, but not yet exceeded */
-#define USERMANAGEMENT_EXCEED_ACTIVE_USERS		0x4 /* Limit exceeded */
-#define USERMANAGEMENT_EXCEED_NONACTIVE_USERS	0x8 /* Limit exceeded */
-
-#define USERMANAGEMENT_BLOCK_CREATE_ACTIVE_USER		( USERMANAGEMENT_LIMIT_ACTIVE_USERS | USERMANAGEMENT_EXCEED_ACTIVE_USERS )
-#define USERMANAGEMENT_BLOCK_CREATE_NONACTIVE_USER	( USERMANAGEMENT_LIMIT_NONACTIVE_USERS | USERMANAGEMENT_EXCEED_NONACTIVE_USERS )
-#define USERMANAGEMENT_USER_LICENSE_EXCEEDED		( USERMANAGEMENT_EXCEED_ACTIVE_USERS | USERMANAGEMENT_EXCEED_NONACTIVE_USERS )
-
 class _kc_export ECUserManagement _kc_final {
 public:
 	_kc_hidden ECUserManagement(BTSession *, ECPluginFactory *, ECConfig *);
-	_kc_hidden virtual ~ECUserManagement(void) _kc_impdtor;
+	_kc_hidden virtual ~ECUserManagement(void) = default;
 
 	// Authenticate a user
 	_kc_hidden virtual ECRESULT AuthUserAndSync(const char *user, const char *pass, unsigned int *user_id);
 
-	// Get data for an object, with on-the-fly delete of the specified object id
+	/* Get data for an object, with on-the-fly deletion of the specified object id. */
 	virtual ECRESULT GetObjectDetails(unsigned int obj_id, objectdetails_t *ret);
 	// Get quota details for a user object
 	_kc_hidden virtual ECRESULT GetQuotaDetailsAndSync(unsigned int obj_id, quotadetails_t *ret, bool get_user_default = false);
 	// Set quota details for a user object
 	_kc_hidden virtual ECRESULT SetQuotaDetailsAndSync(unsigned int obj_id, const quotadetails_t &);
-	// Get (typed) objectlist for company, or list of all companies, with on-the-fly delete/create of users and groups
+	/* Get (typed) objectlist for company, or list of all companies, with on-the-fly deletion/creation of users and groups. */
 	_kc_hidden virtual ECRESULT GetCompanyObjectListAndSync(objectclass_t, unsigned int company_id, std::list<localobjectdetails_t> **objs, unsigned int flags = 0);
-	// Get subobjects in an object, with on-the-fly delete of the specified parent object
+	/* Get subobjects in an object, with on-the-fly deletion of the specified parent object. */
 	_kc_hidden virtual ECRESULT GetSubObjectsOfObjectAndSync(userobject_relation_t, unsigned int parent_id, std::list<localobjectdetails_t> **objs, unsigned int flags = 0);
-	// Get parent to which an object belongs, with on-the-fly delete of the specified child object id
+	/* Get parent for an object, with on-the-fly deletion of the specified child object id. */
 	_kc_hidden virtual ECRESULT GetParentObjectsOfObjectAndSync(userobject_relation_t, unsigned int child_id, std::list<localobjectdetails_t> **groups, unsigned int flags = 0);
-
-	// Set data for a single user, with on-the-fly delete of the specified user id
+	/* Set data for a single user, with on-the-fly deletion of the specified user id. */
 	_kc_hidden virtual ECRESULT SetObjectDetailsAndSync(unsigned int obj_id, const objectdetails_t &, std::list<std::string> *remove_props);
-
-	// Add a member to a group, with on-the-fly delete of the specified group id
+	/* Add a member to a group, with on-the-fly deletion of the specified group id. */
 	_kc_hidden virtual ECRESULT AddSubObjectToObjectAndSync(userobject_relation_t, unsigned int parent_id, unsigned int child_id);
 	_kc_hidden virtual ECRESULT DeleteSubObjectFromObjectAndSync(userobject_relation_t, unsigned int parent_id, unsigned int child_id);
-
-	// Resolve a user name to a user id, with on-the-fly create of the specified user
+	/* Resolve a user name to a user id, with on-the-fly creation of the specified user. */
 	_kc_hidden virtual ECRESULT ResolveObjectAndSync(objectclass_t, const char *name, unsigned int *obj_id);
 
 	// Get a local object ID for a part of a name
@@ -179,25 +148,20 @@ public:
 	_kc_hidden virtual ECRESULT DeleteObjectAndSync(unsigned int obj_id);
 	// Either modify or create an object with a specific object id and type (used for synchronize)
 	_kc_hidden virtual ECRESULT CreateOrModifyObject(const objectid_t &extern_id, const objectdetails_t &, unsigned int pref_id, std::list<std::string> *remove_props);
-
-	// Get MAPI property data for a group or user/group/company id, with on-the-fly delete of the specified user/group/company
+	/* Get MAPI property data for a group or user/group/company id, with on-the-fly deletion of the specified user/group/company. */
 	_kc_hidden virtual ECRESULT GetProps(struct soap *, unsigned int obj_id, struct propTagArray *, struct propValArray *);
 	_kc_hidden virtual ECRESULT GetContainerProps(struct soap *, unsigned int obj_id, struct propTagArray *, struct propValArray *);
 	// Do the same for a whole set of items
 	_kc_hidden virtual ECRESULT QueryContentsRowData(struct soap *, ECObjectTableList *rowlist, struct propTagArray *, struct rowSet **);
 	_kc_hidden virtual ECRESULT QueryHierarchyRowData(struct soap *, ECObjectTableList *rowlist, struct propTagArray *, struct rowSet **);
-	_kc_hidden virtual ECRESULT GetUserCount(unsigned int *active, unsigned int *inactive); // returns active users and non-active users (so you may get ulUsers=3, ulNonActives=5)
 	_kc_hidden virtual ECRESULT GetUserCount(usercount_t *);
 	_kc_hidden virtual ECRESULT GetCachedUserCount(usercount_t *);
 	_kc_hidden virtual ECRESULT GetPublicStoreDetails(objectdetails_t *);
 	virtual ECRESULT GetServerDetails(const std::string &server, serverdetails_t *);
 	_kc_hidden virtual ECRESULT GetServerList(serverlist_t *);
 
-	/* Check if the user license status */
-	_kc_hidden ECRESULT CheckUserLicense(unsigned int *licstatus);
-
 	// Returns true if ulId is an internal ID (so either SYSTEM or EVERYONE)
-	bool		IsInternalObject(unsigned int ulId);
+	bool IsInternalObject(unsigned int id) const;
 
 	// Create a v1 based AB SourceKey
 	_kc_hidden ECRESULT GetABSourceKeyV1(unsigned int user_id, SOURCEKEY *);

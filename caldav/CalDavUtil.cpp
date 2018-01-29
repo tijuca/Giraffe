@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <string>
 #include <utility>
 #include <kopano/ECRestriction.h>
 #include "CalDavUtil.h"
@@ -25,15 +26,14 @@
 #include <kopano/mapi_ptr.h>
 #include <kopano/memory.hpp>
 
-using namespace std;
 using namespace KCHL;
 
 /**
  * Open MAPI session
  *
- * @param[in]	strUser		User's login name
- * @param[in]	strPass		User's password
- * @param[in]	strPath		Kopano server's path
+ * @param[in]	strUser		User login name
+ * @param[in]	strPass		User password
+ * @param[in]	strPath		Kopano server path
  * @param[out]	lppSession	IMAPISession object if login is successful
  * @return		HRESULT
  * @retval		MAPI_E_LOGON_FAILED		Unable to login with the specified user-name and password
@@ -70,7 +70,7 @@ HRESULT HrAddProperty(IMAPIProp *lpMapiProp, ULONG ulPropTag, bool bFldId, std::
 	if(wstrProperty->empty())
 	{
 		CoCreateGuid(&sGuid);
-		wstrProperty->assign(convert_to<wstring>(bin2hex(sizeof(GUID), &sGuid)));
+		wstrProperty->assign(convert_to<std::wstring>(bin2hex(sizeof(GUID), &sGuid)));
 	}
 
 	assert(PROP_TYPE(ulPropTag) == PT_UNICODE);
@@ -85,7 +85,7 @@ HRESULT HrAddProperty(IMAPIProp *lpMapiProp, ULONG ulPropTag, bool bFldId, std::
 			hr = HrGetOneProp(lpMapiProp, PR_ENTRYID, &~lpMsgProp);
 			if(hr != hrSuccess)
 				return hr;
-			wstrProperty->assign(convert_to<wstring>(bin2hex(lpMsgProp->Value.bin.cb, lpMsgProp->Value.bin.lpb)));
+			wstrProperty->assign(convert_to<std::wstring>(bin2hex(lpMsgProp->Value.bin)));
 		}
 	} else if (hr == hrSuccess)
 		wstrProperty->assign(lpMsgProp->Value.lpszW);
@@ -166,7 +166,7 @@ HRESULT HrFindFolder(IMsgStore *lpMsgStore, IMAPIFolder *lpRootFolder,
 
 	// Hack Alert #47 -- get Inbox and Outbox as special folders
 	if (wstrFldId.compare(L"Inbox") == 0) {
-		hr = lpMsgStore->GetReceiveFolder(const_cast<TCHAR *>(KC_T("IPM")), fMapiUnicode, &cbEntryID, &~lpEntryID, NULL);
+		hr = lpMsgStore->GetReceiveFolder(KC_T("IPM"), fMapiUnicode, &cbEntryID, &~lpEntryID, nullptr);
 		if (hr != hrSuccess) {
 			ec_log_err("Cannot open Inbox Folder, no Receive Folder EntryID: 0x%08X", hr);
 			return hr;
@@ -235,12 +235,9 @@ HRESULT HrFindFolder(IMsgStore *lpMsgStore, IMAPIFolder *lpRootFolder,
 	hr = lpHichyTable->QueryRows(1, 0, &~lpRows);
 	if (hr != hrSuccess)
 		return hr;
-
-	if (lpRows->cRows != 1) {
+	if (lpRows->cRows != 1)
 		return MAPI_E_NOT_FOUND;
-	}
-	
-	sbEid = lpRows->aRow[0].lpProps[0].Value.bin;
+	sbEid = lpRows[0].lpProps[0].Value.bin;
 	hr = lpMsgStore->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb),
 	     &iid_of(lpUsrFld), MAPI_BEST_ACCESS, &ulObjType, reinterpret_cast<IUnknown **>(&lpUsrFld));
 	if(hr != hrSuccess)
@@ -267,55 +264,54 @@ HRESULT HrBuildReportSet(WEBDAVPROPERTY *lpsProperty)
 	sDavItem.sDavValue.sPropName.strPropname = "supported-report";
 	sDavItem.sDavValue.sPropName.strNS = WEBDAVNS;
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "report";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "acl-principal-prop-set";
 	sDavItem.ulDepth = ulDepth + 2 ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "supported-report";
 	sDavItem.sDavValue.sPropName.strNS = WEBDAVNS;
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "report";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "principal-match";
 	sDavItem.ulDepth = ulDepth + 2 ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 	
 	sDavItem.sDavValue.sPropName.strPropname = "supported-report";	
 	sDavItem.sDavValue.sPropName.strNS = WEBDAVNS;
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "report";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "principal-property-search";
 	sDavItem.ulDepth = ulDepth + 2 ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 	
 	sDavItem.sDavValue.sPropName.strPropname = "supported-report";	
 	sDavItem.sDavValue.sPropName.strNS = WEBDAVNS;
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "report";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "expand-property";
 	sDavItem.ulDepth = ulDepth + 2 ;
-	lpsProperty->lstItems.push_back(sDavItem);
-
+	lpsProperty->lstItems.emplace_back(sDavItem);
 	return hr;
 }
 
@@ -335,83 +331,82 @@ HRESULT HrBuildACL(WEBDAVPROPERTY *lpsProperty)
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.sDavValue.sPropName.strNS = WEBDAVNS;
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "all";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "read-current-user-privilege-set";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "read";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth ;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "write";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "write-content";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "write-properties";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "unlock";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "read-acl";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "bind";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 	sDavItem.sDavValue.sPropName.strPropname = "privilege";
 	sDavItem.ulDepth = ulDepth;
-	lpsProperty->lstItems.push_back(sDavItem);
+	lpsProperty->lstItems.emplace_back(sDavItem);
 
 	sDavItem.sDavValue.sPropName.strPropname = "unbind";
 	sDavItem.ulDepth = ulDepth + 1;
-	lpsProperty->lstItems.push_back(sDavItem);
-
+	lpsProperty->lstItems.emplace_back(sDavItem);
 	return hr;
 }
 
@@ -430,13 +425,13 @@ std::string StripGuid(const std::string &strInput)
 	size_t ulFoundSlash = -1;
 
 	ulFoundSlash = strInput.rfind('/');
-	if(ulFoundSlash == string::npos)
+	if (ulFoundSlash == std::string::npos)
 		ulFoundSlash = 0;
 	else
 		++ulFoundSlash;
 
 	ulFound = strInput.find(".ics", ulFoundSlash);
-	if (ulFound != string::npos)
+	if (ulFound != std::string::npos)
 		return {strInput.cbegin() + ulFoundSlash, strInput.cbegin() + ulFound};
 	return "";
 }
@@ -627,7 +622,7 @@ HRESULT HrMakeRestriction(const std::string &strGuid, LPSPropTagArray lpNamedPro
 	sSpropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_GOID], PT_BINARY);
 	rst += ECPropertyRestriction(RELOP_EQ, sSpropVal.ulPropTag, &sSpropVal, ECRestriction::Shallow);
 
-	// PUT url [guid].ics part, (eg. Evolution UIDs)
+	// PUT url [guid].ics part, (e.g. Evolution UIDs)
 	sSpropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_APPTTSREF], PT_STRING8);
 	sSpropVal.Value.lpszA = (char*)strGuid.c_str();
 	rst += ECPropertyRestriction(RELOP_EQ, sSpropVal.ulPropTag, &sSpropVal, ECRestriction::Shallow);
@@ -648,7 +643,8 @@ HRESULT HrMakeRestriction(const std::string &strGuid, LPSPropTagArray lpNamedPro
  * @return		HRESULT
  * @retval		MAPI_E_NOT_FOUND	No message found containing the guid value. 
  */
-HRESULT HrFindAndGetMessage(std::string strGuid, IMAPIFolder *lpUsrFld, LPSPropTagArray lpNamedProps, IMessage **lppMessage)
+HRESULT HrFindAndGetMessage(const std::string &strGuid, IMAPIFolder *lpUsrFld,
+    SPropTagArray *lpNamedProps, IMessage **lppMessage)
 {
 	SBinary sbEid = {0,0};
 	memory_ptr<SRestriction> lpsRoot;
@@ -675,9 +671,9 @@ HRESULT HrFindAndGetMessage(std::string strGuid, IMAPIFolder *lpUsrFld, LPSPropT
 		return hr;
 	if (lpValRows->cRows != 1)
 		return MAPI_E_NOT_FOUND;
-	if (PROP_TYPE(lpValRows->aRow[0].lpProps[0].ulPropTag) != PT_BINARY)
+	if (PROP_TYPE(lpValRows[0].lpProps[0].ulPropTag) != PT_BINARY)
 		return MAPI_E_NOT_FOUND;
-	sbEid = lpValRows->aRow[0].lpProps[0].Value.bin;
+	sbEid = lpValRows[0].lpProps[0].Value.bin;
 	hr = lpUsrFld->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb),
 	     &iid_of(lpMessage), MAPI_MODIFY, &ulObjType, &~lpMessage);
 	if (hr != hrSuccess)
@@ -731,7 +727,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 	hr = MAPIAllocateBuffer(CbNewADRLIST(cUsers), &~lpAdrList);
 	if(hr != hrSuccess)
 		return hr;
-	lpAdrList->cEntries = cUsers;
+	lpAdrList->cEntries = 0;
 	hr = MAPIAllocateBuffer(CbNewFlagList(cUsers), &~ptrFlagList);
 	if (hr != hrSuccess)
 		return hr;
@@ -745,6 +741,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 		hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpAdrList->aEntries[cUsers].rgPropVals);
 		if(hr != hrSuccess)
 			return hr;
+		++lpAdrList->cEntries;
 		lpAdrList->aEntries[cUsers].rgPropVals[0].ulPropTag = PR_DISPLAY_NAME_A;
 		lpAdrList->aEntries[cUsers].rgPropVals[0].Value.lpszA = const_cast<char *>(user.c_str());
 		ptrFlagList->ulFlag[cUsers] = MAPI_UNRESOLVED;
@@ -763,7 +760,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 	for (cUsers = 0; cUsers < lpAdrList->cEntries; ++cUsers) {
 		const SPropValue *lpEntryID = nullptr;
 		if (ptrFlagList->ulFlag[cUsers] == MAPI_RESOLVED)
-			lpEntryID = PpropFindProp(lpAdrList->aEntries[cUsers].rgPropVals, lpAdrList->aEntries[cUsers].cValues, PR_ENTRYID);
+			lpEntryID = lpAdrList->aEntries[cUsers].cfind(PR_ENTRYID);
 		if (lpEntryID == nullptr) {
 			lpUsers[cUsers].m_cbEid = 0;
 			lpUsers[cUsers].m_lpEid = NULL;
@@ -827,8 +824,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 next:
 		sWebFbUserInfo.strUser = *itUsers;
 		sWebFbUserInfo.strIcal = strIcal;
-		lpFbInfo->lstFbUserInfo.push_back(sWebFbUserInfo);
-
+		lpFbInfo->lstFbUserInfo.emplace_back(sWebFbUserInfo);
 		++itUsers;
 
 		lpMapiToIcal->ResetObject();

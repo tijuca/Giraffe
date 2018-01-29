@@ -24,7 +24,7 @@ from MAPI.Tags import (
 )
 
 from .store import Store
-from .base import Base
+from .properties import Properties
 from .group import Group
 from .quota import Quota
 from .defs import (
@@ -42,15 +42,23 @@ else:
     import server as _server
     import company as _company
 
-class User(Base):
+class User(Properties):
     """User class"""
 
-    def __init__(self, name=None, server=None, email=None, ecuser=None):
+    def __init__(self, name=None, server=None, email=None, ecuser=None,
+        userid=None
+    ):
         self.server = server or _server.Server()
 
         if ecuser:
             self._ecuser = ecuser
             self._name = ecuser.Username
+        elif userid:
+            try:
+                self._ecuser = self.server.sa.GetUser(_unhex(userid), MAPI_UNICODE)
+            except MAPIErrorNotFound:
+                raise NotFoundError("no user found with userid '%s'" % userid)
+            self._name = self._ecuser.Username
         else:
             if email:
                 try:
@@ -348,10 +356,16 @@ class User(Base):
         )
         self._name = username
 
-    def __getattr__(self, x): # XXX add __setattr__, e.g. for 'user.archive_store = None'
+    def __getattr__(self, x):
         store = self.store
         if store:
             try:
                 return getattr(store, x)
             except AttributeError:
                 raise AttributeError("'User' object has no attribute '%s'" % x)
+
+    def __setattr__(self, x, val):
+        if x not in User.__dict__ and x in Store.__dict__:
+            setattr(self.store, x, val)
+        else:
+            super(User, self).__setattr__(x, val)

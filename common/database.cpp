@@ -15,6 +15,7 @@
  */
 #include "config.h"
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <cassert>
@@ -23,6 +24,7 @@
 #include <mysqld_error.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
+#include <kopano/MAPIErrors.h>
 #include <kopano/database.hpp>
 #include <kopano/stringutil.h>
 #define LOG_SQL_DEBUG(_msg, ...) \
@@ -75,14 +77,14 @@ KDatabase::KDatabase(void)
 ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
     unsigned int mysql_flags, unsigned int gcm)
 {
-	const char *mysql_port = cfg->GetSetting("mysql_port");
-	const char *mysql_socket = cfg->GetSetting("mysql_socket");
+	auto port = cfg->GetSetting("mysql_port");
+	auto socket = cfg->GetSetting("mysql_socket");
 	DB_RESULT result;
 	DB_ROW row = nullptr;
 	std::string query;
 
-	if (*mysql_socket == '\0')
-		mysql_socket = nullptr;
+	if (*socket == '\0')
+		socket = nullptr;
 	auto er = InitEngine(reconnect);
 	if (er != erSuccess) {
 		ec_log_crit("KDatabase::Connect(): InitEngine failed %d", er);
@@ -90,16 +92,15 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 	}
 	if (mysql_real_connect(&m_lpMySQL, cfg->GetSetting("mysql_host"),
 	    cfg->GetSetting("mysql_user"), cfg->GetSetting("mysql_password"),
-	    cfg->GetSetting("mysql_database"),
-	    mysql_port ? atoi(mysql_port) : 0,
-	    mysql_socket, mysql_flags) == nullptr) {
+	    cfg->GetSetting("mysql_database"), port != nullptr ? atoi(port) : 0,
+	    socket, mysql_flags) == nullptr) {
 		if (mysql_errno(&m_lpMySQL) == ER_BAD_DB_ERROR)
 			/* Database does not exist */
 			er = KCERR_DATABASE_NOT_FOUND;
 		else
 			er = KCERR_DATABASE_ERROR;
-		ec_log_err("KDatabase::Connect(): database access error %d, mysql error: %s",
-			er, GetError());
+		ec_log_err("KDatabase::Connect(): database access error %s (0x%x), mysql error: %s",
+			GetMAPIErrorMessage(er), er, GetError());
 		goto exit;
 	}
 
@@ -151,6 +152,8 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
+	if (reconnect)
+		mysql_options(&m_lpMySQL, MYSQL_INIT_COMMAND, query.c_str());
  exit:
 	if (er != erSuccess)
 		Close();
@@ -160,11 +163,11 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 {
 	const char *dbname = cfg->GetSetting("mysql_database");
-	const char *mysql_port = cfg->GetSetting("mysql_port");
-	const char *mysql_socket = cfg->GetSetting("mysql_socket");
+	auto port = cfg->GetSetting("mysql_port");
+	auto socket = cfg->GetSetting("mysql_socket");
 
-	if (*mysql_socket == '\0')
-		mysql_socket = nullptr;
+	if (*socket == '\0')
+		socket = nullptr;
 
 	// Kopano archiver database tables
 	auto er = InitEngine(reconnect);
@@ -177,8 +180,7 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 	// MYSQL structure.
 	if (mysql_real_connect(&m_lpMySQL, cfg->GetSetting("mysql_host"),
 	    cfg->GetSetting("mysql_user"), cfg->GetSetting("mysql_password"),
-	    nullptr, mysql_port != nullptr ? atoi(mysql_port) : 0,
-	    mysql_socket, 0) == nullptr) {
+	    nullptr, port != nullptr ? atoi(port) : 0, socket, 0) == nullptr) {
 		ec_log_err("Failed to connect to database: %s", GetError());
 		return KCERR_DATABASE_ERROR;
 	}
@@ -395,7 +397,7 @@ std::string KDatabase::Escape(const std::string &s)
 	return esc.get();
 }
 
-std::string KDatabase::EscapeBinary(const unsigned char *data, size_t len)
+std::string KDatabase::EscapeBinary(const void *data, size_t len)
 {
 	auto size = len * 2 + 1;
 	std::unique_ptr<char[]> esc(new char[size]);
@@ -403,11 +405,6 @@ std::string KDatabase::EscapeBinary(const unsigned char *data, size_t len)
 	memset(esc.get(), 0, size);
 	mysql_real_escape_string(&m_lpMySQL, esc.get(), reinterpret_cast<const char *>(data), len);
 	return "'" + std::string(esc.get()) + "'";
-}
-
-std::string KDatabase::EscapeBinary(const std::string &s)
-{
-	return EscapeBinary(reinterpret_cast<const unsigned char *>(s.c_str()), s.size());
 }
 
 void KDatabase::FreeResult_internal(void *r)
@@ -454,8 +451,8 @@ ECRESULT KDatabase::InitEngine(bool reconnect)
 		return KCERR_DATABASE_ERROR;
 	}
 	m_bMysqlInitialize = true;
-	my_bool xtrue = true;
-	mysql_options(&m_lpMySQL, MYSQL_OPT_RECONNECT, &xtrue);
+	my_bool value = reconnect;
+	mysql_options(&m_lpMySQL, MYSQL_OPT_RECONNECT, &value);
 	return erSuccess;
 }
 
@@ -521,4 +518,62 @@ ECRESULT KDatabase::I_Update(const std::string &q, unsigned int *aff)
 	if (aff != nullptr)
 		*aff = GetAffectedRows();
 	return erSuccess;
+}
+
+class kd_noop_trans final : public kt_completion {
+	public:
+	ECRESULT Commit() override { return 0; }
+	ECRESULT Rollback() override { return 0; }
+	ECRESULT tmp;
+};
+
+static kd_noop_trans kd_noop_trans;
+
+kd_trans::kd_trans() :
+	m_db(&kd_noop_trans), m_result(&kd_noop_trans.tmp), m_done(true)
+{}
+
+kd_trans::kd_trans(kd_trans &&o) :
+	m_db(o.m_db), m_result(o.m_result), m_done(o.m_done)
+{
+	o.m_done = true;
+}
+
+kd_trans::~kd_trans()
+{
+	if (m_done || std::uncaught_exception())
+		/* was not handled earlier either */
+		return;
+	if (*m_result != 0)
+		m_db->Rollback();
+	else
+		*m_result = m_db->Commit();
+}
+
+kd_trans &kd_trans::operator=(kd_trans &&o)
+{
+	kd_trans x(std::move(*this));
+	m_result = o.m_result;
+	m_db     = o.m_db;
+	m_done   = o.m_done;
+	o.m_done = true;
+	return *this;
+}
+
+ECRESULT kd_trans::commit()
+{
+	if (m_done)
+		return 0;
+	auto ret = m_db->Commit();
+	m_done = true;
+	return ret;
+}
+
+ECRESULT kd_trans::rollback()
+{
+	if (m_done)
+		return 0;
+	auto ret = m_db->Rollback();
+	m_done = true;
+	return ret;
 }

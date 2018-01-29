@@ -18,6 +18,8 @@
 #include <kopano/platform.h>
 
 #include <iostream>
+#include <list>
+#include <string>
 #include <errmsg.h>
 #include "mysqld_error.h"
 #include <kopano/stringutil.h>
@@ -33,15 +35,12 @@
 #include <kopano/ecversion.h>
 
 #include <mapidefs.h>
-#include "ECConversion.h"
 #include "ECDatabase.h"
 #include "SOAPUtils.h"
 #include "ECSearchFolders.h"
 
 #include "ECDatabaseUpdate.h"
 #include "ECStatsCollector.h"
-
-using namespace std;
 
 namespace KC {
 
@@ -72,104 +71,6 @@ class zcp_versiontuple _kc_final {
 };
 
 static const sUpdateList_t sUpdateList[] = {
-	// Updates from version 5.02 to 5.10
-	{ Z_UPDATE_CREATE_VERSIONS_TABLE, 0, "Create table: versions", UpdateDatabaseCreateVersionsTable },
-	{ Z_UPDATE_CREATE_SEARCHFOLDERS_TABLE, 0, "Create table: searchresults", UpdateDatabaseCreateSearchFolders },
-	{ Z_UPDATE_FIX_USERTABLE_NONACTIVE, 0, "Update table: users, field: nonactive", UpdateDatabaseFixUserNonActive },
-	// Only update if previous revision was after Z_UPDATE_CREATE_SEARCHFOLDERS_TABLE, because the definition has changed
-	{ Z_UPDATE_ADD_FLAGS_TO_SEARCHRESULTS, Z_UPDATE_CREATE_SEARCHFOLDERS_TABLE, "Update table: searchresults", UpdateDatabaseCreateSearchFoldersFlags },
-	{ Z_UPDATE_POPULATE_SEARCHFOLDERS, 0, "Populate search folders", UpdateDatabasePopulateSearchFolders },
-
-	// Updates from version 5.10 to 5.20
-	{ Z_UPDATE_CREATE_CHANGES_TABLE, 0, "Create table: changes", UpdateDatabaseCreateChangesTable },
-	{ Z_UPDATE_CREATE_SYNCS_TABLE, 0, "Create table: syncs", UpdateDatabaseCreateSyncsTable },
-	{ Z_UPDATE_CREATE_INDEXEDPROPS_TABLE, 0, "Create table: indexedproperties", UpdateDatabaseCreateIndexedPropertiesTable },
-	{ Z_UPDATE_CREATE_SETTINGS_TABLE, 0, "Create table: settings", UpdateDatabaseCreateSettingsTable},
-	{ Z_UPDATE_CREATE_SERVER_GUID, 0, "Insert server GUID into settings", UpdateDatabaseCreateServerGUID },
-	{ Z_UPDATE_CREATE_SOURCE_KEYS, 0, "Insert source keys into indexedproperties", UpdateDatabaseCreateSourceKeys },
-
-	// Updates from version 5.20 to 6.00
-	{ Z_UPDATE_CONVERT_ENTRYIDS, 0, "Convert entryids: indexedproperties", UpdateDatabaseConvertEntryIDs },
-	{ Z_UPDATE_CONVERT_SC_ENTRYIDLIST, 0, "Update entrylist searchcriteria", UpdateDatabaseSearchCriteria },
-	{ Z_UPDATE_CONVERT_USER_OBJECT_TYPE, 0, "Add Object type to 'users' table", UpdateDatabaseAddUserObjectType },
-	{ Z_UPDATE_ADD_USER_SIGNATURE, 0, "Add signature to 'users' table", UpdateDatabaseAddUserSignature },
-	{ Z_UPDATE_ADD_SOURCE_KEY_SETTING, 0, "Add setting 'source_key_auto_increment'", UpdateDatabaseAddSourceKeySetting },
-	{ Z_UPDATE_FIX_USERS_RESTRICTIONS, 0, "Add restriction to 'users' table", UpdateDatabaseRestrictExternId },
-
-	// Update from version 6.00 to 6.10
-	{ Z_UPDATE_ADD_USER_COMPANY, 0, "Add company column to 'users' table", UpdateDatabaseAddUserCompany },
-	{ Z_UPDATE_ADD_OBJECT_RELATION_TYPE, 0, "Add Object relation type to 'objectrelation' table", UpdateDatabaseAddObjectRelationType },
-	{ Z_UPDATE_DEL_DEFAULT_COMPANY, 0, "Delete default company from 'users' table", UpdateDatabaseDelUserCompany},
-	{ Z_UPDATE_ADD_COMPANY_TO_STORES, 0, "Adding company to 'stores' table", UpdateDatabaseAddCompanyToStore},
-
-	// Update from version x to x
-	{ Z_UPDATE_ADD_IMAP_SEQ, 0, "Add IMAP sequence number in 'settings' table", UpdateDatabaseAddIMAPSequenceNumber},
-	{ Z_UPDATE_KEYS_CHANGES, Z_UPDATE_CREATE_CHANGES_TABLE, "Update keys in 'changes' table", UpdateDatabaseKeysChanges},
-
-	// Update from version 6.1x to 6.20
-	{ Z_UPDATE_MOVE_PUBLICFOLDERS, 0, "Moving publicfolders and favorites", UpdateDatabaseMoveFoldersInPublicFolder},
-
-	// Update from version 6.2x to 6.30
-	{ Z_UPDATE_ADD_EXTERNID_TO_OBJECT, 0, "Adding externid to 'object' table", UpdateDatabaseAddExternIdToObject}, 
-	{ Z_UPDATE_CREATE_REFERENCES, 0, "Creating Single Instance Attachment table", UpdateDatabaseCreateReferences},
-	{ Z_UPDATE_LOCK_DISTRIBUTED, 0, "Locking multiserver capability", UpdateDatabaseLockDistributed},
-	{ Z_UPDATE_CREATE_ABCHANGES_TABLE, 0, "Creating Addressbook Changes table", UpdateDatabaseCreateABChangesTable},
-	{ Z_UPDATE_SINGLEINSTANCE_TAG, 0, "Updating 'singleinstances' table to correct tag value", UpdateDatabaseSetSingleinstanceTag},
-
-	// Update from version 6.3x to 6.40
-	{ Z_UPDATE_CREATE_SYNCEDMESSAGES_TABLE, 0, "Create table: synced messages", UpdateDatabaseCreateSyncedMessagesTable},
-	
-	// Update from < 6.30 to >= 6.30
-	{ Z_UPDATE_FORCE_AB_RESYNC, 0, "Force Addressbook Resync", UpdateDatabaseForceAbResync},
-	
-	// Update from version 6.3x to 6.40
-	{ Z_UPDATE_RENAME_OBJECT_TYPE_TO_CLASS, 0, "Rename objecttype columns to objectclass", UpdateDatabaseRenameObjectTypeToObjectClass},
-	{ Z_UPDATE_CONVERT_OBJECT_TYPE_TO_CLASS, 0, "Convert objecttype columns to objectclass values", UpdateDatabaseConvertObjectTypeToObjectClass},
-	{ Z_UPDATE_ADD_OBJECT_MVPROPERTY_TABLE, 0, "Add object MV property table", UpdateDatabaseAddMVPropertyTable},
-	{ Z_UPDATE_COMPANYNAME_TO_COMPANYID, 0, "Link objects in DB plugin through companyid", UpdateDatabaseCompanyNameToCompanyId},
-	{ Z_UPDATE_OUTGOINGQUEUE_PRIMARY_KEY, 0, "Update outgoingqueue key", UpdateDatabaseOutgoingQueuePrimarykey},
-	{ Z_UPDATE_ACL_PRIMARY_KEY, 0, "Update acl key", UpdateDatabaseACLPrimarykey},
-	{ Z_UPDATE_BLOB_EXTERNID, 0, "Update externid in object table", UpdateDatabaseBlobExternId}, // Avoid MySQL 4.x traling spaces quirk
-	{ Z_UPDATE_KEYS_CHANGES_2, 0, "Update keys in 'changes' table", UpdateDatabaseKeysChanges2},
-	{ Z_UPDATE_MVPROPERTIES_PRIMARY_KEY, 0, "Update mvproperties key", UpdateDatabaseMVPropertiesPrimarykey},
-	{ Z_UPDATE_FIX_SECURITYGROUP_DBPLUGIN, 0, "Update DB plugin group to security groups", UpdateDatabaseFixDBPluginGroups},
-	{ Z_UPDATE_CONVERT_SENDAS_DBPLUGIN, 0, "Update DB/Unix plugin sendas settings", UpdateDatabaseFixDBPluginSendAs},
-
-	{ Z_UPDATE_MOVE_IMAP_SUBSCRIBES, 0, "Move IMAP subscribed list from store to inbox", UpdateDatabaseMoveSubscribedList},
-	{ Z_UPDATE_SYNC_TIME_KEY, 0, "Update sync table time index", UpdateDatabaseSyncTimeIndex },
-
-	// Update within the 6.40
-	{ Z_UPDATE_ADD_STATE_KEY, 0, "Update changes table state key", UpdateDatabaseAddStateKey },
-
-	// Blocking upgrade from 6.40 to 7.00, tables are not unicode compatible.
-	{ Z_UPDATE_CONVERT_TO_UNICODE, 0, "Converting database to Unicode", UpdateDatabaseConvertToUnicode },
-
-	// Update from version 6.4x to 7.00
-	{ Z_UPDATE_CONVERT_STORE_USERNAME, 0, "Update stores table usernames", UpdateDatabaseConvertStoreUsername },
-	{ Z_UPDATE_CONVERT_RULES, 0, "Converting rules to Unicode", UpdateDatabaseConvertRules },
-	{ Z_UPDATE_CONVERT_SEARCH_FOLDERS, 0, "Converting search folders to Unicode", UpdateDatabaseConvertSearchFolders },
-	{ Z_UPDATE_CONVERT_PROPERTIES, 0, "Converting properties for IO performance", UpdateDatabaseConvertProperties },
-	{ Z_UPDATE_CREATE_COUNTERS, 0, "Creating counters for IO performance", UpdateDatabaseCreateCounters },
-	{ Z_UPDATE_CREATE_COMMON_PROPS, 0, "Creating common properties for IO performance", UpdateDatabaseCreateCommonProps },
-	{ Z_UPDATE_CHECK_ATTACHMENTS, 0, "Checking message attachment properties for IO performance", UpdateDatabaseCheckAttachments },
-	{ Z_UPDATE_CREATE_TPROPERTIES, 0, "Creating tproperties for IO performance", UpdateDatabaseCreateTProperties },
-	{ Z_UPDATE_CONVERT_HIERARCHY, 0, "Converting hierarchy for IO performance", UpdateDatabaseConvertHierarchy },
-	{ Z_UPDATE_CREATE_DEFERRED, 0, "Creating deferred table for IO performance", UpdateDatabaseCreateDeferred },
-	{ Z_UPDATE_CONVERT_CHANGES, 0, "Converting changes for IO performance", UpdateDatabaseConvertChanges },
-	{ Z_UPDATE_CONVERT_NAMES, 0, "Converting names table to Unicode", UpdateDatabaseConvertNames },
-
-	// Update from version 7.00 to 7.0.1
-	{ Z_UPDATE_CONVERT_RF_TOUNICODE, 0, "Converting receivefolder table to Unicode", UpdateDatabaseReceiveFolderToUnicode },
-
-	// Update from 6.40.13 / 7.0.3
-	{ Z_UPDATE_CREATE_CLIENTUPDATE_TABLE, 0, "Creating client update status table", UpdateDatabaseClientUpdateStatus },
-
-	{ Z_UPDATE_CONVERT_STORES, 0, "Converting stores table", UpdateDatabaseConvertStores },
-	{ Z_UPDATE_UPDATE_STORES, 0, "Updating stores table", UpdateDatabaseUpdateStores },
-	
-	// Update from 7.0 to 7.1
-	{ Z_UPDATE_UPDATE_WLINK_RECKEY, 0, "Updating wunderbar record keys", UpdateWLinkRecordKeys },
-
 	// New in 7.2.2
 	{ Z_UPDATE_VERSIONTBL_MICRO, 0, "Add \"micro\" column to \"versions\" table", UpdateVersionsTbl },
 
@@ -204,7 +105,7 @@ static const char szGetProps[] =
 "  END IF;\n"
   
 "  SELECT 0, tag, properties.type, val_ulong, val_string, val_binary, val_double, val_longint, val_hi, val_lo, 0, names.nameid, names.namestring, names.guid\n"
-"    FROM properties LEFT JOIN names ON (properties.tag-0x8501)=names.id WHERE hierarchyid=hid AND (tag <= 0x8500 OR names.id IS NOT NULL) AND (tag NOT IN (0x1009, 0x1013) OR mode = 0 OR (mode = 1 AND tag = bestbody) )\n"
+"    FROM properties LEFT JOIN names ON properties.tag-34049=names.id WHERE hierarchyid=hid AND (tag <= 34048 OR names.id IS NOT NULL) AND (tag NOT IN (4105, 4115) OR mode = 0 OR (mode = 1 AND tag = bestbody))\n"
 "  UNION\n"
 "  SELECT count(*), tag, mvproperties.type, \n"
 "          group_concat(length(mvproperties.val_ulong),':', mvproperties.val_ulong ORDER BY mvproperties.orderid SEPARATOR ''), \n"
@@ -215,14 +116,14 @@ static const char szGetProps[] =
 "          group_concat(length(mvproperties.val_hi),':', mvproperties.val_hi ORDER BY mvproperties.orderid SEPARATOR ''), \n"
 "          group_concat(length(mvproperties.val_lo),':', mvproperties.val_lo ORDER BY mvproperties.orderid SEPARATOR ''), \n"
 "          0, names.nameid, names.namestring, names.guid \n"
-"    FROM mvproperties LEFT JOIN names ON (mvproperties.tag-0x8501)=names.id WHERE hierarchyid=hid AND (tag <= 0x8500 OR names.id IS NOT NULL) GROUP BY tag, mvproperties.type; \n"
+"    FROM mvproperties LEFT JOIN names ON mvproperties.tag-34049=names.id WHERE hierarchyid=hid AND (tag <= 34048 OR names.id IS NOT NULL) GROUP BY tag, mvproperties.type; \n"
 "END;\n";
 
 static const char szPrepareGetProps[] =
 "CREATE PROCEDURE PrepareGetProps(IN hid integer)\n"
 "BEGIN\n"
 "  SELECT 0, tag, properties.type, val_ulong, val_string, val_binary, val_double, val_longint, val_hi, val_lo, hierarchy.id, names.nameid, names.namestring, names.guid\n"
-"    FROM properties JOIN hierarchy ON properties.hierarchyid=hierarchy.id LEFT JOIN names ON (properties.tag-0x8501)=names.id WHERE hierarchy.parent=hid AND (tag <= 0x8500 OR names.id IS NOT NULL);\n"
+"    FROM properties JOIN hierarchy ON properties.hierarchyid=hierarchy.id LEFT JOIN names ON properties.tag-34049=names.id WHERE hierarchy.parent=hid AND (tag <= 34048 OR names.id IS NOT NULL);\n"
 "  SELECT count(*), tag, mvproperties.type, \n"
 "          group_concat(length(mvproperties.val_ulong),':', mvproperties.val_ulong ORDER BY mvproperties.orderid SEPARATOR ''), \n"
 "          group_concat(length(mvproperties.val_string),':', mvproperties.val_string ORDER BY mvproperties.orderid SEPARATOR ''), \n"
@@ -232,7 +133,7 @@ static const char szPrepareGetProps[] =
 "          group_concat(length(mvproperties.val_hi),':', mvproperties.val_hi ORDER BY mvproperties.orderid SEPARATOR ''), \n"
 "          group_concat(length(mvproperties.val_lo),':', mvproperties.val_lo ORDER BY mvproperties.orderid SEPARATOR ''), \n"
 "          hierarchy.id, names.nameid, names.namestring, names.guid \n"
-"    FROM mvproperties JOIN hierarchy ON mvproperties.hierarchyid=hierarchy.id LEFT JOIN names ON (mvproperties.tag-0x8501)=names.id WHERE hierarchy.parent=hid AND (tag <= 0x8500 OR names.id IS NOT NULL) GROUP BY tag, mvproperties.type; \n"
+"    FROM mvproperties JOIN hierarchy ON mvproperties.hierarchyid=hierarchy.id LEFT JOIN names ON mvproperties.tag-34049=names.id WHERE hierarchy.parent=hid AND (tag <= 34048 OR names.id IS NOT NULL) GROUP BY tag, mvproperties.type; \n"
 "END;\n";
 
 static const char szGetBestBody[] =
@@ -244,7 +145,7 @@ static const char szGetBestBody[] =
 "    SET bestbody = 0 ;\n"
 "  \n"
 "  # Get body with lowest id (RTF before HTML)\n"
-"  SELECT tag INTO bestbody FROM properties WHERE hierarchyid=hid AND tag IN (0x1009, 0x1013) ORDER BY tag LIMIT 1;\n"
+"  SELECT tag INTO bestbody FROM properties WHERE hierarchyid=hid AND tag IN (4105, 4115) ORDER BY tag LIMIT 1;\n"
 "END;\n";
 
 static const char szStreamObj[] =
@@ -348,8 +249,7 @@ ECDatabase::~ECDatabase(void)
 ECRESULT ECDatabase::InitLibrary(const char *lpDatabaseDir,
     const char *lpConfigFile)
 {
-	string		strDatabaseDir;
-	string		strConfigFile;
+	std::string strDatabaseDir, strConfigFile;
 	int			ret = 0;
 
 	if(lpDatabaseDir) {
@@ -399,7 +299,7 @@ ECRESULT ECDatabase::InitializeDBStateInner(void)
 			
 		er = DoUpdate(stored_procedures[i].szSQL);
 		if (er == erSuccess)
-			break;
+			continue;
 		int err = mysql_errno(&m_lpMySQL);
 		if (err == ER_DBACCESS_DENIED_ERROR) {
 			ec_log_err("The storage server is not allowed to create stored procedures");
@@ -425,45 +325,6 @@ void ECDatabase::UnloadLibrary(void)
 	mysql_server_end();// mysql > 4.1.10 = mysql_library_end();
 	ec_log_notice("Waiting for mysql_library_end");
 	mysql_library_end();
-}
-
-ECRESULT ECDatabase::CheckExistColumn(const std::string &strTable,
-    const std::string &strColumn, bool *lpbExist)
-{
-	DB_RESULT lpDBResult;
-
-	std::string strQuery = "SELECT 1 FROM information_schema.COLUMNS "
-				"WHERE TABLE_SCHEMA = '" + string(m_lpConfig->GetSetting("mysql_database")) + "' "
-				"AND TABLE_NAME = '" + strTable + "' "
-				"AND COLUMN_NAME = '" + strColumn + "'";
-	auto er = DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess)
-		return er;
-	*lpbExist = lpDBResult.fetch_row() != nullptr;
-	return er;
-}
-
-ECRESULT ECDatabase::CheckExistIndex(const std::string &strTable,
-    const std::string &strKey, bool *lpbExist)
-{
-	DB_RESULT lpDBResult;
-	DB_ROW			lpRow = NULL;
-
-	// WHERE not supported in MySQL < 5.0.3 
-	std::string strQuery = "SHOW INDEXES FROM " + strTable;
-	auto er = DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess)
-		return er;
-
-	*lpbExist = false;
-	while ((lpRow = lpDBResult.fetch_row()) != nullptr) {
-		// 2 is Key_name
-		if (lpRow[2] && strcmp(lpRow[2], strKey.c_str()) == 0) {
-			*lpbExist = true;
-			break;
-		}
-	}
-	return er;
 }
 
 ECRESULT ECDatabase::Connect(void)
@@ -720,10 +581,9 @@ ECRESULT ECDatabase::DoSequence(const std::string &strSeqName,
 std::string ECDatabase::FilterBMP(const std::string &strToFilter)
 {
 	const char *c = strToFilter.c_str();
-	std::string::size_type pos = 0;
 	std::string strFiltered;
 
-	while(pos < strToFilter.size()) {
+	for (size_t pos = 0; pos < strToFilter.size(); ) {
 		// Copy 1, 2, and 3-byte UTF-8 sequences
 		int len;
 		
@@ -758,7 +618,6 @@ bool ECDatabase::SuppressLockErrorLogging(bool bSuppress)
 
 ECRESULT ECDatabase::Begin(void)
 {
-	Query("SET autocommit=0;");
 	auto er = KDatabase::Begin();
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
@@ -777,7 +636,6 @@ ECRESULT ECDatabase::Begin(void)
 ECRESULT ECDatabase::Commit(void)
 {
 	auto er = KDatabase::Commit();
-	Query("SET autocommit=1;");
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: COMMIT", &m_lpMySQL);
@@ -795,7 +653,6 @@ ECRESULT ECDatabase::Commit(void)
 ECRESULT ECDatabase::Rollback(void)
 {
 	auto er = KDatabase::Rollback();
-	Query("SET autocommit=1;");
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: ROLLBACK", &m_lpMySQL);
@@ -937,24 +794,6 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 	return erSuccess;
 }
 
-ECRESULT ECDatabase::IsUpdateDone(unsigned int ulDatabaseRevision,
-    unsigned int ulRevision)
-{
-	DB_RESULT lpResult;
-
-	std::string strQuery = "SELECT major,minor,revision,databaserevision FROM versions WHERE databaserevision = " + stringify(ulDatabaseRevision);
-	if (ulRevision > 0)
-		strQuery += " AND revision = " + stringify(ulRevision);
-
-	strQuery += " ORDER BY major DESC, minor DESC, revision DESC, databaserevision DESC LIMIT 1";
-	auto er = DoSelect(strQuery, &lpResult);
-	if(er != erSuccess)
-		return er;
-	if (lpResult.get_num_rows() != 1)
-		return KCERR_NOT_FOUND;
-	return erSuccess;
-}
-
 ECRESULT ECDatabase::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
 {
 	DB_RESULT lpResult;
@@ -994,6 +833,12 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 	er = GetFirstUpdate(&ulDatabaseRevisionMin);
 	if(er != erSuccess)
 		return er;
+	if (stored_ver.v_schema > 0 && stored_ver.v_schema < 63) {
+		strReport = format("DB schema is %u and older than v63 (ZCP 7.2). "
+		            "KC 8.4 was the last version able to upgrade such.",
+		            stored_ver.v_schema);
+		return KCERR_INVALID_VERSION;
+	}
 
 	//default error
 	strReport = "Unable to upgrade database from version " +
@@ -1017,13 +862,8 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 		ec_log_warn("Manually forced the database upgrade because the option \"--force-database-upgrade\" was given.");
 
 	// Loop throught the update list
-	for (size_t i = ulDatabaseRevisionMin;
-	     i < ARRAY_SIZE(sUpdateList); ++i)
-	{
-		if ((ulDatabaseRevisionMin > 0 && IsUpdateDone(sUpdateList[i].ulVersion) == hrSuccess) ||
-		    (sUpdateList[i].ulVersionMin != 0 && stored_ver.v_schema >= sUpdateList[i].ulVersion &&
-		    stored_ver.v_schema >= sUpdateList[i].ulVersionMin) ||
-		    (sUpdateList[i].ulVersionMin != 0 && IsUpdateDone(sUpdateList[i].ulVersionMin, PROJECT_VERSION_REVISION) == hrSuccess))
+	for (size_t i = 0; i < ARRAY_SIZE(sUpdateList); ++i) {
+		if (stored_ver.v_schema >= sUpdateList[i].ulVersion)
 			// Update already done, next
 			continue;
 
@@ -1086,66 +926,6 @@ ECRESULT ECDatabase::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 		strQuery += stringify(PROJECT_VERSION_MICRO) + std::string(", ");
 	strQuery += "'" + stringify(PROJECT_VERSION_REVISION) + "', " + stringify(ulDatabaseRevision) + ", FROM_UNIXTIME(" + stringify(time(nullptr)) + "))";
 	return DoInsert(strQuery);
-}
-/**
- * Validate all database tables
-*/
-ECRESULT ECDatabase::ValidateTables(void)
-{
-	list<std::string> listTables;
-	list<std::string> listErrorTables;
-	DB_RESULT lpResult;
-	DB_ROW		lpDBRow = NULL;
-
-	auto er = DoSelect("SHOW TABLES", &lpResult);
-	if(er != erSuccess) {
-		ec_log_err("Unable to get all tables from the mysql database. %s", GetError());
-		return er;
-	}
-
-	// Get all tables of the database
-	while ((lpDBRow = lpResult.fetch_row()) != nullptr) {
-		if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-			ec_log_err("Wrong table information.");
-			return KCERR_DATABASE_ERROR;
-		}
-
-		listTables.insert(listTables.end(), lpDBRow[0]);
-	}
-
-	for (const auto &table : listTables) {
-		er = DoSelect("CHECK TABLE " + table, &lpResult);
-		if(er != erSuccess) {
-			ec_log_err("Unable to check table \"%s\"", table.c_str());
-			return er;
-		}
-		lpDBRow = lpResult.fetch_row();
-		if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-			ec_log_err("Wrong check table information.");
-			return KCERR_DATABASE_ERROR;
-		}
-
-		ec_log_info("%30s | %15s | %s", lpDBRow[0], lpDBRow[2], lpDBRow[3]);
-		if (strcmp(lpDBRow[2], "error") == 0)
-			listErrorTables.insert(listErrorTables.end(), lpDBRow[0]);
-	}
-
-	if (!listErrorTables.empty())
-	{
-		ec_log_notice("Rebuilding tables.");
-		for (const auto &table : listErrorTables) {
-			er = DoUpdate("ALTER TABLE " + table + " FORCE");
-			if(er != erSuccess) {
-				ec_log_crit("Unable to fix table \"%s\"", table.c_str());
-				break;
-			}
-		}
-		if (er != erSuccess)
-			ec_log_crit("Rebuild tables failed. Error code 0x%08x", er);
-		else
-			ec_log_notice("Rebuilding tables done.");
-	}//	if (!listErrorTables.empty())
-	return er;
 }
 
 static constexpr const sSQLDatabase_t kcsrv_tables[] = {

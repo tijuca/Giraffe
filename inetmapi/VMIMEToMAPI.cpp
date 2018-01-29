@@ -17,7 +17,9 @@
 
 #include <kopano/platform.h>
 #include <exception>
+#include <list>
 #include <utility>
+#include <vector>
 #include "VMIMEToMAPI.h"
 #include <kopano/ECGuid.h>
 #include <kopano/ECLogger.h>
@@ -62,14 +64,17 @@
 // inetmapi
 #include "ECMapiUtils.h"
 #include "ECVMIMEUtils.h"
-#include "outputStreamMAPIAdapter.h"
+#include "inputStreamMAPIAdapter.h"
 
 // vcal support
 #include "ICalToMAPI.h"
 #include "config.h"
 
-using namespace std;
 using namespace KCHL;
+using std::list;
+using std::string;
+using std::vector;
+using std::wstring;
 
 namespace KC {
 
@@ -147,7 +152,6 @@ VMIMEToMAPI::VMIMEToMAPI()
 {
 	imopt_default_delivery_options(&m_dopt);
 	m_dopt.use_received_date = false; // use Date header
-	m_lpAdrBook = NULL;
 	m_dopt.html_safety_filter = false;
 }
 
@@ -278,7 +282,7 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 				return hr;
 				
 			for (unsigned int i = 0; i < lpAttachRows->cRows; ++i) {
-				hr = lpMessage->DeleteAttach(lpAttachRows->aRow[i].lpProps[0].Value.ul, 0, NULL, 0);
+				hr = lpMessage->DeleteAttach(lpAttachRows[i].lpProps[0].Value.ul, 0, nullptr, 0);
 				if(hr != hrSuccess)
 					return hr;
 			}
@@ -447,11 +451,23 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::shared_ptr<vmime::message> vmMessage,
 			for (size_t i = 0; i < myBody->getPartCount(); ++i) {
 				auto bPart = myBody->getPartAt(i);
 				auto ctf = bPart->getHeader()->findField(vmime::fields::CONTENT_TYPE);
+				if (ctf == nullptr)
+					continue;
+				auto cval = ctf->getValue();
+				if (cval == nullptr) {
+					ec_log_debug("MDN Content-Type field without value");
+					continue;
+				}
+				auto dval = vmime::dynamicCast<vmime::mediaType>(cval);
+				if (dval == nullptr) {
+					ec_log_debug("MDN Content-Type field not representable as vmime::mediaType");
+					continue;
+				}
 
-				if ((vmime::dynamicCast<vmime::mediaType>(ctf->getValue())->getType() == vmime::mediaTypes::TEXT &&
-				     vmime::dynamicCast<vmime::mediaType>(ctf->getValue())->getSubType() == vmime::mediaTypes::TEXT_PLAIN) ||
-				    (vmime::dynamicCast<vmime::mediaType>(ctf->getValue())->getType() == vmime::mediaTypes::MULTIPART &&
-				     vmime::dynamicCast<vmime::mediaType>(ctf->getValue())->getSubType() == vmime::mediaTypes::MULTIPART_ALTERNATIVE)) {
+				if ((dval->getType() == vmime::mediaTypes::TEXT &&
+				     dval->getSubType() == vmime::mediaTypes::TEXT_PLAIN) ||
+				    (dval->getType() == vmime::mediaTypes::MULTIPART &&
+				     dval->getSubType() == vmime::mediaTypes::MULTIPART_ALTERNATIVE)) {
 					hr = dissect_body(bPart->getHeader(), bPart->getBody(), lpMessage);
 					if (hr != hrSuccess) {
 						ec_log_err("Unable to parse MDN mail body");
@@ -502,7 +518,8 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::shared_ptr<vmime::message> vmMessage,
 		return MAPI_E_CALL_FAILED;
 	}
 
-	createIMAPEnvelope(vmMessage, lpMessage);
+	if (m_dopt.add_imap_data)
+		createIMAPEnvelope(vmMessage, lpMessage);
 
 	// ignore error/warings from fixup function: it's not critical for correct delivery
 	postWriteFixups(lpMessage);
@@ -726,7 +743,7 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::shared_ptr<vmime::header> vmHeader,
 			// The original sender of the mail account (if non sender exist then the FROM)
 			strSenderEmail = vmime::dynamicCast<vmime::mailbox>(vmHeader->Sender()->getValue())->getEmail().toString();
 			if (vmime::dynamicCast<vmime::mailbox>(vmHeader->Sender()->getValue())->getName().isEmpty() &&
-			    (strSenderEmail.empty() || strSenderEmail == "@")) {
+			    (strSenderEmail.empty() || strSenderEmail == "@" || strSenderEmail == "invalid@invalid")) {
 				// Fallback on the original from address
 				wstrSenderName = wstrFromName;
 				strSenderEmail = strFromEmail;
@@ -866,30 +883,29 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::shared_ptr<vmime::header> vmHeader,
 
 		// X-Kopano-Vacation header (TODO: other headers?)
 		if (vmHeader->hasField("X-Kopano-Vacation")) {
-			SPropValue sIcon[1];
-			sIcon[0].ulPropTag = PR_ICON_INDEX;
-			sIcon[0].Value.l = ICON_MAIL_OOF;
+			SPropValue sIcon;
+			sIcon.ulPropTag = PR_ICON_INDEX;
+			sIcon.Value.l = ICON_MAIL_OOF;
 			// exchange sets PR_MESSAGE_CLASS to IPM.Note.Rules.OofTemplate.Microsoft to get the icon
-			hr = lpMessage->SetProps(1, sIcon, NULL);
+			hr = lpMessage->SetProps(1, &sIcon, nullptr);
 			if (hr != hrSuccess)
 				return hr;
 		}
 
 		// Sensitivity header
 		if (vmHeader->hasField("Sensitivity")) {
-			SPropValue sSensitivity[1];
+			SPropValue sSensitivity;
 			auto sensitivity = strToLower(vmHeader->findField("Sensitivity")->getValue()->generate());
-			sSensitivity[0].ulPropTag = PR_SENSITIVITY;
+			sSensitivity.ulPropTag = PR_SENSITIVITY;
 			if (sensitivity.compare("personal") == 0)
-				sSensitivity[0].Value.ul = SENSITIVITY_PERSONAL;
+				sSensitivity.Value.ul = SENSITIVITY_PERSONAL;
 			else if (sensitivity.compare("private") == 0)
-				sSensitivity[0].Value.ul = SENSITIVITY_PRIVATE;
+				sSensitivity.Value.ul = SENSITIVITY_PRIVATE;
 			else if (sensitivity.compare("company-confidential") == 0)
-				sSensitivity[0].Value.ul = SENSITIVITY_COMPANY_CONFIDENTIAL;
+				sSensitivity.Value.ul = SENSITIVITY_COMPANY_CONFIDENTIAL;
 			else
-				sSensitivity[0].Value.ul = SENSITIVITY_NONE;
-
-			hr = lpMessage->SetProps(1, sSensitivity, NULL);
+				sSensitivity.Value.ul = SENSITIVITY_NONE;
+			hr = lpMessage->SetProps(1, &sSensitivity, nullptr);
 			if (hr != hrSuccess)
 				return hr;
 		}
@@ -950,13 +966,21 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::shared_ptr<vmime::header> vmHeader,
 
 		for (const auto &field : vmHeader->getFieldList()) {
 			std::string value, name = field->getName();
-			
-			if (name[0] != 'X')
-				continue;
 
 			// exclusion list?
 			if (name == "X-Priority")
 				continue;
+
+			if (m_dopt.indexed_headers.size() > 0) {
+				bool found = false;
+				for (const auto &item : m_dopt.indexed_headers)
+					if (kc_istarts_with(name, item))
+						found = true;
+
+				if (!found)
+					continue;
+			}
+
 			name = strToLower(name);
 
 			memory_ptr<MAPINAMEID> lpNameID;
@@ -977,12 +1001,11 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::shared_ptr<vmime::header> vmHeader,
 				continue;
 			}
 
-			SPropValue sProp[1];
+			SPropValue sProp;
 			value = field->getValue()->generate();
-			sProp[0].ulPropTag = PROP_TAG(PT_STRING8, PROP_ID(lpPropTags->aulPropTag[0]));
-			sProp[0].Value.lpszA = (char*)value.c_str();
-
-			lpMessage->SetProps(1, sProp, NULL);
+			sProp.ulPropTag = PROP_TAG(PT_STRING8, PROP_ID(lpPropTags->aulPropTag[0]));
+			sProp.Value.lpszA = (char*)value.c_str();
+			lpMessage->SetProps(1, &sProp, nullptr);
 			// in case of error: ignore this x-header as named props then
 		}
 	}
@@ -1023,9 +1046,8 @@ HRESULT VMIMEToMAPI::handleMessageToMeProps(IMessage *lpMessage, LPADRLIST lpRec
 
 	// Loop through all recipients of the message to find ourselves in the recipient list.
 	for (i = 0; i < lpRecipients->cEntries; ++i) {
-		auto lpRecipType = PCpropFindProp(lpRecipients->aEntries[i].rgPropVals, lpRecipients->aEntries[i].cValues, PR_RECIPIENT_TYPE);
-		auto lpEntryId = PCpropFindProp(lpRecipients->aEntries[i].rgPropVals, lpRecipients->aEntries[i].cValues, PR_ENTRYID);
-
+		auto lpRecipType = lpRecipients->aEntries[i].cfind(PR_RECIPIENT_TYPE);
+		auto lpEntryId = lpRecipients->aEntries[i].cfind(PR_ENTRYID);
 		if(lpRecipType == NULL)
 			continue;
 
@@ -1112,7 +1134,7 @@ HRESULT VMIMEToMAPI::handleRecipients(vmime::shared_ptr<vmime::header> vmHeader,
 			return hr;
 
 		// actually modify recipients in mapi object
-		hr = lpMessage->ModifyRecipients(MODRECIP_ADD, lpRecipients);	
+		hr = lpMessage->ModifyRecipients(0, lpRecipients);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -1380,7 +1402,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	// some, so asserts in some places).
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[0]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_ADDRTYPE_W);
+		lpProp = aent.cfind(PR_ADDRTYPE_W);
 		sRecipProps[cValues].ulPropTag = lpPropsList->aulPropTag[0]; // PR_xxx_ADDRTYPE;
 		assert(lpProp);
 		if (!lpProp) {
@@ -1393,7 +1415,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[1]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_DISPLAY_NAME_W);
+		lpProp = aent.cfind(PR_DISPLAY_NAME_W);
 		sRecipProps[cValues].ulPropTag = lpPropsList->aulPropTag[1];	// PR_xxx_DISPLAY_NAME;
 		if (lpProp)
 			sRecipProps[cValues].Value.lpszW = lpProp->Value.lpszW;	// use addressbook version
@@ -1409,7 +1431,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[2]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_DISPLAY_TYPE);
+		lpProp = aent.cfind(PR_DISPLAY_TYPE);
 		sRecipProps[cValues].ulPropTag = lpPropsList->aulPropTag[2]; // PR_xxx_DISPLAY_TYPE;
 		if (lpProp == nullptr)
 			sRecipProps[cValues].Value.ul = DT_MAILUSER;
@@ -1419,7 +1441,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[3]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_EMAIL_ADDRESS_W);
+		lpProp = aent.cfind(PR_EMAIL_ADDRESS_W);
 		sRecipProps[cValues].ulPropTag = lpPropsList->aulPropTag[3]; // PR_xxx_EMAIL_ADDRESS;
 		assert(lpProp);
 		if (!lpProp) {
@@ -1432,7 +1454,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[4]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_ENTRYID);
+		lpProp = aent.cfind(PR_ENTRYID);
 		assert(lpProp);
 		if (lpProp == nullptr)
 			// the one exception I guess? Let the fallback code create a one off entryid
@@ -1443,7 +1465,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[5]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_SEARCH_KEY);
+		lpProp = aent.cfind(PR_SEARCH_KEY);
 		if (!lpProp) {
 			sRecipProps[cValues].ulPropTag = CHANGE_PROP_TYPE(lpPropsList->aulPropTag[5], PT_ERROR);
 			sRecipProps[cValues].Value.err = MAPI_E_NOT_FOUND;
@@ -1455,7 +1477,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 	}
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[6]) != PT_NULL) {
-		lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_SMTP_ADDRESS_W);
+		lpProp = aent.cfind(PR_SMTP_ADDRESS_W);
 		if (!lpProp) {
 			sRecipProps[cValues].ulPropTag = CHANGE_PROP_TYPE(lpPropsList->aulPropTag[6], PT_ERROR); // PR_xxx_SMTP_ADDRESS;
 			sRecipProps[cValues].Value.err = MAPI_E_NOT_FOUND;
@@ -1466,7 +1488,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals,
 		++cValues;
 	}
 
-	lpProp = PCpropFindProp(aent.rgPropVals, aent.cValues, PR_OBJECT_TYPE);
+	lpProp = aent.cfind(PR_OBJECT_TYPE);
 	assert(lpProp);
 	if (lpProp == nullptr)
 		sRecipProps[cValues].Value.ul = MAPI_MAILUSER;
@@ -1503,22 +1525,22 @@ vtm_order_alternatives(vmime::shared_ptr<vmime::body> vmBody)
 	vmime::shared_ptr<vmime::header> vmHeader;
 	vmime::shared_ptr<vmime::bodyPart> vmBodyPart;
 	vmime::shared_ptr<vmime::mediaType> mt;
-	std::list<unsigned int> lBodies, pgtext;
+	std::list<unsigned int> lBodies;
 
 	for (size_t i = 0; i < vmBody->getPartCount(); ++i) {
 		vmBodyPart = vmBody->getPartAt(i);
 		vmHeader = vmBodyPart->getHeader();
 		if (!vmHeader->hasField(vmime::fields::CONTENT_TYPE)) {
 			/* RFC 2046 §5.1 ¶2 says treat it as text/plain */
-			lBodies.push_front(i);
+			lBodies.emplace_front(i);
 			continue;
 		}
 		mt = vmime::dynamicCast<vmime::mediaType>(vmHeader->ContentType()->getValue());
 		// mostly better alternatives for text/plain, so try that last
 		if (mt->getType() == vmime::mediaTypes::TEXT && mt->getSubType() == vmime::mediaTypes::TEXT_PLAIN)
-			lBodies.push_back(i);
+			lBodies.emplace_back(i);
 		else
-			lBodies.push_front(i);
+			lBodies.emplace_front(i);
 	}
 	return lBodies;
 }
@@ -1684,15 +1706,11 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::shared_ptr<vmime::header> vmHeader,
 		SPropValue sAttProps[3];
 
 		hr = lpMessage->CreateAttach(nullptr, 0, &ulAttNr, &~ptrAttach);
-		if (hr != hrSuccess) {
-			ec_log_err("dissect_ical-1790: Unable to create attachment for ical data: %s (%x)", GetMAPIErrorMessage(hr), hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("dissect_ical-1790: Unable to create attachment for iCal data", hr);
 		hr = ptrAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, &~ptrNewMessage);
-		if (hr != hrSuccess) {
-			ec_log_err("dissect_ical-1796: Unable to create message attachment for ical data: %s (%x)", GetMAPIErrorMessage(hr), hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("dissect_ical-1796: Unable to create message attachment for iCal data", hr);
 
 		sAttProps[0].ulPropTag = PR_ATTACH_METHOD;
 		sAttProps[0].Value.ul = ATTACH_EMBEDDED_MSG;
@@ -1704,21 +1722,15 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::shared_ptr<vmime::header> vmHeader,
 		sAttProps[2].Value.ul = 0;
 
 		hr = ptrAttach->SetProps(3, sAttProps, NULL);
-		if (hr != hrSuccess) {
-			ec_log_err("dissect_ical-1811: Unable to create message attachment for ical data: %s (%x)", GetMAPIErrorMessage(hr), hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("dissect_ical-1811: Unable to create message attachment for iCal data", hr);
 		lpIcalMessage = ptrNewMessage.get();
 	}
 
 	hr = CreateICalToMapi(lpMessage, m_lpAdrBook, true, &tmpicalmapi);
 	lpIcalMapi.reset(tmpicalmapi);
-	if (hr != hrSuccess) {
-		ec_log_err("dissect_ical-1820: Unable to create ical converter: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perror("dissect_ical-1820: Unable to create iCal converter", hr);
 	hr = lpIcalMapi->ParseICal(icaldata, strCharset, "UTC" , NULL, 0);
 	if (hr != hrSuccess || lpIcalMapi->GetItemCount() != 1) {
 		ec_log_err("dissect_ical-1826: Unable to parse ical information: %s (%x), items: %d, adding as normal attachment",
@@ -1728,10 +1740,8 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::shared_ptr<vmime::header> vmHeader,
 
 	if (lpIcalMessage != lpMessage) {
 		hr = lpIcalMapi->GetItem(0, 0, lpIcalMessage);
-		if (hr != hrSuccess) {
-			ec_log_err("dissect_ical-1833: Error while converting ical to mapi: %s (%x)", GetMAPIErrorMessage(hr), hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("dissect_ical-1833: Error while converting iCal to MAPI", hr);
 	}
 
 	if (bIsAttachment)
@@ -1739,10 +1749,9 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::shared_ptr<vmime::header> vmHeader,
 
 	/* Calendar properties need to be on the main message in any case. */
 	hr = lpIcalMapi->GetItem(0, ical_mapi_flags, lpMessage);
-	if (hr != hrSuccess) {
-		ec_log_err("dissect_ical-1834: Error while converting ical to mapi: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("dissect_ical-1834: Error while converting iCal to MAPI", hr);
+
 	/* Evaluate whether vconverter gave us an initial body */
 	if (!bIsAttachment && m_mailState.bodyLevel < BODY_PLAIN &&
 	    (FPropExists(lpMessage, PR_BODY_A) ||
@@ -1761,15 +1770,11 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::shared_ptr<vmime::header> vmHeader,
 	}
 
 	hr = ptrNewMessage->SaveChanges(0);
-	if (hr != hrSuccess) {
-		ec_log_err("dissect_ical-1851: Unable to save ical message: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("dissect_ical-1851: Unable to save iCal message", hr);
 	hr = ptrAttach->SaveChanges(0);
-	if (hr != hrSuccess) {
-		ec_log_err("dissect_ical-1856: Unable to save ical message attachment: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("dissect_ical-1856: Unable to save iCal message attachment", hr);
 
 	// make sure we show the attachment icon
 	m_mailState.attachLevel = ATTACH_NORMAL;
@@ -2388,11 +2393,11 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::shared_ptr<vmime::header> vmHeade
 
 		/* Add secondary candidates and try all in order */
 		std::vector<std::string> cs_cand;
-		cs_cand.push_back(mime_charset.getName());
+		cs_cand.emplace_back(mime_charset.getName());
 		if (!m_dopt.charset_strict_rfc) {
 			if (mime_charset != html_charset)
-				cs_cand.push_back(html_charset.getName());
-			cs_cand.push_back(vmime::charsets::US_ASCII);
+				cs_cand.emplace_back(html_charset.getName());
+			cs_cand.emplace_back(vmime::charsets::US_ASCII);
 		}
 		int cs_best = renovate_encoding(strHTML, cs_cand);
 		if (cs_best < 0) {
@@ -2479,11 +2484,8 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::shared_ptr<vmime::header> vmHeade
 	if (m_mailState.bodyLevel == BODY_NONE || (m_mailState.bodyLevel < BODY_HTML && !bAppendBody))
 		ulFlags |= MAPI_CREATE;
 	hr = lpMessage->OpenProperty(PR_HTML, &IID_IStream, STGM_TRANSACTED, ulFlags, &~lpHTMLStream);
-	if (hr != hrSuccess) {
-		ec_log_err("OpenProperty PR_HTML failed: %s", GetMAPIErrorMessage(hr));
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perror("OpenProperty PR_HTML failed", hr);
 	if (bAppendBody) {
 		static const LARGE_INTEGER liZero = {{0, 0}};
 		hr = lpHTMLStream->Seek(liZero, SEEK_END, NULL);
@@ -3255,17 +3257,15 @@ std::string VMIMEToMAPI::mailboxToEnvelope(vmime::shared_ptr<vmime::mailbox> mbo
 	mbox->getName().generate(os);
 	// encoded names never contain "
 	buffer = StringEscape(buffer.c_str(), "\"", '\\');
-	lMBox.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
-
-	lMBox.push_back("NIL");	// at-domain-list (source route) ... whatever that means
-
+	lMBox.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
+	lMBox.emplace_back("NIL");	// at-domain-list (source route) ... whatever that means
 	buffer = "\"" + mbox->getEmail().toString() + "\"";
 	pos = buffer.find("@");
 	if (pos != string::npos)
 		buffer.replace(pos, 1, "\" \"");
-	lMBox.push_back(std::move(buffer));
+	lMBox.emplace_back(std::move(buffer));
 	if (pos == string::npos)
-		lMBox.push_back("NIL");	// domain was missing
+		lMBox.emplace_back("NIL");	// domain was missing
 	return "(" + kc_join(lMBox, " ") + ")";
 }
 
@@ -3292,7 +3292,7 @@ std::string VMIMEToMAPI::addressListToEnvelope(vmime::shared_ptr<vmime::addressL
 	for (int i = 0; i < aCount; ++i) {
 		try {
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
-			lAddr.push_back(buffer);
+			lAddr.emplace_back(buffer);
 		} catch (vmime::exception &e) {
 		}
 	}
@@ -3364,50 +3364,48 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 		date = vmime::make_shared<vmime::datetime>(0);
 	}
 	date->generate(ctx, os);
-	lItems.push_back("\"" + buffer + "\"");
-
+	lItems.emplace_back("\"" + buffer + "\"");
 	buffer.clear();
 	vmHeader->Subject()->getValue()->generate(ctx, os);
 	// encoded subjects never contain ", so escape won't break those.
 	buffer = StringEscape(buffer.c_str(), "\"", '\\');
-	lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
-
+	lItems.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	buffer.clear();
 
 	// from
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->From()->getValue()));
-		lItems.push_back("(" + buffer + ")");
+		lItems.emplace_back("(" + buffer + ")");
 	} catch (vmime::exception &e) {
 		// this is not allowed, but better than nothing
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
 
 	// sender
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->Sender()->getValue()));
-		lItems.push_back("(" + buffer + ")");
+		lItems.emplace_back("(" + buffer + ")");
 	} catch (vmime::exception &e) {
-		lItems.push_back(lItems.back());
+		lItems.emplace_back(lItems.back());
 	}
 	buffer.clear();
 
 	// reply-to
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->ReplyTo()->getValue()));
-		lItems.push_back("(" + buffer + ")");
+		lItems.emplace_back("(" + buffer + ")");
 	} catch (vmime::exception &e) {
-		lItems.push_back(lItems.back());
+		lItems.emplace_back(lItems.back());
 	}
 	buffer.clear();
 
 	// ((to),(to))
 	try {
 		buffer = addressListToEnvelope(vmime::dynamicCast<vmime::addressList>(vmHeader->To()->getValue()));
-		lItems.push_back(buffer);
+		lItems.emplace_back(buffer);
 	} catch (vmime::exception &e) {
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
 
@@ -3417,9 +3415,9 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 		int aCount = aList->getAddressCount();
 		for (int i = 0; i < aCount; ++i)
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
-		lItems.push_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
+		lItems.emplace_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
 	} catch (vmime::exception &e) {
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
 
@@ -3429,23 +3427,22 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 		int aCount = aList->getAddressCount();
 		for (int i = 0; i < aCount; ++i)
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
-		lItems.push_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
+		lItems.emplace_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
 	} catch (vmime::exception &e) {
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
 
 	// in-reply-to
 	vmHeader->InReplyTo()->getValue()->generate(ctx, os);
-	lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
+	lItems.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	buffer.clear();
 
 	// message-id
 	vmHeader->MessageId()->getValue()->generate(ctx, os);
 	if (buffer.compare("<>") == 0)
 		buffer.clear();
-	lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
-
+	lItems.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	return kc_join(lItems, " ");
 }
 
@@ -3523,8 +3520,8 @@ HRESULT VMIMEToMAPI::messagePartToStructure(const string &input,
 			string strBodyStructure;
 			for (size_t i = 0; i < vmBodyPart->getBody()->getPartCount(); ++i) {
 				messagePartToStructure(input, vmBodyPart->getBody()->getPartAt(i), &strBody, &strBodyStructure);
-				lBody.push_back(std::move(strBody));
-				lBodyStructure.push_back(std::move(strBodyStructure));
+				lBody.emplace_back(std::move(strBody));
+				lBodyStructure.emplace_back(std::move(strBodyStructure));
 				strBody.clear();
 				strBodyStructure.clear();
 			}
@@ -3533,21 +3530,18 @@ HRESULT VMIMEToMAPI::messagePartToStructure(const string &input,
 			strBodyStructure = kc_join(lBodyStructure, "");
 
 			lBody.clear();
-			lBody.push_back(std::move(strBody));
+			lBody.emplace_back(std::move(strBody));
 			lBodyStructure.clear();
-			lBodyStructure.push_back(std::move(strBodyStructure));
+			lBodyStructure.emplace_back(std::move(strBodyStructure));
 
 			// body:
 			//   (<SUB> "subtype")
 			// bodystructure:
 			//   (<SUB> "subtype" ("boundary" "value") "disposition" "language")
-			lBody.push_back("\"" + mt->getSubType() + "\"");
-			lBodyStructure.push_back("\"" + mt->getSubType() + "\"");
-
-			lBodyStructure.push_back(parameterizedFieldToStructure(ctf));
-
-			lBodyStructure.push_back(getStructureExtendedFields(vmHeaderPart));
-
+			lBody.emplace_back("\"" + mt->getSubType() + "\"");
+			lBodyStructure.emplace_back("\"" + mt->getSubType() + "\"");
+			lBodyStructure.emplace_back(parameterizedFieldToStructure(ctf));
+			lBodyStructure.emplace_back(getStructureExtendedFields(vmHeaderPart));
 			if (lpSimple)
 				*lpSimple = "(" + kc_join(lBody, " ") + ")";
 			if (lpExtended)
@@ -3592,54 +3586,52 @@ HRESULT VMIMEToMAPI::bodyPartToStructure(const string &input,
 	auto vmHeaderPart = vmBodyPart->getHeader();
 	if (!vmHeaderPart->hasField(vmime::fields::CONTENT_TYPE)) {
 		// create with text/plain; charset=us-ascii ?
-		lBody.push_back("NIL");
-		lBodyStructure.push_back("NIL");
+		lBody.emplace_back("NIL");
+		lBodyStructure.emplace_back("NIL");
 		goto nil;
 	}
 	ctf = vmime::dynamicCast<vmime::contentTypeField>(vmHeaderPart->findField(vmime::fields::CONTENT_TYPE));
 	mt = vmime::dynamicCast<vmime::mediaType>(ctf->getValue());
-
-	lBody.push_back("\"" + mt->getType() + "\"");
-	lBody.push_back("\"" + mt->getSubType() + "\"");
+	lBody.emplace_back("\"" + mt->getType() + "\"");
+	lBody.emplace_back("\"" + mt->getSubType() + "\"");
 
 	// if string == () force add charset.
-	lBody.push_back(parameterizedFieldToStructure(ctf));
-
+	lBody.emplace_back(parameterizedFieldToStructure(ctf));
 	if (vmHeaderPart->hasField(vmime::fields::CONTENT_ID)) {
 		buffer = vmime::dynamicCast<vmime::messageId>(vmHeaderPart->findField(vmime::fields::CONTENT_ID)->getValue())->getId();
-		lBody.push_back(buffer.empty() ? "NIL" : "\"<" + buffer + ">\"");
+		lBody.emplace_back(buffer.empty() ? "NIL" : "\"<" + buffer + ">\"");
 	} else {
-		lBody.push_back("NIL");
+		lBody.emplace_back("NIL");
 	}
 
 	if (vmHeaderPart->hasField(vmime::fields::CONTENT_DESCRIPTION)) {
 		buffer.clear();
 		vmHeaderPart->findField(vmime::fields::CONTENT_DESCRIPTION)->getValue()->generate(os);
-		lBody.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
+		lBody.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	} else {
-		lBody.push_back("NIL");
+		lBody.emplace_back("NIL");
 	}
 
 	if (vmHeaderPart->hasField(vmime::fields::CONTENT_TRANSFER_ENCODING)) {
 		buffer.clear();
 		vmHeaderPart->findField(vmime::fields::CONTENT_TRANSFER_ENCODING)->getValue()->generate(os);
-		lBody.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
+		lBody.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	} else {
-		lBody.push_back("NIL");
+		lBody.emplace_back("NIL");
 	}
 
 	if (mt->getType() == vmime::mediaTypes::TEXT) {
 		// body part size
 		buffer = stringify(vmBodyPart->getBody()->getParsedLength());
-		lBody.push_back(buffer);
+		lBody.emplace_back(buffer);
 
 		// body part number of lines
 		buffer = stringify(countBodyLines(input, vmBodyPart->getBody()->getParsedOffset(), vmBodyPart->getBody()->getParsedLength()));
-		lBody.push_back(buffer);
+		lBody.emplace_back(buffer);
 	} else {
 		// attachment: size only
 		buffer = stringify(vmBodyPart->getBody()->getParsedLength());
-		lBody.push_back(buffer);
+		lBody.emplace_back(buffer);
 	}
 
 	// up until now, they were the same
@@ -3659,28 +3651,25 @@ HRESULT VMIMEToMAPI::bodyPartToStructure(const string &input,
 		// envelope eerst, dan message, dan lines
 		vmBodyPart->getBody()->getContents()->extractRaw(os); // generate? raw?
 		subMessage->parse(buffer);
-
-		lBody.push_back("("+createIMAPEnvelope(subMessage)+")");
-		lBodyStructure.push_back("("+createIMAPEnvelope(subMessage)+")");
+		lBody.emplace_back("(" + createIMAPEnvelope(subMessage) + ")");
+		lBodyStructure.emplace_back("(" + createIMAPEnvelope(subMessage) + ")");
 
 		// recurse message-in-message
 		messagePartToStructure(buffer, subMessage, &strSubSingle, &strSubExtended);
-		lBody.push_back(std::move(strSubSingle));
-		lBodyStructure.push_back(std::move(strSubExtended));
+		lBody.emplace_back(std::move(strSubSingle));
+		lBodyStructure.emplace_back(std::move(strSubExtended));
 
 		// dus hier nog de line count van vmBodyPart->getBody buffer?
-		lBody.push_back(stringify(countBodyLines(buffer, 0, buffer.length())));
+		lBody.emplace_back(stringify(countBodyLines(buffer, 0, buffer.length())));
 	}
 
 nil:
 	if (lpSimple)
 		*lpSimple = "(" + kc_join(lBody, " ") + ")";
 
-	// just push some NIL's or also inbetween?
-	lBodyStructure.push_back("NIL");	// MD5 of body (use Content-MD5 header?)
-
-	lBodyStructure.push_back(getStructureExtendedFields(vmHeaderPart));
-
+	/* just push some NILs or also inbetween? */
+	lBodyStructure.emplace_back("NIL"); // MD5 of body (use Content-MD5 header?)
+	lBodyStructure.emplace_back(getStructureExtendedFields(vmHeaderPart));
 	if (lpExtended)
 		*lpExtended = "(" + kc_join(lBodyStructure, " ") + ")";
 
@@ -3707,22 +3696,22 @@ std::string VMIMEToMAPI::getStructureExtendedFields(vmime::shared_ptr<vmime::hea
 		// use findField because we want an exception when missing
 		auto cdf = vmime::dynamicCast<vmime::contentDispositionField>(vmHeaderPart->findField(vmime::fields::CONTENT_DISPOSITION));
 		auto cd = vmime::dynamicCast<vmime::contentDisposition>(cdf->getValue());
-		lItems.push_back("(\"" + cd->getName() + "\" " + parameterizedFieldToStructure(cdf) + ")");
+		lItems.emplace_back("(\"" + cd->getName() + "\" " + parameterizedFieldToStructure(cdf) + ")");
 	} else {
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 
 	// language
-	lItems.push_back("NIL");
+	lItems.emplace_back("NIL");
 
 	// location
 	try {
 		buffer.clear();
 		vmHeaderPart->ContentLocation()->getValue()->generate(os);
-		lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
+		lItems.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	}
 	catch (vmime::exception &e) {
-		lItems.push_back("NIL");
+		lItems.emplace_back("NIL");
 	}
 	return kc_join(lItems, " ");
 }
@@ -3742,9 +3731,9 @@ std::string VMIMEToMAPI::parameterizedFieldToStructure(vmime::shared_ptr<vmime::
 
 	try {
 		for (const auto &param : vmParamField->getParameterList()) {
-			lParams.push_back("\"" + param->getName() + "\"");
+			lParams.emplace_back("\"" + param->getName() + "\"");
 			param->getValue().generate(os);
-			lParams.push_back("\"" + buffer + "\"");
+			lParams.emplace_back("\"" + buffer + "\"");
 			buffer.clear();
 		}
 	}
@@ -3798,6 +3787,7 @@ void imopt_default_delivery_options(delivery_options *dopt) {
 	dopt->parse_smime_signed = false;
 	dopt->ascii_upgrade = nullptr;
 	dopt->html_safety_filter = false;
+	dopt->indexed_headers = {"X-"}; // per default save all X- headers
 }
 
 /**
@@ -3813,7 +3803,6 @@ void imopt_default_sending_options(sending_options *sopt) {
 	sopt->headers_only = false;
 	sopt->add_received_date = false;
 	sopt->use_tnef = 0;
-	sopt->force_utf8 = false;
 	sopt->charset_upgrade = const_cast<char *>("windows-1252");
 	sopt->allow_send_to_everyone = true;
 	sopt->enable_dsn = true;

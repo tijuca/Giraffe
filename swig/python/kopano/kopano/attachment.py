@@ -1,8 +1,8 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 import sys
@@ -15,7 +15,7 @@ from MAPI.Tags import (
 from MAPI.Defs import HrGetOneProp
 from MAPI.Struct import MAPIErrorNotFound
 
-from .base import Base
+from .properties import Properties
 
 if sys.hexversion >= 0x03000000:
     try:
@@ -25,7 +25,7 @@ if sys.hexversion >= 0x03000000:
 else:
     import utils as _utils
 
-class Attachment(Base):
+class Attachment(Properties):
     """Attachment class"""
 
     def __init__(self, mapiitem=None, entryid=None, mapiobj=None):
@@ -61,27 +61,27 @@ class Attachment(Base):
 
     @property
     def mimetype(self):
-        """ Mime-type or *None* if not found """
-
+        """Mime-type"""
         try:
             return HrGetOneProp(self.mapiobj, PR_ATTACH_MIME_TAG_W).Value
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @property
     def filename(self):
-        """ Filename or *None* if not found """
-
+        """Filename"""
         try:
             return HrGetOneProp(self.mapiobj, PR_ATTACH_LONG_FILENAME_W).Value
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @property
     def size(self):
-        """ Size """
-        # XXX size of the attachment object, so more than just the attachment data
-        # XXX (useful when calculating store size, for example.. sounds interesting to fix here)
+        """Size"""
+        # XXX size of the attachment object, so more than just the attachment
+        #     data
+        # XXX (useful when calculating store size, for example.. sounds
+        #     interesting to fix here)
         try:
             return int(HrGetOneProp(self.mapiobj, PR_ATTACH_SIZE).Value)
         except MAPIErrorNotFound:
@@ -92,8 +92,7 @@ class Attachment(Base):
 
     @property
     def data(self):
-        """ Binary data """
-
+        """Binary data"""
         if self._data is None:
             self._data = _utils.stream(self.mapiobj, PR_ATTACH_DATA_BIN)
         return self._data

@@ -16,8 +16,12 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
+#include <list>
+#include <map>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <mapidefs.h>
 #include <mapitags.h>
@@ -34,8 +38,6 @@
 
 #include <algorithm>
 
-using namespace std;
-
 namespace KC {
 
 #define LOG_CACHE_DEBUG(_msg, ...) \
@@ -46,29 +48,29 @@ namespace KC {
 	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_CACHE, "cellcache: " _msg, ##__VA_ARGS__)
 
 // Specialization for ECsACL
-template<>
-unsigned int GetCacheAdditionalSize(const ECsACLs &val) {
+template<> size_t GetCacheAdditionalSize(const ECsACLs &val)
+{
 	return val.ulACLs * sizeof(val.aACL[0]);
 }
 
-template<>
-unsigned int GetCacheAdditionalSize(const ECsIndexProp &val) {
+template<> size_t GetCacheAdditionalSize(const ECsIndexProp &val)
+{
 	return val.cbData;
 }
 
 // Specialization for ECsCell
-template<>
-unsigned int GetCacheAdditionalSize(const ECsCells &val) {
+template<> size_t GetCacheAdditionalSize(const ECsCells &val)
+{
 	return val.GetSize();
 }
 
-template<>
-unsigned int GetCacheAdditionalSize(const std::string &val) {
+template<> size_t GetCacheAdditionalSize(const std::string &val)
+{
 	return MEMORY_USAGE_STRING(val);
 }
 
-template<>
-unsigned int GetCacheAdditionalSize(const ECsUEIdKey &val) {
+template<> size_t GetCacheAdditionalSize(const ECsUEIdKey &val)
+{
 	return MEMORY_USAGE_STRING(val.strExternId);
 }
 
@@ -99,6 +101,7 @@ ECCacheManager::~ECCacheManager()
 
 ECRESULT ECCacheManager::PurgeCache(unsigned int ulFlags)
 {
+	auto start = std::chrono::steady_clock::now();
 	LOG_CACHE_DEBUG("Purge cache, flags 0x%08X", ulFlags);
 
 	// cache mutex items
@@ -107,14 +110,20 @@ ECRESULT ECCacheManager::PurgeCache(unsigned int ulFlags)
 		m_QuotaCache.ClearCache();
 	if (ulFlags & PURGE_CACHE_QUOTADEFAULT)
 		m_QuotaUserDefaultCache.ClearCache();
-	if (ulFlags & PURGE_CACHE_OBJECTS)
-		m_ObjectsCache.ClearCache();
-	if (ulFlags & PURGE_CACHE_STORES)
-		m_StoresCache.ClearCache();
 	if (ulFlags & PURGE_CACHE_ACL)
 		m_AclCache.ClearCache();
 	l_cache.unlock();
-	
+
+	ulock_rec l_object(m_hCacheObjectMutex);
+	if (ulFlags & PURGE_CACHE_OBJECTS)
+		m_ObjectsCache.ClearCache();
+	l_object.unlock();
+
+	ulock_rec l_store(m_hCacheStoreMutex);
+	if (ulFlags & PURGE_CACHE_STORES)
+		m_StoresCache.ClearCache();
+	l_store.unlock();
+
 	// Cell cache mutex
 	ulock_rec l_cells(m_hCacheCellsMutex);
 	if(ulFlags & PURGE_CACHE_CELL)
@@ -144,6 +153,10 @@ ECRESULT ECCacheManager::PurgeCache(unsigned int ulFlags)
 	if (ulFlags & PURGE_CACHE_SERVER)
 		m_ServerDetailsCache.ClearCache();
 	l_cache.unlock();
+
+	using namespace std::chrono;
+	auto end = duration_cast<milliseconds>(decltype(start)::clock::now() - start);
+	ec_log_debug("PurgeCache took %u ms", static_cast<unsigned int>(end.count()));
 	return erSuccess;
 }
 
@@ -199,14 +212,12 @@ ECRESULT ECCacheManager::I_GetObject(unsigned int ulObjId,
     unsigned int *ulType)
 {
 	ECsObjects	*sObject;
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheObjectMutex);
 
 	auto er = m_ObjectsCache.GetCacheItem(ulObjId, &sObject);
 	if(er != erSuccess)
 		return er;
-
-	assert((sObject->ulType != MAPI_FOLDER && (sObject->ulFlags & ~(MAPI_ASSOCIATED | MSGFLAG_DELETED)) == 0) || sObject->ulType == MAPI_FOLDER);
-
+	assert(sObject->ulType == MAPI_FOLDER || (sObject->ulFlags & ~(MSGFLAG_ASSOCIATED | MSGFLAG_DELETED)) == 0);
 	if(ulParent)
 		*ulParent = sObject->ulParent;
 
@@ -227,15 +238,13 @@ ECRESULT ECCacheManager::SetObject(unsigned int ulObjId, unsigned int ulParent, 
 
 	if(ulParent == 0 || ulObjId == 0 || ulOwner == 0)
 		return 1;
-
-	assert((ulType != MAPI_FOLDER && (ulFlags & ~(MAPI_ASSOCIATED | MSGFLAG_DELETED)) == 0) || ulType == MAPI_FOLDER);
-
+	assert(ulType == MAPI_FOLDER || (ulFlags & ~(MSGFLAG_ASSOCIATED | MSGFLAG_DELETED)) == 0);
 	sObjects.ulParent	= ulParent;
 	sObjects.ulOwner	= ulOwner;
 	sObjects.ulFlags	= ulFlags;
 	sObjects.ulType		= ulType;
 
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheObjectMutex);
 	auto er = m_ObjectsCache.AddCacheItem(ulObjId, sObjects);
 	LOG_CACHE_DEBUG("Set cache object id %d, parent %d, owner %d, flags %d, type %d", ulObjId, ulParent, ulOwner, ulFlags, ulType);
 	return er;
@@ -243,7 +252,7 @@ ECRESULT ECCacheManager::SetObject(unsigned int ulObjId, unsigned int ulParent, 
 
 ECRESULT ECCacheManager::I_DelObject(unsigned int ulObjId)
 {
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheObjectMutex);
 	return m_ObjectsCache.RemoveCacheItem(ulObjId);
 }
 
@@ -251,7 +260,7 @@ ECRESULT ECCacheManager::I_GetStore(unsigned int ulObjId, unsigned int *ulStore,
     GUID *lpGuid, unsigned int *lpulType)
 {
 	ECsStores	*sStores;
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheStoreMutex);
 
 	auto er = m_StoresCache.GetCacheItem(ulObjId, &sStores);
 	if(er != erSuccess)
@@ -273,7 +282,7 @@ ECRESULT ECCacheManager::SetStore(unsigned int ulObjId, unsigned int ulStore,
 	sStores.guidStore = *lpGuid;
 	sStores.ulType = ulType;
 
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheStoreMutex);
 	auto er = m_StoresCache.AddCacheItem(ulObjId, sStores);
 	LOG_CACHE_DEBUG("Set store cache id %d, store %d, type %d, guid %s", ulObjId, ulStore, ulType, (lpGuid != nullptr ? bin2hex(sizeof(GUID), lpGuid).c_str() : "NULL"));
 	return er;
@@ -281,7 +290,7 @@ ECRESULT ECCacheManager::SetStore(unsigned int ulObjId, unsigned int ulStore,
 
 ECRESULT ECCacheManager::I_DelStore(unsigned int ulObjId)
 {
-	scoped_rlock lock(m_hCacheMutex);
+	scoped_rlock lock(m_hCacheStoreMutex);
 	return m_StoresCache.RemoveCacheItem(ulObjId);
 }
 
@@ -412,13 +421,13 @@ ECRESULT ECCacheManager::GetObjects(const std::list<sObjectTableKey> &lstObjects
 		
     {
         // Get everything from the cache that we can
-    	scoped_rlock lock(m_hCacheMutex);
+       scoped_rlock lock(m_hCacheObjectMutex);
 
 	for (const auto &key : lstObjects)
 		if (m_ObjectsCache.GetCacheItem(key.ulObjId, &lpsObject) == erSuccess)
 			mapObjects[key] = *lpsObject;
 		else
-			setUncached.insert(key);
+			setUncached.emplace(key);
     }
 
     if(!setUncached.empty()) {
@@ -485,7 +494,7 @@ ECRESULT ECCacheManager::GetObjectsFromProp(unsigned int ulTag,
 			ECsIndexProp p(PROP_ID(ulTag), lpdata[i], cbdata[i]);
 			mapObjects[std::move(p)] = objid;
 		} else {
-			uncached.push_back(i);
+			uncached.emplace_back(i);
 		}
 	}
 
@@ -685,7 +694,7 @@ ECRESULT ECCacheManager::GetUserDetails(unsigned int ulUserId, objectdetails_t *
 }
 
 ECRESULT ECCacheManager::SetUserDetails(unsigned int ulUserId,
-    const objectdetails_t *details)
+    const objectdetails_t &details)
 {
 	return I_AddUserObjectDetails(ulUserId, details);
 }
@@ -766,7 +775,8 @@ exit:
 	return er;
 }
 
-ECRESULT ECCacheManager::GetUserObjects(const list<objectid_t> &lstExternObjIds, map<objectid_t, unsigned int> *lpmapLocalObjIds)
+ECRESULT ECCacheManager::GetUserObjects(const std::list<objectid_t> &lstExternObjIds,
+    std::map<objectid_t, unsigned int> *lpmapLocalObjIds)
 {
 	ECRESULT er = erSuccess;
 	DB_RESULT lpDBResult;
@@ -774,10 +784,10 @@ ECRESULT ECCacheManager::GetUserObjects(const list<objectid_t> &lstExternObjIds,
 	DB_LENGTHS lpDBLen = NULL;
 	std::string strQuery;
 	ECDatabase *lpDatabase = NULL;
-	list<objectid_t> lstExternIds;
-	list<objectid_t>::const_iterator iter;
+	std::list<objectid_t> lstExternIds;
+	decltype(lstExternIds)::const_iterator iter;
 	objectid_t sExternId;
-	string strSignature;
+	std::string strSignature;
 	unsigned int ulLocalId = 0;
 	unsigned int ulCompanyId;
 
@@ -791,10 +801,10 @@ ECRESULT ECCacheManager::GetUserObjects(const list<objectid_t> &lstExternObjIds,
 			bin2hex(objid.id).c_str(), objid.objclass);
 		if (I_GetUEIdObject(objid.id, objid.objclass, NULL, &ulLocalId, NULL) == erSuccess)
 			/* Object was found in cache. */
-			lpmapLocalObjIds->insert(make_pair(objid, ulLocalId));
+			lpmapLocalObjIds->insert({objid, ulLocalId});
 		else
 			/* Object was not found in cache. */
-			lstExternIds.push_back(objid);
+			lstExternIds.emplace_back(objid);
 	}
 
 	// Check if all objects have been collected from the cache
@@ -833,8 +843,7 @@ ECRESULT ECCacheManager::GetUserObjects(const list<objectid_t> &lstExternObjIds,
 		sExternId.objclass = (objectclass_t)atoi(lpDBRow[2]);
 		strSignature.assign(lpDBRow[3], lpDBLen[3]);
 		ulCompanyId = atoi(lpDBRow[4]);
-
-		lpmapLocalObjIds->insert(make_pair(sExternId, ulLocalId));
+		lpmapLocalObjIds->insert({sExternId, ulLocalId});
 		I_AddUEIdObject(sExternId.id, sExternId.objclass, ulCompanyId, ulLocalId, strSignature);
 		LOG_USERCACHE_DEBUG(" Get user objects result company %d, userid %d, signature '%s'", ulCompanyId, ulLocalId, bin2hex(strSignature).c_str());
 	}
@@ -905,18 +914,13 @@ ECRESULT ECCacheManager::I_DelUserObject(unsigned int ulUserId)
 }
 
 ECRESULT ECCacheManager::I_AddUserObjectDetails(unsigned int ulUserId,
-    const objectdetails_t *details)
+    const objectdetails_t &details)
 {
 	ECsUserObjectDetails sObjectDetails;
 
 	scoped_rlock lock(m_hCacheMutex);
-
-	if (details == NULL)
-		return KCERR_INVALID_PARAMETER;
-
-	LOG_USERCACHE_DEBUG("_Add user details. userid %d, %s", ulUserId, details->ToStr().c_str() );
-
-	sObjectDetails.sDetails = *details;
+	LOG_USERCACHE_DEBUG("_Add user details. userid %d, %s", ulUserId, details.ToStr().c_str());
+	sObjectDetails.sDetails = details;
 	return m_UserObjectDetailsCache.AddCacheItem(ulUserId, sObjectDetails);
 }
 
@@ -1059,8 +1063,7 @@ ECRESULT ECCacheManager::GetACLs(unsigned int ulObjId, struct rightsArray **lppR
 	else
 	    memset(lpRights, 0, sizeof *lpRights);
 
-    SetACLs(ulObjId, lpRights);
-
+	SetACLs(ulObjId, *lpRights);
     *lppRights = lpRights;
 	return erSuccess;
 }
@@ -1099,21 +1102,20 @@ ECRESULT ECCacheManager::I_GetACLs(unsigned int ulObjId, struct rightsArray **lp
 }
 
 ECRESULT ECCacheManager::SetACLs(unsigned int ulObjId,
-    const struct rightsArray *lpRights)
+    const struct rightsArray &lpRights)
 {
     ECsACLs sACLs;
 
 	LOG_USERCACHE_DEBUG("Set ACLs for objectid %d", ulObjId);
-
-    sACLs.ulACLs = lpRights->__size;
-	sACLs.aACL.reset(new ECsACLs::ACL[lpRights->__size]);
-
-    for (gsoap_size_t i = 0; i < lpRights->__size; ++i) {
-        sACLs.aACL[i].ulType = lpRights->__ptr[i].ulType;
-        sACLs.aACL[i].ulMask = lpRights->__ptr[i].ulRights;
-        sACLs.aACL[i].ulUserId = lpRights->__ptr[i].ulUserid;
-
-		LOG_USERCACHE_DEBUG("Set ACLs for objectid %d: userid %d, type %d, permissions %d", ulObjId, lpRights->__ptr[i].ulUserid, lpRights->__ptr[i].ulType, lpRights->__ptr[i].ulRights);
+	sACLs.ulACLs = lpRights.__size;
+	sACLs.aACL.reset(new ECsACLs::ACL[lpRights.__size]);
+	for (gsoap_size_t i = 0; i < lpRights.__size; ++i) {
+		sACLs.aACL[i].ulType   = lpRights.__ptr[i].ulType;
+		sACLs.aACL[i].ulMask   = lpRights.__ptr[i].ulRights;
+		sACLs.aACL[i].ulUserId = lpRights.__ptr[i].ulUserid;
+		LOG_USERCACHE_DEBUG("Set ACLs for objectid %d: userid %d, type %d, permissions %d",
+			ulObjId, lpRights.__ptr[i].ulUserid,
+			lpRights.__ptr[i].ulType, lpRights.__ptr[i].ulRights);
     }
 
 	scoped_rlock lock(m_hCacheMutex);
@@ -1182,8 +1184,6 @@ ECRESULT ECCacheManager::I_DelQuota(unsigned int ulUserId, bool bIsDefaultQuota)
 void ECCacheManager::ForEachCacheItem(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj)
 {
 	ulock_rec l_cache(m_hCacheMutex);
-	m_ObjectsCache.RequestStats(callback, obj);
-	m_StoresCache.RequestStats(callback, obj);
 	m_AclCache.RequestStats(callback, obj);
 	m_QuotaCache.RequestStats(callback, obj);
 	m_QuotaUserDefaultCache.RequestStats( callback, obj);
@@ -1192,6 +1192,14 @@ void ECCacheManager::ForEachCacheItem(void(callback)(const std::string &, const 
 	m_UserObjectDetailsCache.RequestStats(callback, obj);
 	m_ServerDetailsCache.RequestStats(callback, obj);
 	l_cache.unlock();
+
+	ulock_rec l_store(m_hCacheStoreMutex);
+	m_StoresCache.RequestStats(callback, obj);
+	l_store.unlock();
+
+	ulock_rec l_object(m_hCacheObjectMutex);
+	m_ObjectsCache.RequestStats(callback, obj);
+	l_object.unlock();
 
 	ulock_rec l_cell(m_hCacheCellsMutex);
 	m_CellCache.RequestStats(callback, obj);
@@ -1208,8 +1216,6 @@ ECRESULT ECCacheManager::DumpStats()
 	ec_log_info("Dumping cache stats:");
 
 	ulock_rec l_cache(m_hCacheMutex);
-	m_ObjectsCache.DumpStats();
-	m_StoresCache.DumpStats();
 	m_AclCache.DumpStats();
 	m_QuotaCache.DumpStats();
 	m_QuotaUserDefaultCache.DumpStats();
@@ -1218,6 +1224,14 @@ ECRESULT ECCacheManager::DumpStats()
 	m_UserObjectDetailsCache.DumpStats();
 	m_ServerDetailsCache.DumpStats();
 	l_cache.unlock();
+
+	ulock_rec l_object(m_hCacheObjectMutex);
+	m_ObjectsCache.DumpStats();
+	l_object.unlock();
+
+	ulock_rec l_store(m_hCacheStoreMutex);
+	m_StoresCache.DumpStats();
+	l_store.unlock();
 
 	ulock_rec l_cells(m_hCacheCellsMutex);
 	m_CellCache.DumpStats();
@@ -1481,19 +1495,18 @@ ECRESULT ECCacheManager::RemoveIndexData(unsigned int ulPropTag, unsigned int ul
 	return erSuccess;
 }
 
-ECRESULT ECCacheManager::I_AddIndexData(const ECsIndexObject *lpObject,
-    const ECsIndexProp *lpProp)
+ECRESULT ECCacheManager::I_AddIndexData(const ECsIndexObject &lpObject,
+    const ECsIndexProp &lpProp)
 {
 	scoped_rlock lock(m_hCacheIndPropMutex);
 
     // Remove any pre-existing references to this data
-    RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpObject->ulTag), lpObject->ulObjId);
-    RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpProp->ulTag), lpProp->cbData, lpProp->lpData);
-    
-	auto er = m_PropToObjectCache.AddCacheItem(*lpProp, *lpObject);
+	RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpObject.ulTag), lpObject.ulObjId);
+	RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpProp.ulTag), lpProp.cbData, lpProp.lpData);
+	auto er = m_PropToObjectCache.AddCacheItem(lpProp, lpObject);
 	if(er != erSuccess)
 		return er;
-	return m_ObjectToPropCache.AddCacheItem(*lpObject, *lpProp);
+	return m_ObjectToPropCache.AddCacheItem(lpObject, lpProp);
 }
 
 ECRESULT ECCacheManager::GetPropFromObject(unsigned int ulTag, unsigned int ulObjId, struct soap *soap, unsigned int* lpcbData, unsigned char** lppData)
@@ -1524,7 +1537,8 @@ ECRESULT ECCacheManager::GetPropFromObject(unsigned int ulTag, unsigned int ulOb
 			memcpy(*lppData, sObject->lpData, sObject->cbData);
 			
 			// All done
-			goto exit;
+			LOG_CACHE_DEBUG("Get Prop From Object tag=0x%04X, objectid %d, data %s", ulTag, ulObjId, bin2hex(sObject->cbData, sObject->lpData).c_str());
+			return erSuccess;
 		}
 	}
 
@@ -1547,7 +1561,7 @@ ECRESULT ECCacheManager::GetPropFromObject(unsigned int ulTag, unsigned int ulOb
 	}
 
 	sNewObject.SetValue(ulTag, (unsigned char*) lpDBRow[0], (unsigned int) lpDBLenths[0]);
-	er = I_AddIndexData(&sObjectKey, &sNewObject);
+	er = I_AddIndexData(sObjectKey, sNewObject);
 	if(er != erSuccess)
 		goto exit;
 
@@ -1610,7 +1624,7 @@ ECRESULT ECCacheManager::GetObjectFromProp(unsigned int ulTag, unsigned int cbDa
 	sObject.ulTag = ulTag;
 	sObject.cbData = cbData;
 	sObject.lpData = lpData; // Cheap copy, Set this item on NULL before you exit
-	er = I_AddIndexData(&sNewIndexObject, &sObject);
+	er = I_AddIndexData(sNewIndexObject, sObject);
 	if (er != erSuccess)
 		goto exit;
 	*lpulObjId = sNewIndexObject.ulObjId;
@@ -1665,7 +1679,7 @@ ECRESULT ECCacheManager::SetObjectProp(unsigned int ulTag, unsigned int cbData, 
     sObject.ulObjId = ulObjId;
     
     sProp.SetValue(ulTag, lpData, cbData);
-	er = I_AddIndexData(&sObject, &sProp);
+	er = I_AddIndexData(sObject, sProp);
 	LOG_CACHE_DEBUG("Set object prop tag 0x%04X, data %s, objectid %d", ulTag, bin2hex(cbData, lpData).c_str(), ulObjId);
     return er;
 }
@@ -1717,7 +1731,7 @@ ECRESULT ECCacheManager::GetObjectFromEntryId(const entryId *lpEntryId,
 	EntryId eid(lpEntryId);
 	try {
 		eid.setFlags(0);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		ec_log_err("K-1573: eid.setFlags: %s\n", e.what());
 		/*
 		 * The subsequent functions will catch the too-small eid.size
@@ -1738,7 +1752,7 @@ ECRESULT ECCacheManager::SetObjectEntryId(const entryId *lpEntryId,
     EntryId eid(lpEntryId);
 	try {
 		eid.setFlags(0);
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		ec_log_err("K-1574: eid.setFlags: %s\n", e.what());
 		/* ignore exception - the following functions will catch the too-small eid.size */
 	}
@@ -1764,8 +1778,7 @@ ECRESULT ECCacheManager::GetEntryListToObjectList(struct entryList *lpEntryList,
 			bPartialCompletion = true;
 			continue; // Unknown entryid, next item
 		}
-
-		lplObjectList->push_back(ulId);
+		lplObjectList->emplace_back(ulId);
 	}
 
 	if(bPartialCompletion)

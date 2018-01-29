@@ -107,7 +107,7 @@
 		* Returns a structure containing the data:
 		*
 		* type		- type of recurrence: day=10, week=11, month=12, year=13
-		* subtype	- type of day recurrence: 2=monthday (ie 21st day of month), 3=nday'th weekdays (ie. 2nd Tuesday and Wednesday)
+		* subtype	- type of day recurrence: 2=monthday (ie 21st day of month), 3=nday'th weekdays (i.e. 2nd Tuesday and Wednesday)
 		* start	- Unix timestamp of first occurrence
 		* end		- Unix timestamp of last occurrence (up to and including), so when start == end -> occurrences = 1
 		* numoccur     - occurrences (may be very large when there is no end data)
@@ -1293,7 +1293,7 @@
 		 * @param int $week
 		 * @param int $day
 		 * @param int $hour
-		 * @return returns the timestamp of the given date, timezone-independant
+		 * @return returns the timestamp of the given date, timezone independent
 		 */
 		function getDateByYearMonthWeekDayHour($year, $month, $week, $day, $hour)
 		{

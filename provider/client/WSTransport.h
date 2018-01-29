@@ -68,6 +68,8 @@ enum
     NUM_RFT_PROPS
 };
 
+class ECABLogon;
+
 class WSTransport _kc_final : public ECUnknown {
 protected:
 	WSTransport(ULONG ulUIFlags);
@@ -77,8 +79,6 @@ public:
 	static HRESULT Create(ULONG ulUIFlags, WSTransport **lppTransport);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
-
-	static	HRESULT	HrOpenTransport(LPMAPISUP lpMAPISup, WSTransport **lppTransport, BOOL bOffline = FALSE);
 
 	virtual HRESULT HrLogon2(const struct sGlobalProfileProps &);
 	virtual HRESULT HrLogon(const struct sGlobalProfileProps &);
@@ -132,13 +132,12 @@ public:
 
 	// Named properties
 	virtual HRESULT HrGetIDsFromNames(LPMAPINAMEID *lppPropNamesUnresolved, ULONG cUnresolved, ULONG ulFlags, ULONG **lpServerIDs);
-
-	virtual HRESULT HrGetNamesFromIDs(LPSPropTagArray lpsPropTags, LPMAPINAMEID ** lpppNames, ULONG *cResolved);
+	virtual HRESULT HrGetNamesFromIDs(SPropTagArray *tags, MAPINAMEID ***names, ULONG *resolved);
 	
 	// ReceiveFolder
-	virtual HRESULT HrGetReceiveFolder(ULONG cbStoreEntryID, LPENTRYID lpStoreEntryID, const utf8string &strMessageClass, ULONG* lpcbEntryID, LPENTRYID* lppEntryID, utf8string *lpstrExplicitClass);
-	virtual HRESULT HrSetReceiveFolder(ULONG cbStoreEntryID, LPENTRYID lpStoreEntryID, const utf8string &strMessageClass, ULONG cbEntryID, LPENTRYID lpEntryID);
-	virtual HRESULT HrGetReceiveFolderTable(ULONG ulFlags, ULONG cbStoreEntryID, LPENTRYID lpStoreEntryID, LPSRowSet* lppsRowSet);
+	virtual HRESULT HrGetReceiveFolder(ULONG store_eid_size, const ENTRYID *store_eid, const utf8string &cls, ULONG *eid_size, ENTRYID **folder_eid, utf8string *exp_class);
+	virtual HRESULT HrSetReceiveFolder(ULONG store_eid_size, const ENTRYID *store_eid, const utf8string &cls, ULONG eid_size, const ENTRYID *folder_eid);
+	virtual HRESULT HrGetReceiveFolderTable(ULONG flags, ULONG store_eid_size, const ENTRYID *store_eid, SRowSet **);
 
 	// Read / Unread
 	virtual HRESULT HrSetReadFlag(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG ulSyncId);
@@ -148,8 +147,7 @@ public:
 
 	// Outgoing Queue Finished message
 	virtual HRESULT HrFinishedMessage(ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG ulFlags);
-	virtual HRESULT HrAbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID);
-	virtual HRESULT HrIsMessageInQueue(ULONG cbEntryID, LPENTRYID lpEntryID);
+	virtual HRESULT HrAbortSubmit(ULONG eid_size, const ENTRYID *);
 
 	// Get user information
 	virtual HRESULT HrResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
@@ -257,21 +255,10 @@ public:
 	virtual HRESULT HrOpenMiscTable(ULONG ulTableType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableView);
 
 	/* Message locking */
-	virtual HRESULT HrSetLockState(ULONG cbEntryID, LPENTRYID lpEntryID, bool bLocked);
-
-	// License information
-
-	virtual HRESULT HrLicenseAuth(unsigned char *lpData, unsigned int ulSize, unsigned char **lppResponseData, unsigned int *lpulSize);
-
-	virtual HRESULT HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapas, unsigned int *lpulSize);
-	
-	virtual HRESULT HrLicenseUsers(unsigned int ulServiceType, unsigned int *lpulUsers);
+	virtual HRESULT HrSetLockState(ULONG eid_size, const ENTRYID *, bool locked);
 
 	/* expose capabilities */
 	virtual HRESULT HrCheckCapabilityFlags(ULONG ulFlags, BOOL *lpbResult);
-	
-	/* Get flags received on logon */
-	virtual HRESULT GetLicenseFlags(unsigned long long *lpllFlags);
 
 	/* Test protocol */
 	virtual HRESULT HrTestPerform(const char *cmd, unsigned int argc, char **args);
@@ -294,9 +281,6 @@ public:
 	/* notifications */
 	virtual HRESULT HrGetNotify(struct notificationArray **lppsArrayNotifications);
 	virtual HRESULT HrCancelIO();
-	
-	/* Check session and relogon if needed */
-	virtual HRESULT HrEnsureSession();
 
 	virtual HRESULT HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates);
 
@@ -307,7 +291,7 @@ private:
 	virtual HRESULT UnLockSoap();
 
 	//TODO: Move this function to the right file
-	static ECRESULT TrySSOLogon(KCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string strClientAppVersion, const std::string strClientAppMisc);
+	static ECRESULT TrySSOLogon(KCmd *, const char *server, const utf8string &user, const utf8string &imp_user, unsigned int caps, ECSESSIONGROUPID, const char *app_name, ECSESSIONID *, unsigned int *srv_caps, unsigned long long *flags, GUID *srv_guid, const std::string &cl_app_ver, const std::string &cl_app_misc);
 
 	// Returns name of calling application (eg 'program.exe' or 'httpd')
 	std::string GetAppName();

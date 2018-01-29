@@ -74,20 +74,16 @@ static ECPERMISSION RightsToECPermCheap(const struct rights r)
 	return p;
 }
 
-class FindUser {
-public:
-	FindUser(const ECENTRYID &sEntryID): m_sEntryID(sEntryID) {}
-	bool operator()(const ECPERMISSION &sPermission) const {
-		return CompareABEID(m_sEntryID.cb, (LPENTRYID)m_sEntryID.lpb, sPermission.sUserId.cb, (LPENTRYID)sPermission.sUserId.lpb);
-	}
-
-private:
-	const ECENTRYID &m_sEntryID;
-};
-
 ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
     const ECMAPIProp *lpRoot, const char *szClassName) :
-	ECGenericProp(lpProvider, ulObjType, fModify, szClassName)
+	ECGenericProp(lpProvider, ulObjType, fModify, szClassName),
+	/*
+	 * Track "root object". This is the object that was opened via
+	 * OpenEntry or OpenMsgStore, so normally lpRoot == this, but in the
+	 * case of attachments and submessages it points to the top-level
+	 * message.
+	 */
+	m_lpRoot(lpRoot != nullptr ? lpRoot : this)
 {
 	this->HrAddPropHandlers(PR_STORE_ENTRYID,			DefaultMAPIGetProp,		DefaultSetPropComputed, (void*) this);
 	this->HrAddPropHandlers(PR_STORE_RECORD_KEY,		DefaultMAPIGetProp,		DefaultSetPropComputed, (void*) this);
@@ -106,21 +102,6 @@ ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 
 	// ICS system
 	this->HrAddPropHandlers(PR_SOURCE_KEY,		DefaultMAPIGetProp	,SetPropHandler,		(void*) this, FALSE, FALSE);
-
-	// Used for loadsim
-	this->HrAddPropHandlers(0x664B0014/*PR_REPLICA_VERSION*/,		DefaultMAPIGetProp	,DefaultSetPropIgnore,		(void*) this, FALSE, FALSE);
-
-	// Track 'root object'. This is the object that was opened via OpenEntry or OpenMsgStore, so normally
-	// lpRoot == this, but in the case of attachments and submessages it points to the top-level message
-	if(lpRoot)
-		m_lpRoot = lpRoot;
-	else
-		m_lpRoot = this;
-}
-
-ECMAPIProp::~ECMAPIProp()
-{
-	MAPIFreeBuffer(m_lpParentID);
 }
 
 HRESULT ECMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
@@ -168,12 +149,6 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		hr = lpProp->HrGetRealProp(PR_SOURCE_KEY, ulFlags, lpBase, lpsPropValue);
 		if(hr != hrSuccess)
 			return hr;
-		break;
-		
-	case PROP_ID(0x664B0014):
-		// Used for loadsim
-		lpsPropValue->ulPropTag = 0x664B0014;//PR_REPLICA_VERSION;
-		lpsPropValue->Value.li.QuadPart = 1688871835664386LL;
 		break;
 		
 	case PROP_ID(PR_MAPPING_SIGNATURE):
@@ -409,7 +384,7 @@ HRESULT ECMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 	    PROP_TYPE(ulPropTag) != PT_UNICODE)
 		return MAPI_E_NOT_FOUND;
 
-	if (*lpiid == IID_IStream && this->lstProps == NULL &&
+	if (*lpiid == IID_IStream && !this->m_props_loaded &&
 	    PROP_TYPE(ulPropTag) == PT_BINARY && !(ulFlags & MAPI_MODIFY) &&
 	    // Shortcut: don't load entire object if only one property is being requested for read-only. HrLoadProp() will return
 		// without querying the server if the server does not support this capability (introduced in 6.20.8). Main reason is
@@ -562,9 +537,10 @@ HRESULT ECMAPIProp::GetSerializedACLData(LPVOID lpBase, LPSPropValue lpsPropValu
 	soap_begin(&soap);
 	soap.os = &os;
 	soap_serialize_rightsArray(&soap, &rights);
-	soap_begin_send(&soap);
-	soap_put_rightsArray(&soap, &rights, "rights", "rightsArray");
-	soap_end_send(&soap);
+	if (soap_begin_send(&soap) != 0 ||
+	    soap_put_rightsArray(&soap, &rights, "rights", "rightsArray") != 0 ||
+	    soap_end_send(&soap) != 0)
+		return MAPI_E_NETWORK_ERROR;
 
 	strAclData = os.str();
 	lpsPropValue->Value.bin.cb = strAclData.size();
@@ -648,7 +624,12 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 	// But there can also be overlap, where some items are left unchanged, and
 	// other modified.
 	for (ULONG i = 0; i < cPerms; ++i) {
-		ECPERMISSION *lpMatch = std::find_if(lpNewPerms, lpNewPerms + cNewPerms, FindUser(ptrPerms[i].sUserId));
+		auto lpMatch = std::find_if(lpNewPerms, lpNewPerms + cNewPerms,
+			[&](const ECPERMISSION &r) {
+				auto &l = ptrPerms[i].sUserId;
+				return CompareABEID(l.cb, reinterpret_cast<ENTRYID *>(l.lpb),
+				       r.sUserId.cb, reinterpret_cast<ENTRYID *>(r.sUserId.lpb));
+			});
 		if (lpMatch == lpNewPerms + cNewPerms) {
 			// Not in new set, so delete
 			ptrPerms[i].ulState = RIGHT_DELETED;
@@ -676,8 +657,8 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 		--cNewPerms;
 	}
 
-	// Now see if there are still some new ACL's left. If enough spare space is available
-	// we'll reuse the ptrPerms storage. If not we'll reallocate the whole array.
+	// Now see if there are still some new ACLs left. If enough spare space is available,
+	// we will reuse the ptrPerms storage. If not, we will reallocate the whole array.
 	lpPermissions = ptrPerms.get();
 	if (cNewPerms > 0) {
 		if (cNewPerms <= cSparePerms) {
@@ -718,14 +699,16 @@ HRESULT ECMAPIProp::CopyProps(const SPropTagArray *lpIncludeProps,
 }
 
 // Pass call off to lpMsgStore
-HRESULT ECMAPIProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
+HRESULT ECMAPIProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
+    const GUID *lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames,
+    MAPINAMEID ***lpppPropNames)
 {
-	return this->GetMsgStore()->lpNamedProp->GetNamesFromIDs(lppPropTags, lpPropSetGuid, ulFlags, lpcPropNames, lpppPropNames);
+	return GetMsgStore()->lpNamedProp.GetNamesFromIDs(lppPropTags, lpPropSetGuid, ulFlags, lpcPropNames, lpppPropNames);
 }
 
 HRESULT ECMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags)
 {
-	return this->GetMsgStore()->lpNamedProp->GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
+	return GetMsgStore()->lpNamedProp.GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
 }
 
 // Stream functions
@@ -761,6 +744,8 @@ HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 			return hr;
 		// read the data into the buffer
 		hr = lpStream->Read(buffer, (ULONG)sStat.cbSize.QuadPart, &ulSize);
+		/* no point in dealing with an incomplete multibyte sequence */
+		ulSize = ulSize / sizeof(wchar_t) * sizeof(wchar_t);
 	} else{
 		hr = lpStream->QueryInterface(IID_ECMemStream, &~lpECStream);
 		if(hr != hrSuccess)
@@ -863,13 +848,10 @@ HRESULT ECMAPIProp::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
 
 HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
 {
-	HRESULT hr;
-
 	assert(m_lpParentID == NULL);
 	if (lpParentID == NULL || cbParentID == 0)
 		return MAPI_E_INVALID_PARAMETER;
-
-	hr = MAPIAllocateBuffer(cbParentID, (void**)&m_lpParentID);
+	auto hr = MAPIAllocateBuffer(cbParentID, &~m_lpParentID);
 	if (hr != hrSuccess)
 		return hr;
 

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <list>
 #include <memory>
 #include <new>
 #include "kcore.hpp"
@@ -37,7 +38,6 @@
 #include "ECSessionManager.h"
 #include <kopano/stringutil.h>
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -105,25 +105,25 @@ ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 	lplstProps->clear();
 
 	// Add some generated and standard properties
-	lplstProps->push_back(PR_DISPLAY_NAME);
-	lplstProps->push_back(PR_ENTRYID);
-	lplstProps->push_back(PR_DISPLAY_TYPE);
-	lplstProps->push_back(PR_DISPLAY_TYPE_EX);
-	lplstProps->push_back(PR_INSTANCE_KEY);
-	lplstProps->push_back(PR_RECORD_KEY);
-	lplstProps->push_back(PR_OBJECT_TYPE);
-	lplstProps->push_back(PR_AB_PROVIDER_ID);
-	lplstProps->push_back(PR_LAST_MODIFICATION_TIME);
-	lplstProps->push_back(PR_CREATION_TIME);
+	lplstProps->emplace_back(PR_DISPLAY_NAME);
+	lplstProps->emplace_back(PR_ENTRYID);
+	lplstProps->emplace_back(PR_DISPLAY_TYPE);
+	lplstProps->emplace_back(PR_DISPLAY_TYPE_EX);
+	lplstProps->emplace_back(PR_INSTANCE_KEY);
+	lplstProps->emplace_back(PR_RECORD_KEY);
+	lplstProps->emplace_back(PR_OBJECT_TYPE);
+	lplstProps->emplace_back(PR_AB_PROVIDER_ID);
+	lplstProps->emplace_back(PR_LAST_MODIFICATION_TIME);
+	lplstProps->emplace_back(PR_CREATION_TIME);
 
 	if(lpODAB->ulABType == MAPI_ABCONT) {
 	    // Hierarchy table
-    	lplstProps->push_back(PR_CONTAINER_FLAGS);
-    	lplstProps->push_back(PR_DEPTH);
-    	lplstProps->push_back(PR_EMS_AB_CONTAINERID);
+		lplstProps->emplace_back(PR_CONTAINER_FLAGS);
+		lplstProps->emplace_back(PR_DEPTH);
+		lplstProps->emplace_back(PR_EMS_AB_CONTAINERID);
 	} else {
 	    // Contents table
-	    lplstProps->push_back(PR_SMTP_ADDRESS);
+		lplstProps->emplace_back(PR_SMTP_ADDRESS);
 	}
 	return erSuccess;
 }
@@ -136,9 +136,10 @@ ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECLis
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount)
+ECRESULT ECABObjectTable::GetMVRowCount(std::list<unsigned int> &&ids,
+    std::map<unsigned int, unsigned int> &lpulCount)
 {
-	*lpulCount = 0;
+	lpulCount.clear();
 	return erSuccess;
 }
 
@@ -183,8 +184,8 @@ struct filter_objects {
 	}
 };
 
-ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsigned int ulFlags,
-												   list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
@@ -210,8 +211,8 @@ ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsi
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId, unsigned int ulFlags,
-											   list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	ECSecurity *lpSecurity = lpSession->GetSecurity();
@@ -238,8 +239,8 @@ ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId, unsigned
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsigned int ulFlags,
-												 list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	objectid_t objectid;
@@ -252,10 +253,10 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		 * the second is the Global Address Lists container.
 		 */
 		lpObjects.reset(new std::list<localobjectdetails_t>());
-		lpObjects->push_back({KOPANO_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY});
+		lpObjects->emplace_back(KOPANO_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY);
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
 			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_BOOK);
-		lpObjects->push_back({KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST});
+		lpObjects->emplace_back(KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST);
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
 			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_LISTS);
 
@@ -295,8 +296,8 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId, unsigned int ulFlags,
-												  list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
@@ -313,8 +314,8 @@ ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId, unsig
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId, unsigned int ulFlags,
-											  list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
@@ -331,8 +332,8 @@ ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId, unsigned 
 	return erSuccess;
 }
 
-ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId, unsigned int ulFlags,
-											   list<localobjectdetails_t> **lppObjects)
+ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId,
+    unsigned int ulFlags, std::list<localobjectdetails_t> **lppObjects)
 {
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 
@@ -396,7 +397,7 @@ ECRESULT ECABObjectTable::Load()
 		 * that one isn't visible.
 		 */
 		if (!ulObjectId)
-			lpObjects->push_front({ulObjectId, CONTAINER_COMPANY});
+			lpObjects->emplace_front(ulObjectId, CONTAINER_COMPANY);
 	} else if (lpODAB->ulABParentId == KOPANO_UID_GLOBAL_ADDRESS_LISTS && lpODAB->ulABParentType == MAPI_ABCONT) {
 		/*
 		 * Load contents of Global Address Lists
@@ -458,7 +459,7 @@ ECRESULT ECABObjectTable::Load()
 		/* Only add visible items */
 		if (sec->IsUserObjectVisible(obj.ulId) != erSuccess)
 			continue;
-		lstObjects.push_back(obj.ulId);
+		lstObjects.emplace_back(obj.ulId);
 	}
 	return LoadRows(&lstObjects, 0);
 }

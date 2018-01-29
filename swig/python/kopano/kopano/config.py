@@ -1,8 +1,8 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 import os
@@ -66,8 +66,8 @@ Configuration class
 Example::
 
     config = Config({
-        'some_str': Config.String(default='blah'),
-        'number': Config.Integer(),
+        'some_str': Config.string(default='blah'),
+        'number': Config.integer(),
         'filesize': Config.size(), # understands '5MB' etc
     })
 
@@ -77,6 +77,7 @@ Example::
         self.service = service
         self.warnings = []
         self.errors = []
+        self.info = []
         if filename:
             pass
         elif options and getattr(options, 'config_file', None):
@@ -88,33 +89,14 @@ Example::
             for key, val in self.config.items():
                 if 'default' in val.kwargs:
                     self.data[key] = val.kwargs.get('default')
-        for line in open(filename):
-            line = _decode(line.strip())
-            if not line.startswith('#'):
-                pos = line.find('=')
-                if pos != -1:
-                    key = line[:pos].strip()
-                    value = line[pos + 1:].strip()
-                    if self.config is None:
-                        self.data[key] = value
-                    elif key in self.config:
-                        if self.config[key].type_ == 'ignore':
-                            self.data[key] = None
-                            self.warnings.append('%s: config option ignored' % key)
-                        else:
-                            try:
-                                self.data[key] = self.config[key].parse(key, value)
-                            except ConfigError as e:
-                                if service:
-                                    self.errors.append(e.message)
-                                else:
-                                    raise
-                    else:
-                        msg = "%s: unknown config option" % key
-                        if service:
-                            self.warnings.append(msg)
-                        else:
-                            raise ConfigError(msg)
+
+        try:
+            fh = open(filename, "r")
+            self._parse_config(fh)
+        except:
+            msg = "cannot open config file %s running with defaults"
+            self.info.append(msg)
+
         if self.config is not None:
             for key, val in self.config.items():
                 if key not in self.data and val.type_ != 'ignore':
@@ -123,6 +105,37 @@ Example::
                         self.errors.append(msg)
                     else:
                         raise ConfigError(msg)
+
+    def _parse_config(self, fh):
+        for line in fh:
+            line = _decode(line.strip())
+            if line.startswith('#'):
+                continue
+            pos = line.find('=')
+            if pos == -1:
+                continue
+            key = line[:pos].strip()
+            value = line[pos + 1:].strip()
+            if self.config is None:
+                self.data[key] = value
+            elif key in self.config:
+                if self.config[key].type_ == 'ignore':
+                    self.data[key] = None
+                    self.warnings.append('%s: config option ignored' % key)
+                else:
+                    try:
+                        self.data[key] = self.config[key].parse(key, value)
+                    except ConfigError as e:
+                        if service:
+                            self.errors.append(e.message)
+                        else:
+                            raise
+            else:
+                msg = "%s: unknown config option" % key
+                if service:
+                    self.warnings.append(msg)
+                else:
+                    raise ConfigError(msg)
 
     @staticmethod
     def string(**kwargs):

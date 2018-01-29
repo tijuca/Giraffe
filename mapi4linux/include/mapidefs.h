@@ -470,6 +470,7 @@ struct ADRENTRY {
     ULONG           ulReserved1;
     ULONG           cValues;
     LPSPropValue    rgPropVals;
+	inline const SPropValue *cfind(ULONG tag) const;
 };
 typedef struct ADRENTRY *LPADRENTRY;
 
@@ -497,6 +498,8 @@ struct SRow {
     ULONG           ulAdrEntryPad;
     ULONG           cValues;
     LPSPropValue    lpProps;
+	inline SPropValue *find(ULONG tag) const;
+	inline const SPropValue *cfind(ULONG tag) const;
 };
 typedef struct SRow *LPSRow;
 
@@ -667,7 +670,7 @@ typedef struct MAPINAMEID *LPMAPINAMEID;
 /* IUnknown Interface */
 class IUnknown {
 public:
-	virtual ~IUnknown() _kc_impdtor;
+	virtual ~IUnknown() = default;
 	virtual ULONG AddRef() = 0;
 	virtual ULONG Release() = 0;
 	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) = 0;
@@ -683,7 +686,7 @@ class ISequentialStream : public virtual IUnknown {
 };
 IID_OF(ISequentialStream)
 
-class IEnumSTATSTG : public IUnknown {
+class IEnumSTATSTG : public virtual IUnknown {
 	public:
 	virtual HRESULT Next(ULONG celt, STATSTG *rgelt, ULONG *pceltFetched) = 0;
 	virtual HRESULT Skip(ULONG celt) = 0;
@@ -710,7 +713,7 @@ class IStream : public virtual ISequentialStream {
 IID_OF(IStream)
 typedef IStream *LPSTREAM;
 
-class IMalloc : public IUnknown {
+class IMalloc : public virtual IUnknown {
 	public:
 	virtual void *Alloc(ULONG cb) = 0;
 	virtual void *Realloc(void *pv, ULONG cb) = 0;
@@ -721,7 +724,7 @@ class IMalloc : public IUnknown {
 };
 typedef IMalloc *LPMALLOC;
 
-class IStorage : public IUnknown {
+class IStorage : public virtual IUnknown {
 	public:
 	virtual HRESULT CreateStream(const OLECHAR *pwcsName, DWORD grfMode, DWORD reserved1, DWORD reserved2, IStream **ppstm) = 0;
 	virtual HRESULT OpenStream(const OLECHAR *pwcsName, void *reserved1, DWORD grfMode, DWORD reserved2, IStream **ppstm) = 0;
@@ -753,8 +756,7 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems) = 0;
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) = 0;
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) = 0;
-    virtual HRESULT GetNamesFromIDs(LPSPropTagArray* lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG* lpcPropNames,
-				    LPMAPINAMEID** lpppPropNames) = 0;
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) = 0;
     virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID* lppPropNames, ULONG ulFlags, LPSPropTagArray* lppPropTags) = 0;
 };
 IID_OF(IMAPIProp)
@@ -957,20 +959,18 @@ IID_OF(IMAPIAdviseSink)
 
 class IMsgStore : public virtual IMAPIProp {
 public:
-    virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink,
-			   ULONG *lpulConnection) = 0;
+	virtual HRESULT Advise(ULONG eid_size, const ENTRYID *, ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn) = 0;
     virtual HRESULT Unadvise(ULONG ulConnection) = 0;
 	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result) = 0;
 	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **) = 0;
-    virtual HRESULT SetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
-    virtual HRESULT GetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID,
-				     LPTSTR *lppszExplicitClass) = 0;
+	virtual HRESULT SetReceiveFolder(const TCHAR *cls, ULONG flags, ULONG eid_size, const ENTRYID *) = 0;
+	virtual HRESULT GetReceiveFolder(const TCHAR *cls, ULONG flags, ULONG *eid_size, ENTRYID **eid, TCHAR **exp_class) = 0;
     virtual HRESULT GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable) = 0;
     virtual HRESULT StoreLogoff(ULONG *lpulFlags) = 0;
-    virtual HRESULT AbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags) = 0;
+	virtual HRESULT AbortSubmit(ULONG eid_size, const ENTRYID *, ULONG flags) = 0;
     virtual HRESULT GetOutgoingQueue(ULONG ulFlags, LPMAPITABLE *lppTable) = 0;
     virtual HRESULT SetLockState(LPMESSAGE lpMessage,ULONG ulLockState) = 0;
-    virtual HRESULT FinishedMsg(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
+	virtual HRESULT FinishedMsg(ULONG flags, ULONG eid_size, const ENTRYID *) = 0;
     virtual HRESULT NotifyNewMail(LPNOTIFICATION lpNotification) = 0;
 };
 IID_OF(IMsgStore)
@@ -1043,15 +1043,13 @@ public:
     virtual HRESULT CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LPVOID lpDestFolder, ULONG ulUIParam,
 				 LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
-    virtual HRESULT CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, LPCIID lpInterface,
-				 ULONG ulFlags, LPMAPIFOLDER* lppFolder) = 0;
+	virtual HRESULT CreateFolder(ULONG folder_type, const TCHAR *name, const TCHAR *comment, const IID *intf, ULONG flags, IMAPIFolder **) = 0;
     virtual HRESULT CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName,
 			       ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
-    virtual HRESULT DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
+	virtual HRESULT DeleteFolder(ULONG eid_size, const ENTRYID *, ULONG ui_param, IMAPIProgress *, ULONG flags) = 0;
     virtual HRESULT SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
-    virtual HRESULT GetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG* lpulMessageStatus) = 0;
-    virtual HRESULT SetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulNewStatus, ULONG ulNewStatusMask,
-				     ULONG* lpulOldStatus) = 0;
+	virtual HRESULT GetMessageStatus(ULONG eid_size, const ENTRYID *, ULONG flags, ULONG *status) = 0;
+	virtual HRESULT SetMessageStatus(ULONG eid_size, const ENTRYID *, ULONG new_status, ULONG stmask, ULONG *old_status) = 0;
     virtual HRESULT SaveContentsSort(const SSortOrderSet *lpSortCriteria, ULONG ulFlags) = 0;
     virtual HRESULT EmptyFolder(ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
 };
@@ -1476,8 +1474,8 @@ public:
     virtual HRESULT SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRowsSought) = 0;
     virtual HRESULT SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator) = 0;
     virtual HRESULT QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *lpulDenominator) = 0;
-    virtual HRESULT FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags) = 0;
-    virtual HRESULT Restrict(LPSRestriction lpRestriction, ULONG ulFlags) = 0;
+	virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) = 0;
+	virtual HRESULT Restrict(const SRestriction *, ULONG flags) = 0;
     virtual HRESULT CreateBookmark(BOOKMARK* lpbkPosition) = 0;
     virtual HRESULT FreeBookmark(BOOKMARK bkPosition) = 0;
     virtual HRESULT SortTable(const SSortOrderSet *, ULONG flags) = 0;
@@ -1575,7 +1573,7 @@ IID_OF(IProfSect)
  */
 #define MAPI_TOP_LEVEL      ((ULONG) 0x00000001)
 
-class IMAPIProgress : public IUnknown {
+class IMAPIProgress : public virtual IUnknown {
 public:
     virtual HRESULT Progress(ULONG ulValue, ULONG ulCount, ULONG ulTotal) = 0;
     virtual HRESULT GetFlags(ULONG* lpulFlags) = 0;
@@ -1730,7 +1728,7 @@ typedef struct ADRPARM *LPADRPARM;
  */
 #define  MAPI_ENABLED       ((ULONG) 0x00000000)
 #define  MAPI_DISABLED      ((ULONG) 0x00000001)
-class IMAPIControl : public IUnknown {
+class IMAPIControl : public virtual IUnknown {
 public:
     virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR* lppMAPIError) = 0;
     virtual HRESULT Activate(ULONG ulFlags, ULONG ulUIParam) = 0;

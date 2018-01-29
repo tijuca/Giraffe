@@ -33,21 +33,11 @@
 
 using namespace KCHL;
 
-ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")
-{
-	this->lpNotifyClient = lpNotifyClient;
-	
-	if(this->lpNotifyClient)
-		this->lpNotifyClient->AddRef();
-
-	this->ulFlags = ulFlags;
-	this->lpTableOps = NULL;
-	
-	m_ulRowCount = 0;
-	m_ulFlags = 0;
-	m_ulDeferredFlags = 0;
-	m_strName = strName;
-}
+ECMAPITable::ECMAPITable(const std::string &strName, ECNotifyClient *nc,
+    ULONG f) :
+	ECUnknown("IMAPITable"), lpNotifyClient(nc), ulFlags(f),
+	m_strName(strName)
+{}
 
 HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
 {
@@ -87,15 +77,11 @@ ECMAPITable::~ECMAPITable()
 		++iterMapInt;
 		Unadvise(*iterMapIntDel);
 	}
-
-	if(lpNotifyClient)
-		lpNotifyClient->Release();
-
-	if(lpTableOps)
-		lpTableOps->Release();	// closes the table on the server too
+	/* ~WSTableView closes the table on the server too */
 }
 
-HRESULT ECMAPITable::Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
+HRESULT ECMAPITable::Create(const std::string &strName,
+    ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
 {
 	return alloc_wrap<ECMAPITable>(strName, lpNotifyClient, ulFlags)
 	       .put(lppECMAPITable);
@@ -137,7 +123,7 @@ HRESULT ECMAPITable::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, UL
 
 	// We lock the connection list separately
 	scoped_rlock l_conn(m_hMutexConnectionList);
-	m_ulConnectionList.insert(*lpulConnection);
+	m_ulConnectionList.emplace(*lpulConnection);
 	return hrSuccess;
 }
 
@@ -258,7 +244,8 @@ HRESULT ECMAPITable::QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *
 	return hr;
 }
 
-HRESULT ECMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags)
+HRESULT ECMAPITable::FindRow(const SRestriction *lpRestriction,
+    BOOKMARK bkOrigin, ULONG ulFlags)
 {
 	if (lpRestriction == NULL)
 		return MAPI_E_INVALID_PARAMETER;
@@ -270,7 +257,7 @@ HRESULT ECMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, UL
 	return this->lpTableOps->HrFindRow(lpRestriction, bkOrigin, ulFlags);
 }
 
-HRESULT ECMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags)
+HRESULT ECMAPITable::Restrict(const SRestriction *lpRestriction, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 
@@ -428,13 +415,11 @@ HRESULT ECMAPITable::SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBY
 	return hr;
 }
 
-HRESULT ECMAPITable::HrSetTableOps(WSTableView *lpTableOps, bool fLoad)
+HRESULT ECMAPITable::HrSetTableOps(WSTableView *ops, bool fLoad)
 {
 	HRESULT hr;
 
-	this->lpTableOps = lpTableOps;
-	lpTableOps->AddRef();
-
+	lpTableOps.reset(ops);
 	// Open the table on the server, ready for reading ..
 	if(fLoad) {
 		hr = lpTableOps->HrOpenTable();

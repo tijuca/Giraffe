@@ -129,7 +129,7 @@ class IECExportChanges : public IExchangeExportChanges {
 	virtual HRESULT SetLogger(ECLogger *lpLogger) = 0;
 };
 
-class IECImportAddressbookChanges : public IUnknown {
+class IECImportAddressbookChanges : public virtual IUnknown {
 	public:
 	virtual HRESULT GetLastError(HRESULT hr, ULONG ulFlags, LPMAPIERROR *lppMAPIError) = 0;
 	virtual HRESULT Config(LPSTREAM lpState, ULONG ulFlags) = 0;
@@ -147,13 +147,6 @@ class IECImportContentsChanges : public IExchangeImportContentsChanges {
 class IECImportHierarchyChanges : public IExchangeImportHierarchyChanges {
 	public:
 	virtual HRESULT ImportFolderChangeEx(ULONG cValues, LPSPropValue lpPropArray, BOOL fNew) = 0;
-};
-
-class IECLicense : public virtual IUnknown {
-	public:
-	virtual HRESULT LicenseAuth(unsigned char *lpData, unsigned int ulSize, unsigned char **lpAuthResponse, unsigned int *lpulResponseSize) = 0;
-	virtual HRESULT LicenseCapa(unsigned int ulServiceType, char ***lppszCapabilities, unsigned int *lpulCapabilities) = 0;
-	virtual HRESULT LicenseUsers(unsigned int ulServiceType, unsigned int *ulUsers) = 0;
 };
 
 class IECMultiStoreTable : public virtual IUnknown {
@@ -239,9 +232,6 @@ class IECServiceAdmin : public virtual IUnknown {
 	/* Multiserver functions */
 	virtual HRESULT GetServerDetails(ECSVRNAMELIST *lpServerNameList, ULONG ulFlags, ECSERVERLIST **lppsServerList) = 0;
 	virtual HRESULT ResolvePseudoUrl(const char *url, char **path, bool *ispeer) = 0;
-
-	/* Public store function(s) */
-	virtual HRESULT GetPublicStoreEntryID(ULONG ulFlags, ULONG *lpcbStoreID, LPENTRYID *lppStoreID) = 0;
 
 	/* Archive store function(s) */
 	virtual HRESULT GetArchiveStoreEntryID(LPCTSTR lpszUserName, LPCTSTR lpszServerName, ULONG ulFlags, ULONG *lpcbStoreID, LPENTRYID *lppStoreID) = 0;

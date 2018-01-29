@@ -47,7 +47,7 @@ namespace KC {
  * Extra attributes, such as email addresses, are stored in the objectproperty
  * tables, which are always present. It's exactly the same as the DBUserPlugin.
  */
-class UnixUserPlugin: public DBPlugin {
+class UnixUserPlugin final : public DBPlugin {
 public:
     /**
 	 * @param[in]	pluginlock
@@ -58,7 +58,6 @@ public:
 	 * @throw notsupported When multi-server or multi-company support is enabled.
 	 */
 	UnixUserPlugin(std::mutex &, ECPluginSharedData *lpSharedData);
-	virtual ~UnixUserPlugin();
 
     /**
 	 * Initialize plugin
@@ -81,7 +80,7 @@ public:
 	 * @throw objectnotfound When no object was found.
 	 * @throw runtime_error When an unsupported objectclass was requested.
 	 */
-	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company);
+	virtual objectsignature_t resolveName(objectclass_t objclass, const std::string &name, const objectid_t &company);
 
     /**
 	 * Authenticate user with username and password
@@ -97,7 +96,7 @@ public:
 	 * @throw objectnotfound When no user with the given name exists.
 	 * @throw login_error When the wrong password is provied or the user is nonactive.
 	 */
-	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company);
+	virtual objectsignature_t authenticateUser(const std::string &username, const std::string &password, const objectid_t &company);
 
     /**
 	 * Request a list of objects for a particular company and specified objectclass.
@@ -111,7 +110,7 @@ public:
 	 * @return The list of object signatures of all objects which were found
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
+	virtual signatures_t getAllObjects(const objectid_t &company, objectclass_t) override;
 
 	/**
 	 * Obtain the object details for the given object
@@ -124,7 +123,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
+	virtual objectdetails_t getObjectDetails(const objectid_t &) override;
 
     /**
 	 * Obtain the object details for the given objects
@@ -137,7 +136,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<std::map<objectid_t, objectdetails_t> > getObjectDetails(const std::list<objectid_t> &objectids);
+	virtual std::map<objectid_t, objectdetails_t> getObjectDetails(const std::list<objectid_t> &objectids) override;
 
     /**
 	 * Get all children for a parent for a given relation type.
@@ -153,7 +152,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
+	virtual signatures_t getSubObjectsForObject(userobject_relation_t, const objectid_t &parentobject) override;
 
     /**
 	 * Request all parents for a childobject for a given relation type.
@@ -169,7 +168,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
+	virtual signatures_t getParentObjectsForObject(userobject_relation_t, const objectid_t &childobject) override;
 
 	/**
 	 * Search for all objects which match the given string,
@@ -186,7 +185,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw objectnotfound When no object was found
 	 */
-	virtual std::unique_ptr<signatures_t> searchObject(const std::string &match, unsigned int ulFlags);
+	virtual signatures_t searchObject(const std::string &match, unsigned int flags) override;
 
     /**
 	 * Obtain details for the public store
@@ -196,7 +195,7 @@ public:
 	 * @return The public store details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual std::unique_ptr<objectdetails_t> getPublicStoreDetails(void);
+	virtual objectdetails_t getPublicStoreDetails() override;
 
 	/**
 	 * Obtain the objectdetails for a server
@@ -208,7 +207,7 @@ public:
 	 * @return The server details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual std::unique_ptr<serverdetails_t> getServerDetails(const std::string &server);
+	virtual serverdetails_t getServerDetails(const std::string &server) override;
 	
 	/**
 	 * Obtain server list
@@ -216,7 +215,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual std::unique_ptr<serverlist_t> getServers(void);
+	virtual serverlist_t getServers() override;
 
 	/**
 	 * Create object in plugin
@@ -311,7 +310,7 @@ public:
 										 const objectid_t &parentobject, const objectid_t &childobject);
 
 private:
-	ECIConv *m_iconv = nullptr;
+	std::unique_ptr<ECIConv> m_iconv;
 
 	/**
 	 * Find a user with specific name
@@ -324,7 +323,7 @@ private:
 	 *					A buffer which will contain the strings for pwd
 	 * @throw objectnotfound If no user was found.
 	 */
-	void findUserID(const string &id, struct passwd *pwd, char *buffer);
+	void findUserID(const std::string &id, struct passwd *pwd, char *buffer);
 
 	/**
 	 * Find a user with specific name
@@ -337,7 +336,7 @@ private:
 	 *					A buffer which will contain the strings for pwd
 	 * @throw objectnotfound If no user was found.
 	 */
-	void findUser(const string &name, struct passwd *pwd, char *buffer);
+	void findUser(const std::string &name, struct passwd *pwd, char *buffer);
 
 	/**
 	 * Find a group with specific ID
@@ -350,7 +349,7 @@ private:
 	 *					A buffer which will contain the strings for grp
 	 * @throw objectnotfound If no group was found.
 	 */
-	void findGroupID(const string &id, struct group *grp, char *buffer);
+	void findGroupID(const std::string &id, struct group *grp, char *buffer);
 
 	/**
 	 * Find a group with specific name
@@ -363,7 +362,7 @@ private:
 	 *					A buffer which will contain the strings for grp
 	 * @throw objectnotfound If no group was found.
 	 */
-	void findGroup(const string &name, struct group *grp, char *buffer);
+	void findGroup(const std::string &name, struct group *grp, char *buffer);
 
 	/**
 	 * Resolve user name to objectsignature
@@ -375,7 +374,7 @@ private:
 	 * @return The objectsignature of the resolved object
 	 * @throw std::exception
 	 */
-	objectsignature_t resolveUserName(const string &name);
+	objectsignature_t resolveUserName(const std::string &name);
 
 	/**
 	 * Resolve group name to objectsignature
@@ -387,7 +386,7 @@ private:
 	 * @return The objectsignature of the resolved object
 	 * @throw std::exception
 	 */
-	objectsignature_t resolveGroupName(const string &name);
+	objectsignature_t resolveGroupName(const std::string &name);
 
 	/**
 	 * Match a user with given search query
@@ -401,7 +400,7 @@ private:
 	 *					email address otherwise a partial match is allowed.
 	 * @return True if the user matches the query
 	 */
-	bool matchUserObject(struct passwd *pw, const string &match, unsigned int ulFlags);
+	bool matchUserObject(struct passwd *pw, const std::string &match, unsigned int ulFlags);
 
 	/**
 	 * Match a group with given search query
@@ -415,7 +414,7 @@ private:
 	 *					email address otherwise a partial match is allowed.
 	 * @return True if the group matches the query
 	 */
-	bool matchGroupObject(struct group *gr, const string &match, unsigned int ulFlags);
+	bool matchGroupObject(struct group *gr, const std::string &match, unsigned int ulFlags);
 
 	/**
 	 * Create a list containing all users which optionally match the search term.
@@ -427,7 +426,7 @@ private:
 	 *					match the name or email address otherwise a partial match is allowed.
 	 * @return List of objectsignatures
 	 */
-	std::unique_ptr<signatures_t> getAllUserObjects(const std::string &match = std::string(), unsigned int ulFlags = 0);
+	signatures_t getAllUserObjects(const std::string &match = std::string(), unsigned int flags = 0);
 
 	/**
 	 * Create a list containing all groups which optionally match the search term.
@@ -439,7 +438,7 @@ private:
 	 *					match the name or email address otherwise a partial match is allowed.
 	 * @return List of objectsignatures
 	 */
-	std::unique_ptr<signatures_t> getAllGroupObjects(const std::string &match = std::string(), unsigned int ulFlags = 0);
+	signatures_t getAllGroupObjects(const std::string &match = std::string(), unsigned int flags = 0);
 
 	/**
 	 * Copy object details from struct passwd to objectdetails
@@ -448,7 +447,7 @@ private:
 	 *					Pointer to struct pw from which the details must be collected
 	 * @return The objectdetails which were collected from pw
 	 */
-	std::unique_ptr<objectdetails_t> objectdetailsFromPwent(struct passwd *pw); // PAM part
+	objectdetails_t objectdetailsFromPwent(const struct passwd *); // PAM part
 
 	/**
 	 * Copy object details from struct group to objectdetails
@@ -457,7 +456,7 @@ private:
 	 *					Pointer to struct group from which the details must be collected
 	 * @return The objectdetails which were collected from gr
 	 */
-	std::unique_ptr<objectdetails_t> objectdetailsFromGrent(struct group *gr);
+	objectdetails_t objectdetailsFromGrent(const struct group *);
 
 	/**
 	 * Query the Database to obtain the signature for the objectid.

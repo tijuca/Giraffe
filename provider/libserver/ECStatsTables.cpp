@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
 #include <memory>
 #include <new>
 #include <kopano/tie.hpp>
@@ -115,7 +116,6 @@ ECRESULT ECSystemStatsTable::Load()
 	double dblAge = 0;
 	unsigned int ulThreads = 0;
 	unsigned int ulIdleThreads = 0;
-	unsigned int ulLicensedUsers = 0;
 	usercount_t userCount;
 
 	id = 0;
@@ -132,22 +132,13 @@ ECRESULT ECSystemStatsTable::Load()
 	GetStatsCollectorData("queueage", "Age of the front queue item", stringify_double(dblAge,3), this);
 	GetStatsCollectorData("threads", "Number of threads running to process items", stringify(ulThreads), this);
 	GetStatsCollectorData("threads_idle", "Number of idle threads", stringify(ulIdleThreads), this);
-
-	sesmgr->GetLicensedUsers(0 /*SERVICE_TYPE_ZCP*/, &ulLicensedUsers);
 	lpSession->GetUserManagement()->GetCachedUserCount(&userCount);
-
-	GetStatsCollectorData("usercnt_licensed", "Number of allowed users", stringify(ulLicensedUsers), this);
 	GetStatsCollectorData("usercnt_active", "Number of active users", stringify(userCount[usercount_t::ucActiveUser]), this);
 	GetStatsCollectorData("usercnt_nonactive", "Number of total non-active objects", stringify(userCount[usercount_t::ucNonActiveTotal]), this);
 	GetStatsCollectorData("usercnt_na_user", "Number of non-active users", stringify(userCount[usercount_t::ucNonActiveUser]), this);
 	GetStatsCollectorData("usercnt_room", "Number of rooms", stringify(userCount[usercount_t::ucRoom]), this);
 	GetStatsCollectorData("usercnt_equipment", "Number of equipment", stringify(userCount[usercount_t::ucEquipment]), this);
 	GetStatsCollectorData("usercnt_contact", "Number of contacts", stringify(userCount[usercount_t::ucContact]), this);
-
-	// @todo report licensed archived users and current archieved users
-	//sesmgr->GetLicensedUsers(1/*SERVICE_TYPE_ARCHIVE*/, &ulLicensedArchivedUsers);
-	//GetStatsCollectorData("??????????", "Number of allowed archive users", stringify(ulLicensedArchivedUsers), this);
-
 	load_tcmalloc();
 #ifdef HAVE_MALLINFO
 	/* parallel threaded allocator */
@@ -337,7 +328,7 @@ void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 			
 		clock_gettime(clock, &now);
 		sd.dblUser += timespec2dbl(now) - timespec2dbl(bs.threadstart);
-		sd.dblReal += GetTimeOfDay() - bs.start;
+		sd.dblReal += dur2dbl(decltype(bs.start)::clock::now() - bs.start);
 	}
 	lpThis->m_mapSessionData[lpThis->id] = sd;
 	++lpThis->id;
@@ -592,7 +583,7 @@ ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 		// we only return users present on this server
 		if (bDistrib && obj.GetPropString(OB_PROP_S_SERVERNAME).compare(server) != 0)
 			continue;
-		lstObjId.push_back(obj.ulId);
+		lstObjId.emplace_back(obj.ulId);
 	}
 
 	UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, false);
@@ -1003,7 +994,7 @@ ECRESULT ECServerStatsTable::Load()
 		
 	// Assign an ID to each server which is usable from QueryRowData
 	for (const auto &srv : servers) {
-		m_mapServers.insert(std::make_pair(i, srv));
+		m_mapServers.emplace(i, srv);
 		// For each server, add a row in the table
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
 		++i;

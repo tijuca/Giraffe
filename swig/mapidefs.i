@@ -127,8 +127,7 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *OUTPUT /*lppProblems*/) = 0;
 	virtual HRESULT CopyTo(ULONG cInterfaces, LPCIID lpInterfaces, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, IMAPIProgress *lpProgress, LPCIID lpInterface, void *lpDestObj, ULONG ulFlags, LPSPropProblemArray *OUTPUT /*lppProblems*/) = 0;
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, IMAPIProgress *lpProgress, LPCIID lpInterface, void *lpDestObj, ULONG ulFlags, LPSPropProblemArray *OUTPUT /*lppProblems*/) = 0;
-    virtual HRESULT GetNamesFromIDs(LPSPropTagArray* lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG* OUTPUTC,
-				    LPMAPINAMEID** OUTPUTP /*lpppPropNames*/) = 0;
+	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *lppPropTags, const GUID *lpPropSetGuid, ULONG ulFlags, ULONG *OUTPUTC, LPMAPINAMEID **OUTPUTP /*lpppPropNames*/) = 0;
     virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID* lppPropNames, ULONG ulFlags, LPSPropTagArray* OUTPUT /*lppPropTags*/) = 0;
 	%extend {
 		~IMAPIProp() { self->Release(); }
@@ -329,8 +328,7 @@ public:
     //    virtual ~IMAPIFolder() = 0;
 
     virtual HRESULT CreateMessage(LPCIID lpInterface, ULONG ulFlags, IMessage ** OUTPUT /*lppMessage*/) = 0;
-    virtual HRESULT CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, IUnknown *lpDestFolder, ULONG ulUIParam,
-				 IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
+	virtual HRESULT CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, void *lpDestFolder, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, LPCIID lpInterface,
 				 ULONG ulFlags, IMAPIFolder** OUTPUT /*lppFolder*/) = 0;
@@ -616,8 +614,8 @@ public:
     virtual HRESULT SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG* OUTPUT /*lplRowsSought*/) = 0;
     virtual HRESULT SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator) = 0;
     virtual HRESULT QueryPosition(ULONG *lpulRow, ULONG* OUTPUT1 /*lpulNumerator*/, ULONG* OUTPUT2 /*lpulDenominator*/) = 0;
-    virtual HRESULT FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags) = 0;
-    virtual HRESULT Restrict(LPSRestriction lpRestriction, ULONG ulFlags) = 0;
+	virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) = 0;
+	virtual HRESULT Restrict(const SRestriction *, ULONG flags) = 0;
     virtual HRESULT CreateBookmark(BOOKMARK* OUTPUT /*lpbkPosition*/) = 0;
     virtual HRESULT FreeBookmark(BOOKMARK bkPosition) = 0;
     virtual HRESULT SortTable(const SSortOrderSet *c, ULONG flags) = 0;

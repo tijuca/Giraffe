@@ -84,19 +84,7 @@ ECExchangeModifyTable::ECExchangeModifyTable(ULONG ulUniqueTag,
     ULONG ulFlags) :
 	m_ulUniqueId(ulStartUniqueId), m_ulUniqueTag(ulUniqueTag),
 	m_ulFlags(ulFlags), m_lpParent(lpParent), m_ecTable(table)
-{
-	m_ecTable->AddRef();
-	if (m_lpParent != nullptr)
-		m_lpParent->AddRef();
-}
-
-ECExchangeModifyTable::~ECExchangeModifyTable() {
-	if (m_ecTable)
-		m_ecTable->Release();
-
-	if(m_lpParent)
-		m_lpParent->Release();
-}
+{}
 
 HRESULT ECExchangeModifyTable::CreateACLTable(ECMAPIProp *lpParent,
     ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj)
@@ -396,10 +384,9 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 		else if (lpulStatus[i] == ECROW_MODIFIED)
 			lpECPermissions[cECPerm].ulState |= RIGHT_MODIFY;
 
-		auto lpMemberID = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_ID);
-		auto lpMemberEntryID = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_ENTRYID);
-		auto lpMemberRights = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MEMBER_RIGHTS);
-
+		auto lpMemberID = lpRowSet[i].cfind(PR_MEMBER_ID);
+		auto lpMemberEntryID = lpRowSet[i].cfind(PR_MEMBER_ENTRYID);
+		auto lpMemberRights = lpRowSet[i].cfind(PR_MEMBER_RIGHTS);
 		if (lpMemberID == NULL || lpMemberRights == NULL || (lpMemberID->Value.ul != 0 && lpMemberEntryID == NULL))
 			continue;
 
@@ -476,9 +463,10 @@ HRESULT	ECExchangeModifyTable::HrSerializeTable(ECMemTable *lpTable, char **lppS
 	soap_begin(&soap);
 	soap.os = &os;
 	soap_serialize_rowSet(&soap, lpSOAPRowSet);
-	soap_begin_send(&soap);
-	soap_put_rowSet(&soap, lpSOAPRowSet,"tableData","rowSet");
-	soap_end_send(&soap);
+	if (soap_begin_send(&soap) != 0 ||
+	    soap_put_rowSet(&soap, lpSOAPRowSet, "tableData", "rowSet") != 0 ||
+	    soap_end_send(&soap) != 0)
+		return MAPI_E_NETWORK_ERROR;
 
 	// os now contains XML for row data
 	szXML = new char [ os.str().size()+1 ];
@@ -520,7 +508,10 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 		hr = MAPI_E_CORRUPT_DATA;
 		goto exit;
 	}
-	soap_end_recv(&soap); 
+	if (soap_end_recv(&soap) != 0) {
+		hr = MAPI_E_NETWORK_FAILURE;
+		goto exit;
+	}
 	hr = CopySOAPRowSetToMAPIRowSet(NULL, &sSOAPRowSet, &~lpsRowSet, 0);
 	if(hr != hrSuccess)
 		goto exit;
@@ -532,7 +523,7 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 		//       Information placed in the HighPart of this PT_I8 is lost!
 		sRowId.ulPropTag = PR_RULE_ID;
 		sRowId.Value.li.QuadPart = ulHighestRuleID++;
-		hr = Util::HrAddToPropertyArray(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, &sRowId, &~lpProps, &cValues);
+		hr = Util::HrAddToPropertyArray(lpsRowSet[i].lpProps, lpsRowSet[i].cValues, &sRowId, &~lpProps, &cValues);
 		if(hr != hrSuccess)
 			goto exit;
 

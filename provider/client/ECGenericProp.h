@@ -19,11 +19,13 @@
 #define ECGENERICPROP_H
 
 #include <kopano/zcdefs.h>
+#include <memory>
 #include <mutex>
 #include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 #include "ECPropertyEntry.h"
 #include <kopano/IECInterfaces.hpp>
+#include <kopano/memory.hpp>
 #include <list>
 #include <map>
 #include <set>
@@ -55,7 +57,7 @@ class ECGenericProp :
     public ECUnknown, public virtual IMAPIProp, public IECSingleInstance {
 protected:
 	ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName = NULL);
-	virtual ~ECGenericProp();
+	virtual ~ECGenericProp() = default;
 
 public:
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
@@ -63,7 +65,6 @@ public:
 	HRESULT SetProvider(void* lpProvider);
 	HRESULT SetEntryId(ULONG eid_size, const ENTRYID *eid);
 	static HRESULT		DefaultGetPropGetReal(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);	
-	static HRESULT		DefaultGetPropNotFound(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
 	static HRESULT DefaultSetPropComputed(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 	static HRESULT DefaultSetPropIgnore(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 	static HRESULT DefaultSetPropSetReal(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
@@ -121,11 +122,11 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames);
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags);
 
 protected:
-	ECPropertyEntryMap *lstProps = nullptr;
+	ECPropertyEntryMap lstProps;
 	std::set<ULONG>			m_setDeletedProps;
 	ECPropCallBackMap		lstCallBack;
 	DWORD dwLastError = hrSuccess;
@@ -137,15 +138,16 @@ protected:
 	void*					lpProvider;
 	BOOL isTransactedObject = true; // only ECMsgStore and ECMAPIFolder are not transacted
 	ULONG m_ulMaxPropSize = 8192;
+	bool m_props_loaded = false;
 
 public:
 	// Current entryid of object
 	ULONG m_cbEntryId = 0;
-	ENTRYID *m_lpEntryId = nullptr;
-	MAPIOBJECT *m_sMapiObject = nullptr;
 	std::recursive_mutex m_hMutexMAPIObject; /* Mutex for locking the MAPIObject */
 	BOOL m_bReload = false, m_bLoading = false;
-	IECPropStorage *lpStorage = nullptr;
+	KCHL::memory_ptr<ENTRYID> m_lpEntryId;
+	KCHL::object_ptr<IECPropStorage> lpStorage;
+	std::unique_ptr<MAPIOBJECT> m_sMapiObject;
 };
 
 

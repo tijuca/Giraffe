@@ -145,9 +145,7 @@ public:
 			 LPENTRYID* OUTPUT /*lppEntryID*/) = 0;
 	virtual HRESULT NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, LPENTRYID lpEIDContainer, ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl, ULONG *OUTPUT /*lpcbEIDNewEntry*/, LPENTRYID *OUTPUT /*lppEIDNewEntry*/) = 0;
 	virtual HRESULT ResolveName(ULONG_PTR ulUIParam, ULONG ulFlags, LPTSTR lpszNewEntryTitle, LPADRLIST INOUT /*lpAdrList*/) = 0;
-	virtual HRESULT Address(ULONG_PTR *lpulUIParam, LPADRPARM lpAdrParms, LPADRLIST *OUTPUT /*lppAdrList*/) = 0;
     virtual HRESULT Details(ULONG* lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID, LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText, ULONG ulFlags) = 0;
-	virtual HRESULT RecipOptions(ULONG_PTR ulUIParam, ULONG ulFlags, LPADRENTRY lpRecip) = 0;
     virtual HRESULT QueryDefaultRecipOpt(LPTSTR lpszAdrType, ULONG ulFlags, ULONG* OUTPUT /*lpcValues*/, LPSPropValue* OUTPUT /*lppOptions*/) = 0;
     virtual HRESULT GetPAB(ULONG* OUTPUT /*lpcbEntryID*/, LPENTRYID* OUTPUT /*lppEntryID*/) = 0;
     virtual HRESULT SetPAB(ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
@@ -224,3 +222,26 @@ public:
 	}
 };
 
+/* kc_session_save/kc_session_restore */
+%typemap(in,numinputs=0) (std::string &serout) (std::string temp) {
+        $1 = &temp;
+}
+
+%typemap(argout,numinputs=0) (std::string &serout) {
+        %append_output(PyBytes_FromStringAndSize($1->c_str(), $1->length()));
+}
+
+%typemap(in) (const std::string &a) (std::string temp, char *buf=NULL, Py_ssize_t size)
+{
+    if(PyBytes_AsStringAndSize($input, &buf, &size) == -1)
+        %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
+
+    temp = std::string(buf, size);
+    $1 = &temp;
+}
+
+%typemap(freearg) (const std::string &a) {
+}
+
+HRESULT kc_session_save(IMAPISession *ses, std::string &serout);
+HRESULT kc_session_restore(const std::string &a, IMAPISession **s);

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <string>
 #include <utility>
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -40,8 +41,6 @@
 #include <kopano/mapiext.h>
 
 #define _(string) dcgettext("kopano", string, LC_MESSAGES)
-
-using namespace std;
 
 namespace KC {
 
@@ -88,7 +87,7 @@ ECRESULT ECGenProps::GetPropSubquery(unsigned int ulPropTagRequested, std::strin
 	switch(ulPropTagRequested) {
 	case PR_PARENT_DISPLAY_W:
 	case PR_PARENT_DISPLAY_A:
-		subquery = "SELECT properties.val_string FROM properties JOIN hierarchy as subquery ON properties.hierarchyid=subquery.parent WHERE subquery.id=hierarchy.id AND properties.tag=0x3001"; // PR_DISPLAY_NAME of parent
+		subquery = "SELECT properties.val_string FROM properties JOIN hierarchy as subquery ON properties.hierarchyid=subquery.parent WHERE subquery.id=hierarchy.id AND properties.tag=12289"; // PR_DISPLAY_NAME of parent
 		return erSuccess;
     case PR_EC_OUTGOING_FLAGS:
         subquery = "SELECT outgoingqueue.flags FROM outgoingqueue where outgoingqueue.hierarchy_id = hierarchy.id and outgoingqueue.flags & 1 = 1";
@@ -275,7 +274,7 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 			return erSuccess;
 		if (lpszColon - lpPropVal->Value.lpszA <= 1 || lpszColon - lpPropVal->Value.lpszA >= 4)
 			return erSuccess;
-		char *c = lpPropVal->Value.lpszA;
+		const char *c = lpPropVal->Value.lpszA;
 		while (c < lpszColon && isdigit(*c))
 			++c; // test for all digits prefix
 		if (c == lpszColon)
@@ -602,8 +601,6 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 			case MAPI_MESSAGE:
 				sPropVal.Value.ul = MAPI_ACCESS_READ | MAPI_ACCESS_MODIFY | MAPI_ACCESS_DELETE;
 				break;
-			case MAPI_ATTACH:
-			case MAPI_STORE:
 			default:
 				er = KCERR_NOT_FOUND;
 				goto exit;
@@ -647,8 +644,6 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 			if ((ulRights & ecRightsDeleteAny) == ecRightsDeleteAny || (bOwner == true && (ulRights & ecRightsDeleteOwned) == ecRightsDeleteOwned))
 				sPropVal.Value.ul |= MAPI_ACCESS_DELETE;
 			break;
-		case MAPI_ATTACH:
-		case MAPI_STORE:
 		default:
 			er = KCERR_NOT_FOUND;
 			goto exit;
@@ -759,8 +754,7 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 	unsigned int	    ulCompanyId = 0;
 	struct propValArray sPropValArray{__gszeroinit};
 	struct propTagArray sPropTagArray{__gszeroinit};
-
-	string				strFormat;
+	std::string strFormat;
 	char*				lpStoreName = NULL;
 
 	auto sec = lpSession->GetSecurity();
@@ -789,10 +783,9 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
             goto exit;
         }
 
-        strFormat = string(lpSession->GetSessionManager()->GetConfig()->GetSetting("storename_format"));
-
+        strFormat = lpSession->GetSessionManager()->GetConfig()->GetSetting("storename_format");
         for (gsoap_size_t i = 0; i < sPropValArray.__size; ++i) {
-            string sub;
+			std::string sub;
             size_t pos = 0;
 
             switch (sPropValArray.__ptr[i].ulPropTag) {
@@ -811,15 +804,14 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 
             if (sub.empty())
                 continue;
-
-            while ((pos = strFormat.find(sub, pos)) != string::npos)
+			while ((pos = strFormat.find(sub, pos)) != std::string::npos)
                 strFormat.replace(pos, sub.size(), sPropValArray.__ptr[i].Value.lpszA);
         }
 
 		if (ulStoreType == ECSTORE_TYPE_PRIVATE)
-			strFormat = string(_("Inbox")) + " - " + strFormat;
+			strFormat = std::string(_("Inbox")) + " - " + strFormat;
 		else if (ulStoreType == ECSTORE_TYPE_ARCHIVE)
-			strFormat = string(_("Archive")) + " - " + strFormat;
+			strFormat = std::string(_("Archive")) + " - " + strFormat;
 		else
 			assert(false);
     }

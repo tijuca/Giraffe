@@ -18,6 +18,9 @@
 #include <kopano/platform.h>
 
 #include <iostream>
+#include <list>
+#include <set>
+#include <string>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -58,8 +61,13 @@
 
 #include <kopano/MAPIErrors.h> // for declaration of GetMAPIErrorMessage()
 
-using namespace std;
 using namespace KCHL;
+using std::cerr;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::string;
+using std::wstring;
 
 static int forcedExitCode = 0;
 
@@ -138,6 +146,12 @@ enum {
 	OPT_RESET_FOLDER_COUNT,
 	OPT_VERBOSITY,
 	OPT_VERSION,
+	OPT_LIST_USERS,
+	OPT_LIST_GROUPS,
+	OPT_PASSWORD,
+	OPT_PASSWORD_PROMPT,
+	OPT_FULLNAME,
+	OPT_EMAIL,
 };
 
 static const struct option long_options[] = {
@@ -199,6 +213,12 @@ static const struct option long_options[] = {
 	{ "reset-folder-count", 1, NULL, OPT_RESET_FOLDER_COUNT },
 	{ "verbose", required_argument, NULL, OPT_VERBOSITY },
 	{ "version", no_argument, NULL, OPT_VERSION },
+	{"list-users", no_argument, nullptr, OPT_LIST_USERS},
+	{"list-groups", no_argument, nullptr, OPT_LIST_GROUPS},
+	{"password", no_argument, nullptr, OPT_PASSWORD},
+	{"password-prompt", no_argument, nullptr, OPT_PASSWORD_PROMPT},
+	{"fullname", no_argument, nullptr, OPT_FULLNAME},
+	{"email", no_argument, nullptr, OPT_EMAIL},
 	{ NULL, 0, NULL, 0 }
 };
 
@@ -345,9 +365,7 @@ static void print_help(const char *name)
 static char *get_password(void)
 {
 	static char password[80] = {0};
-	char *s = NULL;
-
-	s = get_password("Type password:");
+	auto s = get_password("Type password:");
 	if(s == NULL)
 		return NULL;
 
@@ -464,14 +482,13 @@ static HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid,
     LPENTRYID lpEid, int quota, bool udefault, long long warn, long long soft,
     long long hard, bool print = false, bool company = false)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<ECQUOTASTATUS> lpsQuotaStatus;
 	memory_ptr<ECQUOTA> lpsQuota;
 	ECQUOTA sQuota;
 
 	if (lpEid == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = lpServiceAdmin->GetQuota(cbEid, lpEid, false, &~lpsQuota);
+	auto hr = lpServiceAdmin->GetQuota(cbEid, lpEid, false, &~lpsQuota);
 	if (hr != hrSuccess) {
 		cerr << "Unable to update quota, probably not found." << endl;
 		return hr;
@@ -573,7 +590,7 @@ static string getMapiPropertyString(ULONG ulPropTag)
  *
  * @param[in]	cCompanies		Number of companies in lpECCompanies
  * @param[in]	lpECCompanies	Array of ECCompany structs
- * @param[in]	bList			true to list with comma's separation, otherwise enters are used.
+ * @param[in]	bList			true to list with comma separation, otherwise enters are used.
  */
 static void print_companies(unsigned int cCompanies,
     const ECCOMPANY *lpECCompanies, bool bList)
@@ -928,14 +945,13 @@ static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
 static HRESULT print_archive_details(LPMAPISESSION lpSession,
     IUnknown *lpECMsgStore, const char *lpszName)
 {
-	HRESULT hr;
 	ECServiceAdminPtr ptrServiceAdmin;
 	ULONG cbArchiveId = 0;
 	EntryIdPtr ptrArchiveId;
 	MsgStorePtr ptrArchive;
 	SPropValuePtr ptrArchiveSize;
 
-	hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, &~ptrServiceAdmin);
+	auto hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, &~ptrServiceAdmin);
 	if (hr != hrSuccess) {
 		cerr << "Unable to get admin interface." << endl;
 		return hr;
@@ -978,19 +994,15 @@ static HRESULT CreateOrphanStoreEntryID(const char *lpServerUrl,
     ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbEntryID,
     LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
-	ULONG cbNewEntryID = 0;
 	memory_ptr<ENTRYID> lpNewEntryID;
-	ULONG cbServerURL = 0;
 
 	if (lpServerUrl == nullptr || lpEntryID == nullptr ||
 	    lpcbEntryID == nullptr || lppEntryID == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
-	cbServerURL = strlen(lpServerUrl);
-
-	cbNewEntryID = cbEntryID + cbServerURL;
-	hr = MAPIAllocateBuffer(cbNewEntryID, &~lpNewEntryID);
+	ULONG cbServerURL = strlen(lpServerUrl);
+	ULONG cbNewEntryID = cbEntryID + cbServerURL;
+	auto hr = MAPIAllocateBuffer(cbNewEntryID, &~lpNewEntryID);
 	if (hr != hrSuccess)
 		return hr;
 	memcpy(lpNewEntryID, lpEntryID, cbEntryID);
@@ -1014,7 +1026,6 @@ static HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin,
     GUID *lpStoreGuid, const char *lpServerUrl, wstring &strUsername,
     wstring &strCompanyName, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr;
 	MAPITablePtr ptrTable;
 	SRowSetPtr ptrRowSet;
 	SPropValue sStoreGuid;
@@ -1026,7 +1037,7 @@ static HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin,
 		}
 	};
 
-	hr = lpServiceAdmin->OpenUserStoresTable(MAPI_UNICODE, &~ptrTable);
+	auto hr = lpServiceAdmin->OpenUserStoresTable(MAPI_UNICODE, &~ptrTable);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrTable->SortTable(tableSort, 0);
@@ -1041,19 +1052,18 @@ static HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin,
 	     .FindRowIn(ptrTable, BOOKMARK_BEGINNING, 0);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrTable->QueryRows(1, 0, &ptrRowSet);
+	hr = ptrTable->QueryRows(1, 0, &~ptrRowSet);
 	if (hr != hrSuccess)
 		return hr;
 	if (ptrRowSet.empty())
 		return MAPI_E_NOT_FOUND;
-
-	auto lpsName = PCpropFindProp(ptrRowSet[0].lpProps, ptrRowSet[0].cValues, PR_DISPLAY_NAME_W);
+	auto lpsName = ptrRowSet[0].cfind(PR_DISPLAY_NAME_W);
 	if (lpsName != nullptr)
 		strUsername = lpsName->Value.lpszW;
-	lpsName = PCpropFindProp(ptrRowSet[0].lpProps, ptrRowSet[0].cValues, PR_EC_COMPANY_NAME_W);
+	lpsName = ptrRowSet[0].cfind(PR_EC_COMPANY_NAME_W);
 	if (lpsName != nullptr)
 		strCompanyName = lpsName->Value.lpszW;
-	auto lpsPropEntryId = PCpropFindProp(ptrRowSet[0].lpProps, ptrRowSet[0].cValues, PR_STORE_ENTRYID);
+	auto lpsPropEntryId = ptrRowSet[0].cfind(PR_STORE_ENTRYID);
 	if (lpsPropEntryId == NULL)
 		return MAPI_E_NOT_FOUND;
 
@@ -1076,18 +1086,16 @@ static HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin,
 static HRESULT OpenDeletedStoresFolder(LPMDB lpPublicStore,
     LPMAPIFOLDER *lppFolderStores)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpFolderSubTree, lpFolderAdmin, lpFolderDeletedStores;
 	memory_ptr<SPropValue> lpsPropSubTree, lpPropValue, lpsPropMDB;
 	ULONG ulObjType;
-	IUnknown *lpECFolder = nullptr; // non reference
 	ECPERMISSION sPermission = {0};
 	object_ptr<IECSecurity> lpSecurity;
 	ULONG ulPropTagSubtree = 0;
 
 	if (lpPublicStore == nullptr || lppFolderStores == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = HrGetOneProp(lpPublicStore, PR_MDB_PROVIDER, &~lpsPropMDB);
+	auto hr = HrGetOneProp(lpPublicStore, PR_MDB_PROVIDER, &~lpsPropMDB);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -1112,7 +1120,7 @@ static HRESULT OpenDeletedStoresFolder(LPMDB lpPublicStore,
 		hr = HrGetOneProp(lpFolderAdmin, PR_EC_OBJECT, &~lpPropValue);
 		if(hr != hrSuccess)
 			return hr;
-		lpECFolder = reinterpret_cast<IUnknown *>(lpPropValue->Value.lpszA);
+		auto lpECFolder = reinterpret_cast<IUnknown *>(lpPropValue->Value.lpszA);
 		hr = lpECFolder->QueryInterface(IID_IECSecurity, &~lpSecurity);
 		if (hr != hrSuccess)
 			return hr;
@@ -1151,17 +1159,16 @@ static HRESULT OpenDeletedStoresFolder(LPMDB lpPublicStore,
 static HRESULT GetPublicStore(LPMAPISESSION lpSession, LPMDB lpMsgStore,
     const wstring &strCompanyname, LPMDB *lppPublicStore)
 {
-	HRESULT hr = hrSuccess;
 	ULONG cbEntryID = 0;
 	memory_ptr<ENTRYID> lpEntryID;
 	object_ptr<IExchangeManageStore> lpIEMS;
 
 	if (strCompanyname.empty())
 		return HrOpenECPublicStore(lpSession, lppPublicStore);
-	hr = lpMsgStore->QueryInterface(IID_IExchangeManageStore, &~lpIEMS);
+	auto hr = lpMsgStore->QueryInterface(IID_IExchangeManageStore, &~lpIEMS);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpIEMS->CreateStoreEntryID((LPTSTR)L"", (LPTSTR)strCompanyname.c_str(), MAPI_UNICODE, &cbEntryID, &~lpEntryID);
+	hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(L""), reinterpret_cast<const TCHAR *>(strCompanyname.c_str()), MAPI_UNICODE, &cbEntryID, &~lpEntryID);
 	if (hr != hrSuccess)
 		return hr;
 	return lpSession->OpenMsgStore(0, cbEntryID, lpEntryID, &IID_IMsgStore, MDB_WRITE, lppPublicStore);
@@ -1194,8 +1201,6 @@ static const char *StoreTypeToString(ULONG ulStoreType)
  */
 static HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
 {
-	HRESULT hr = hrSuccess;
-	ULONG i = 0;
 	object_ptr<IMAPITable> lpTable;
 	std::string strUsername;
 	bool bHeader = true;
@@ -1208,7 +1213,7 @@ static HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
 		}
 	};
 
-	hr = lpServiceAdmin->OpenUserStoresTable(0, &~lpTable);
+	auto hr = lpServiceAdmin->OpenUserStoresTable(0, &~lpTable);
 	if (hr != hrSuccess) {
 		cerr << "Unable to open user/stores table" << endl;
 		return hr;
@@ -1239,19 +1244,18 @@ static HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
 		if(lpRowSet->cRows == 0)
 			break;
 
-		for (i = 0; i < lpRowSet->cRows; ++i) {
-			auto lpStoreGuid = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EC_STOREGUID);
-			auto lpUserName = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EC_USERNAME_A);
-			auto lpModTime = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_LAST_MODIFICATION_TIME);
-			auto lpStoreSize = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MESSAGE_SIZE_EXTENDED);
-			auto lpStoreType = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EC_STORETYPE);
-
+		for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
+			auto lpStoreGuid = lpRowSet[i].cfind(PR_EC_STOREGUID);
+			auto lpUserName  = lpRowSet[i].cfind(PR_EC_USERNAME_A);
+			auto lpModTime   = lpRowSet[i].cfind(PR_LAST_MODIFICATION_TIME);
+			auto lpStoreSize = lpRowSet[i].cfind(PR_MESSAGE_SIZE_EXTENDED);
+			auto lpStoreType = lpRowSet[i].cfind(PR_EC_STORETYPE);
 			if (lpStoreGuid && lpUserName)
 				continue;
 
 			if (!lpUserName) {
 				// find "guessed" named
-				lpUserName = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_DISPLAY_NAME_A);
+				lpUserName = lpRowSet[i].cfind(PR_DISPLAY_NAME_A);
 				if (lpUserName)
 					strUsername = lpUserName->Value.lpszA;
 				else
@@ -1273,7 +1277,7 @@ static HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
 				ct.AddColumn(0, strUsername);
 				continue;
 			}
-			ct.AddColumn(0, bin2hex(lpStoreGuid->Value.bin.cb, lpStoreGuid->Value.bin.lpb));
+			ct.AddColumn(0, bin2hex(lpStoreGuid->Value.bin));
 			ct.AddColumn(1, strUsername);
 			if (lpModTime)
 				ct.AddColumn(2, FiletimeToString(lpModTime->Value.ft));
@@ -1317,33 +1321,26 @@ static LPMVPROPMAPENTRY FindMVPropmapEntry(ECUSER *lpUser, ULONG ulPropTag)
 static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
     objectclass_t ulClass, const char *lpszName)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<ECUSER> lpECUser;
 	memory_ptr<ECGROUP> lpECGroup, lpECGroups;
 	memory_ptr<ECCOMPANY> lpECCompany, lpECViews;
 	memory_ptr<ECQUOTASTATUS> lpsQuotaStatus;
 	memory_ptr<ECQUOTA> lpsQuota;
 	memory_ptr<ECUSER> lpECUsers, lpECAdmins;
-	ULONG cGroups = 0;
-	ULONG cUsers = 0;
-	ULONG cAdmins = 0;
-	ULONG cViews = 0;
-	ULONG cbEntryID = 0;
+	ULONG cGroups = 0, cUsers = 0, cAdmins = 0, cViews = 0, cbEntryID = 0;
 	memory_ptr<ENTRYID> lpEntryID;
 	object_ptr<IMsgStore> lpStore;
 	object_ptr<IExchangeManageStore> lpIEMS;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
-	bool bAutoAccept = false;
-	bool bDeclineConflict = false;
-	bool bDeclineRecurring = false;
+	bool bAutoAccept = false, bDeclineConflict = false, bDeclineRecurring = false;
 	ULONG cbObjectId = 0;
-	LPENTRYID lpObjectId = NULL;
+	memory_ptr<ENTRYID> lpObjectId;
 	ArchiveManagePtr ptrArchiveManage;
 	ArchiveList lstArchives;
-	ECUSERCLIENTUPDATESTATUS *lpECUCUS = NULL;
+	memory_ptr<ECUSERCLIENTUPDATESTATUS> lpECUCUS;
 	convert_context converter;
 
-	hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
+	auto hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if (hr != hrSuccess) {
 		cerr << "Unable to get admin interface." << endl;
 		return hr;
@@ -1352,7 +1349,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 	switch (ulClass) {
 	case OBJECTCLASS_CONTAINER:
 	case CONTAINER_COMPANY:
-		hr = lpServiceAdmin->ResolveCompanyName((LPTSTR)lpszName, 0, &cbObjectId, &lpObjectId);
+		hr = lpServiceAdmin->ResolveCompanyName((LPTSTR)lpszName, 0, &cbObjectId, &~lpObjectId);
 		if (hr != hrSuccess) {
 			cerr << "Unable to resolve company: " << getMapiCodeString(hr, lpszName) << endl;
 			return hr;
@@ -1367,7 +1364,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 			cerr << "Unable to get admin interface." << endl;
 			return hr;
 		}
-		hr = lpIEMS->CreateStoreEntryID((LPTSTR)"", lpECCompany->lpszCompanyname, 0, &cbEntryID, &~lpEntryID);
+		hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(""), lpECCompany->lpszCompanyname, 0, &cbEntryID, &~lpEntryID);
 		if (hr != hrSuccess) {
 			cerr << "Unable to get company store entry id. Company possibly has no store." << endl;
 			return hr;
@@ -1398,7 +1395,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 	case DISTLIST_GROUP:
 	case DISTLIST_SECURITY:
 	case DISTLIST_DYNAMIC:
-		hr = lpServiceAdmin->ResolveGroupName((LPTSTR)lpszName, 0, &cbObjectId, &lpObjectId);
+		hr = lpServiceAdmin->ResolveGroupName((LPTSTR)lpszName, 0, &cbObjectId, &~lpObjectId);
 		if (hr != hrSuccess) {
 			cerr << "Unable to resolve group: " << getMapiCodeString(hr, lpszName) << endl;
 			return hr;
@@ -1422,7 +1419,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 	case NONACTIVE_EQUIPMENT:
 	case NONACTIVE_CONTACT:
 	default:
-		hr = lpServiceAdmin->ResolveUserName((LPTSTR)lpszName, 0, &cbObjectId, &lpObjectId);
+		hr = lpServiceAdmin->ResolveUserName((LPTSTR)lpszName, 0, &cbObjectId, &~lpObjectId);
 		if (hr != hrSuccess) {
 			cerr << "Unable to resolve user: " << getMapiCodeString(hr, lpszName) << endl;
 			return hr;
@@ -1437,7 +1434,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 			cerr << "Unable to get admin interface." << endl;
 			return hr;
 		}
-		hr = lpIEMS->CreateStoreEntryID((LPTSTR)"", lpECUser->lpszUsername, 0, &cbEntryID, &~lpEntryID);
+		hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(""), lpECUser->lpszUsername, 0, &cbEntryID, &~lpEntryID);
 		if (hr != hrSuccess) {
 			cerr << "WARNING: Unable to get user store entry id. User possibly has no store." << endl << endl;
 			lpStore.reset();
@@ -1471,7 +1468,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 				hr = hrSuccess; /* Don't make error fatal */
 			}
 		}
-		hr = lpServiceAdmin->GetUserClientUpdateStatus(cbObjectId, lpObjectId, 0, &lpECUCUS);
+		hr = lpServiceAdmin->GetUserClientUpdateStatus(cbObjectId, lpObjectId, 0, &~lpECUCUS);
 		if (hr != hrSuccess) {
 			cerr << "Unable to get auto update status: " <<
 				GetMAPIErrorMessage(hr) << " (" <<
@@ -1546,11 +1543,9 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 	for (int i = 0; i < lpArchiveServers->cValues; ++i) {
 		MsgStorePtr ptrRemoteAdminStore;
 		SPropValuePtr ptrPropValue;
-		IUnknown *lpECRemoteAdminStore = nullptr;
-		HRESULT hrTmp;
 
 		cout << "Archive details on node '" << (LPSTR)lpArchiveServers->lpszValues[i] << "':" << endl;
-		hrTmp = HrGetRemoteAdminStore(lpSession, ptrAdminStore, lpArchiveServers->lpszValues[i], 0, &~ptrRemoteAdminStore);
+		auto hrTmp = HrGetRemoteAdminStore(lpSession, ptrAdminStore, lpArchiveServers->lpszValues[i], 0, &~ptrRemoteAdminStore);
 		if (FAILED(hrTmp)) {
 			cerr << "Unable to access node '" <<
 				(LPSTR)lpArchiveServers->lpszValues[i] <<
@@ -1565,7 +1560,7 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
 			return hr;
 		}
 
-		lpECRemoteAdminStore = reinterpret_cast<IUnknown *>(ptrPropValue->Value.lpszA);
+		auto lpECRemoteAdminStore = reinterpret_cast<IUnknown *>(ptrPropValue->Value.lpszA);
 		print_archive_details(lpSession, lpECRemoteAdminStore, lpszName);
 		cout << endl;
 	}
@@ -1581,11 +1576,10 @@ static HRESULT print_details(LPMAPISESSION lpSession, IUnknown *lpECMsgStore,
  */
 static HRESULT ListUsers(IECServiceAdmin *lpServiceAdmin, ECCOMPANY *lpCompany)
 {
-	HRESULT		hr = hrSuccess;
 	memory_ptr<ECUSER> lpECUsers;
 	ULONG		cUsers = 0;
 
-	hr = lpServiceAdmin->GetUserList(lpCompany->sCompanyId.cb, (LPENTRYID)lpCompany->sCompanyId.lpb, 0, &cUsers, &~lpECUsers);
+	auto hr = lpServiceAdmin->GetUserList(lpCompany->sCompanyId.cb, (LPENTRYID)lpCompany->sCompanyId.lpb, 0, &cUsers, &~lpECUsers);
 	if (hr != hrSuccess) {
 		cerr << "Unable to list users: " << getMapiCodeString(hr) << endl;
 		return hr;
@@ -1607,11 +1601,10 @@ static HRESULT ListUsers(IECServiceAdmin *lpServiceAdmin, ECCOMPANY *lpCompany)
 static HRESULT ListGroups(IECServiceAdmin *lpServiceAdmin,
     ECCOMPANY *lpCompany)
 {
-	HRESULT		hr = hrSuccess;
 	memory_ptr<ECGROUP> lpECGroups;
 	ULONG		cGroups = 0;
 
-	hr = lpServiceAdmin->GetGroupList(lpCompany->sCompanyId.cb, (LPENTRYID)lpCompany->sCompanyId.lpb, 0, &cGroups, &~lpECGroups);
+	auto hr = lpServiceAdmin->GetGroupList(lpCompany->sCompanyId.cb, (LPENTRYID)lpCompany->sCompanyId.lpb, 0, &cGroups, &~lpECGroups);
 	if (hr != hrSuccess) {
 		cerr << "Unable to list groups: " << getMapiCodeString(hr) << endl;
 		return hr;
@@ -1633,10 +1626,8 @@ static HRESULT ListGroups(IECServiceAdmin *lpServiceAdmin,
  */
 static HRESULT SyncUsers(IECServiceAdmin *lpServiceAdmin)
 {
-	HRESULT hr;
-
 	// we don't sync one company, since the complete cache is flushed in the server
-	hr = lpServiceAdmin->SyncUsers(0, NULL);
+	auto hr = lpServiceAdmin->SyncUsers(0, nullptr);
 	if (hr != hrSuccess)
 		cerr << "User/group synchronization failed: " << getMapiCodeString(hr) << endl;
 	return hr;
@@ -1702,7 +1693,6 @@ static HRESULT ForEachCompany(IECServiceAdmin *lpServiceAdmin,
 static HRESULT ForceResyncFor(LPMAPISESSION lpSession, LPMDB lpAdminStore,
     const char *lpszAccount, const char *lpszHomeMDB)
 {
-	HRESULT hr;
 	ExchangeManageStorePtr ptrEMS;
 	ULONG cbEntryID = 0;
 	EntryIdPtr ptrEntryID;
@@ -1711,10 +1701,10 @@ static HRESULT ForceResyncFor(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 	SPropValuePtr ptrPropResyncID;
 	ULONG ulType = 0;
 
-	hr = lpAdminStore->QueryInterface(iid_of(ptrEMS), &~ptrEMS);
+	auto hr = lpAdminStore->QueryInterface(iid_of(ptrEMS), &~ptrEMS);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrEMS->CreateStoreEntryID((LPTSTR)lpszHomeMDB, (LPTSTR)lpszAccount, 0, &cbEntryID, &~ptrEntryID);
+	hr = ptrEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(lpszHomeMDB), reinterpret_cast<const TCHAR *>(lpszAccount), 0, &cbEntryID, &~ptrEntryID);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpSession->OpenMsgStore(0, cbEntryID, ptrEntryID, NULL, MDB_WRITE|MAPI_DEFERRED_ERRORS, &~ptrUserStore);
@@ -1739,7 +1729,6 @@ static HRESULT ForceResyncFor(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 
 static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 {
-	HRESULT			hr = hrSuccess;
 	AddrBookPtr		ptrAdrBook;
 	ABContainerPtr	ptrABContainer;
 	MAPITablePtr	ptrTable;
@@ -1753,7 +1742,7 @@ static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 	SPropValue			  sObjTypePropVal;
 	SPropValue			  sDispTypePropVal;
 
-	hr = lpSession->OpenAddressBook(0, &iid_of(ptrAdrBook), AB_NO_DIALOG, &~ptrAdrBook);
+	auto hr = lpSession->OpenAddressBook(0, &iid_of(ptrAdrBook), AB_NO_DIALOG, &~ptrAdrBook);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrAdrBook->OpenEntry(0, nullptr, &iid_of(ptrABContainer), 0, &ulType, &~ptrABContainer);
@@ -1774,7 +1763,7 @@ static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 	     .RestrictTable(ptrTable, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrTable->QueryRows(1, 0, &ptrRows);
+	hr = ptrTable->QueryRows(1, 0, &~ptrRows);
 	if (hr != hrSuccess)
 		return hr;
 	if (ptrRows.size() != 1 || ptrRows[0].lpProps[0].ulPropTag != PR_ENTRYID)
@@ -1804,7 +1793,7 @@ static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 		return hr;
 
 	while (true) {
-		hr = ptrTable->QueryRows(50, 0, &ptrRows);
+		hr = ptrTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			goto exit;
 
@@ -1839,7 +1828,7 @@ exit:
 }
 
 static HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore,
-    const list<string> &lstUsernames)
+    const std::list<std::string> &lstUsernames)
 {
 	HRESULT hr = hrSuccess;
 	bool bFail = false;
@@ -1855,25 +1844,23 @@ static HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 	}
 
 	if (!FAILED(hr) && bFail)
-		hr = MAPI_W_ERRORS_RETURNED;
-
+		return MAPI_W_ERRORS_RETURNED;
 	return hr;
 }
 
 static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 {
-	HRESULT hr;
 	MAPITablePtr ptrSystemTable;
 	SPropValue sPropDisplayName;
 	SRowSetPtr ptrRows;
 	ULONG ulLicensedUsers = (ULONG)-1;	//!< active users allowed by license
 	ULONG ulActiveUsers = (ULONG)-1;	//!< used active users
 	ULONG ulNonActiveTotal = (ULONG)-1;	//!< used non-active users
-	ULONG ulNonActiveUsers = (ULONG)-1;	//!< used sharedstores, subset of used non-active users
+	ULONG ulNonActiveUsers = (ULONG)-1;	//!< used shared stores, subset of used non-active users
 	ULONG ulRooms = (ULONG)-1;			//!< used rooms, subset of used non-active users
 	ULONG ulEquipment = (ULONG)-1;		//!< used equipment, subset of used non-active users
 	ULONG ulMaxTotal = 0;				//!< complete total of user objects allowed by license, aka ulNonActiveHigh limit
-	ULONG ulNonActiveLow = 0;			//!< atleast non-active users allowed
+	ULONG ulNonActiveLow = 0; //!< at least non-active users allowed
 	ULONG ulActiveAsNonActive = 0;		//!< non-active users taken from active count
 	ConsoleTable ct(3, 4);
 	ULONG ulExtraRow = 0;
@@ -1883,7 +1870,7 @@ static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 	enum {IDX_DISPLAY_NAME_A, IDX_EC_STATS_SYSTEM_VALUE};
 	enum {COL_ALLOWED=1, COL_USED, COL_AVAILABLE};
 
-	hr = lpAdminStore->OpenProperty(PR_EC_STATSTABLE_SYSTEM, &iid_of(ptrSystemTable), 0, 0, &~ptrSystemTable);
+	auto hr = lpAdminStore->OpenProperty(PR_EC_STATSTABLE_SYSTEM, &iid_of(ptrSystemTable), 0, 0, &~ptrSystemTable);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -1897,7 +1884,7 @@ static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 	hr = ptrSystemTable->SetColumns(sptaStatsProps, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrSystemTable->QueryRows(0xffff, 0, &ptrRows);
+	hr = ptrSystemTable->QueryRows(0xffff, 0, &~ptrRows);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -2003,7 +1990,6 @@ static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 static HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore,
     const char *lpszAccount)
 {
-	HRESULT hr = hrSuccess;
 	ExchangeManageStorePtr ptrEMS;
 	ULONG cbEntryID;
 	EntryIdPtr ptrEntryID;
@@ -2021,10 +2007,10 @@ static HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 		{2, {PR_DISPLAY_NAME_A, PR_ENTRYID}};
 	enum {IDX_DISPLAY_NAME, IDX_ENTRYID};
 
-	hr = lpAdminStore->QueryInterface(iid_of(ptrEMS), &~ptrEMS);
+	auto hr = lpAdminStore->QueryInterface(iid_of(ptrEMS), &~ptrEMS);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrEMS->CreateStoreEntryID(NULL, (LPTSTR)lpszAccount, 0, &cbEntryID, &~ptrEntryID);
+	hr = ptrEMS->CreateStoreEntryID(nullptr, reinterpret_cast<const TCHAR *>(lpszAccount), 0, &cbEntryID, &~ptrEntryID);
 	if (hr != hrSuccess) {
 		cerr << "Unable to resolve store for '" << lpszAccount << "'." << endl;
 		return hr;
@@ -2049,7 +2035,6 @@ static HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 	if (hr != hrSuccess) {
 		cerr << "Failed to update counters in the root folder." << endl;
 		bFailures = true;
-		hr = hrSuccess;
 	} else if (ulUpdates) {
 		cerr << "Updated " << ulUpdates << " counters in the root folder." << endl;
 		ulTotalUpdates += ulUpdates;
@@ -2058,7 +2043,7 @@ static HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 	hr = ptrRoot->GetHierarchyTable(CONVENIENT_DEPTH, &~ptrTable);
 	if (hr != hrSuccess)
 		goto exit;
-	hr = HrQueryAllRows(ptrTable, sptaTableProps, NULL, NULL, 0, &ptrRows);
+	hr = HrQueryAllRows(ptrTable, sptaTableProps, nullptr, nullptr, 0, &~ptrRows);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -2107,15 +2092,9 @@ class InputValidator {
 			m_bFailure = true;
 			wstring strInput;
 
-			if (!szInput)
+			if (szInput == nullptr || TryConvert(szInput, strInput) != hrSuccess ||
+			    std::find_if_not(strInput.cbegin(), strInput.cend(), iswprint) != strInput.cend())
 				return NULL;
-
-			if (TryConvert(szInput, strInput) != hrSuccess)
-				return NULL;
-
-			for (auto c : strInput)
-				if (!iswprint(c))
-					return NULL;
 			m_bFailure = false;
 			return szInput;
 		}
@@ -2124,34 +2103,23 @@ class InputValidator {
 		bool m_bFailure = false;
 };
 
-// compare function for set<tstring, ltstr>, fixes default wchar_t compare, and makes it case-insensitive
-// used for PR_EC_*ABLED_FEATURES_A properties from TCHAR* strings in ECUSER struct
-struct lstr {
-	bool operator()(const string &t1, const string &t2) const
-	{
-		return strcasecmp((char*)t1.c_str(), (char*)t2.c_str()) < 0;
-	}
-};
-
 static HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index,
-    set<string, lstr> &sFeatures, void *lpBase)
+    std::set<std::string, strcasecmp_comparison> &sFeatures, void *lpBase)
 {
-	HRESULT hr;
-
 	sECUser.sMVPropmap.lpEntries[index].ulPropId = ulPropTag;
 	sECUser.sMVPropmap.lpEntries[index].cValues = sFeatures.size();
 	sECUser.sMVPropmap.lpEntries[index].lpszValues = NULL;
 	if (sFeatures.size() == 0)
 		return hrSuccess;
-	hr = MAPIAllocateMore(sizeof(LPTSTR) * sFeatures.size(), lpBase, (void**)&sECUser.sMVPropmap.lpEntries[index].lpszValues);
+	auto hr = MAPIAllocateMore(sizeof(LPTSTR) * sFeatures.size(), lpBase,
+	          reinterpret_cast<void **>(&sECUser.sMVPropmap.lpEntries[index].lpszValues));
 	if (hr != hrSuccess) {
 		cerr << "Memory error" << endl;
 		return hr;
 	}
-	int n = 0;
 	auto i = sFeatures.cbegin();
 	// @note we store char* data in a LPTSTR (whcar_t by -DUNICODE) pointer.
-	for (n = 0; i != sFeatures.cend(); ++i, ++n)
+	for (unsigned int n = 0; i != sFeatures.cend(); ++i, ++n)
 		sECUser.sMVPropmap.lpEntries[index].lpszValues[n] = (TCHAR*)i->c_str();
 	return hrSuccess;
 }
@@ -2168,7 +2136,6 @@ static void missing_quota(int hard, int warn, int soft)
 
 int main(int argc, char* argv[])
 {
-	HRESULT hr = hrSuccess;
 	AutoMAPI mapiinit;
 	object_ptr<IMAPISession> lpSession;
 	object_ptr<IUnknown> lpECMsgStore;
@@ -2221,8 +2188,7 @@ int main(int argc, char* argv[])
 	char *feature = NULL;
 	char *node = NULL;
 	bool bFeature = true;
-	set<string, lstr> sEnabled;
-	set<string, lstr> sDisabled;
+	std::set<std::string, strcasecmp_comparison> sEnabled, sDisabled;
 	int quota = -1;
 	long long quotahard = -1;
 	long long quotasoft = -1;
@@ -2242,7 +2208,7 @@ int main(int argc, char* argv[])
 	int passprompt = 0;
 	bool bCopyToPublic = false;
 	int nFolderId = 0;
-	list<string> lstUsernames;
+	std::list<std::string> lstUsernames;
 
 	bool bAutoAccept = false, bDeclineConflict = false, bDeclineRecurring = false;
 	ULONG cbEntryID = 0;
@@ -2278,10 +2244,9 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	int c;
 	while (1) {
 		InputValidator validateInput;
-		c = getopt_long(argc, argv, "VlLsc:u:d:U:Pp:f:e:a:h:g:G:b:B:i:I:n:v", long_options, NULL);
+		auto c = getopt_long(argc, argv, "VlLsc:u:d:U:Pp:f:e:a:h:g:G:b:B:i:I:n:v", long_options, NULL);
 		if (c == -1)
 			break;
 		switch (c) {
@@ -2293,6 +2258,7 @@ int main(int argc, char* argv[])
 				++loglevel;
 			break;
 		case 'l':
+		case OPT_LIST_USERS:
 			mode = MODE_LIST_USERS;
 			break;
 		case 's':
@@ -2320,6 +2286,7 @@ int main(int argc, char* argv[])
 			groupname = validateInput(optarg);
 			break;
 		case 'L':
+		case OPT_LIST_GROUPS:
 			mode = MODE_LIST_GROUP;
 			break;
 		case 'b':
@@ -2334,15 +2301,19 @@ int main(int argc, char* argv[])
 			new_username = validateInput(optarg);
 			break;
 		case 'P':
+		case OPT_PASSWORD:
 			passprompt = 1;
 			break;
 		case 'p':
+		case OPT_PASSWORD_PROMPT:
 			password = validateInput(optarg);
 			break;
 		case 'f':
+		case OPT_FULLNAME:
 			fullname = validateInput(optarg);
 			break;
 		case 'e':
+		case OPT_EMAIL:
 			emailadr = validateInput(optarg);
 			break;
 		case 'a':
@@ -2350,7 +2321,7 @@ int main(int argc, char* argv[])
 			if (isadmin == 0)
 				isadmin = parse_yesno(optarg);
 			else
-				isadmin = min(2, isadmin);
+				isadmin = std::min(2, isadmin);
 			break;
 		case 'n':
 			isnonactive = parse_yesno(optarg);
@@ -2886,25 +2857,22 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (szConfig) {
-		bool bHaveConfig = lpsConfig->LoadSettings(szConfig);
-		/* Special case on complaining errors in config file:
-		 * - explicit config file given, but was not found
-		 * - default config file loaded, but contains errors
-		 * This makes that we do not complain for errors when an "invalid" config was given but did load ok.
-		 * This is a trick that people can use to give the spooler or dagent a config for its client SSL settings,
-		 * which are the only settings used by the admin program.
-		 */
-		if ((!bHaveConfig && bExplicitConfig) || (bHaveConfig && !bExplicitConfig && lpsConfig->HasErrors())) {
-			cerr << "Error while reading configuration file " << szConfig << endl;
-			// create fatal logger without a timestamp to stderr
-			lpLogger.reset(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
-			ec_log_set(lpLogger);
-			LogConfigErrors(lpsConfig.get());
-			return 1;
-		}
+	bool bHaveConfig = lpsConfig->LoadSettings(szConfig);
+	/* Special case on complaining errors in config file:
+	 * - explicit config file given, but was not found
+	 * - default config file loaded, but contains errors
+	 * This makes that we do not complain for errors when an "invalid" config was given but did load ok.
+	 * This is a trick that people can use to give the spooler or dagent a config for its client SSL settings,
+	 * which are the only settings used by the admin program.
+	 */
+	if ((!bHaveConfig && bExplicitConfig) || (bHaveConfig && !bExplicitConfig && lpsConfig->HasErrors())) {
+		cerr << "Error while reading configuration file " << szConfig << endl;
+		// create fatal logger without a timestamp to stderr
+		lpLogger.reset(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
+		ec_log_set(lpLogger);
+		LogConfigErrors(lpsConfig.get());
+		return 1;
 	}
-
 	if(lang) {
 		char* locale = setlocale(LC_MESSAGES, lang);
 		if (!locale) {
@@ -2925,7 +2893,7 @@ int main(int argc, char* argv[])
 	ec_log_set(lpLogger);
 
 	//Init mapi
-	hr = mapiinit.Initialize();
+	auto hr = mapiinit.Initialize();
 	if (hr != hrSuccess) {
 		cerr << "Unable to initialize" << endl;
 		goto exit;
@@ -3382,7 +3350,7 @@ int main(int argc, char* argv[])
 					goto exit;
 
 				// do not redirect to another server, unhook works on the server it's connected to
-				hr = lpIEMS->CreateStoreEntryID(NULL, reinterpret_cast<LPTSTR>(username), OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~lpStoreId);
+				hr = lpIEMS->CreateStoreEntryID(nullptr, reinterpret_cast<const TCHAR *>(username), OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~lpStoreId);
 				if (hr != hrSuccess) {
 					if (hr == MAPI_E_NOT_FOUND)
 						cout << "Unable to unhook store. User '" << username << "' has no store attached." << endl;
@@ -3468,11 +3436,11 @@ int main(int argc, char* argv[])
 
 		if (feature) {
 			if (bFeature) {
-				sEnabled.insert(feature);
+				sEnabled.emplace(feature);
 				sDisabled.erase(feature);
 			} else {
 				sEnabled.erase(feature);
-				sDisabled.insert(feature);
+				sDisabled.emplace(feature);
 			}
 		}
 
@@ -3543,7 +3511,7 @@ int main(int argc, char* argv[])
 				cerr << "Unable to get admin interface." << endl;
 				goto exit;
 			}
-			hr = lpIEMS->CreateStoreEntryID((LPTSTR)"", (LPTSTR)username, 0, &cbEntryID, &~lpEntryID);
+			hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(""), reinterpret_cast<const TCHAR *>(username), 0, &cbEntryID, &~lpEntryID);
 			if (hr != hrSuccess) {
 				cerr << "Unable to get user store entry id. User has possibly has not store." << endl;
 				goto exit;
@@ -3961,8 +3929,12 @@ int main(int argc, char* argv[])
 		break;
 	case MODE_PURGE_SOFTDELETE:
 		hr = lpServiceAdmin->PurgeSoftDelete(ulDays);
-		if (hr != hrSuccess) {
-			cerr << "Softdelete purge failed" << endl;
+		if (hr == MAPI_E_BUSY) {
+			cout << "Softdelete purge already running." << endl;
+			hr = hrSuccess;
+			break;
+		} else if (hr != hrSuccess) {
+			cerr << "Softdelete purge failed: " << getMapiCodeString(hr) << endl;
 			goto exit;
 		}
 		cout << "Softdelete purge done." << endl;

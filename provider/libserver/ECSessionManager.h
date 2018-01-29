@@ -31,6 +31,7 @@
 #include <set>
 #include <pthread.h>
 #include <kopano/lockhelper.hpp>
+#include "ECAttachmentStorage.h"
 #include "ECUserManagement.h"
 #include "ECSearchFolders.h"
 #include "ECDatabaseFactory.h"
@@ -98,7 +99,7 @@ public:
 	_kc_hidden virtual ~ECSessionManager(void);
 	_kc_hidden virtual ECRESULT CreateAuthSession(struct soap *, unsigned int caps, ECSESSIONID *, ECAuthSession **, bool register_ses, bool lock_ses);
 	// Creates a session based on passed credentials
-	_kc_hidden virtual ECRESULT CreateSession(struct soap *, const char *name, const char *pass, const char *imp_user, const char *cl_vers, const char *cl_app, const char *cl_app_ver, const char *cl_app_misc, unsigned int caps, ECSESSIONGROUPID, ECSESSIONID *, ECSession **, bool lock_ses, bool allow_uid_auth);
+	_kc_hidden virtual ECRESULT CreateSession(struct soap *, const char *name, const char *pass, const char *imp_user, const char *cl_vers, const char *cl_app, const char *cl_app_ver, const char *cl_app_misc, unsigned int caps, ECSESSIONGROUPID, ECSESSIONID *, ECSession **, bool lock_ses, bool allow_uid_auth, bool register_session);
 	// Creates a session without credential checking (caller must check credentials)
 	_kc_hidden virtual ECRESULT RegisterSession(ECAuthSession *, ECSESSIONGROUPID, const char *cl_ver, const char *cl_app, const char *cl_app_ver, const char *cl_app_misc, ECSESSIONID *, ECSession **, bool lock_ses);
 	virtual ECRESULT CreateSessionInternal(ECSession **, unsigned int user_id = KOPANO_UID_SYSTEM);
@@ -116,7 +117,6 @@ public:
 	_kc_hidden ECRESULT CancelAllSessions(ECSESSIONID except = 0);
 	_kc_hidden ECRESULT ForEachSession(void (*cb)(ECSession *, void *), void *obj);
 	_kc_hidden ECRESULT LoadSettings(void);
-	_kc_hidden ECRESULT CheckUserLicense(void);
 	_kc_hidden ECRESULT UpdateTables(ECKeyTable::UpdateType, unsigned int flags, unsigned int obj_id, unsigned int child_id, unsigned int obj_type);
 	_kc_hidden ECRESULT UpdateTables(ECKeyTable::UpdateType, unsigned int flags, unsigned int obj_id, std::list<unsigned int> &objects, unsigned int obj_type);
 	_kc_hidden ECRESULT UpdateOutgoingTables(ECKeyTable::UpdateType, unsigned int store_id, unsigned int obj_id, unsigned int flags, unsigned int obj_type);
@@ -138,9 +138,8 @@ public:
 	_kc_hidden void GetStats(void (*cb)(const std::string &, const std::string &, const std::string &, void *), void *obj);
 	_kc_hidden void GetStats(sSessionManagerStats &);
 	_kc_hidden ECRESULT DumpStats(void);
-	_kc_hidden bool IsHostedSupported(void) { return m_bHostedKopano; }
-	_kc_hidden bool IsDistributedSupported(void) { return m_bDistributedKopano; }
-	_kc_hidden ECRESULT GetLicensedUsers(unsigned int svc_type, unsigned int *licusers);
+	_kc_hidden bool IsHostedSupported() const { return m_bHostedKopano; }
+	_kc_hidden bool IsDistributedSupported() const { return m_bDistributedKopano; }
 	_kc_hidden ECRESULT GetServerGUID(GUID *);
 	_kc_hidden ECRESULT GetNewSourceKey(SOURCEKEY *);
 
@@ -162,12 +161,13 @@ public:
 	_kc_hidden LPCSTR GetDefaultSortLocaleID(void);
 	_kc_hidden ULONG GetSortLCID(ULONG store_id);
 	_kc_hidden ECLocale GetSortLocale(ULONG store_id);
-	_kc_hidden ECCacheManager *GetCacheManager(void) { return m_lpECCacheManager; }
-	_kc_hidden ECSearchFolders *GetSearchFolders(void) { return m_lpSearchFolders; }
-	_kc_hidden ECConfig *GetConfig(void) { return m_lpConfig; }
-	_kc_hidden ECLogger *GetAudit(void) { return m_lpAudit; }
-	_kc_hidden ECPluginFactory *GetPluginFactory(void) { return m_lpPluginFactory; }
-	_kc_hidden ECLockManager *GetLockManager(void) { return m_ptrLockManager.get(); }
+	_kc_hidden ECCacheManager *GetCacheManager() const { return m_lpECCacheManager.get(); }
+	_kc_hidden ECSearchFolders *GetSearchFolders() const { return m_lpSearchFolders.get(); }
+	_kc_hidden ECConfig *GetConfig() const { return m_lpConfig; }
+	_kc_hidden ECLogger *GetAudit() const { return m_lpAudit; }
+	_kc_hidden ECPluginFactory *GetPluginFactory() const { return m_lpPluginFactory.get(); }
+	_kc_hidden ECLockManager *GetLockManager() const { return m_ptrLockManager.get(); }
+	_kc_hidden ECAttachmentConfig *get_atxconfig() const { return m_atxconfig.get(); }
 
 protected:
 	_kc_hidden BTSession *GetSession(ECSESSIONID, bool lock_ses = false);
@@ -187,18 +187,11 @@ protected:
 	bool				m_bTerminateThread;
 	ECConfig*			m_lpConfig;
 	bool bExit = false;
-	ECCacheManager*		m_lpECCacheManager;
-	ECLogger*			m_lpAudit;
-	ECDatabaseFactory*	m_lpDatabaseFactory;
-	ECPluginFactory*	m_lpPluginFactory;
-	ECSearchFolders*	m_lpSearchFolders;
 	bool				m_bHostedKopano;
 	bool				m_bDistributedKopano;
-	GUID *m_lpServerGuid = nullptr;
 	unsigned long long m_ullSourceKeyAutoIncrement = 0;
 	unsigned int m_ulSourceKeyQueue = 0;
 	std::mutex m_hSourceKeyAutoIncrementMutex;
-	ECDatabase *m_lpDatabase = nullptr;
 
 	std::mutex m_mutexPersistent;
 	PERSISTENTBYSESSION m_mapPersistentBySession; ///< map of all persistent sessions mapped to their connection id
@@ -211,14 +204,22 @@ protected:
 	std::mutex m_mutexObjectSubscriptions;
 	OBJECTSUBSCRIPTIONSMULTIMAP	m_mapObjectSubscriptions;	///< Maps an object notification subscription (store id) to the subscriber
 
-	ECNotificationManager *m_lpNotificationManager;
-	ECTPropsPurge		*m_lpTPropsPurge;
-	ECLockManagerPtr	m_ptrLockManager;
-
 	// Sequences
 	std::mutex m_hSeqMutex;
 	unsigned long long m_ulSeqIMAP = 0;
 	unsigned int m_ulSeqIMAPQueue = 0;
+
+	KCHL::object_ptr<ECLogger> m_lpAudit;
+	std::unique_ptr<GUID> m_lpServerGuid;
+	std::unique_ptr<ECPluginFactory> m_lpPluginFactory;
+	std::unique_ptr<ECSearchFolders> m_lpSearchFolders;
+	std::unique_ptr<ECDatabaseFactory> m_lpDatabaseFactory;
+	std::unique_ptr<ECCacheManager> m_lpECCacheManager;
+	std::unique_ptr<ECTPropsPurge> m_lpTPropsPurge;
+	ECLockManagerPtr m_ptrLockManager;
+	std::unique_ptr<ECNotificationManager> m_lpNotificationManager;
+	std::unique_ptr<ECDatabase> m_lpDatabase;
+	std::unique_ptr<ECAttachmentConfig> m_atxconfig;
 };
 
 extern _kc_export ECSessionManager *g_lpSessionManager;

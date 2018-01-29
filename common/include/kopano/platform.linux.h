@@ -122,7 +122,7 @@ typedef __int64_t __int64;
 	UNUSED_VAR auto pThis = container_of(this, theClass, m_x##localClass)
 
 /* GUID defines */
-struct __attribute__((__packed__)) GUID {
+struct GUID {
     DWORD	Data1;
     WORD	Data2;
     WORD	Data3;
@@ -320,7 +320,7 @@ struct FILETIME {
     DWORD dwHighDateTime;
 };
 typedef struct FILETIME *LPFILETIME;
-#define NANOSECS_BETWEEN_EPOCHS 116444736000000000LL
+#define NANOSECS_BETWEEN_EPOCHS 116444736000000000LL /* units of 100 ns! */
 
 /* made up .. seems correct */
 union LARGE_INTEGER {

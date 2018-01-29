@@ -26,7 +26,6 @@
 
 #include <set>
 #include <ldap.h>
-#define LDAP_TIMEVAL struct timeval
 #include "plugin.h"
 #include "LDAPCache.h"
 
@@ -44,7 +43,7 @@ namespace KC {
  *
  * @todo update documentation with the right exception, some function can throw more exceptions!
  */
-class LDAPUserPlugin: public UserPlugin {
+class LDAPUserPlugin final : public UserPlugin {
 public:
 	/** 
 	 * Create a connection to the LDAP server and do some
@@ -123,7 +122,7 @@ public:
 	 *					The objectclass can be partially unknown (OBJECTCLASS_UNKNOWN, MAILUSER_UNKNOWN, ...)
 	 * @return The list of object signatures of all objects which were found
 	 */
-	virtual std::unique_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
+	virtual signatures_t getAllObjects(const objectid_t &company, objectclass_t) override;
 
 	/**
 	 * Obtain the object details for the given object
@@ -135,7 +134,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw objectnotfound When the object was not found
 	 */
-	virtual std::unique_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
+	virtual objectdetails_t getObjectDetails(const objectid_t &) override;
 
 	/**
 	 * Obtain the object details for the given objects
@@ -148,7 +147,7 @@ public:
 	 * @remarks The methode returns a whole set of objectdetails but user may be missing if the user
 	 * 			details cannot be retrieved for some reason.
 	 */
-	virtual std::unique_ptr<std::map<objectid_t, objectdetails_t> > getObjectDetails(const std::list<objectid_t> &objectids);
+	virtual std::map<objectid_t, objectdetails_t> getObjectDetails(const std::list<objectid_t> &objectids) override;
 
 	/**
 	 * Get all children for a parent for a given relation type.
@@ -161,7 +160,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw When an unsupported object relation was requested
 	 */
-	virtual std::unique_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
+	virtual signatures_t getSubObjectsForObject(userobject_relation_t, const objectid_t &parentobject) override;
 
 	/**
 	 * Request all parents for a childobject for a given relation type.
@@ -174,7 +173,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw runtime_error When an unsupported object relation was requested
 	 */
-	virtual std::unique_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
+	virtual signatures_t getParentObjectsForObject(userobject_relation_t, const objectid_t &childobject) override;
 
 	/**
 	 * Search for all objects which match the given string,
@@ -188,7 +187,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw objectnotfound When no objects were found
 	 */
-	virtual std::unique_ptr<signatures_t> searchObject(const std::string &match, unsigned int ulFlags);
+	virtual signatures_t searchObject(const std::string &match, unsigned int flags) override;
 
 	/**
 	 * Obtain details for the public store
@@ -198,7 +197,7 @@ public:
 	 * @throw objectnotfound When no public store was found
 	 * @throw toomanyobjects When more then one public store has been found
 	 */
-	virtual std::unique_ptr<objectdetails_t> getPublicStoreDetails(void);
+	virtual objectdetails_t getPublicStoreDetails() override;
 
 	/**
 	 * Obtain the objectdetails for a server
@@ -210,7 +209,7 @@ public:
 	 * @throw objectnotfound When no server has been found with the given name
 	 * @throw toomanyobjects When more then one server have been found with the given name
 	 */
-	virtual std::unique_ptr<serverdetails_t> getServerDetails(const std::string &server);
+	virtual serverdetails_t getServerDetails(const std::string &server) override;
 
 	/**
 	 * Obtain server list
@@ -218,7 +217,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual std::unique_ptr<serverlist_t> getServers(void);
+	virtual serverlist_t getServers() override;
 
 	/**
 	 * Update an object with new details
@@ -321,7 +320,7 @@ public:
 	 *					Boolean to indicate if the userdefault quota must be requested.
 	 * @throw runtime_error When the LDAP query failed
 	 */	 
-	virtual std::unique_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault);
+	virtual quotadetails_t getQuota(const objectid_t &, bool get_user_default) override;
 
     /**
 	 * Set quota information on object
@@ -343,7 +342,7 @@ public:
 	 *
 	 * @return	a list of properties
 	 */
-	virtual std::unique_ptr<abprops_t> getExtraAddressbookProperties(void);
+	virtual abprops_t getExtraAddressbookProperties() override;
 
 	virtual void removeAllObjects(objectid_t except);
 
@@ -356,16 +355,15 @@ protected:
 	/**
 	 * converter FROM ldap TO kopano-server
 	 */
-	ECIConv *m_iconv;
+	std::unique_ptr<ECIConv> m_iconv;
 
 	/**
 	 * converter FROM kopano-server TO ldap
 	 */
-	ECIConv *m_iconvrev;
+	std::unique_ptr<ECIConv> m_iconvrev;
 
 	static std::unique_ptr<LDAPCache> m_lpCache;
-
-	LDAP_TIMEVAL m_timeout;
+	struct timeval m_timeout;
 
 private:
 	/**
@@ -505,16 +503,16 @@ private:
 	objectsignature_t objectDNtoObjectSignature(objectclass_t objclass, const std::string &dn);
 
 	/**
-	 * Convert a list of DN's to a list of object signatures
+	 * Convert a list of DNs to a list of object signatures
 	 *
 	 * @param[in]	objclass
 	 *					The objectclass to which this search should be restricted.
 	 *					The objectclass can be partially unknown (OBJECTCLASS_UNKNOWN, MAILUSER_UNKNOWN, ...)
 	 * @param[in]	dn
-	 *					List of DN's
+	 *					List of DNs
 	 * @return The list of objectsignatures
 	 */
-	std::unique_ptr<signatures_t> objectDNtoObjectSignatures(objectclass_t objclass, const std::list<std::string> &dn);
+	signatures_t objectDNtoObjectSignatures(objectclass_t, const std::list<std::string> &dn);
 
 	/**
 	 * Escape binary data to escaped string
@@ -622,7 +620,7 @@ private:
 	 *					Optional argument, The company where the possible object should belong.
 	 * @return The list of object signatures which were found
 	 */
-	std::unique_ptr<signatures_t> resolveObjectsFromAttribute(objectclass_t objclass, const std::list<std::string> &objects, const char *lpAttr, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
+	signatures_t resolveObjectsFromAttribute(objectclass_t, const std::list<std::string> &objects, const char *attr, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data by checking if the data contains
@@ -641,7 +639,7 @@ private:
 	 *					Optional argument, The company where the possible object should belong.
 	 * @return The list of object signatures which were found
 	 */
-	std::unique_ptr<signatures_t> resolveObjectsFromAttributes(objectclass_t objclass, const std::list<std::string> &objects, const char **lppAttr, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
+	signatures_t resolveObjectsFromAttributes(objectclass_t, const std::list<std::string> &objects, const char **attr, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve object from attribute data depending on the attribute type
@@ -683,7 +681,7 @@ private:
 	 *					Optional argument, The company where the possible object should belong.
 	 * @return The list of object signatures which were found
 	 */
-	std::unique_ptr<signatures_t> resolveObjectsFromAttributeType(objectclass_t objclass, const std::list<std::string> &objects, const char *lpAttr, const char *lpAttrType, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
+	signatures_t resolveObjectsFromAttributeType(objectclass_t, const std::list<std::string> &objects, const char *attr, const char *attr_type, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data by checking if the data contains
@@ -705,7 +703,7 @@ private:
 	 *					Optional argument, The company where the possible object should belong.
 	 * @return The list of object signatures which were found
 	 */
-	std::unique_ptr<signatures_t> resolveObjectsFromAttributesType(objectclass_t objclass, const std::list<std::string> &objects, const char **lppAttr, const char *lpAttrType, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
+	signatures_t resolveObjectsFromAttributesType(objectclass_t, const std::list<std::string> &objects, const char **attr, const char *attr_type, const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Determine attribute data for a specific object id
@@ -740,7 +738,7 @@ private:
 	 * @return The list of object signatures for all found objects
 	 * @throw runtime_error When the LDAP query failed
 	 */
-	std::unique_ptr<signatures_t> getAllObjectsByFilter(const std::string &basedn, int scope, const std::string &search_filter, const std::string &strCompanyDN, bool bCache);
+	signatures_t getAllObjectsByFilter(const std::string &basedn, int scope, const std::string &search_filter, const std::string &company_dn, bool cache);
 
 	/**
 	 * Detecmine object id from LDAP result entry

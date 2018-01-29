@@ -30,21 +30,7 @@ ECParentStorage::ECParentStorage(ECGenericProp *lpParentObject,
     ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage) :
 	m_lpParentObject(lpParentObject), m_ulObjId(ulObjId),
 	m_ulUniqueId(ulUniqueId), m_lpServerStorage(lpServerStorage)
-{
-	if (m_lpParentObject)
-		m_lpParentObject->AddRef();
-	if (m_lpServerStorage)
-		m_lpServerStorage->AddRef();
-}
-
-ECParentStorage::~ECParentStorage()
-{
-	if (m_lpParentObject)
-		m_lpParentObject->Release();
-
-	if (m_lpServerStorage)
-		m_lpServerStorage->Release();
-}
+{}
 
 HRESULT ECParentStorage::QueryInterface(REFIID refiid, void **lppInterface)
 {
@@ -59,29 +45,11 @@ HRESULT ECParentStorage::Create(ECGenericProp *lpParentObject, ULONG ulUniqueId,
 	       lpServerStorage).put(lppParentStorage);
 }
 
-HRESULT ECParentStorage::HrReadProps(LPSPropTagArray *lppPropTags, ULONG *lpcValues, LPSPropValue *lppValues)
-{
-	// this call should disappear
-	return MAPI_E_NO_SUPPORT;
-}
-
 HRESULT ECParentStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue)
 {
 	if (m_lpServerStorage == NULL)
 		return MAPI_E_NOT_FOUND;
 	return m_lpServerStorage->HrLoadProp(ulObjId, ulPropTag, lppsPropValue);
-}
-
-HRESULT	ECParentStorage::HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags)
-{
-	// this call should disappear
-	return MAPI_E_NO_SUPPORT;
-}
-
-HRESULT ECParentStorage::HrDeleteProps(const SPropTagArray *lpsPropTagArray)
-{
-	// this call should disappear
-	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECParentStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
@@ -117,7 +85,7 @@ HRESULT ECParentStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	if (iterSObj == m_lpParentObject->m_sMapiObject->lstChildren.cend())
 		return MAPI_E_NOT_FOUND;
 	// make a complete copy of the object, because of close / re-open
-	*lppsMapiObject = new MAPIOBJECT(*iterSObj);
+	*lppsMapiObject = new MAPIOBJECT(**iterSObj);
 	return hr;
 }
 

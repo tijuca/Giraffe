@@ -1,11 +1,28 @@
-#include "config.h"
+/*
+ * Copyright 2016+, Kopano and its licensors
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <chrono>
+#include <memory>
+#include <mutex>
 #include <cerrno>
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <getopt.h>
+#include <pthread.h>
 #include <spawn.h>
 #include <unistd.h>
 #include <kopano/CommonUtil.h>
@@ -15,242 +32,204 @@
 #include <kopano/ECMemTable.h>
 #include <kopano/automapi.hpp>
 #include <kopano/memory.hpp>
+#include <kopano/stringutil.h>
 #include <kopano/IECInterfaces.hpp>
 #ifdef HAVE_CURL_CURL_H
 #	include <curl/curl.h>
 #endif
+#define NO_NOTIFY EC_PROFILE_FLAGS_NO_NOTIFICATIONS
 
 struct mpt_stat_entry {
-	struct timespec start, stop;
+	KC::time_point start, stop;
 };
 
 using namespace KCHL;
+using clk = std::chrono::steady_clock;
 
+class mpt_job {
+	public:
+	virtual int init();
+	virtual int run() = 0;
+	private:
+	AutoMAPI m_mapi;
+};
+
+static pthread_t mpt_ticker;
 static std::list<struct mpt_stat_entry> mpt_stat_list;
+static std::mutex mpt_stat_lock;
 static std::wstring mpt_userw, mpt_passw;
 static const wchar_t *mpt_user, *mpt_pass;
 static const char *mpt_socket;
 static size_t mpt_repeat = ~0U;
 static int mpt_loglevel = EC_LOGLEVEL_NOTICE;
 
-static void mpt_stat_dump(int s = 0)
+static void *mpt_stat_dump(void *)
 {
-	size_t z = mpt_stat_list.size();
-	if (z == 0)
-		return;
-	const struct mpt_stat_entry &first = *mpt_stat_list.begin();
-	const struct mpt_stat_entry &last  = *mpt_stat_list.rbegin();
-	typedef std::chrono::seconds sec;
-	typedef std::chrono::nanoseconds nsec;
-	auto dt = std::chrono::duration<double>(
-	          sec(last.stop.tv_sec) + nsec(last.stop.tv_nsec) -
-	          (sec(first.start.tv_sec) + nsec(first.start.tv_nsec)));
-	if (dt.count() == 0)
-		return;
-	printf("\r\x1b\x5b""2K%.1f per second", z / dt.count());
-	fflush(stdout);
+	for (;; sleep(1)) {
+		std::unique_lock<std::mutex> locker(mpt_stat_lock);
+		size_t z = mpt_stat_list.size();
+		if (z == 0)
+			continue;
+		decltype(mpt_stat_list.front().start - mpt_stat_list.front().start) dt;
+		dt = dt.zero();
+		for (const auto &i : mpt_stat_list)
+			dt += i.stop - i.start;
+		locker.unlock();
+		if (dt.count() == 0)
+			continue;
+		printf("\r\x1b\x5b""2K%.1f per second", z / std::chrono::duration_cast<std::chrono::duration<double>>(dt).count());
+		fflush(stdout);
+	}
+	return nullptr;
 }
 
-static void mpt_stat_record(const struct mpt_stat_entry &dp, size_t limit = 50)
+static void mpt_stat_record(const struct mpt_stat_entry &dp, size_t limit = 300)
 {
-	mpt_stat_list.push_back(dp);
+	std::lock_guard<std::mutex> locker(mpt_stat_lock);
+	mpt_stat_list.emplace_back(dp);
 	if (mpt_stat_list.size() > limit)
 		mpt_stat_list.pop_front();
 }
 
-static int mpt_setup_tick(void)
-{
-#ifdef HAVE_TIMER_CREATE
-	struct sigaction sa;
-	sa.sa_handler = mpt_stat_dump;
-	sa.sa_flags = SA_RESTART;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGALRM, &sa, NULL) < 0) {
-		perror("sigaction");
-		return -errno;
-	}
-	struct sigevent sev;
-	memset(&sev, 0, sizeof(sev));
-	sev.sigev_notify = SIGEV_SIGNAL;
-	sev.sigev_signo  = SIGALRM;
-	timer_t timerid;
-	if (timer_create(CLOCK_MONOTONIC, &sev, &timerid) < 0) {
-		perror("timer_create");
-		return -errno;
-	}
-	struct itimerspec it;
-	it.it_interval.tv_sec = it.it_value.tv_sec = 1;
-	it.it_interval.tv_nsec = it.it_value.tv_nsec = 0;
-	if (timer_settime(timerid, 0, &it, NULL) < 0) {
-		perror("timer_settime");
-		return -errno;
-	}
-#else
-	/* Not guaranteed to use CLOCK_MONOTONIC */
-	alarm(1);
-#endif
-	return 1;
-}
-
 static int mpt_main_init(void)
 {
-	if (mpt_setup_tick() < 0)
-		return EXIT_FAILURE;
 	struct mpt_stat_entry dp;
 	while (mpt_repeat-- > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
+		dp.start = clk::now();
 		HRESULT ret = MAPIInitialize(NULL);
 		if (ret == erSuccess)
 			MAPIUninitialize();
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		dp.stop = clk::now();
 		mpt_stat_record(dp);
 	}
 	return EXIT_SUCCESS;
 }
 
-static void mpt_ping(IMAPISession *ses)
+int mpt_job::init()
 {
-	object_ptr<IMsgStore> store;
-	auto ret = HrOpenDefaultStore(ses, &~store);
-	if (ret != hrSuccess)
-		return;
-	object_ptr<IECTestProtocol> tp;
-	ret = store->QueryInterface(IID_IECTestProtocol, &~tp);
-	if (ret != hrSuccess)
-		return;
-	memory_ptr<char> out;
-	tp->TestGet("ping", &~out);
-}
-
-/**
- * @with_lo:	whether to include the logoff RPC in the time
- * 		measurement (it is executed in any case)
- * @with_ping:	whether to issue some more RPCs
- */
-static int mpt_main_login(bool with_lo, bool with_ping)
-{
-	HRESULT ret = MAPIInitialize(NULL);
+	auto ret = m_mapi.Initialize();
 	if (ret != hrSuccess) {
 		perror("MAPIInitialize");
 		return EXIT_FAILURE;
 	}
-
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
-	struct mpt_stat_entry dp;
-
-	while (mpt_repeat-- > 0) {
-		object_ptr<IMAPISession> ses;
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
-		ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
-		      mpt_socket, 0, NULL, NULL);
-		if (!with_lo)
-			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
-		if (ret != hrSuccess) {
-			fprintf(stderr, "Logon failed: %s\n", GetMAPIErrorMessage(ret));
-			sleep(1);
-			continue;
-		}
-		if (with_lo) {
-			if (with_ping)
-				mpt_ping(ses);
-			ses.reset();
-			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
-		}
-		mpt_stat_record(dp);
-	}
-	MAPIUninitialize();
 	return EXIT_SUCCESS;
 }
 
-/* Login-Logout with Save–Restore */
-static int mpt_main_lsr(bool with_ping)
+static int mpt_basic_open(object_ptr<IMAPISession> &ses,
+    object_ptr<IMsgStore> &store)
 {
-	AutoMAPI automapi;
-	auto ret = automapi.Initialize();
-	if (ret != hrSuccess) {
-		perror("MAPIInitialize");
-		return EXIT_FAILURE;
-	}
-
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
-	object_ptr<IMAPISession> ses;
-	ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
-	      mpt_socket, 0, nullptr, nullptr);
+	auto ret = HrOpenECSession(&~ses, "mapitime", "", mpt_user, mpt_pass,
+	           mpt_socket, NO_NOTIFY, nullptr, nullptr);
 	if (ret != hrSuccess) {
 		fprintf(stderr, "Logon failed: %s\n", GetMAPIErrorMessage(ret));
+		sleep(1);
+		return ret;
+	}
+	ret = HrOpenDefaultStore(ses, &~store);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "OpenDefaultStore: %s\n", GetMAPIErrorMessage(ret));
+		sleep(1);
+		return ret;
+	}
+	return hrSuccess;
+}
+
+static int mpt_basic_work(IMsgStore *store)
+{
+	memory_ptr<ENTRYID> eid;
+	ULONG neid = 0;
+	auto ret = store->GetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0, &neid, &~eid, nullptr);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "GRF failed: %s\n", GetMAPIErrorMessage(ret));
 		return EXIT_FAILURE;
 	}
-
-	struct mpt_stat_entry dp;
-	while (mpt_repeat-- > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
-		std::string data;
-		ret = kc_session_save(ses, data);
-		if (ret != hrSuccess) {
-			fprintf(stderr, "save failed: %s\n", GetMAPIErrorMessage(ret));
-			return EXIT_FAILURE;
-		}
-		ret = kc_session_restore(data, &~ses);
-		if (ret != hrSuccess) {
-			fprintf(stderr, "restore failed: %s\n", GetMAPIErrorMessage(ret));
-			return EXIT_FAILURE;
-		}
-		if (with_ping)
-			mpt_ping(ses);
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
-		mpt_stat_record(dp);
+	object_ptr<IMAPIFolder> folder;
+	ULONG type = 0;
+	ret = store->OpenEntry(0, nullptr, &iid_of(folder), MAPI_MODIFY, &type, &~folder);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "OE failed: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
 }
 
-static int mpt_main_vft(void)
+class mpt_open1 : public mpt_job {
+	public:
+	int run() override;
+};
+
+int mpt_open1::run()
 {
-	AutoMAPI mapiinit;
-	HRESULT ret = mapiinit.Initialize();
+	object_ptr<IMAPISession> ses;
+	object_ptr<IMsgStore> store;
+	auto ret = mpt_basic_open(ses, store);
+	if (ret != hrSuccess)
+		return EXIT_FAILURE;
+	return mpt_basic_work(store);
+}
+
+class mpt_open2 : public mpt_job {
+	public:
+	int init() override;
+	int run() override;
+	private:
+	std::string m_data;
+};
+
+int mpt_open2::init()
+{
+	auto ret = mpt_job::init();
+	if (ret != hrSuccess)
+		return EXIT_FAILURE;
+	object_ptr<IMAPISession> ses;
+	object_ptr<IMsgStore> store;
+	ret = mpt_basic_open(ses, store);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "mpt_open_base: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
+	}
+	ret = kc_session_save(ses, m_data);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "save failed: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
+}
+
+int mpt_open2::run()
+{
+	object_ptr<IMAPISession> ses;
+	auto ret = kc_session_restore(m_data, &~ses);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "restore failed: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
+	}
+	object_ptr<IMsgStore> store;
+	ret = HrOpenDefaultStore(ses, &~store);
+	if (ret != hrSuccess) {
+		fprintf(stderr, "OpenDefaultStore: %s\n", GetMAPIErrorMessage(ret));
+		return EXIT_FAILURE;
+	}
+	return mpt_basic_work(store);
+}
+
+static int mpt_runner(mpt_job &&fct)
+{
+	auto ret = fct.init();
 	if (ret != hrSuccess) {
 		perror("MAPIInitialize");
 		return EXIT_FAILURE;
 	}
-
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
 	struct mpt_stat_entry dp;
-	static constexpr const SizedSPropTagArray(1, spta) = {1, {PR_ENTRYID}};
-	object_ptr<ECMemTable> mt;
-	ret = ECMemTable::Create(spta, PT_LONG, &~mt);
-	if (ret != hrSuccess) {
-		ec_log_err("ECMemTable::Create died");
-		return EXIT_FAILURE;
-	}
-	ECMemTableView *view;
-	ret = mt->HrGetView(createLocaleFromName(""), 0, &view);
-	if (ret != hrSuccess) {
-		ec_log_err("HrGetView died");
-		return EXIT_FAILURE;
-	}
-
 	while (mpt_repeat-- > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
-		IMAPITable *imt = NULL;
-		IUnknown *iunk = NULL;
-		view->QueryInterface(IID_IMAPITable, reinterpret_cast<void **>(&imt));
-		view->QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&iunk));
-		imt->QueryInterface(IID_IMAPITable, reinterpret_cast<void **>(&imt));
-		imt->QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&iunk));
-		iunk->QueryInterface(IID_IMAPITable, reinterpret_cast<void **>(&imt));
-		iunk->QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&iunk));
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		dp.start = clk::now();
+		ret = fct.run();
+		if (ret != EXIT_SUCCESS)
+			break;
+		dp.stop = clk::now();
 		mpt_stat_record(dp);
 	}
-	return EXIT_SUCCESS;
+	return ret;
 }
 
 static int mpt_main_pagetime(int argc, char **argv)
@@ -259,10 +238,6 @@ static int mpt_main_pagetime(int argc, char **argv)
 		fprintf(stderr, "Need URL to test\n");
 		return EXIT_FAILURE;
 	}
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
 #ifndef HAVE_CURL_CURL_H
 	fprintf(stderr, "Not built with curl support\n");
 	return EXIT_FAILURE;
@@ -274,9 +249,9 @@ static int mpt_main_pagetime(int argc, char **argv)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, static_cast<curl_write_callback>([](char *, size_t, size_t n, void *) { return n; }));
 	struct mpt_stat_entry dp;
 	while (mpt_repeat-- > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
+		dp.start = clk::now();
 		curl_easy_perform(curl);
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		dp.stop = clk::now();
 		mpt_stat_record(dp);
 	}
 	return EXIT_SUCCESS;
@@ -291,19 +266,15 @@ static int mpt_main_exectime(int argc, char **argv)
 	}
 	--argc;
 	++argv; // skip "exectime"
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
 	struct mpt_stat_entry dp;
 	while (mpt_repeat-- > 0) {
 		pid_t pid;
 		int st;
 
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
+		dp.start = clk::now();
 		if (posix_spawn(&pid, argv[0], nullptr, nullptr, const_cast<char **>(argv), nullptr) == 0)
 			wait(&st);
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		dp.stop = clk::now();
 		mpt_stat_record(dp);
 	}
 	return EXIT_SUCCESS;
@@ -317,9 +288,6 @@ static int mpt_main_cast(bool which)
 		perror("MAPIInitialize");
 		return EXIT_FAILURE;
 	}
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
 	object_ptr<IProfAdmin> profadm;
 	ret = MAPIAdminProfiles(0, &~profadm);
 	if (ret != hrSuccess)
@@ -333,20 +301,20 @@ static int mpt_main_cast(bool which)
 		while (mpt_repeat-- > 0) {
 			struct mpt_stat_entry dp;
 			unsigned int rep = 100000;
-			clock_gettime(CLOCK_MONOTONIC, &dp.start);
+			dp.start = clk::now();
 			while (rep-- > 0)
 				unk->QueryInterface(IID_IProfAdmin, &~profadm);
-			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+			dp.stop = clk::now();
 			mpt_stat_record(dp);
 		}
 	} else if (which == 1) { /* dycast */
 		while (mpt_repeat-- > 0) {
 			struct mpt_stat_entry dp;
 			unsigned int rep = 100000;
-			clock_gettime(CLOCK_MONOTONIC, &dp.start);
+			dp.start = clk::now();
 			while (rep-- > 0)
 				profadm.reset(dynamic_cast<IProfAdmin *>(unk.get()));
-			clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+			dp.stop = clk::now();
 			mpt_stat_record(dp);
 		}
 	}
@@ -356,23 +324,35 @@ static int mpt_main_cast(bool which)
 static int mpt_main_malloc(void)
 {
 	struct mpt_stat_entry dp;
-	void *base, *x;
-	int err = mpt_setup_tick();
-	if (err < 0)
-		return EXIT_FAILURE;
-
 	while (mpt_repeat-- > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &dp.start);
-		auto ret = MAPIAllocateBuffer(sizeof(MAPIUID), &base);
+		dp.start = clk::now();
+		memory_ptr<MAPIUID> base;
+		auto ret = MAPIAllocateBuffer(sizeof(MAPIUID), &~base);
 		if (ret != hrSuccess)
 			return EXIT_FAILURE;
 		for (unsigned int i = 0; i < 10000; ++i) {
+			void *x = nullptr;
 			ret = MAPIAllocateMore(sizeof(MAPIUID), base, &x);
 			if (ret != hrSuccess)
 				return EXIT_FAILURE;
 		}
-		MAPIFreeBuffer(base);
-		clock_gettime(CLOCK_MONOTONIC, &dp.stop);
+		base.reset();
+		dp.stop = clk::now();
+		mpt_stat_record(dp);
+	}
+	return EXIT_SUCCESS;
+}
+
+static int mpt_main_bin2hex()
+{
+	struct mpt_stat_entry dp;
+	static constexpr const size_t bufsize = 1048576;
+	std::unique_ptr<char[]> temp(new char[bufsize]);
+	memset(temp.get(), 0, bufsize);
+	while (mpt_repeat-- > 0) {
+		dp.start = clk::now();
+		bin2hex(bufsize, reinterpret_cast<const unsigned char *>(temp.get()));
+		dp.stop = clk::now();
 		mpt_stat_record(dp);
 	}
 	return EXIT_SUCCESS;
@@ -384,14 +364,14 @@ static void mpt_usage(void)
 	fprintf(stderr, "  -z count    Run this many iterations (default: finite but almost forever)\n");
 	fprintf(stderr, "Benchmark choices:\n");
 	fprintf(stderr, "  init        Just the library initialization\n");
-	fprintf(stderr, "  li          Issue login/logoff RPCs, but measure only login\n");
-	fprintf(stderr, "  lilo        Issue login/logoff RPCs, and measure both\n");
-	fprintf(stderr, "  ping        Issue login/logoff/PING RPCs, and measure all\n");
-	fprintf(stderr, "  lsr         Measure profile save-restore cycle\n");
-	fprintf(stderr, "  lsr+ping    lsr with forced network access (PING RPC)\n");
-	fprintf(stderr, "  vft         Measure C++ class dispatching\n");
+	fprintf(stderr, "  open1       Measure: init, login, open store, open root container\n");
+	fprintf(stderr, "  open2       Like open1, but use Save-Restore\n");
 	fprintf(stderr, "  pagetime    Measure webpage retrieval time\n");
 	fprintf(stderr, "  exectime    Measure process runtime\n");
+	fprintf(stderr, "  qicast      Measure QueryInterface throughput\n");
+	fprintf(stderr, "  dycast      Measure dynamic_cast<> throughput\n");
+	fprintf(stderr, "  malloc      Measure MAPIAllocateMore throughput\n");
+	fprintf(stderr, "  bin2hex     Measure bin2hex throughput\n");
 }
 
 static int mpt_option_parse(int argc, char **argv)
@@ -450,31 +430,34 @@ int main(int argc, char **argv)
 		mpt_usage();
 		return EXIT_FAILURE;
 	}
-	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "i") == 0)
-		return mpt_main_init();
-	else if (strcmp(argv[1], "li") == 0)
-		return mpt_main_login(false, false);
-	else if (strcmp(argv[1], "lilo") == 0)
-		return mpt_main_login(true, false);
-	else if (strcmp(argv[1], "ping") == 0)
-		return mpt_main_login(true, true);
-	else if (strcmp(argv[1], "lsr") == 0)
-		return mpt_main_lsr(false);
-	else if (strcmp(argv[1], "lsr+ping") == 0)
-		return mpt_main_lsr(true);
-	else if (strcmp(argv[1], "vft") == 0)
-		return mpt_main_vft();
-	else if (strcmp(argv[1], "exectime") == 0)
-		return mpt_main_exectime(argc - 1, argv + 1);
-	else if (strcmp(argv[1], "pagetime") == 0)
-		return mpt_main_pagetime(argc - 1, argv + 1);
-	else if (strcmp(argv[1], "qicast") == 0)
-		return mpt_main_cast(0);
-	else if (strcmp(argv[1], "dycast") == 0)
-		return mpt_main_cast(1);
-	else if (strcmp(argv[1], "malloc") == 0)
-		return mpt_main_malloc();
 
-	mpt_usage();
-	return EXIT_FAILURE;
+	ret = pthread_create(&mpt_ticker, nullptr, mpt_stat_dump, nullptr);
+	if (ret != 0) {
+		perror("pthread_create");
+		return EXIT_FAILURE;
+	}
+	ret = EXIT_FAILURE;
+	if (strcmp(argv[1], "init") == 0 || strcmp(argv[1], "i") == 0)
+		ret = mpt_main_init();
+	else if (strcmp(argv[1], "open1") == 0)
+		ret = mpt_runner(mpt_open1());
+	else if (strcmp(argv[1], "open2") == 0)
+		ret = mpt_runner(mpt_open2());
+	else if (strcmp(argv[1], "exectime") == 0)
+		ret = mpt_main_exectime(argc - 1, argv + 1);
+	else if (strcmp(argv[1], "pagetime") == 0)
+		ret = mpt_main_pagetime(argc - 1, argv + 1);
+	else if (strcmp(argv[1], "qicast") == 0)
+		ret = mpt_main_cast(0);
+	else if (strcmp(argv[1], "dycast") == 0)
+		ret = mpt_main_cast(1);
+	else if (strcmp(argv[1], "malloc") == 0)
+		ret = mpt_main_malloc();
+	else if (strcmp(argv[1], "bin2hex") == 0)
+		ret = mpt_main_bin2hex();
+	else
+		mpt_usage();
+	pthread_cancel(mpt_ticker);
+	pthread_join(mpt_ticker, nullptr);
+	return ret;
 }

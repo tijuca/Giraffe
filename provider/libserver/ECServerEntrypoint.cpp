@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <kopano/ECLogger.h>
 #include <kopano/lockhelper.hpp>
+#include <kopano/hl.hpp>
 #include "ECDatabase.h"
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
@@ -41,7 +42,7 @@ static bool g_bInitLib = false;
 void AddDatabaseObject(ECDatabase* lpDatabase)
 {
 	scoped_lock lk(g_hMutexDBObjectList);
-	g_lpDBObjectList.insert(lpDatabase);
+	g_lpDBObjectList.emplace(lpDatabase);
 }
 
 static void database_destroy(void *lpParam)
@@ -94,17 +95,9 @@ ECRESULT kopano_unloadlibrary(void)
 
 	// Remove all exist database objects
 	ulock_normal l_obj(g_hMutexDBObjectList);
-	auto iterDBObject = g_lpDBObjectList.cbegin();
-	while (iterDBObject != g_lpDBObjectList.cend())
-	{
-		auto iNext = iterDBObject;
-		++iNext;
-		delete (*iterDBObject);
-
-		g_lpDBObjectList.erase(iterDBObject);
-
-		iterDBObject = iNext;
-	}
+	for (auto o = g_lpDBObjectList.cbegin(); o != g_lpDBObjectList.cend();
+	     o = g_lpDBObjectList.erase(o))
+		delete *o;
 	l_obj.unlock();
 
 	// remove mutex for database object list
@@ -117,19 +110,12 @@ ECRESULT kopano_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedKopano, 
 {
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
-
-	g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedKopano, bDistributedKopano);
-	auto er = g_lpSessionManager->LoadSettings();
-	if(er != erSuccess)
-		return er;
-	er = g_lpSessionManager->CheckUserLicense();
-	if (er != erSuccess)
-		return er;
-#ifdef HAVE_LIBS3_H
-        if (strcmp(lpConfig->GetSetting("attachment_storage"), "s3") == 0)
-                ECS3Attachment::StaticInit(lpConfig);
-#endif
-	return erSuccess;
+	try {
+		g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedKopano, bDistributedKopano);
+	} catch (KCHL::KMAPIError &e) {
+		return e.code();
+	}
+	return g_lpSessionManager->LoadSettings();
 }
 
 void kopano_removeallsessions()
@@ -142,12 +128,6 @@ ECRESULT kopano_exit()
 {
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
-
-#ifdef HAVE_LIBS3_H
-        if (g_lpSessionManager && strcmp(g_lpSessionManager->GetConfig()->GetSetting("attachment_storage"), "s3") == 0)
-                ECS3Attachment::StaticDeinit();
-#endif
-
 	// delete our plugin of the mainthread: requires ECPluginFactory to be alive, because that holds the dlopen() result
 	plugin_destroy(pthread_getspecific(plugin_key));
 

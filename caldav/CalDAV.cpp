@@ -45,9 +45,6 @@
 #include "SSLUtil.h"
 
 #include "TmpPath.h"
-
-using namespace std;
-
 #include <execinfo.h>
 #include <kopano/UnixUtil.h>
 #include <unicode/uclean.h>
@@ -111,6 +108,9 @@ static void sigsegv(int signr, siginfo_t *si, void *uc)
 	generic_sigsegv_handler(g_lpLogger, "kopano-ical", PROJECT_VERSION, signr, si, uc);
 }
 
+using std::cout;
+using std::endl;
+
 static void PrintHelp(const char *name)
 {
 	cout << "Usage:\n" << endl;
@@ -138,12 +138,13 @@ int main(int argc, char **argv) {
 	// Configuration
 	int opt = 0;
 	const char *lpszCfg = ECConfig::GetDefaultPath("ical.cfg");
+	bool exp_config = false;
 	static const configsetting_t lpDefaults[] = {
 		{ "run_as_user", "kopano" },
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/ical.pid" },
 		{ "running_path", "/var/lib/kopano" },
-		{ "process_model", "fork" },
+		{ "process_model", "thread" },
 		{ "server_bind", "" },
 		{"ical_port", "8080", CONFIGSETTING_NONEMPTY},
 		{"ical_enable", "yes", CONFIGSETTING_NONEMPTY},
@@ -197,6 +198,7 @@ int main(int argc, char **argv) {
 		switch (opt) {
 		case 'c':
 			lpszCfg = optarg;
+			exp_config = true;
 			break;
 		case 'F':
 			g_bDaemonize = false;
@@ -218,7 +220,7 @@ int main(int argc, char **argv) {
 	xmlInitParser();
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(lpszCfg) ||
+	if (!g_lpConfig->LoadSettings(lpszCfg, !exp_config) ||
 	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(1, 0, "-", false);
@@ -239,8 +241,7 @@ int main(int argc, char **argv) {
 	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
-
-	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+	if (!TmpPath::instance.OverridePath(g_lpConfig))
 		ec_log_err("Ignoring invalid path-setting!");
 
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0)
@@ -292,14 +293,13 @@ int main(int argc, char **argv) {
 
 	hr = MAPIInitialize(NULL);
 	if (hr != hrSuccess) {
-		fprintf(stderr, "Messaging API could not be initialized: %s (%x)",
-		        GetMAPIErrorMessage(hr), hr);
+		kc_perror("Messaging API could not be initialized", hr);
 		goto exit;
 	}
 
 	if (g_bThreads)
 		mainthread = pthread_self();
-	ec_log_info("Starting kopano-ical version " PROJECT_VERSION " (pid %d)", getpid());
+	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-ical version " PROJECT_VERSION " (pid %d)", getpid());
 	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
 	if (hr != hrSuccess)
 		goto exit2;
@@ -479,7 +479,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		hr = HrStartHandlerClient(lpChannel, bUseSSL, nCloseFDs, pCloseFDs);
 		if (hr != hrSuccess) {
 			delete lpChannel;	// destructor closes sockets
-			ec_log_err("Handling client connection failed. (0x%08X %s)", hr, GetMAPIErrorMessage(hr));
+			kc_perror("Handling client connection failed", hr);
 			continue;
 		}
 		if (g_bThreads == false)
@@ -631,7 +631,7 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	hr = HrParseURL(strUrl, &ulFlag);
 	if (hr != hrSuccess) {
-		ec_log_err("Client request is invalid: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
+		kc_perror("Client request is invalid", hr);
 		lpRequest.HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
 		goto exit;
 	}

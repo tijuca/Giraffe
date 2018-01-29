@@ -52,7 +52,6 @@
 #include <kopano/ECLogger.h>
 #include "HtmlEntity.h"
 
-using namespace std;
 using namespace KCHL;
 
 #include <kopano/ECGetText.h>
@@ -170,7 +169,7 @@ HRESULT	Util::HrMergePropertyArrays(const SPropValue *lpSrc, ULONG cValues,
     ULONG *cDestValues)
 {
 	HRESULT hr = hrSuccess;
-	map<ULONG, const SPropValue *> mapPropSource;
+	std::map<ULONG, const SPropValue *> mapPropSource;
 	ULONG i = 0;
 	memory_ptr<SPropValue> lpProps;
 
@@ -599,6 +598,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 
 	switch(lpSrc->rt) {
 	case RES_AND:
+		if (lpSrc->res.resAnd.cRes > 0 && lpSrc->res.resAnd.lpRes == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		lpDest->res.resAnd.cRes = lpSrc->res.resAnd.cRes;
 		hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resAnd.cRes, lpBase, (void **)&lpDest->res.resAnd.lpRes);
 		if (hr != hrSuccess)
@@ -610,6 +611,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 		}
 		break;
 	case RES_OR:
+		if (lpSrc->res.resOr.cRes > 0 && lpSrc->res.resOr.lpRes == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		lpDest->res.resOr.cRes = lpSrc->res.resOr.cRes;
 		hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resOr.cRes, lpBase, (void **)&lpDest->res.resOr.lpRes);
 		if (hr != hrSuccess)
@@ -621,11 +624,15 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 		}
 		break;
 	case RES_NOT:
+		if (lpSrc->res.resNot.lpRes == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resNot.lpRes);
 		if (hr != hrSuccess)
 			return hr;
 		return HrCopySRestriction(lpDest->res.resNot.lpRes, lpSrc->res.resNot.lpRes, lpBase);
 	case RES_CONTENT:
+		if (lpSrc->res.resContent.lpProp == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		lpDest->res.resContent.ulFuzzyLevel = lpSrc->res.resContent.ulFuzzyLevel;
 		lpDest->res.resContent.ulPropTag = lpSrc->res.resContent.ulPropTag;
 		hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resContent.lpProp);
@@ -633,6 +640,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 			return hr;
 		return HrCopyProperty(lpDest->res.resContent.lpProp, lpSrc->res.resContent.lpProp, lpBase);
 	case RES_PROPERTY:
+		if (lpSrc->res.resProperty.lpProp == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		lpDest->res.resProperty.relop = lpSrc->res.resProperty.relop;
 		lpDest->res.resProperty.ulPropTag = lpSrc->res.resProperty.ulPropTag;
 		hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resProperty.lpProp);
@@ -658,6 +667,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 		lpDest->res.resExist.ulPropTag = lpSrc->res.resExist.ulPropTag;
 		break;
 	case RES_SUBRESTRICTION:
+		if (lpSrc->res.resSub.lpRes == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 		lpDest->res.resSub.ulSubObject = lpSrc->res.resSub.ulSubObject;
 		hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpDest->res.resSub.lpRes);
 		if (hr != hrSuccess)
@@ -669,6 +680,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 
 		if (lpSrc->res.resComment.cValues > 0)
 		{
+			if (lpSrc->res.resComment.lpProp == nullptr)
+				return MAPI_E_INVALID_PARAMETER;
 			hr = MAPIAllocateMore(sizeof(SPropValue) * lpSrc->res.resComment.cValues, lpBase, (void **) &lpDest->res.resComment.lpProp);
 			if (hr != hrSuccess)
 				return hr;
@@ -677,6 +690,8 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 				return hr;
 		}
 		if (lpSrc->res.resComment.lpRes) {
+			if (lpSrc->res.resComment.lpRes == nullptr)
+				return MAPI_E_INVALID_PARAMETER;
 			hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resComment.lpRes);
 			if (hr != hrSuccess)
 				return hr;
@@ -819,7 +834,7 @@ HRESULT Util::HrCopySRowSet(LPSRowSet lpDest, const SRowSet *lpSrc,
  * freed individually.  Make sure to free your RowSet with
  * FreeProws(), which frees the rows individually.
  *
- * However, when you have a rowset within a rowset (eg. lpadrlist in
+ * However, when you have a rowset within a rowset (e.g. lpadrlist in
  * OP_FORWARD and OP_DELEGATE rules) these need to be allocated to the
  * original row, and not separate
  * 
@@ -1412,7 +1427,7 @@ HRESULT Util::HrTextToHtml(const WCHAR *text, std::string &strHTML, ULONG ulCode
 {
 	HRESULT hr = hrSuccess;
 	const char *lpszCharset;
-	wstring wHTML;
+	std::wstring wHTML;
 
 	hr = HrGetCharsetByCP(ulCodepage, &lpszCharset);
 	if (hr != hrSuccess) {
@@ -1436,48 +1451,12 @@ HRESULT Util::HrTextToHtml(const WCHAR *text, std::string &strHTML, ULONG ulCode
 	}
 
 	try {
-		strHTML += convert_to<string>(lpszCharset, wHTML, rawsize(wHTML), CHARSET_WCHAR);
+		strHTML += convert_to<std::string>(lpszCharset, wHTML, rawsize(wHTML), CHARSET_WCHAR);
 	} catch (const convert_exception &) {
 	}
 
 	return hr;
 }
-
-static const struct _rtfcodepages {
-	int id;						// RTF codepage ID
-	ULONG ulCodepage;			// Windows codepage
-} RTFCODEPAGES[] = {
-	{437, 437},					// United States IBM
-	{708, 0},					// Arabic (ASMO 708)
-	{709, 0},					// Arabic (ASMO 449+, BCON V4)
-	{710, 0},					// Arabic (transparent Arabic)
-	{711, 0},					// Arabic (Nafitha Enhanced)
-	{720, 0},					// Arabic (transparent ASMO)
-	{819, 0},		 // Windows 3.1 (United States and Western Europe)
-	{850, 1252},		 // IBM multilingual
-	{852, 1251},		 // Eastern European
-	{860, 0},		 // Portuguese
-	{862, 0},		 // Hebrew
-	{863, 0},		 // French Canadian
-	{864, 0},		 // Arabic
-	{865, 0},		 // Norwegian
-	{866, 0},		 // Soviet Union
-	{874, 0},		 // Thai
-	{932, 50220},		 // Japanese
-	{936, 936},		 // Simplified Chinese
-	{949, 0},		 // Korean
-	{950, 0},		 // Traditional Chinese
-	{1250, 0},		 // Windows 3.1 (Eastern European)
-	{1251, 0},		 // Windows 3.1 (Cyrillic)
-	{1252, 0},		 // Western European
-	{1253, 0},		 // Greek
-	{1254, 0},		 // Turkish
-	{1255, 0},		 // Hebrew
-	{1256, 0},		 // Arabic
-	{1257, 0},		 // Baltic
-	{1258, 0},		 // Vietnamese
-	{1361, 0},		 // Johab
-};
 
 /**
  * Convert plaintext to uncompressed RTF using streams.
@@ -1509,9 +1488,8 @@ HRESULT Util::HrTextToRtf(IStream *text, IStream *rtf)
 	rtf->Write(header, strlen(header), NULL);
 
 	while(1) {
-		text->Read(c, BUFSIZE * sizeof(WCHAR), &cRead);
-
-		if(cRead == 0)
+		auto ret = text->Read(c, BUFSIZE * sizeof(WCHAR), &cRead);
+		if (ret != hrSuccess || cRead == 0)
 			break;
 
 		cRead /= sizeof(WCHAR);
@@ -1826,7 +1804,7 @@ HRESULT Util::HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::w
 {
 	const char *lpszCharset;
 	convert_context converter;
-	string data;
+	std::string data;
 	HRESULT hr = HrGetCharsetByCP(ulCodepage, &lpszCharset);
 	if (hr != hrSuccess) {
 		lpszCharset = "us-ascii";
@@ -1838,7 +1816,7 @@ HRESULT Util::HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::w
 		return hr;
 
 	try {
-		wstrOutput->assign(converter.convert_to<wstring>(CHARSET_WCHAR"//IGNORE", data, rawsize(data), lpszCharset));
+		wstrOutput->assign(converter.convert_to<std::wstring>(CHARSET_WCHAR"//IGNORE", data, rawsize(data), lpszCharset));
 	} catch (std::exception &) {
 		return MAPI_E_INVALID_PARAMETER;
 	}
@@ -1879,7 +1857,7 @@ template<size_t N> static bool StrCaseCompare(const wchar_t *lpString,
  * Always escape { and } to \{ and \}
  * Always escape \r\n to \par (dfq?)
  * All HTML tags are converted from, say <BODY onclick=bla> to \r\n{\htmltagX <BODY onclick=bla>}
- * Each tag with text content gets an extra {\htmltag64} to suppress generated <P>'s in the final HTML output
+ * Each tag with text content gets an extra {\htmltag64} to suppress generated <P>s in the final HTML output
  * Some tags output \htmlrtf \par \htmlrtf0 so that the plaintext version of the RTF has newlines in the right places
  * Some effort is done so that data between <STYLE> tags is output as a single entity
  * <!-- and --> tags are supported and output as a single htmltagX entity
@@ -1894,7 +1872,7 @@ template<size_t N> static bool StrCaseCompare(const wchar_t *lpString,
 HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 {
 	int tag = 0, type = 0;
-	stack<unsigned int> stackTag;
+	std::stack<unsigned int> stackTag;
 	size_t pos = 0;
 	bool inTag = false;
 	int ulCommentMode = 0;		// 0=no comment, 1=just starting top-level comment, 2=inside comment level 1, 3=inside comment level 2, etc
@@ -2102,7 +2080,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 				// both strChar and strEntity in output, unicode in rtf space, entity in html space
                 strRTF += std::string("\\htmlrtf ") + strChar + "\\htmlrtf0{\\*\\htmltag" +
 					stringify((ulParMode == 2 ? RTF_FLAG_INPAR : 0) | RTF_TAG_TYPE_STARTP | stackTag.top()) +
-					"&" + convert_to<string>(strEntity) + ";}";
+					"&" + convert_to<std::string>(strEntity) + ";}";
                 pos += strEntity.size() + 2;
                 continue;
             }
@@ -2191,7 +2169,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
  */
 HRESULT	Util::HrHtmlToRtf(IStream *html, IStream *rtf, unsigned int ulCodepage)
 {
-	wstring wstrHTML;
+	std::wstring wstrHTML;
 	std::string strRTF;
 	HRESULT hr = HrConvertStreamToWString(html, ulCodepage, &wstrHTML);
 	if(hr != hrSuccess)
@@ -2625,7 +2603,7 @@ HRESULT Util::CopyAttachments(LPMESSAGE lpSrc, LPMESSAGE lpDest, LPSRestriction 
 
 	for (ULONG i = 0; i < lpRows->cRows; ++i) {
 		object_ptr<IAttach> lpDestAttach, lpSrcAttach;
-		auto lpAttachNum = PCpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
+		auto lpAttachNum = lpRows[i].cfind(PR_ATTACH_NUM);
 		if (!lpAttachNum) {
 			bPartial = true;
 			continue;
@@ -2714,12 +2692,12 @@ static HRESULT CopyHierarchy(IMAPIFolder *lpSrc, IMAPIFolder *lpDest,
 			return hr;
 		if (lpRowSet->cRows == 0)
 			break;
-		hr = lpSrc->OpenEntry(lpRowSet->aRow[0].lpProps[1].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpRowSet->aRow[0].lpProps[1].Value.bin.lpb), &IID_IMAPIFolder, 0, &ulObj, &~lpSrcFolder);
+		hr = lpSrc->OpenEntry(lpRowSet[0].lpProps[1].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpRowSet[0].lpProps[1].Value.bin.lpb), &IID_IMAPIFolder, 0, &ulObj, &~lpSrcFolder);
 		if (hr != hrSuccess) {
 			bPartial = true;
 			continue;
 		}
-		hr = lpDest->CreateFolder(FOLDER_GENERIC, (LPTSTR)lpRowSet->aRow[0].lpProps[0].Value.lpszW, NULL, &IID_IMAPIFolder,
+		hr = lpDest->CreateFolder(FOLDER_GENERIC, reinterpret_cast<const TCHAR *>(lpRowSet[0].lpProps[0].Value.lpszW), nullptr, &IID_IMAPIFolder,
 		     MAPI_UNICODE | (ulFlags & MAPI_NOREPLACE ? 0 : OPEN_IF_EXISTS), &~lpDestFolder);
 		if (hr != hrSuccess) {
 			bPartial = true;
@@ -2735,7 +2713,7 @@ static HRESULT CopyHierarchy(IMAPIFolder *lpSrc, IMAPIFolder *lpDest,
 		}
 
 		if (ulFlags & MAPI_MOVE)
-			lpSrc->DeleteFolder(lpRowSet->aRow[0].lpProps[1].Value.bin.cb, (LPENTRYID)lpRowSet->aRow[0].lpProps[1].Value.bin.lpb, 0, NULL, 0);
+			lpSrc->DeleteFolder(lpRowSet[0].lpProps[1].Value.bin.cb, reinterpret_cast<const ENTRYID *>(lpRowSet[0].lpProps[1].Value.bin.lpb), 0, nullptr, 0);
 	}
 
 	if (bPartial)
@@ -2793,7 +2771,7 @@ static HRESULT CopyContents(ULONG ulWhat, IMAPIFolder *lpSrc,
 		for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
 			object_ptr<IMessage> lpSrcMessage, lpDestMessage;
 
-			hr = lpSrc->OpenEntry(lpRowSet->aRow[i].lpProps[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpRowSet->aRow[i].lpProps[0].Value.bin.lpb), &IID_IMessage, 0, &ulObj, &~lpSrcMessage);
+			hr = lpSrc->OpenEntry(lpRowSet[i].lpProps[0].Value.bin.cb, reinterpret_cast<const ENTRYID *>(lpRowSet[i].lpProps[0].Value.bin.lpb), &IID_IMessage, 0, &ulObj, &~lpSrcMessage);
 			if (hr != hrSuccess) {
 				bPartial = true;
 				continue;
@@ -2816,8 +2794,8 @@ static HRESULT CopyContents(ULONG ulWhat, IMAPIFolder *lpSrc,
 			if (hr != hrSuccess) {
 				bPartial = true;
 			} else if (ulFlags & MAPI_MOVE) {
-				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].cb = lpRowSet->aRow[i].lpProps[0].Value.bin.cb;
-				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpRowSet->aRow[i].lpProps[0].Value.bin.lpb;
+				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].cb  = lpRowSet[i].lpProps[0].Value.bin.cb;
+				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpRowSet[i].lpProps[0].Value.bin.lpb;
 				++lpDeleteEntries->cValues;
 			}
 		}
@@ -3268,7 +3246,7 @@ HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, void *lpSrcObj,
 				// stream
 				// Not being able to open the source message is not an error: it may just not be there
 				if (((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, 0, &~lpSrcStream) == hrSuccess) {
-					// While dragging and dropping, Outlook 2007 (atleast) returns an internal MAPI object to CopyTo as destination
+					// While dragging and dropping, Outlook 2007 (at least) returns an internal MAPI object to CopyTo as destination
 					// The internal MAPI object is unable to make a stream STGM_TRANSACTED, so we retry the action without that flag
 					// to get the stream without the transaction feature.
 					hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~lpDestStream);
@@ -3600,7 +3578,7 @@ HRESULT Util::HrDeleteResidualProps(LPMESSAGE lpDestMsg, LPMESSAGE lpSourceMsg, 
 
 	// Add the PropTags the message currently has
 	for (unsigned i = 0; i < lpsPropArray->cValues; ++i)
-		sPropTagSet.insert(lpsPropArray->aulPropTag[i]);
+		sPropTagSet.emplace(lpsPropArray->aulPropTag[i]);
 
 	// Remove the regular properties we want to keep
 	for (unsigned i = 0; i < lpsValidProps->cValues; ++i)
@@ -3640,7 +3618,7 @@ HRESULT Util::HrDeleteAttachments(LPMESSAGE lpMsg)
 	HRESULT hr = lpMsg->GetAttachmentTable(0, &~ptrAttachTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = HrQueryAllRows(ptrAttachTable, sptaAttachNum, NULL, NULL, 0, &ptrRows);
+	hr = HrQueryAllRows(ptrAttachTable, sptaAttachNum, nullptr, nullptr, 0, &~ptrRows);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -3663,7 +3641,7 @@ HRESULT Util::HrDeleteRecipients(LPMESSAGE lpMsg)
 	HRESULT hr = lpMsg->GetRecipientTable(0, &~ptrRecipTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = HrQueryAllRows(ptrRecipTable, sptaRowId, NULL, NULL, 0, &ptrRows);
+	hr = HrQueryAllRows(ptrRecipTable, sptaRowId, nullptr, nullptr, 0, &~ptrRows);
 	if (hr != hrSuccess)
 		return hr;
 	return lpMsg->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRows.get());

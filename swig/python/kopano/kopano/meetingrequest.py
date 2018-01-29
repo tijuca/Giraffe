@@ -51,10 +51,10 @@ if sys.hexversion >= 0x03000000:
         from . import utils as _utils
     except ImportError:
         _utils = sys.modules[__package__+'.utils']
-    from . import prop as _prop
+    from . import property_ as _prop
 else:
     import utils as _utils
-    import prop as _prop
+    import property_ as _prop
 
 # XXX move all pidlids into separate definition file, plus short description of their meanings
 
@@ -171,6 +171,8 @@ def _organizer_props(cal_item, item):
         ]
 
 class MeetingRequest(object):
+    """MeetingRequest class"""
+
     def __init__(self, item):
         self.item = item
 
@@ -201,19 +203,19 @@ class MeetingRequest(object):
     def basedate(self):
         """ Exception date """
 
-        blob = self.item.get_value(PidLidGlobalObjectId)
+        blob = self.item.get(PidLidGlobalObjectId)
         if blob is not None:
             y, m, d = struct.unpack_from('>HBB', blob, 16)
             if (y, m, d) != (0, 0, 0):
                 ts = timegm(datetime.datetime(y, m, d).timetuple())
-                tz = self.item.get_value(PidLidTimeZoneStruct)
+                tz = self.item.get(PidLidTimeZoneStruct)
                 return _utils._to_gmt(datetime.datetime.fromtimestamp(ts), tz)
 
     @property
     def update_counter(self):
         """ Update counter """
 
-        return self.item.get_value(PidLidAppointmentSequence)
+        return self.item.get(PidLidAppointmentSequence)
 
     @property
     def track_status(self):
@@ -229,11 +231,11 @@ class MeetingRequest(object):
     def processed(self):
         """ Has the request/response been processed """
 
-        processed = self.item.get_value(PR_PROCESSED) or False
+        processed = self.item.get(PR_PROCESSED) or False
 
     @processed.setter
     def processed(self, value):
-        self.item.set_value(PR_PROCESSED, value)
+        self.item[PR_PROCESSED] = value
 
     def _check_processed(self):
         if self.processed:
@@ -269,13 +271,13 @@ class MeetingRequest(object):
         cal_item.message_class = 'IPM.Appointment'
 
         # busystatus
-        intended_busystatus = self.item.get_value(PidLidIntendedBusyStatus)
+        intended_busystatus = self.item.get(PidLidIntendedBusyStatus)
         if intended_busystatus is not None:
             if tentative and intended_busystatus != libfreebusy.fbFree: # XXX
                 busystatus = libfreebusy.fbTentative
             else:
                 busystatus = intended_busystatus
-            cal_item.set_value(PidLidBusyStatus, busystatus)
+            cal_item[PidLidBusyStatus] = busystatus
 
         # add organizer as recipient
         organizer_props = _organizer_props(cal_item, self.item)
@@ -342,7 +344,7 @@ class MeetingRequest(object):
                     RELOP_EQ, goid.proptag, SPropValue(goid.proptag, goid.mapiobj.Value))
                 )
                 existing_items = list(calendar.items(restriction))
-                existing_items.sort(key=lambda i: i.get_value(PidLidAppointmentStartWhole)) # XXX check php
+                existing_items.sort(key=lambda i: i.get(PidLidAppointmentStartWhole)) # XXX check php
             else:
                 existing_items = []
 
@@ -451,8 +453,8 @@ class MeetingRequest(object):
                         recurrence.create_exception(basedate, self.item, copytags)
 
                     message = recurrence.exception_message(basedate)
-                    message.set_value(PidLidBusyStatus, libfreebusy.fbFree)
-                    message.set_value(PR_MESSAGE_FLAGS, MSGFLAG_UNSENT | MSGFLAG_READ)
+                    message[PidLidBusyStatus] = libfreebusy.fbFree
+                    message[PR_MESSAGE_FLAGS] = MSGFLAG_UNSENT | MSGFLAG_READ
 
                     message._attobj.SaveChanges(KEEP_OPEN_READWRITE)
 
@@ -489,9 +491,9 @@ class MeetingRequest(object):
                 if recurrence.is_exception(basedate):
                     message = recurrence.exception_message(basedate)
 
-                    owner_appt_id = self.item.get_value(PR_OWNER_APPT_ID)
+                    owner_appt_id = self.item.get(PR_OWNER_APPT_ID)
                     if owner_appt_id is not None:
-                        message.set_value(PR_OWNER_APPT_ID, owner_appt_id)
+                        message[PR_OWNER_APPT_ID] = owner_appt_id
                     attach = message._attobj
         else:
             message = cal_item
@@ -525,7 +527,7 @@ class MeetingRequest(object):
                 else:
                     row.append(SPropValue(PR_RECIPIENT_TRACKSTATUS, self.track_status))
 
-                if self.item.get_value(PidLidAppointmentCounterProposal) is True:
+                if self.item.get(PidLidAppointmentCounterProposal) is True:
                     row.extend([
                         SPropValue(PR_PROPOSED_NEWTIME, True),
                         SPropValue(PR_PROPOSED_NEWTIME_START, self.item.prop(PidLidAppointmentProposedStartWhole).mapiobj.Value),
@@ -535,8 +537,8 @@ class MeetingRequest(object):
         message.mapiobj.ModifyRecipients(MODRECIP_MODIFY, rows)
 
         # counter proposal
-        if self.item.get_value(PidLidAppointmentCounterProposal):
-            message.set_value(PidLidAppointmentCounterProposal, True)
+        if self.item.get(PidLidAppointmentCounterProposal):
+            message[PidLidAppointmentCounterProposal] = True
 
         # save all the things
         message.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)

@@ -44,7 +44,7 @@ public:
 	virtual HRESULT DeleteProps(const SPropTagArray *proptag, LPSPropProblemArray *) _kc_override;
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *exclprop, ULONG ui_param, LPMAPIPROGRESS, LPCIID iface, LPVOID dest_obj, ULONG flags, LPSPropProblemArray *) _kc_override;
 	virtual HRESULT CopyProps(const SPropTagArray *inclprop, ULONG ui_param, LPMAPIPROGRESS, LPCIID iface, LPVOID dest_obj, ULONG flags, LPSPropProblemArray *) _kc_override;
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *proptag, LPGUID lpPropSetGuid, ULONG flags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames) _kc_override;
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG flags, LPSPropTagArray *proptag) _kc_override;
 	virtual HRESULT QueryInterface(REFIID refiid, void **iface) _kc_override;
 };
@@ -73,8 +73,8 @@ public:
 	virtual HRESULT SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRowsSought) _kc_override;
 	virtual HRESULT SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator) _kc_override;
 	virtual HRESULT QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *lpulDenominator) _kc_override;
-	virtual HRESULT FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG flags) _kc_override;
-	virtual HRESULT Restrict(LPSRestriction lpRestriction, ULONG flags) _kc_override;
+	virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) _kc_override;
+	virtual HRESULT Restrict(const SRestriction *, ULONG flags) _kc_override;
 	virtual HRESULT CreateBookmark(BOOKMARK *lpbkPosition) _kc_override;
 	virtual HRESULT FreeBookmark(BOOKMARK bkPosition) _kc_override;
 	virtual HRESULT SortTable(const SSortOrderSet *sort_crit, ULONG flags) _kc_override;

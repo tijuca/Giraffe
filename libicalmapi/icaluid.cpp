@@ -15,12 +15,15 @@
  *
  */
 #include <utility>
+#include <cstdint>
 #include <kopano/platform.h>
 #include "icaluid.h"
 #include <mapix.h>
 #include <kopano/stringutil.h>
 
 namespace KC {
+
+const std::string outlook_guid = "040000008200E00074C5B7101A82E008";
 
 /**
  * Check if UID is of outlook format.
@@ -32,8 +35,7 @@ namespace KC {
  */
 bool IsOutlookUid(const std::string &strUid)
 {
-	std::string strByteArrayID = "040000008200E00074C5B7101A82E008";
-	return (strUid.compare(0, strByteArrayID.length(), strByteArrayID) == 0);
+	return strUid.compare(0, outlook_guid.length(), outlook_guid) == 0;
 }
 
 /**
@@ -44,8 +46,6 @@ bool IsOutlookUid(const std::string &strUid)
  */
 HRESULT HrGenerateUid(std::string *lpStrData)
 {
-	std::string strByteArrayID = "040000008200E00074C5B7101A82E008";
-	std::string strBinUid;
 	GUID sGuid;
 	FILETIME ftNow;
 	ULONG ulSize = 1;
@@ -56,7 +56,7 @@ HRESULT HrGenerateUid(std::string *lpStrData)
 	hr = UnixTimeToFileTime(time(NULL), &ftNow);
 	if (hr != hrSuccess)
 		return hr;
-	strBinUid = strByteArrayID;	// Outlook Guid
+	auto strBinUid = outlook_guid;
 	strBinUid += "00000000";	// InstanceDate
 	strBinUid += bin2hex(sizeof(FILETIME), &ftNow);
 	strBinUid += "0000000000000000"; // Padding
@@ -128,15 +128,11 @@ exit:
  */
 HRESULT HrGetICalUidFromBinUid(const SBinary &sBin, std::string *lpStrUid)
 {
-	HRESULT hr = hrSuccess;
-	std::string strUid;
-
 	if (sBin.cb > 0x34 && memcmp(sBin.lpb + 0x28, "vCal-Uid", 8) == 0)
-		strUid = (char*)sBin.lpb + 0x34;
+		*lpStrUid = reinterpret_cast<const char *>(sBin.lpb) + 0x34;
 	else
-		strUid = bin2hex(sBin.cb, sBin.lpb);
-	*lpStrUid = std::move(strUid);
-	return hr;
+		*lpStrUid = bin2hex(sBin);
+	return hrSuccess;
 }
 
 /**
@@ -151,19 +147,75 @@ HRESULT HrGetICalUidFromBinUid(const SBinary &sBin, std::string *lpStrUid)
  */
 HRESULT HrMakeBinUidFromICalUid(const std::string &strUid, std::string *lpStrBinUid)
 {
-	HRESULT hr = hrSuccess;
-	std::string strBinUid;
-	int len = 13 + strUid.length();
-
-	strBinUid.insert(0, "\x04\x00\x00\x00\x82\x00\xE0\x00\x74\xC5\xB7\x10\x1A\x82\xE0\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0x24);
+	uint32_t len = cpu_to_le32(13 + strUid.length());
+	std::string strBinUid("\x04\x00\x00\x00\x82\x00\xE0\x00\x74\xC5\xB7\x10\x1A\x82\xE0\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0x24);
 	strBinUid.append((char*) &len, 4);
 	strBinUid.append("vCal-Uid", 8);
-	len = 1;				// this is always 1
+	len = cpu_to_le32(1); /* this is always 1 */
 	strBinUid.append((char*)&len, 4);
 	strBinUid.append(strUid);
 	strBinUid.append("\x00", 1);
 	*lpStrBinUid = std::move(strBinUid);
-	return hr;
+	return hrSuccess;
+}
+
+/**
+ * Converts string UID to binary property. The converted UID is in a
+ * format outlook wants, as described here.
+ *
+ * UID contents according to [MS-OXCICAL].pdf
+ * UID = EncodedGlobalId or ThirdPartyGlobalId
+ *
+ * EncodedGlobalId    = Header GlobalIdData
+ * ThirdPartyGlobalId = 1*UTF8-octets    ; Assuming UTF-8 is the encoding
+ *
+ * Header = ByteArrayID InstanceDate CreationDateTime Padding DataSize
+ *
+ * ByteArrayID        = "040000008200E00074C5B7101A82E008"
+ * InstanceDate       = InstanceYear InstanceMonth InstanceDay
+ * InstanceYear       = 4*4HEXDIGIT      ; UInt16
+ * InstanceMonth      = 2*2HEXDIGIT      ; UInt8
+ * InstanceDay        = 2*2HEXDIGIT      ; UInt8
+ * CreationDateTime   = FileTime
+ * FileTime           = 16*16HEXDIGIT    ; UInt6
+ * Padding            = 16*16HEXDIGIT    ; "0000000000000000" recommended
+ * DataSize           = 8*8HEXDIGIT      ; UInt32 little-endian
+ * GlobalIdData       = 2*HEXDIGIT4
+ *
+ * @param[in]	strUid			String UID
+ * @param[in]	base			Base for allocating memory
+ * @param[out]	lpPropValue		The binary uid is returned in SPropValue structure
+ * @return		Always return hrSuccess
+ */
+HRESULT HrMakeBinaryUID(const std::string &strUid, void *base, SPropValue *lpPropValue)
+{
+	SPropValue sPropValue;
+	std::string strBinUid;
+	std::string strByteArrayID = "040000008200E00074C5B7101A82E008";
+
+	// Check whether this is a default Outlook UID
+	// Exchange example: UID:040000008200E00074C5B7101A82E008 00000000 305D0F2A9A06C901 0000000000000000 10000000 7F64D28AE2DCC64C88F849733F5FBD1D
+	// GMail example:    UID:rblkvqecgurvb0all6rjb3d1j8@google.com
+	// Sunbird example: UID:1090c3de-36b2-4352-a155-a1436bc806b8
+	if (strUid.compare(0, strByteArrayID.length(), strByteArrayID) == 0)
+		// EncodedGlobalId
+		strBinUid = hex2bin(strUid);
+	else
+		// ThirdPartyGlobalId
+		HrMakeBinUidFromICalUid(strUid, &strBinUid);
+
+	// Caller sets .ulPropTag
+	sPropValue.Value.bin.cb = strBinUid.size();
+	HRESULT hr = MAPIAllocateMore(sPropValue.Value.bin.cb, base,
+	             reinterpret_cast<void **>(&sPropValue.Value.bin.lpb));
+	if (hr != hrSuccess)
+		return hr;
+	memcpy(sPropValue.Value.bin.lpb, strBinUid.data(), sPropValue.Value.bin.cb);
+
+	// set return value
+	lpPropValue->Value.bin.cb  = sPropValue.Value.bin.cb;
+	lpPropValue->Value.bin.lpb = sPropValue.Value.bin.lpb;
+	return hrSuccess;
 }
 
 } /* namespace */

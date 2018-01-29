@@ -91,11 +91,13 @@ PATTERN_MONTHNTH = 3
 # see MS-OXOCAL, section 2.2.1.44.5, "AppointmentRecurrencePattern Structure"
 
 class Recurrence(object):
+    """Recurrence class"""
+
     def __init__(self, item):
         # XXX add check if we actually have a recurrence, otherwise we throw a mapi exception which might not be desirable
 
         self.item = item
-        self.tz = item.get_value(PidLidTimeZoneStruct)
+        self.tz = item.get(PidLidTimeZoneStruct)
         self._parse()
 
     def _parse(self):
@@ -234,6 +236,7 @@ class Recurrence(object):
         for exception in self.exceptions:
             extended_exception = {}
 
+            # ChangeHighlight
             if self.writer_version2 >= 0x3009:
                 change_highlight_size = _utils.unpack_long(value, pos)
                 pos += LONG
@@ -241,9 +244,10 @@ class Recurrence(object):
                 extended_exception['change_highlight'] = change_highlight_value
                 pos += change_highlight_size
 
-            # Reserved
-            pos += LONG
+            # ReservedBlockEE1
+            pos += _utils.unpack_long(value, pos) + LONG
 
+            # StartDateTime, EndDateTime, OriginalStartDate
             if exception['override_flags'] & ARO_SUBJECT or exception['override_flags'] & ARO_LOCATION:
                 extended_exception['start_datetime'] = _utils.unpack_long(value, pos)
                 pos += LONG
@@ -252,17 +256,23 @@ class Recurrence(object):
                 extended_exception['original_start_date'] = _utils.unpack_long(value, pos)
                 pos += LONG
 
+            # WideCharSubject
             if exception['override_flags'] & ARO_SUBJECT:
                 length = _utils.unpack_short(value, pos)
                 pos += SHORT
                 extended_exception['subject'] = value[pos:pos+2*length].decode('utf-16-le')
                 pos += 2*length
 
+            # WideCharLocation
             if exception['override_flags'] & ARO_LOCATION:
                 length = _utils.unpack_short(value, pos)
                 pos += SHORT
                 extended_exception['location'] = value[pos:pos+2*length].decode('utf-16-le')
                 pos += 2*length
+
+            # ReservedBlockEE2
+            if exception['override_flags'] & ARO_SUBJECT or exception['override_flags'] & ARO_LOCATION:
+                pos += _utils.unpack_long(value, pos) + LONG
 
             self.extended_exceptions.append(extended_exception)
 
@@ -376,7 +386,7 @@ class Recurrence(object):
         # ReservedBlock2Size
         data += struct.pack('<I', 0)
 
-        self.item.set_value(PidLidAppointmentRecur, data)
+        self.item[PidLidAppointmentRecur] = data
 
     @property
     def _start(self):
@@ -387,22 +397,12 @@ class Recurrence(object):
         return datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(self.end_date)) + datetime.timedelta(minutes=self.endtime_offset)# XXX local time..
 
     @property
-    def _del_recurrences(self): # XXX local time..
-        return [datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(val)) \
-            for val in self.deleted_instance_dates]
-
-    @property
-    def _mod_recurrences(self): # XXX local time..
-        return [datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(val)) \
-            for val in self.modified_instance_dates]
-
-    @property
     def recurrences(self):
         rrule_weekdays = {0: SU, 1: MO, 2: TU, 3: WE, 4: TH, 5: FR, 6: SA}
         rule = rruleset()
 
         if self.pattern_type == PATTERN_DAILY:
-            rule.rrule(rrule(DAILY, dtstart=self._start, until=self._end, interval=self.period/(24*60)))
+            rule.rrule(rrule(DAILY, dtstart=self._start, until=self._end, interval=self.period//(24*60)))
 
         if self.pattern_type == PATTERN_WEEKLY:
             byweekday = () # Set
@@ -433,21 +433,25 @@ class Recurrence(object):
         elif self.pattern_type != 0: # XXX check 0
             raise NotSupportedError('Unsupported recurrence pattern: %d' % self.pattern_type)
 
-        # Remove deleted ocurrences
-        for del_date in self._del_recurrences:
-            del_date = datetime.datetime(del_date.year, del_date.month, del_date.day, self._start.hour, self._start.minute)
-            if del_date not in self._mod_recurrences:
-                rule.exdate(del_date)
-
         # add exceptions
+        exc_starts = set()
         for exception in self.exceptions:
-            rule.rdate(datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(exception['start_datetime'])))
+            exc_start = datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(exception['start_datetime']))
+            rule.rdate(exc_start)
+            exc_starts.add(exc_start)
+
+        # Remove deleted ocurrences (skip added exceptions)
+        for del_date_val in self.deleted_instance_dates:
+            del_date = datetime.datetime.fromtimestamp(_utils.rectime_to_unixtime(del_date_val))
+            del_date = datetime.datetime(del_date.year, del_date.month, del_date.day, self._start.hour, self._start.minute)
+            if del_date not in exc_starts:
+                rule.exdate(del_date)
 
         return rule
 
     def exception_message(self, basedate):
         for message in self.item.items():
-            replacetime = message.get_value(PidLidExceptionReplaceTime)
+            replacetime = message.get(PidLidExceptionReplaceTime)
             if replacetime and replacetime.date() == basedate.date():
                 return message
 
@@ -461,7 +465,7 @@ class Recurrence(object):
         exception['override_flags'] = 0
 
         extended = False
-        subject = item.get_value(PR_NORMALIZED_SUBJECT_W)
+        subject = item.get(PR_NORMALIZED_SUBJECT_W)
         if subject is not None:
             exception['override_flags'] |= ARO_SUBJECT
             exception['subject'] = subject.encode('cp1252', 'replace')
@@ -470,24 +474,24 @@ class Recurrence(object):
 
         # skip ARO_MEETINGTYPE (like php)
 
-        reminder_delta = item.get_value(PidLidReminderDelta)
+        reminder_delta = item.get(PidLidReminderDelta)
         if reminder_delta is not None:
             exception['override_flags'] |= ARO_REMINDERDELTA
             exception['reminder_delta'] = reminder_delta
 
-        reminder_set = item.get_value(PidLidReminderSet)
+        reminder_set = item.get(PidLidReminderSet)
         if reminder_set is not None:
             exception['override_flags'] |= ARO_REMINDERSET
             exception['reminder_set'] = reminder_set
 
-        location = item.get_value(PidLidLocation)
+        location = item.get(PidLidLocation)
         if location is not None:
             exception['override_flags'] |= ARO_LOCATION
             exception['location'] = location.encode('cp1252', 'replace')
             extended = True
             extended_exception['location'] = location
 
-        busy_status = item.get_value(PidLidBusyStatus)
+        busy_status = item.get(PidLidBusyStatus)
         if busy_status is not None:
             exception['override_flags'] |= ARO_BUSYSTATUS
             exception['busy_status'] = busy_status
@@ -496,12 +500,12 @@ class Recurrence(object):
 
         # XXX php doesn't set the following by accident? ("alldayevent" not in copytags..)
         if not copytags or not create:
-            sub_type = item.get_value(PidLidAppointmentSubType)
+            sub_type = item.get(PidLidAppointmentSubType)
             if sub_type is not None:
                 exception['override_flags'] |= ARO_SUBTYPE
                 exception['sub_type'] = sub_type
 
-        appointment_color = item.get_value(PidLidAppointmentColor)
+        appointment_color = item.get(PidLidAppointmentColor)
         if appointment_color is not None:
             exception['override_flags'] |= ARO_APPTCOLOR
             exception['appointment_color'] = appointment_color
@@ -514,17 +518,17 @@ class Recurrence(object):
     def _update_calitem(self, item):
         cal_item = self.item
 
-        cal_item.set_value(PidLidSideEffects, 3441) # XXX spec, check php
-        cal_item.set_value(PidLidSmartNoAttach, True)
+        cal_item[PidLidSideEffects] = 3441 # XXX spec, check php
+        cal_item[PidLidSmartNoAttach] = True
 
         # reminder
-        if cal_item.get_value(PidLidReminderSet) and cal_item.get_value(PidLidReminderDelta):
+        if cal_item.get(PidLidReminderSet) and cal_item.get(PidLidReminderDelta):
             occs = list(cal_item.occurrences(datetime.datetime.now(), datetime.datetime(2038,1,1))) # XXX slow for daily?
             occs.sort(key=lambda occ: occ.start)
             for occ in occs: # XXX check default/reminder props
-                dueby = occ.start - datetime.timedelta(minutes=cal_item.get_value(PidLidReminderDelta))
+                dueby = occ.start - datetime.timedelta(minutes=cal_item.get(PidLidReminderDelta))
                 if dueby > datetime.datetime.now():
-                    cal_item.set_value(PidLidReminderSignalTime, dueby)
+                    cal_item[PidLidReminderSignalTime] = dueby
                     break
             else:
                 cal_item.prop(PidLidReminderSet).value = False
@@ -541,16 +545,16 @@ class Recurrence(object):
 
         message.mapiobj.SetProps(props)
 
-        message.set_value(PR_MESSAGE_CLASS_W, u'IPM.OLE.CLASS.{00061055-0000-0000-C000-000000000046}')
-        message.set_value(PidLidExceptionReplaceTime, basetime)
+        message[PR_MESSAGE_CLASS_W] = u'IPM.OLE.CLASS.{00061055-0000-0000-C000-000000000046}'
+        message[PidLidExceptionReplaceTime] = basetime
 
-        intended_busystatus = cal_item.get_value(PidLidIntendedBusyStatus) # XXX tentative? merge with modify_exc?
+        intended_busystatus = cal_item.get(PidLidIntendedBusyStatus) # XXX tentative? merge with modify_exc?
         if intended_busystatus is not None:
-            message.set_value(PidLidBusyStatus, intended_busystatus)
+            message[PidLidBusyStatus] = intended_busystatus
 
-        sub_type = cal_item.get_value(PidLidAppointmentSubType)
+        sub_type = cal_item.get(PidLidAppointmentSubType)
         if sub_type is not None:
-            message.set_value(PidLidAppointmentSubType, sub_type)
+            message[PidLidAppointmentSubType] = sub_type
 
         props = [
             SPropValue(PR_ATTACHMENT_FLAGS, 2), # XXX cannot find spec
@@ -561,7 +565,7 @@ class Recurrence(object):
             SPropValue(PR_DISPLAY_NAME_W, u'Exception'),
         ]
 
-        start = message.get_value(PidLidAppointmentStartWhole)
+        start = message.get(PidLidAppointmentStartWhole)
         if start is not None:
             start_local = unixtime(time.mktime(_utils._from_gmt(start, self.tz).timetuple())) # XXX why local??
             props.append(SPropValue(PR_EXCEPTION_STARTTIME, start_local))
@@ -580,20 +584,20 @@ class Recurrence(object):
         message._attobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     def create_exception(self, basedate, item, copytags=None, merge=False):
-        tz = item.get_value(PidLidTimeZoneStruct)
+        tz = item.get(PidLidTimeZoneStruct)
         cal_item = self.item
 
         # create embedded item
         message_flags = MSGFLAG_READ
-        if item.get_value(PR_MESSAGE_FLAGS) == 0: # XXX wut/php compat
+        if item.get(PR_MESSAGE_FLAGS) == 0: # XXX wut/php compat
             message_flags |= MSGFLAG_UNSENT
         message = cal_item.create_item(message_flags)
 
         self._update_embedded(basedate, message, item, copytags, create=True)
 
-        message.set_value(PidLidResponseStatus, respDeclined | respOrganized) # XXX php bug for merge case?
+        message[PidLidResponseStatus] = respDeclined | respOrganized # XXX php bug for merge case?
         if copytags:
-            message.set_value(PidLidBusyStatus, 0)
+            message[PidLidBusyStatus] = 0
 
         # copy over recipients (XXX check php delta stuff..)
         table = item.mapiobj.OpenProperty(PR_MESSAGE_RECIPIENTS, IID_IMAPITable, MAPI_UNICODE, 0)
@@ -655,18 +659,18 @@ class Recurrence(object):
         self._update_calitem(item)
 
     def modify_exception(self, basedate, item, copytags=None): # XXX 'item' too MR specific
-        tz = item.get_value(PidLidTimeZoneStruct)
+        tz = item.get(PidLidTimeZoneStruct)
         cal_item = self.item
 
         # update embedded item
         for message in cal_item.items(): # XXX no cal_item? to helper
-            replacetime = message.get_value(PidLidExceptionReplaceTime)
+            replacetime = message.get(PidLidExceptionReplaceTime)
             if replacetime and replacetime.date() == basedate.date():
                 self._update_embedded(basedate, message, item, copytags)
 
-                icon_index = item.get_value(PR_ICON_INDEX)
+                icon_index = item.get(PR_ICON_INDEX)
                 if not copytags and icon_index is not None:
-                    message.set_value(PR_ICON_INDEX, icon_index)
+                    message[PR_ICON_INDEX] = icon_index
 
                 message._attobj.SaveChanges(KEEP_OPEN_READWRITE)
                 break
@@ -674,7 +678,7 @@ class Recurrence(object):
             return # XXX exception
 
         if copytags: # XXX bug in php code? (setallrecipients, !empty..)
-            message.set_value(PidLidBusyStatus, 0)
+            message[PidLidBusyStatus] = 0
 
             table = message.mapiobj.OpenProperty(PR_MESSAGE_RECIPIENTS, IID_IMAPITable, MAPI_UNICODE, 0)
             table.SetColumns(_meetingrequest.RECIP_PROPS, 0)
@@ -721,7 +725,7 @@ class Recurrence(object):
         self._update_calitem(item)
 
     def delete_exception(self, basedate, item, copytags):
-        tz = item.get_value(PidLidTimeZoneStruct)
+        tz = item.get(PidLidTimeZoneStruct)
 
         basedate2 = _utils._from_gmt(basedate, tz)
         basedate_val = _utils.unixtime_to_rectime(time.mktime(basedate2.timetuple()))
@@ -749,27 +753,32 @@ class Recurrence(object):
         self._update_calitem(item)
 
     def occurrences(self, start=None, end=None): # XXX fit-to-period
-        tz = self.item.get_value(PidLidTimeZoneStruct)
+        tz = self.item.get(PidLidTimeZoneStruct)
 
         recurrences = self.recurrences
         if start and end:
             recurrences = recurrences.between(_utils._from_gmt(start, tz), _utils._from_gmt(end, tz))
 
-        start_end = {}
-        for exc in self.exceptions:
-            start_end[exc['start_datetime']] = exc['end_datetime']
+        start_exc_ext = {}
+        for exc, ext in zip(self.exceptions, self.extended_exceptions):
+            start_exc_ext[exc['start_datetime']] = exc, ext
 
         for d in recurrences:
             startdatetime_val = _utils.unixtime_to_rectime(time.mktime(d.timetuple()))
 
-            if startdatetime_val in start_end:
-                minutes = start_end[startdatetime_val] - startdatetime_val
+            subject = self.item.subject
+            location = self.item.location
+            if startdatetime_val in start_exc_ext:
+                exc, ext = start_exc_ext[startdatetime_val]
+                minutes = exc['end_datetime'] - startdatetime_val
+                subject = ext.get('subject', subject)
+                location = ext.get('location', location)
             else:
                 minutes = self.endtime_offset - self.starttime_offset
 
-            d = _utils._to_gmt(d, tz)
+            d = _utils._to_gmt(d, tz, align_dst=True)
 
-            occ = Occurrence(self.item, d, d + datetime.timedelta(minutes=minutes))
+            occ = Occurrence(self.item, d, d + datetime.timedelta(minutes=minutes), subject, location)
             if (not start or occ.end > start) and (not end or occ.start < end):
                 yield occ
 
@@ -781,10 +790,16 @@ class Recurrence(object):
 
 
 class Occurrence(object):
-    def __init__(self, item, start, end): # XXX make sure all GMT?
+    """Occurrence class"""
+
+    def __init__(self, item, start, end, subject=None, location=None):
         self.item = item
         self.start = start
         self.end = end
+        if subject is not None:
+            self.subject = subject
+        if location is not None:
+            self.location = location
 
     def __getattr__(self, x):
         return getattr(self.item, x)

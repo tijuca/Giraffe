@@ -539,6 +539,20 @@ private:
 		const char *tocode;
 		const char *fromtype;
 		const char *fromcode;
+
+		bool operator<(const context_key &o) const noexcept
+		{
+			auto r = strcmp(fromtype, o.fromtype);
+			if (r != 0)
+				return r < 0;
+			r = strcmp(totype, o.totype);
+			if (r != 0)
+				return r < 0;
+			r = strcmp(fromcode, o.fromcode);
+			if (r != 0)
+				return r < 0;
+			return strcmp(tocode, o.tocode) < 0;
+		}
 	};
 
 	/** Create a context_key based on the to- and from types and optionaly the to- and from codes.
@@ -568,31 +582,9 @@ private:
 	}
 
 	/**
-	 * @brief Sort predicate for the context_map;
-	 */
-	class _kc_hidden context_predicate _kc_final {
-	public:
-		bool operator()(const context_key &lhs, const context_key &rhs) const {
-			int r = strcmp(lhs.fromtype, rhs.fromtype);
-			if (r != 0)
-				return (r < 0);
-
-			r = strcmp(lhs.totype, rhs.totype);
-			if (r != 0)
-				return (r < 0);
-
-			r = strcmp(lhs.fromcode, rhs.fromcode);
-			if (r != 0)
-				return (r < 0);
-
-			return (strcmp(lhs.tocode, rhs.tocode) < 0);
-		}
-	};
-	
-	/**
 	 * @brief Map containing contexts that can be reused.
 	 */
-	typedef std::map<context_key, details::iconv_context_base*, context_predicate>	context_map;
+	typedef std::map<context_key, details::iconv_context_base *> context_map;
 
 	/**
 	 * @brief Set containing dynamic allocated from- and to codes.
@@ -616,7 +608,7 @@ private:
 		context_map::const_iterator iContext = m_contexts.find(key);
 		if (iContext == m_contexts.cend()) {
 			auto lpContext = new details::iconv_context<To_Type, From_Type>();
-			iContext = m_contexts.insert({key, lpContext}).first;
+			iContext = m_contexts.emplace(key, lpContext).first;
 		}
 		return dynamic_cast<details::iconv_context<To_Type, From_Type> *>(iContext->second);
 	}
@@ -643,7 +635,7 @@ private:
 			// Before we store it, we need to copy the fromcode as we don't know what the
 			// lifetime will be.
 			persist_code(key, pfFromCode);
-			iContext = m_contexts.insert({key, lpContext}).first;
+			iContext = m_contexts.emplace(key, lpContext).first;
 		}
 		return dynamic_cast<details::iconv_context<To_Type, From_Type> *>(iContext->second);
 	}
@@ -670,7 +662,7 @@ private:
 			// Before we store it, we need to copy the fromcode as we don't know what the
 			// lifetime will be.
 			persist_code(key, pfToCode|pfFromCode);
-			iContext = m_contexts.insert({key, lpContext}).first;
+			iContext = m_contexts.emplace(key, lpContext).first;
 		}
 		return dynamic_cast<details::iconv_context<To_Type, From_Type> *>(iContext->second);
 	}

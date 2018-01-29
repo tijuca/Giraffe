@@ -7,6 +7,7 @@ Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 
 import atexit
 import datetime
+import functools
 import os
 import time
 import socket
@@ -47,10 +48,10 @@ from .parser import parser
 from .table import Table
 from .company import Company
 from .group import Group
-from .prop import _proptag_to_name
+from .property_ import _proptag_to_name
 
 from .compat import (
-    unhex as _unhex, decode as _decode, repr as _repr,
+    unhex as _unhex, repr as _repr, is_str as _is_str,
     fake_unicode as _unicode, lru_cache as _lru_cache
 )
 
@@ -68,18 +69,16 @@ if sys.hexversion >= 0x03000000:
         from . import store as _store
     except ImportError:
         _store = sys.modules[__package__+'.store']
+    try:
+        from . import utils as _utils
+    except ImportError:
+        _utils = sys.modules[__package__+'.utils']
 else:
     import user as _user
     import config as _config
     import ics as _ics
     import store as _store
-
-# avoid module-class-decorator-cache-store references, which are
-# somehow not dereferenced correctly (python bug?), resulting in
-# many valgrind errors
-def _clear_cache():
-    Server._store2.cache_clear()
-atexit.register(_clear_cache)
+    import utils as _utils
 
 def _timed_cache(seconds=0, minutes=0, hours=0, days=0):
     # used with permission from will mcgugan, https://www.willmcgugan.com
@@ -110,10 +109,32 @@ def _timed_cache(seconds=0, minutes=0, hours=0, days=0):
         return do_cache
     return decorate
 
-class Server(object):
-    """Server class."""
+def instance_method_lru_cache(*cache_args, **cache_kwargs):
+    '''
+    Just like functools.lru_cache, but a new cache is created for each instance
+    of the class that owns the method this is applied to.
 
-    def __init__(self, options=None, config=None, sslkey_file=None, sslkey_pass=None, server_socket=None, auth_user=None, auth_pass=None, log=None, service=None, mapisession=None, parse_args=True):
+    Snippet by Alex Fraser (https://github.com/z0u, alex@phatcore.com)
+    '''
+    def cache_decorator(func):
+        @functools.wraps(func)
+        def cache_factory(self, *args, **kwargs):
+            # Wrap the function in a cache by calling the decorator
+            instance_cache = _lru_cache(*cache_args, **cache_kwargs)(func)
+            # Bind the decorated function to the instance to make it a method
+            instance_cache = instance_cache.__get__(self, self.__class__)
+            setattr(self, func.__name__, instance_cache)
+            # Call the instance cache now. Next time the method is called, the
+            # call will go directly to the instance cache and not via this
+            # decorator.
+            return instance_cache(*args, **kwargs)
+        return cache_factory
+    return cache_decorator
+
+class Server(object):
+    """Server class"""
+
+    def __init__(self, options=None, config=None, sslkey_file=None, sslkey_pass=None, server_socket=None, auth_user=None, auth_pass=None, log=None, service=None, mapisession=None, parse_args=True, notifications=False, store_cache=True):
         """
         Create Server instance.
 
@@ -140,7 +161,7 @@ class Server(object):
         self.service = service
         self.log = log
         self.mapisession = mapisession
-        self._store_cache = {}
+        self.store_cache = store_cache
 
         if not self.mapisession:
             # get cmd-line options
@@ -181,7 +202,9 @@ class Server(object):
             self.auth_user = auth_user or getattr(self.options, 'auth_user', None) or 'SYSTEM' # XXX override with args
             self.auth_pass = auth_pass or getattr(self.options, 'auth_pass', None) or ''
 
-            flags = EC_PROFILE_FLAGS_NO_NOTIFICATIONS
+            flags = 0
+            if not notifications:
+                flags |= EC_PROFILE_FLAGS_NO_NOTIFICATIONS
 
             # Username and password was supplied, so let us do verfication
             # (OpenECSession will not check password unless this parameter is provided)
@@ -201,23 +224,60 @@ class Server(object):
                 except MAPIErrorLogonFailed:
                     raise LogonError('Could not logon to server: username or password incorrect')
 
-        # start talking dirty
-        self.mapistore = GetDefaultStore(self.mapisession)
-        self.sa = self.mapistore.QueryInterface(IID_IECServiceAdmin)
-        self.ems = self.mapistore.QueryInterface(IID_IExchangeManageStore)
+        self._mapistore = None
+        self._sa = None
+        self._ems = None
         self._ab = None
         self._admin_store = None
         self._gab = None
-        entryid = HrGetOneProp(self.mapistore, PR_STORE_ENTRYID).Value
-        self.pseudo_url = entryid[entryid.find(b'pseudo:'):-1] # XXX ECSERVER
-        self.name = self.pseudo_url[9:].decode('ascii') # XXX encoding, get this kind of stuff from pr_ec_statstable_servers..?
+        self._pseudo_url = None
+        self._name = None
+
+    @property
+    def mapistore(self):
+        if self._mapistore is None:
+            self._mapistore = GetDefaultStore(self.mapisession)
+        return self._mapistore
+
+    @property
+    def sa(self):
+        if self._sa is None:
+            self._sa = self.mapistore.QueryInterface(IID_IECServiceAdmin)
+        return self._sa
+
+    @property
+    def ems(self):
+        if self._ems is None:
+            self._ems = self.mapistore.QueryInterface(IID_IExchangeManageStore)
+        return self._ems
+
+    @property
+    def pseudo_url(self):
+        if self._pseudo_url is None:
+            entryid = HrGetOneProp(self.mapistore, PR_STORE_ENTRYID).Value
+            self._pseudo_url = entryid[entryid.find(b'pseudo:'):-1] # XXX ECSERVER
+        return self._pseudo_url
+
+    @property
+    def name(self):
+        if self._name is None:
+            self._name = self.pseudo_url[9:].decode('ascii') # XXX encoding, get this kind of stuff from pr_ec_statstable_servers..?
+        return self._name
 
     def nodes(self): # XXX delay mapi sessions until actually needed
         for row in self.table(PR_EC_STATSTABLE_SERVERS).dict_rows():
             yield Server(options=self.options, config=self.config, sslkey_file=self.sslkey_file, sslkey_pass=self.sslkey_pass, server_socket=row[PR_EC_STATS_SERVER_HTTPSURL], log=self.log, service=self.service)
 
     def table(self, name, restriction=None, order=None, columns=None):
-        return Table(self, self.mapistore.OpenProperty(name, IID_IMAPITable, MAPI_UNICODE, 0), name, restriction=restriction, order=order, columns=columns)
+        return Table(
+            self,
+            self.mapistore,
+            self.mapistore.OpenProperty(name, IID_IMAPITable, MAPI_UNICODE, 0),
+            name,
+            restriction=restriction,
+            order=order,
+            columns=columns,
+        )
 
     def tables(self):
         for table in (PR_EC_STATSTABLE_SYSTEM, PR_EC_STATSTABLE_SESSIONS, PR_EC_STATSTABLE_USERS, PR_EC_STATSTABLE_COMPANY, PR_EC_STATSTABLE_SERVERS):
@@ -228,7 +288,12 @@ class Server(object):
 
     def gab_table(self): # XXX separate addressbook class? useful to add to self.tables?
         ct = self.gab.GetContentsTable(MAPI_DEFERRED_ERRORS)
-        return Table(self, ct, PR_CONTAINER_CONTENTS)
+        return Table(
+            self,
+            self.mapistore,
+            ct,
+            PR_CONTAINER_CONTENTS,
+        )
 
     @property
     def ab(self):
@@ -253,7 +318,7 @@ class Server(object):
         """Server GUID."""
         return bin2hex(HrGetOneProp(self.mapistore, PR_MAPPING_SIGNATURE).Value)
 
-    def user(self, name=None, email=None, create=False):
+    def user(self, name=None, email=None, create=False, userid=None):
         """Return :class:`user <User>` with given name or email address.
 
         :param name: user name
@@ -261,7 +326,7 @@ class Server(object):
         :param create: create user if it doesn't exist (name required)
         """
         try:
-            return _user.User(name, email=email, server=self)
+            return _user.User(name, email=email, server=self, userid=userid)
         except NotFoundError:
             if create and name:
                 return self.create_user(name)
@@ -283,7 +348,7 @@ class Server(object):
         """
         if parse and getattr(self.options, 'users', None):
             for username in self.options.users:
-                yield _user.User(_decode(username), self)
+                yield _user.User(username, self)
             return
         try:
             for name in self._companylist():
@@ -336,6 +401,10 @@ class Server(object):
         return user
 
     def remove_user(self, name): # XXX delete(object)?
+        """Remove a user
+
+        :param name: the login name of the user
+        """
         user = self.user(name)
         self.sa.DeleteUser(user._ecuser.UserID)
 
@@ -356,7 +425,11 @@ class Server(object):
                 raise
 
     def get_company(self, name):
-        """Return :class:`company <Company>` with given name or *None* if not found."""
+        """:class:`company <Company>` with given name
+
+        :param name: the company name
+        :return: :class:`company <Company>` with given name or *None* if not found.
+        """
         try:
             return self.company(name)
         except NotFoundError:
@@ -385,11 +458,12 @@ class Server(object):
     def companies(self, remote=False, parse=True): # XXX remote?
         """Return all :class:`companies <Company>` on server.
 
-        :param remote: include companies without users on this server node
+        :param remote: include companies without users on this server node (default False)
+        :param parse: take cli argument --companies into account (default True)
+        :return: Generator of :class:`companies <Company>` on server.
         """
         if parse and getattr(self.options, 'companies', None):
             for name in self.options.companies:
-                name = _decode(name) # can optparse give us unicode?
                 try:
                     yield Company(name, self)
                 except MAPIErrorNoSupport:
@@ -429,9 +503,15 @@ class Server(object):
             return self._store2(row[0].Value)
         raise NotFoundError("no such store: '%s'" % guid)
 
-    @_lru_cache(128) # backend doesn't like more than 1000 stores open on certain multiserver setup
-    def _store2(self, storeid): # XXX max lifetime
-        return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore, MDB_WRITE)
+    @instance_method_lru_cache(128) # backend doesn't like too many open stores
+    def _store_cached(self, storeid):
+        return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore,MDB_WRITE)
+
+    def _store2(self, storeid): # TODO max lifetime?
+        if self.store_cache:
+            return self._store_cached(storeid)
+        else:
+            return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore,MDB_WRITE)
 
     def groups(self):
         """Return all :class:`groups <Group>` on server."""
@@ -461,6 +541,9 @@ class Server(object):
         :param name: the name of the group
         :param fullname: the full name of the group (optional)
         :param email: the email address of the group (optional)
+        :param hidden: hide the group (optional)
+        :param groupid: the id of the group (optional)
+        :return: :class:`group <Group>` the created group
         """
         name = _unicode(name) # XXX: fullname/email unicode?
         email = _unicode(email)
@@ -481,10 +564,7 @@ class Server(object):
 
         :param objects: The object(s) to delete
         """
-        if isinstance(objects, (_user.User, Group, Company, _store.Store)):
-            objects = [objects]
-        else:
-            objects = list(objects)
+        objects = _utils.arg_objects(objects, (_user.User, Group, Company, _store.Store), 'Server.delete')
 
         for item in objects:
             if isinstance(item, _user.User):
@@ -502,14 +582,14 @@ class Server(object):
                 raise NotFoundError("no public store")
             return self.public_store
         else:
-            company = Company(name.split('@')[1])
+            company = Company(name.split('@')[1], self)
             if not company.public_store:
                 raise NotFoundError("no public store for company '%s'" % company.name)
             return company.public_store
 
     def store(self, guid=None, entryid=None):
         """Return :class:`store <Store>` with given GUID."""
-        if _unicode(guid).split('@')[0] == 'public':
+        if _is_str(guid) and _unicode(guid).split('@')[0] == 'public':
             return self._pubstore(guid)
         else:
             return _store.Store(guid=guid, entryid=entryid, server=self)

@@ -42,6 +42,7 @@ struct delivery_options {
 	const char *ascii_upgrade; // Upgrade ASCII parts to this new (ASCII-compatible) charset
 	bool html_safety_filter;
 	std::map<std::string, std::string> cset_subst; /* custom substitutions for broken charsets */
+	std::vector<std::string> indexed_headers; /* the headers we want to index in the PS_INTERNET_HEADERS namespace */
 };
 
 struct sending_options {
@@ -51,7 +52,6 @@ struct sending_options {
 	bool headers_only;
 	bool add_received_date;
 	int use_tnef;					// -1: minimize usage, 0: autodetect, 1: force
-	bool force_utf8;
 	char *charset_upgrade;
 	bool allow_send_to_everyone;
 	bool enable_dsn;				/**< Enable SMTP Delivery Status Notifications */

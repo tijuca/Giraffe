@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <new>
+#include <cstring>
 #include "ZCABContainer.h"
 #include "ZCMAPIProp.h"
 #include <mapiutil.h>
@@ -38,7 +39,6 @@
 #include <iostream>
 #include <kopano/Util.h>
 #include <kopano/stringutil.h>
-using namespace std;
 using namespace KCHL;
 
 ZCABContainer::ZCABContainer(const std::vector<zcabFolderEntry> *lpFolders,
@@ -311,7 +311,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 	j = 0;
 	while (true) {
-		hr = ptrContents->QueryRows(256, 0, &ptrRows);
+		hr = ptrContents->QueryRows(256, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 		if (ptrRows.empty())
@@ -414,7 +414,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 			    PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_UNICODE)
 				strSearchKey = strToUpper(convert_to<std::string>(std::wstring(lpColData[O_ADDRTYPE].Value.lpszW) + L":" + lpColData[O_EMAIL_ADDRESS].Value.lpszW));
 			else
-				// eg. distlists
+				// e.g. distlists
 				hr = MAPI_E_NOT_FOUND;
 			if (hr == hrSuccess) {
 				lpColData[O_SEARCH_KEY].ulPropTag = PR_SEARCH_KEY;
@@ -477,8 +477,8 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 	if (hr != hrSuccess)
 		return hr;
 
+	memset(&sKey, 0, sizeof(sKey));
 	sKey.ulPropTag = PR_ROWID;
-	sKey.Value.ul = 0;
 	for (ULONG i = 0; i < ptrEntries->Value.MVbin.cValues; ++i) {
 		ULONG ulOffset = 0;
 		BYTE cType = 0;
@@ -741,13 +741,13 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 			hr = ptrContainer->GetHierarchyTable(ulFlags, &~ptrTable);
 			if (hr != hrSuccess)
 				return hr;
-			hr = ptrTable->QueryRows(-1, 0, &ptrRows);
+			hr = ptrTable->QueryRows(-1, 0, &~ptrRows);
 			if (hr != hrSuccess)
 				return hr;
 
 			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 				// use PR_STORE_ENTRYID field to set instance key, since that is always MAPI_E_NOT_FOUND (see above)
-				auto lpProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, CHANGE_PROP_TYPE(PR_STORE_ENTRYID, PT_ERROR));
+				auto lpProp = ptrRows[i].find(CHANGE_PROP_TYPE(PR_STORE_ENTRYID, PT_ERROR));
 				if (lpProp == nullptr)
 					continue;
 				lpProp->ulPropTag = PR_ROWID;
@@ -954,13 +954,13 @@ HRESULT ZCABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
 		hr = this->GetHierarchyTable(0, &~ptrHierarchy);
 		if (hr != hrSuccess)
 			return hr;
-		hr = ptrHierarchy->QueryRows(m_lpFolders->size(), 0, &ptrRows);
+		hr = ptrHierarchy->QueryRows(m_lpFolders->size(), 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 
 		for (i = 0; i < ptrRows.size(); ++i) {
 			ABContainerPtr ptrContainer;
-			auto lpEntryID = PCpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_ENTRYID);
+			auto lpEntryID = ptrRows[i].cfind(PR_ENTRYID);
 			ULONG ulObjType;
 
 			if (!lpEntryID)
@@ -984,7 +984,7 @@ HRESULT ZCABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
 		// make joint proptags
 		std::copy(lpPropTagArray->aulPropTag, lpPropTagArray->aulPropTag + lpPropTagArray->cValues, std::inserter(stProps, stProps.begin()));
 		for (i = 0; i < lpAdrList->aEntries[0].cValues; ++i)
-			stProps.insert(lpAdrList->aEntries[0].rgPropVals[i].ulPropTag);
+			stProps.emplace(lpAdrList->aEntries[0].rgPropVals[i].ulPropTag);
 		hr = MAPIAllocateBuffer(CbNewSPropTagArray(stProps.size()), &~ptrColumns);
 		if (hr != hrSuccess)
 			return hr;
@@ -999,9 +999,8 @@ HRESULT ZCABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
 			return hr;
 
 		for (i = 0; i < lpAdrList->cEntries; ++i) {
-			auto lpDisplayNameA = PCpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_A);
-			auto lpDisplayNameW = PCpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_W);
-
+			auto lpDisplayNameA = lpAdrList->aEntries[i].cfind(PR_DISPLAY_NAME_A);
+			auto lpDisplayNameW = lpAdrList->aEntries[i].cfind(PR_DISPLAY_NAME_W);
 			if (!lpDisplayNameA && !lpDisplayNameW)
 				continue;
 
@@ -1020,7 +1019,7 @@ HRESULT ZCABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
 			hr = resFind.RestrictTable(ptrContents, 0);
 			if (hr != hrSuccess)
 				return hr;
-			hr = ptrContents->QueryRows(-1, MAPI_UNICODE, &ptrRows);
+			hr = ptrContents->QueryRows(-1, MAPI_UNICODE, &~ptrRows);
 			if (hr != hrSuccess)
 				return hr;
 
@@ -1099,8 +1098,8 @@ HRESULT ZCABContainer::CopyProps(const SPropTagArray *, ULONG, IMAPIProgress *,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCABContainer::GetNamesFromIDs(SPropTagArray **, GUID *, ULONG,
-    ULONG *, MAPINAMEID ***)
+HRESULT ZCABContainer::GetNamesFromIDs(SPropTagArray **tags, const GUID *propset,
+    ULONG flags, ULONG *nvals, MAPINAMEID ***names)
 {
 	return MAPI_E_NO_SUPPORT;
 }

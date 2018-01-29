@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <list>
 #include <memory>
 #include <utility>
 #include <kopano/tie.hpp>
@@ -47,7 +48,6 @@
 #include "ECDBDef.h"
 #include "cmdutil.hpp"
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -64,19 +64,8 @@ ECSecurity::ECSecurity(ECSession *lpSession, ECConfig *lpConfig,
     ECLogger *lpAudit) :
 	m_lpSession(lpSession), m_lpAudit(lpAudit), m_lpConfig(lpConfig)
 {
-	if (m_lpAudit != NULL)
-		m_lpAudit->AddRef();
 	m_bRestrictedAdmin = parseBool(lpConfig->GetSetting("restrict_admin_permissions"));
 	m_bOwnerAutoFullAccess = parseBool(lpConfig->GetSetting("owner_auto_full_access"));
-}
-
-ECSecurity::~ECSecurity()
-{
-	delete m_lpGroups;
-	delete m_lpViewCompanies;
-	delete m_lpAdminCompanies;
-	if (m_lpAudit != NULL)
-		m_lpAudit->Release();
 }
 
 /** 
@@ -175,10 +164,10 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 		 * groups here to exclude.
 		 */
 		if (IsUserObjectVisible(iterGroups->ulId) != erSuccess || iterGroups->GetClass() == DISTLIST_DYNAMIC) {
-			lpGroups->erase(iterGroups++);
+			iterGroups = lpGroups->erase(iterGroups);
 			continue;
 		}
-		cSeenGroups.m_seen.insert(*iterGroups);
+		cSeenGroups.m_seen.emplace(*iterGroups);
 
 		std::list<localobjectdetails_t> *lpGroupInGroups = NULL;
 		er = usrmgt->GetParentObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
@@ -188,7 +177,7 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 			remove_copy_if(lpGroupInGroups->begin(), lpGroupInGroups->end(), back_inserter(*lpGroups), cSeenGroups);
 			delete lpGroupInGroups;
 		}
-		// Ignore error (eg. cannot use that function on group Everyone)
+		// Ignore error (e.g. cannot use that function on group Everyone)
 		++iterGroups;
 	}
 
@@ -215,14 +204,13 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 	*lpulRights = 0;
 
 	// Get the deepest GRANT ACL that applies to this user or groups that this user is in
-	// WARNING we totally ignore DENY ACL's here. This means that the deepest GRANT counts. In practice
+	// WARNING we totally ignore DENY ACLs here. This means that the deepest GRANT counts. In practice
 	// this doesn't matter because GRANTmask = ~DENYmask.
 	auto cache = m_lpSession->GetSessionManager()->GetCacheManager();
 	while(true)
 	{
 		if (cache->GetACLs(ulCurObj, &lpRights) == erSuccess) {
-			// This object has ACL's, check if any of them are for this user
-
+			/* This object has ACLs, check if any of them are for this user. */
 			for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
 				if(lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == m_ulUserID) {
 					*lpulRights |= lpRights->__ptr[i].ulRights;
@@ -237,7 +225,7 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 				}
 
 			// Also check for groups that we are in, and add those permissions
-			if(m_lpGroups || GetGroupsForUser(m_ulUserID, &m_lpGroups) == erSuccess)
+			if (m_lpGroups || GetGroupsForUser(m_ulUserID, &unique_tie(m_lpGroups)) == erSuccess)
 				for (const auto &grp : *m_lpGroups)
 					for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
 						if (lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT &&
@@ -747,9 +735,9 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 	}
 
 	if (lpsRightsArray->__size >= 0 && ulErrors == static_cast<size_t>(lpsRightsArray->__size))
-		er = KCERR_INVALID_PARAMETER;	// all acl's failed
+		er = KCERR_INVALID_PARAMETER; /* all ACLs failed */
 	else if (ulErrors != 0)
-		er = KCWARN_PARTIAL_COMPLETION;	// some acl's failed
+		er = KCWARN_PARTIAL_COMPLETION; /* some ACLs failed */
 	else
 		er = erSuccess;
 	return er;
@@ -776,7 +764,8 @@ ECRESULT ECSecurity::GetUserCompany(unsigned int *lpulCompanyId) const
  * 
  * @return Kopano error code
  */
-ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjectdetails_t> **lppObjects)
+ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags,
+    std::list<localobjectdetails_t> **lppObjects)
 {
 	ECRESULT er;
 	/*
@@ -788,7 +777,7 @@ ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjec
 	 * want all details while others will only want the IDs.
 	 */
 	if (!m_lpViewCompanies) {
-		er = GetViewableCompanies(0, &m_lpViewCompanies);
+		er = GetViewableCompanies(0, &unique_tie(m_lpViewCompanies));
 		if (er != erSuccess)
 			return er;
 	}
@@ -797,16 +786,16 @@ ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjec
 	 * Because of the difference in flags it is possible we have
 	 * too many entries in the list. We need to filter those out now.
 	 */
-	*lppObjects = new list<localobjectdetails_t>();
+	*lppObjects = new std::list<localobjectdetails_t>;
 	for (const auto &i : *m_lpViewCompanies) {
 		if (m_ulUserID != 0 && (ulFlags & USERMANAGEMENT_ADDRESSBOOK) &&
 		    i.GetPropBool(OB_PROP_B_AB_HIDDEN))
 			continue;
 
 		if (ulFlags & USERMANAGEMENT_IDS_ONLY)
-			(*lppObjects)->push_back({i.ulId, i.GetClass()});
+			(*lppObjects)->emplace_back(i.ulId, i.GetClass());
 		else
-			(*lppObjects)->push_back({i.ulId, i});
+			(*lppObjects)->emplace_back(i.ulId, i);
 	}
 	return erSuccess;
 }
@@ -844,7 +833,7 @@ ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 		ulCompanyId = ulUserObjectId;
 
 	if (!m_lpViewCompanies) {
-		er = GetViewableCompanies(0, &m_lpViewCompanies);
+		er = GetViewableCompanies(0, &unique_tie(m_lpViewCompanies));
 		if (er != erSuccess)
 			return er;
 	}
@@ -900,7 +889,7 @@ ECRESULT ECSecurity::GetViewableCompanies(unsigned int ulFlags,
 		} else {
 			details = objectdetails_t(CONTAINER_COMPANY);
 		}
-		lpObjects->push_back({m_ulCompanyID, details});
+		lpObjects->emplace_back(m_ulCompanyID, details);
 	}
 
 	lpObjects->sort();
@@ -917,7 +906,8 @@ ECRESULT ECSecurity::GetViewableCompanies(unsigned int ulFlags,
  * 
  * @return Kopano error code
  */
-ECRESULT ECSecurity::GetAdminCompanies(unsigned int ulFlags, list<localobjectdetails_t> **lppObjects)
+ECRESULT ECSecurity::GetAdminCompanies(unsigned int ulFlags,
+    std::list<localobjectdetails_t> **lppObjects)
 {
 	ECRESULT er = erSuccess;
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
@@ -976,7 +966,7 @@ unsigned int ECSecurity::GetUserId(unsigned int ulObjId)
  * @param[in] ulObjId hierarchy object id of object to check
  * 
  * @return Kopano error code
- * @retval erSuccess object is in current user's store
+ * @retval erSuccess object is in the current user's store
  */
 ECRESULT ECSecurity::IsStoreOwner(unsigned int ulObjId) const
 {
@@ -1097,7 +1087,7 @@ ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 	}
 
 	if (!m_lpAdminCompanies) {
-		er = GetAdminCompanies(USERMANAGEMENT_IDS_ONLY, &m_lpAdminCompanies);
+		er = GetAdminCompanies(USERMANAGEMENT_IDS_ONLY, &unique_tie(m_lpAdminCompanies));
 		if (er != erSuccess)
 			return er;
 	}
@@ -1435,7 +1425,7 @@ size_t ECSecurity::GetObjectSize(void) const
 			++ulItems;
 			ulSize += i.GetObjectSize();
 		}
-		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);
+		ulSize += MEMORY_USAGE_LIST(ulItems, std::list<localobjectdetails_t>);
 	}
 
 	if (m_lpViewCompanies)
@@ -1445,7 +1435,7 @@ size_t ECSecurity::GetObjectSize(void) const
 			++ulItems;
 			ulSize += i.GetObjectSize();
 		}
-		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);
+		ulSize += MEMORY_USAGE_LIST(ulItems, std::list<localobjectdetails_t>);
 	}
 
 	if (m_lpAdminCompanies)
@@ -1455,7 +1445,7 @@ size_t ECSecurity::GetObjectSize(void) const
 			++ulItems;
 			ulSize += i.GetObjectSize();
 		}
-		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);
+		ulSize += MEMORY_USAGE_LIST(ulItems, std::list<localobjectdetails_t>);
 	}
 
 	return ulSize;

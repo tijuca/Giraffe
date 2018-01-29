@@ -20,6 +20,7 @@
 #include <new>
 #include <climits>
 #include <csignal>
+#include <netdb.h>
 #include <poll.h>
 #include <inetmapi/inetmapi.h>
 
@@ -63,7 +64,8 @@
  * @{
  */
 
-using namespace std;
+using std::cout;
+using std::endl;
 
 static int daemonize = 1;
 int quit = 0;
@@ -280,6 +282,32 @@ static void *Handler_Threaded(void *a)
 	return Handler(a);
 }
 
+static std::string GetServerFQDN()
+{
+	std::string retval = "localhost";
+	char hostname[256] = {0};
+	struct addrinfo *result = nullptr;
+
+	auto rc = gethostname(hostname, sizeof(hostname));
+	if (rc != 0)
+		return retval;
+	retval = hostname;
+	rc = getaddrinfo(hostname, nullptr, nullptr, &result);
+	if (rc != 0 || result == nullptr)
+		return retval;
+	/* Name lookup is required, so set that flag */
+	rc = getnameinfo(result->ai_addr, result->ai_addrlen, hostname,
+	     sizeof(hostname), nullptr, 0, NI_NAMEREQD);
+	if (rc != 0)
+		goto exit;
+	if (hostname[0] != '\0')
+		retval = hostname;
+ exit:
+	if (result)
+		freeaddrinfo(result);
+	return retval;
+}
+
 int main(int argc, char *argv[]) {
 	HRESULT hr = hrSuccess;
 	int c = 0;
@@ -287,13 +315,14 @@ int main(int argc, char *argv[]) {
 
 	ssl_threading_setup();
 	const char *szConfig = ECConfig::GetDefaultPath("gateway.cfg");
+	bool exp_config = false;
 	static const configsetting_t lpDefaults[] = {
 		{ "server_bind", "" },
 		{ "run_as_user", "kopano" },
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/gateway.pid" },
 		{ "running_path", "/var/lib/kopano" },
-		{ "process_model", "fork" },
+		{ "process_model", "thread" },
 		{"coredump_enabled", "systemdefault"},
 		{"pop3_enable", "yes", CONFIGSETTING_NONEMPTY},
 		{"pop3_port", "110", CONFIGSETTING_NONEMPTY},
@@ -309,10 +338,10 @@ int main(int argc, char *argv[]) {
 		{ "imap_always_generate", "no", CONFIGSETTING_UNUSED },
 		{ "imap_max_fail_commands", "10", CONFIGSETTING_RELOADABLE },
 		{ "imap_max_messagesize", "128M", CONFIGSETTING_RELOADABLE | CONFIGSETTING_SIZE },
-		{ "imap_generate_utf8", "no", CONFIGSETTING_RELOADABLE },
+		{ "imap_generate_utf8", "no", CONFIGSETTING_UNUSED },
 		{ "imap_expunge_on_delete", "no", CONFIGSETTING_RELOADABLE },
-		{ "imap_store_rfc822", "yes", CONFIGSETTING_RELOADABLE },
-		{ "imap_cache_folders_time_limit", "0", CONFIGSETTING_RELOADABLE },
+		{ "imap_store_rfc822", "", CONFIGSETTING_UNUSED },
+		{ "imap_cache_folders_time_limit", "", CONFIGSETTING_UNUSED },
 		{ "imap_ignore_command_idle", "no", CONFIGSETTING_RELOADABLE },
 		{ "disable_plaintext_auth", "no", CONFIGSETTING_RELOADABLE },
 		{ "server_socket", "http://localhost:236/" },
@@ -367,6 +396,7 @@ int main(int argc, char *argv[]) {
 		case OPT_CONFIG:
 		case 'c':
 			szConfig = optarg;
+			exp_config = true;
 			break;
 		case OPT_HOST:
 		case 'h':
@@ -394,7 +424,7 @@ int main(int argc, char *argv[]) {
 
 	// Setup config
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(szConfig) ||
+	if (!g_lpConfig->LoadSettings(szConfig, !exp_config) ||
 	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);	// create logger without a timestamp to stderr
@@ -414,8 +444,7 @@ int main(int argc, char *argv[]) {
 
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
-
-	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+	if (!TmpPath::instance.OverridePath(g_lpConfig))
 		ec_log_err("Ignoring invalid path-setting!");
 	if (parseBool(g_lpConfig->GetSetting("bypass_auth")))
 		ec_log_warn("Gateway is started with bypass_auth=yes meaning username and password will not be checked.");
@@ -433,8 +462,7 @@ int main(int argc, char *argv[]) {
 	g_strHostString = g_lpConfig->GetSetting("server_hostname", NULL, "");
 	if (g_strHostString.empty())
 		g_strHostString = GetServerFQDN();
-	g_strHostString = string(" on ") + g_strHostString;
-
+	g_strHostString.insert(0, " on ");
 	hr = running_service(szPath, argv[0]);
 
 exit:
@@ -607,7 +635,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 		goto exit;
 	}
 
-	ec_log_info("Starting kopano-gateway version " PROJECT_VERSION " (pid %d)", getpid());
+	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-gateway version " PROJECT_VERSION " (pid %d)", getpid());
 	if (bListenPOP3) {
 		pfd_pop3 = nfds;
 		pollfd[nfds++].fd = ulListenPOP3;

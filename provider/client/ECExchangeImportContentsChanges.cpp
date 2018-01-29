@@ -49,14 +49,7 @@ using namespace KCHL;
 ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder) :
 	m_lpFolder(lpFolder)
 {
-	ECSyncLog::GetLogger(&m_lpLogger);
-	m_lpFolder->AddRef();
-}
-
-ECExchangeImportContentsChanges::~ECExchangeImportContentsChanges(){
-	m_lpFolder->Release();
-	m_lpLogger->Release();
-	MAPIFreeBuffer(m_lpSourceKey);
+	ECSyncLog::GetLogger(&~m_lpLogger);
 }
 
 HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges){
@@ -66,7 +59,7 @@ HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHAN
 	object_ptr<ECExchangeImportContentsChanges> lpEICC(new(std::nothrow) ECExchangeImportContentsChanges(lpFolder));
 	if (lpEICC == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &lpEICC->m_lpSourceKey);
+	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpEICC->m_lpSourceKey);
 	if (hr != hrSuccess)
 		return hr;
 	return lpEICC->QueryInterface(IID_IExchangeImportContentsChanges,
@@ -93,14 +86,15 @@ HRESULT	ECExchangeImportContentsChanges::QueryInterface(REFIID refiid, void **lp
 
 HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError){
 	HRESULT		hr = hrSuccess;
-	LPMAPIERROR	lpMapiError = NULL;
+	memory_ptr<MAPIERROR> lpMapiError;
 	memory_ptr<TCHAR> lpszErrorMsg;
 	
 	//FIXME: give synchronization errors messages
 	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
 		return hr;
-	if ((hr = MAPIAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError)) != hrSuccess)
+	hr = MAPIAllocateBuffer(sizeof(MAPIERROR), &~lpMapiError);
+	if (hr != hrSuccess)
 		return hr;
 	
 	if (ulFlags & MAPI_UNICODE) {
@@ -131,8 +125,7 @@ HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulF
 	lpMapiError->ulContext		= 0;
 	lpMapiError->ulLowLevelError= 0;
 	lpMapiError->ulVersion		= 0;
-
-	*lppMAPIError = lpMapiError;
+	*lppMAPIError = lpMapiError.release();
 	return hrSuccess;
 }
 
@@ -293,8 +286,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 	hr = lpMessage->SetProps(cValue, lpPropArray, NULL);
 	if(hr != hrSuccess)
 		return hr;
-	*lppMessage = lpMessage;
-	lpMessage->AddRef();
+	*lppMessage = lpMessage.release();
 	return hrSuccess;
 }
 
@@ -577,7 +569,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		ZLOG_DEBUG(m_lpLogger, "Failed to open root folder, hr = 0x%08x", hr);
 		return hr;
 	}
-	hr = m_lpFolder->GetMsgStore()->GetReceiveFolder((TCHAR*)"IPM", 0, &cbEntryId, &~lpEntryId, NULL);
+	hr = m_lpFolder->GetMsgStore()->GetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0, &cbEntryId, &~lpEntryId, nullptr);
 	if(hr != hrSuccess) {
 		ZLOG_DEBUG(m_lpLogger, "Failed to get 'IPM' receive folder id, hr = 0x%08x", hr);
 		return hr;
@@ -598,15 +590,18 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		return hr;
 	}
 
-	HrGetOneProp(lpRootFolder, PR_ADDITIONAL_REN_ENTRYIDS, &~lpAdditionalREN);
 
 	//make new PR_ADDITIONAL_REN_ENTRYIDS
 	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpNewAdditionalREN);
 	if(hr != hrSuccess)
 		return hr;
-
 	lpNewAdditionalREN->ulPropTag = PR_ADDITIONAL_REN_ENTRYIDS;
-	lpNewAdditionalREN->Value.MVbin.cValues = (lpAdditionalREN == nullptr || lpAdditionalREN->Value.MVbin.cValues < 4) ? 4 : lpAdditionalREN->Value.MVbin.cValues;
+	if (HrGetOneProp(lpRootFolder, PR_ADDITIONAL_REN_ENTRYIDS, &~lpAdditionalREN) != hrSuccess ||
+	    lpAdditionalREN->Value.MVbin.cValues < 4)
+		lpNewAdditionalREN->Value.MVbin.cValues = 4;
+	else
+		lpNewAdditionalREN->Value.MVbin.cValues = lpAdditionalREN->Value.MVbin.cValues;
+
 	hr = MAPIAllocateMore(sizeof(SBinary)*lpNewAdditionalREN->Value.MVbin.cValues, lpNewAdditionalREN, (LPVOID*)&lpNewAdditionalREN->Value.MVbin.lpbin);
 	if(hr != hrSuccess)
 		return hr;
@@ -936,11 +931,9 @@ HrVerifyRemindersRestriction(const SRestriction *lpRestriction,
 
 	if (lpAdditionalREN->Value.MVbin.lpbin[0].cb == 0 || lpAdditionalREN->Value.MVbin.lpbin[2].cb == 0 || lpAdditionalREN->Value.MVbin.lpbin[3].cb == 0)
 		return hrSuccess;
-
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[0]);
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[2]);
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[3]);
-
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[0]);
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[2]);
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[3]);
 	return HrRestrictionContains(lpRestriction, lstEntryIds);
 }
 

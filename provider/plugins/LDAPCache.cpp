@@ -21,14 +21,6 @@
 #include "LDAPUserPlugin.h"
 #include <kopano/stringutil.h>
 
-LDAPCache::LDAPCache()
-{
-	m_lpCompanyCache.reset(new dn_cache_t());
-	m_lpGroupCache.reset(new dn_cache_t());
-	m_lpUserCache.reset(new dn_cache_t());
-	m_lpAddressListCache.reset(new dn_cache_t());
-}
-
 bool LDAPCache::isObjectTypeCached(objectclass_t objclass)
 {
 	scoped_rlock biglock(m_hMutex);
@@ -40,32 +32,28 @@ bool LDAPCache::isObjectTypeCached(objectclass_t objclass)
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
 	case NONACTIVE_CONTACT:
-		return !m_lpUserCache->empty();
+		return !m_lpUserCache.empty();
 	case OBJECTCLASS_DISTLIST:
 	case DISTLIST_GROUP:
 	case DISTLIST_SECURITY:
 	case DISTLIST_DYNAMIC:
-		return !m_lpGroupCache->empty();
+		return !m_lpGroupCache.empty();
 	case CONTAINER_COMPANY:
-		return !m_lpCompanyCache->empty();
+		return !m_lpCompanyCache.empty();
 	case CONTAINER_ADDRESSLIST:
-		return !m_lpAddressListCache->empty();
+		return !m_lpAddressListCache.empty();
 	default:
 		return false;
 	}
 }
 
-void LDAPCache::setObjectDNCache(objectclass_t objclass,
-    std::unique_ptr<dn_cache_t> lpCache)
+void LDAPCache::setObjectDNCache(objectclass_t objclass, dn_cache_t &&lpCache)
 {
-	/*
-	 * Always merge caches rather then overwritting them.
-	 */
-	std::unique_ptr<dn_cache_t> lpTmp = getObjectDNCache(NULL, objclass);
+	/* Always merge caches rather then overwriting them. */
+	auto lpTmp = getObjectDNCache(nullptr, objclass);
 	// cannot use insert() because it does not override existing entries
-	for (const auto &i : *lpCache)
-		(*lpTmp)[i.first] = i.second;
-	lpCache = std::move(lpTmp);
+	for (const auto &i : lpCache)
+		lpTmp[i.first] = std::move(i.second);
 
 	scoped_rlock biglock(m_hMutex);
 	switch (objclass) {
@@ -75,29 +63,28 @@ void LDAPCache::setObjectDNCache(objectclass_t objclass,
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
 	case NONACTIVE_CONTACT:
-		m_lpUserCache = std::move(lpCache);
+		m_lpUserCache = std::move(lpTmp);
 		break;
 	case OBJECTCLASS_DISTLIST:
 	case DISTLIST_GROUP:
 	case DISTLIST_SECURITY:
 	case DISTLIST_DYNAMIC:
-		m_lpGroupCache = std::move(lpCache);
+		m_lpGroupCache = std::move(lpTmp);
 		break;
 	case CONTAINER_COMPANY:
-		m_lpCompanyCache = std::move(lpCache);
+		m_lpCompanyCache = std::move(lpTmp);
 		break;
 	case CONTAINER_ADDRESSLIST:
-		m_lpAddressListCache = std::move(lpCache);
+		m_lpAddressListCache = std::move(lpTmp);
 		break;
 	default:
 		break;
 	}
 }
 
-std::unique_ptr<dn_cache_t>
+dn_cache_t
 LDAPCache::getObjectDNCache(LDAPUserPlugin *lpPlugin, objectclass_t objclass)
 {
-	std::unique_ptr<dn_cache_t> cache;
 	scoped_rlock biglock(m_hMutex);
 
 	/* If item was not yet cached, make sure it is done now. */
@@ -111,37 +98,32 @@ LDAPCache::getObjectDNCache(LDAPUserPlugin *lpPlugin, objectclass_t objclass)
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
 	case NONACTIVE_CONTACT:
-		cache.reset(new dn_cache_t(*m_lpUserCache.get()));
-		break;
+		return m_lpUserCache;
 	case OBJECTCLASS_DISTLIST:
 	case DISTLIST_GROUP:
 	case DISTLIST_SECURITY:
 	case DISTLIST_DYNAMIC:
-		cache.reset(new dn_cache_t(*m_lpGroupCache.get()));
-		break;
+		return m_lpGroupCache;
 	case CONTAINER_COMPANY:
-		cache.reset(new dn_cache_t(*m_lpCompanyCache.get()));
-		break;
+		return m_lpCompanyCache;
 	case CONTAINER_ADDRESSLIST:
-		cache.reset(new dn_cache_t(*m_lpAddressListCache.get()));
-		break;
+		return m_lpAddressListCache;
 	default:
-		break;
+		return {};
 	}
-	return cache;
 }
 
-objectid_t LDAPCache::getParentForDN(const std::unique_ptr<dn_cache_t> &lpCache,
+objectid_t LDAPCache::getParentForDN(const dn_cache_t &lpCache,
     const std::string &dn)
 {
 	objectid_t entry;
 	std::string parent_dn;
 
-	if (lpCache->empty())
+	if (lpCache.empty())
 		return entry; /* empty */
 
 	// @todo make sure we find the largest DN match
-	for (const auto &i : *lpCache)
+	for (const auto &i : lpCache)
 		/* Key should be larger then current guess, but has to be smaller then the userobject dn */
 		/* If key matches the end of the userobject dn, we have a positive match */
 		if (i.second.size() > parent_dn.size() && i.second.size() < dn.size() &&
@@ -154,35 +136,32 @@ objectid_t LDAPCache::getParentForDN(const std::unique_ptr<dn_cache_t> &lpCache,
 	return entry;
 }
 
-std::unique_ptr<dn_list_t>
-LDAPCache::getChildrenForDN(const std::unique_ptr<dn_cache_t> &lpCache,
-    const std::string &dn)
+dn_list_t
+LDAPCache::getChildrenForDN(const dn_cache_t &lpCache, const std::string &dn)
 {
-	std::unique_ptr<dn_list_t> list(new dn_list_t());
+	dn_list_t list;
 
 	/* Find al DNs which are hierarchically below the given dn */
-	for (const auto &i : *lpCache)
+	for (const auto &i : lpCache)
 		/* Key should be larger then root DN */
 		/* If key matches the end of the root dn, we have a positive match */
 		if (i.second.size() > dn.size() &&
 		    strcasecmp(i.second.c_str() + (i.second.size() - dn.size()), dn.c_str()) == 0)
-			list->push_back(i.second);
+			list.emplace_back(i.second);
 	return list;
 }
 
 std::string
-LDAPCache::getDNForObject(const std::unique_ptr<dn_cache_t> &lpCache,
-    const objectid_t &externid)
+LDAPCache::getDNForObject(const dn_cache_t &lpCache, const objectid_t &externid)
 {
-	dn_cache_t::const_iterator it = lpCache->find(externid);
-	return it == lpCache->cend() ? std::string() : it->second;
+	dn_cache_t::const_iterator it = lpCache.find(externid);
+	return it == lpCache.cend() ? std::string() : it->second;
 }
 
-bool LDAPCache::isDNInList(const std::unique_ptr<dn_list_t> &lpList,
-    const std::string &dn)
+bool LDAPCache::isDNInList(const dn_list_t &lpList, const std::string &dn)
 {
 	/* We were given a DN, check if a parent of that dn is listed as filterd */
-	for (const auto &i : *lpList)
+	for (const auto &i : lpList)
 		/* Key should be larger or equal then user DN */
 		/* If key matches the end of the user dn, we have a positive match */
 		if (i.size() <= dn.size() &&

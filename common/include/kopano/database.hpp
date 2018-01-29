@@ -4,6 +4,7 @@
 #include <mutex>
 #include <string>
 #include <utility>
+#include <mapidefs.h>
 #include <mysql.h>
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
@@ -38,6 +39,7 @@ struct sSQLDatabase_t {
 	const char *lpSQL;
 };
 
+class ECConfig;
 class KDatabase;
 
 class _kc_export DB_RESULT _kc_final {
@@ -67,10 +69,38 @@ class _kc_export DB_RESULT _kc_final {
 	KDatabase *m_db = nullptr;
 };
 
+class kt_completion {
+	public:
+	virtual ECRESULT Commit() = 0;
+	virtual ECRESULT Rollback() = 0;
+};
+
+/**
+ * kd_trans is an explicit variable wrapper around a database transaction.
+ * The transaction's scope is bounded by the scope of a certain kd_trans.
+ * Essentially, this gives the programmer an implicit rollback whenever
+ * a kd_trans did not have commit() called.
+ */
+class _kc_export kd_trans final {
+	public:
+	kd_trans();
+	kd_trans(kt_completion &d, ECRESULT &r) : m_db(&d), m_result(&r) {}
+	kd_trans(kd_trans &&);
+	~kd_trans();
+	kd_trans &operator=(kd_trans &&);
+	ECRESULT commit();
+	ECRESULT rollback();
+
+	private:
+	kt_completion *m_db;
+	ECRESULT *m_result;
+	bool m_done = false;
+};
+
 class _kc_export KDatabase {
 	public:
 	KDatabase(void);
-	virtual ~KDatabase(void) _kc_impdtor;
+	virtual ~KDatabase(void) = default;
 	ECRESULT Close(void);
 	virtual ECRESULT Connect(ECConfig *, bool, unsigned int, unsigned int);
 	virtual ECRESULT CreateDatabase(ECConfig *, bool);
@@ -82,8 +112,9 @@ class _kc_export KDatabase {
 	virtual ECRESULT DoSequence(const std::string &seq, unsigned int count, unsigned long long *first_id);
 	virtual ECRESULT DoUpdate(const std::string &query, unsigned int *affect = nullptr);
 	std::string Escape(const std::string &);
-	std::string EscapeBinary(const unsigned char *, size_t);
-	std::string EscapeBinary(const std::string &);
+	std::string EscapeBinary(const void *, size_t);
+	std::string EscapeBinary(const std::string &s) { return EscapeBinary(s.c_str(), s.size()); }
+	std::string EscapeBinary(const SBinary &s) { return EscapeBinary(s.lpb, s.cb); }
 	const char *GetError(void);
 	DB_ERROR GetLastError(void);
 	unsigned int GetMaxAllowedPacket(void) const { return m_ulMaxAllowedPacket; }

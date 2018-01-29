@@ -28,6 +28,8 @@
 #include <kopano/platform.h>
 #include <openssl/md5.h>
 
+struct SBinary;
+
 namespace KC {
 
 /*
@@ -98,6 +100,7 @@ extern _kc_export std::string hex2bin(const std::string &);
 extern _kc_export std::string hex2bin(const std::wstring &);
 extern _kc_export std::string bin2hex(const std::string &);
 extern _kc_export std::string bin2hex(size_t len, const void *input);
+extern _kc_export std::string bin2hex(const SBinary &);
 extern _kc_export std::string urlEncode(const std::string &);
 extern _kc_export std::string urlEncode(const std::wstring &, const char *charset);
 extern _kc_export std::string urlEncode(const wchar_t *input, const char *charset);
@@ -122,7 +125,7 @@ std::vector<T> tokenize(const T &str, const T &delimiters)
    	while (std::string::npos != pos || std::string::npos != lastPos)
    	{
        	// found a token, add it to the std::vector.
-       	tokens.push_back(str.substr(lastPos, pos - lastPos));
+		tokens.emplace_back(str.substr(lastPos, pos - lastPos));
 
        	// skip delimiters.  Note the "not_of"
        	lastPos = str.find_first_not_of(delimiters, pos);
@@ -185,7 +188,6 @@ template<typename T> std::string kc_join(const T &v, const char *sep)
 extern _kc_export std::string base64_encode(const void *, unsigned int);
 extern _kc_export std::string base64_decode(const std::string &);
 extern _kc_export std::string zcp_md5_final_hex(MD5_CTX *);
-extern _kc_export std::string string_strip_nuls(const std::string &);
 extern _kc_export std::wstring string_strip_nuls(const std::wstring &);
 extern _kc_export std::string string_strip_crlf(const char *);
 

@@ -15,10 +15,11 @@
  *
  */
 
-#include <kopano/platform.h>
-
 #ifndef ECDEFS_H
 #define ECDEFS_H
+
+#include <string>
+#include <kopano/platform.h>
 
 namespace KC {
 
@@ -77,11 +78,11 @@ namespace KC {
 	( OBJECTCLASS_FIELD_COMPARE(OBJECTCLASS_TYPE(__left), OBJECTCLASS_TYPE(__right)) && \
 	  OBJECTCLASS_FIELD_COMPARE((__left) & 0xffff, (__right) & 0xffff) )
 #define OBJECTCLASS_COMPARE_SQL(__column, __objclass) \
-	string(((__objclass) == 0) ? \
+	std::string(((__objclass) == 0) ? \
 			"TRUE" : \
 			((__objclass) & 0xffff) ? \
 				__column " = " + stringify(__objclass) : \
-				"(" __column " & 0xffff0000) = " + stringify((__objclass) & 0xffff0000))
+				"(" __column " & 4294901760) = " + stringify((__objclass) & 0xffff0000))
 
 enum objecttype_t {
 	OBJECTTYPE_UNKNOWN		= 0,

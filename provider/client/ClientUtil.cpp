@@ -43,7 +43,6 @@
 #include <kopano/charset/convstring.h>
 #include "EntryPoint.h"
 
-using namespace std;
 using namespace KCHL;
 
 // profile properties
@@ -53,8 +52,7 @@ static constexpr const SizedSPropTagArray(22, sptaKopanoProfile) =
 	PR_EC_IMPERSONATEUSER_A, PR_EC_IMPERSONATEUSER_W, PR_EC_FLAGS,
 	PR_EC_SSLKEY_FILE, PR_EC_SSLKEY_PASS, PR_EC_PROXY_HOST,
 	PR_EC_PROXY_PORT, PR_EC_PROXY_USERNAME, PR_EC_PROXY_PASSWORD,
-	PR_EC_PROXY_FLAGS, PR_EC_CONNECTION_TIMEOUT, PR_EC_OFFLINE_PATH_A,
-	PR_EC_OFFLINE_PATH_W, PR_SERVICE_NAME,
+	PR_EC_PROXY_FLAGS, PR_EC_CONNECTION_TIMEOUT, PR_SERVICE_NAME,
 	PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
 	PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC}};
 
@@ -64,7 +62,6 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 	memory_ptr<SPropValue> lpspvStatusRow;
 	ULONG			cCurVal = 0;
 	unsigned int	size = 0;
-	std::wstring	wstrSearchKey;
 
 	hResult = MAPIAllocateBuffer(sizeof(SPropValue) * 13, &~lpspvStatusRow);
 	if(hResult != hrSuccess)
@@ -526,11 +523,11 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	hr = MAPIAllocateBuffer(CbNewADRLIST(1), &~lpMods);
 	if (hr != hrSuccess)
 		return hr;
-	lpMods->cEntries = 1;
-
+	lpMods->cEntries = 0;
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 8, (void**)&lpMods->aEntries->rgPropVals);
 	if (hr != hrSuccess)
 		return hr;
+	++lpMods->cEntries;
 	hr = ECParseOneOff(reinterpret_cast<ENTRYID *>(spv[RR_REPORT_ENTRYID].Value.bin.lpb), spv[RR_REPORT_ENTRYID].Value.bin.cb, strName, strType, strAddress);
 	if (hr != hrSuccess)
 		return hr;
@@ -579,35 +576,17 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPMAPISUP lpMAPISup, struct sGlob
 HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, struct sGlobalProfileProps* lpsProfileProps)
 {
 	HRESULT			hr = hrSuccess;
-	memory_ptr<SPropValue> lpsPropArray, lpsEMSPropArray, lpPropEMS;
+	memory_ptr<SPropValue> lpsPropArray;
 	ULONG			cValues = 0;
-	ULONG			cEMSValues = 0;
 	const SPropValue *lpProp = NULL;
-	bool			bIsEMS = false;
 
 	if (lpGlobalProfSect == nullptr || lpsProfileProps == nullptr)
 		return MAPI_E_INVALID_OBJECT;
-	if (HrGetOneProp(lpGlobalProfSect, PR_PROFILE_UNRESOLVED_NAME, &~lpPropEMS) == hrSuccess || g_ulLoadsim)
-		bIsEMS = true;
 
-	if(bIsEMS) {
-		static constexpr const SizedSPropTagArray(4, sptaEMSProfile) =
-			{4, {PR_PROFILE_NAME_A, PR_PROFILE_UNRESOLVED_SERVER,
-			PR_PROFILE_UNRESOLVED_NAME, PR_PROFILE_USER}};
-
-		// This is an emulated MSEMS store. Get the properties we need and convert them to ZARAFA-style properties
-		hr = lpGlobalProfSect->GetProps(sptaEMSProfile, 0, &cEMSValues, &~lpsEMSPropArray);
-		if(FAILED(hr))
-			return hr;
-		hr = ConvertMSEMSProps(cEMSValues, lpsEMSPropArray, &cValues, &~lpsPropArray);
-		if(FAILED(hr))
-			return hr;
-	} else {
-		// Get the properties we need directly from the global profile section
-		hr = lpGlobalProfSect->GetProps(sptaKopanoProfile, 0, &cValues, &~lpsPropArray);
-		if(FAILED(hr))
-			return hr;
-	}
+	// Get the properties we need directly from the global profile section
+	hr = lpGlobalProfSect->GetProps(sptaKopanoProfile, 0, &cValues, &~lpsPropArray);
+	if(FAILED(hr))
+		return hr;
 
 	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PATH)) != NULL)
 		lpsProfileProps->strServerPath = lpProp->Value.lpszA;
@@ -651,16 +630,11 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, stru
 		lpsProfileProps->ulConnectionTimeOut = lpProp->Value.ul;
 	else
 		lpsProfileProps->ulConnectionTimeOut = 10;
-	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_W)) != NULL)
-		lpsProfileProps->strOfflinePath = convstring::from_SPropValue(lpProp);
-	else if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_A)) != NULL)
-		lpsProfileProps->strOfflinePath = convstring::from_SPropValue(lpProp);
 	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION)) != NULL)
 		lpsProfileProps->strClientAppVersion = lpProp->Value.lpszA;
 	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC)) != NULL)
 		lpsProfileProps->strClientAppMisc = lpProp->Value.lpszA;
 
-	lpsProfileProps->bIsEMS = bIsEMS;
 	return hrSuccess;
 }
 
@@ -691,134 +665,6 @@ HRESULT ClientUtil::GetGlobalProfileDelegateStoresProp(LPPROFSECT lpGlobalProfSe
 
 	*lpcDelegates = lpsPropValue[0].Value.bin.cb;
 	*lppDelegateStores = lpDelegateStores.release();
-	return hrSuccess;
-}
-
-/*
- * Read registry key to discover the installation directory for the exchange redirector
- *
- * @param[out] lpConfigPath String containing full config path
- */
-HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
-{
-	return MAPI_E_NO_SUPPORT;
-}
-
-/**
- * Convert incoming MSEMS profile properties to ZARAFA properties
- *
- * Basically we take the username and servername from the exchange properties and set all other properties
- * by reading a configuration file.
- *
- * @param cValues[in] Number of props in pValues
- * @param pValues[in] Incoming exchange properties (must contain PR_PROFILE_UNRESOLVED_{USER,SERVER})
- * @param lpcValues[out] Number of properties in lppProps
- * @param lppProps[out] New ZARAFA properties
- */
-HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, const SPropValue *pValues,
-    ULONG *lpcValues, SPropValue **lppProps)
-{
-	HRESULT hr = hrSuccess;
-	memory_ptr<SPropValue> lpProps;
-	const char *szUsername;
-	std::string strServerPath;
-	std::wstring strUsername;
-	ULONG cProps = 0;
-	const SPropValue *lpServer = NULL;
-	const SPropValue *lpUsername = NULL;
-	const SPropValue *lpProfileName = NULL;
-	static const configsetting_t settings[] = {
-		{ "ssl_port", "237" },
-		{ "ssl_key_file", "c:\\program files\\kopano\\exchange-redirector.pem" },
-		{ "ssl_key_pass", "kopano" },
-		{ "server_address", "" },
-		{"log_method", "file", CONFIGSETTING_NONEMPTY},
-		{"log_file", "-", CONFIGSETTING_NONEMPTY},
-		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
-		{ "log_timestamp","1" },
-		{ "log_buffer_size", "0" },
-		{ NULL, NULL },
-	};
-	std::unique_ptr<ECConfig> lpConfig(ECConfig::Create(settings));
-	std::string strConfigPath;
-
-	hr = GetConfigPath(&strConfigPath);
-	if (hr != hrSuccess)
-		return hr;
-
-	// Remove trailing slash
-	if(*(strConfigPath.end()-1) == '\\' )
-		strConfigPath.resize(strConfigPath.size()-1);
-
-	strConfigPath += "\\exchange-redirector.cfg";
-	if (!lpConfig->LoadSettings(strConfigPath.c_str()))
-		return MAPI_E_NOT_FOUND;
-	if(g_ulLoadsim) {
-		lpUsername = PCpropFindProp(pValues, cValues, PR_PROFILE_USER);
-		if (lpUsername == nullptr)
-			return MAPI_E_UNCONFIGURED;
-	} else {
-		lpUsername = PCpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_NAME);
-		lpServer = PCpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_SERVER);
-		if (lpServer == nullptr || lpUsername == nullptr)
-			return MAPI_E_UNCONFIGURED;
-	}
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 7, &~lpProps);
-	if (hr != hrSuccess)
-		return hr;
-	if (lpConfig->GetSetting("server_address")[0]) {
-		strServerPath = (std::string)"https://" + lpConfig->GetSetting("server_address") + ":" + lpConfig->GetSetting("ssl_port") + "/";
-	} else {
-		if (lpServer == nullptr)
-			return MAPI_E_UNCONFIGURED;
-		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + lpConfig->GetSetting("ssl_port") + "/";
-	}
-
-	szUsername = lpUsername->Value.lpszA;
-
-	if(strrchr(szUsername, '='))
-		szUsername = strrchr(szUsername, '=')+1;
-
-	lpProps[cProps].ulPropTag = PR_EC_PATH;
-	if ((hr = MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		return hr;
-	strcpy(lpProps[cProps++].Value.lpszA, strServerPath.c_str());
-
-	strUsername = convert_to<std::wstring>(szUsername);
-	lpProps[cProps].ulPropTag = PR_EC_USERNAME;
-	if ((hr = MAPIAllocateMore((strUsername.size() + 1) * sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.lpszW)) != hrSuccess)
-		return hr;
-	wcscpy(lpProps[cProps++].Value.lpszW, strUsername.c_str());
-
-	lpProps[cProps].ulPropTag = PR_EC_USERPASSWORD;
-	if ((hr = MAPIAllocateMore(sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.LPSZ)) != hrSuccess)
-		return hr;
-	_tcscpy(lpProps[cProps++].Value.LPSZ, L"");
-
-	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_FILE;
-	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		return hr;
-	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_file"));
-
-	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_PASS;
-	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		return hr;
-	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_pass"));
-
-	lpProps[cProps].ulPropTag = PR_EC_FLAGS; // Since we're emulating exchange, use 22-byte exchange-style sourcekeys
-	lpProps[cProps++].Value.ul = EC_PROFILE_FLAGS_TRUNCATE_SOURCEKEY;
-
-	lpProfileName = PCpropFindProp(pValues, cValues, PR_PROFILE_NAME_A);
-	if(lpProfileName) {
-		lpProps[cProps].ulPropTag = PR_PROFILE_NAME_A;
-		if ((hr = MAPIAllocateMore(strlen(lpProfileName->Value.lpszA) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-			return hr;
-		strcpy(lpProps[cProps++].Value.lpszA, lpProfileName->Value.lpszA);
-	}
-	
-	*lpcValues = cProps;
-	*lppProps = lpProps;
 	return hrSuccess;
 }
 
@@ -965,7 +811,7 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID,
 	LPENTRYID lpEntryID = NULL;
 
 	GUID guidEmpty = {0};
-	EID eid = EID(MAPI_FOLDER, guidStore, guidEmpty);
+	EID eid(MAPI_FOLDER, guidStore, guidEmpty);
 
 	switch (ePublicEntryID) {
 	case ePE_IPMSubtree:

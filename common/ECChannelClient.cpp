@@ -34,12 +34,9 @@
 
 namespace KC {
 
-ECChannelClient::ECChannelClient(const char *szPath, const char *szTokenizer)
+ECChannelClient::ECChannelClient(const char *szPath, const char *tk) :
+	m_strTokenizer(tk), m_strPath(GetServerNameFromPath(szPath))
 {
-	m_strTokenizer = szTokenizer;
-
-	m_strPath = GetServerNameFromPath(szPath);
-
 	if (strncmp(szPath, "file", 4) == 0 || szPath[0] == PATH_SEPARATOR) {
 		m_bSocket = true;
 		m_ulPort = 0;
@@ -47,11 +44,6 @@ ECChannelClient::ECChannelClient(const char *szPath, const char *szTokenizer)
 	}
 	m_bSocket = false;
 	m_ulPort = atoi(GetServerPortFromPath(szPath).c_str());
-}
-
-ECChannelClient::~ECChannelClient()
-{
-	delete m_lpChannel;
 }
 
 ECRESULT ECChannelClient::DoCmd(const std::string &strCommand, std::vector<std::string> &lstResponse)
@@ -120,8 +112,7 @@ ECRESULT ECChannelClient::ConnectSocket()
 		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
-
-	m_lpChannel = new(std::nothrow) ECChannel(fd);
+	m_lpChannel.reset(new(std::nothrow) ECChannel(fd));
 	if (!m_lpChannel) {
 		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
@@ -175,8 +166,7 @@ ECRESULT ECChannelClient::ConnectHttp()
 		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
-
-	m_lpChannel = new(std::nothrow) ECChannel(fd);
+	m_lpChannel.reset(new(std::nothrow) ECChannel(fd));
 	if (!m_lpChannel) {
 		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;

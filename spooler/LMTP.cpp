@@ -21,6 +21,7 @@
 #include <iostream>
 #include <cctype>
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <mapi.h>
 #include <mapix.h>
@@ -39,14 +40,11 @@
 #include <kopano/stringutil.h>
 #include "fileutil.h"
 
-using namespace std;
+using std::string;
 
-LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECConfig *lpConf)
-{
-    m_lpChannel = lpChan;
-    m_lpConfig = lpConf;
-    m_strPath = szServerPath;
-}
+LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECConfig *lpConf) :
+	m_lpChannel(lpChan), m_lpConfig(lpConf), m_strPath(szServerPath)
+{}
 
 /** 
  * Tests the start of the input for the LMTP command. LMTP is case
@@ -67,8 +65,6 @@ LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECConfig *lpConf)
  */
 HRESULT LMTP::HrGetCommand(const string &strCommand, LMTP_Command &eCommand)
 {
-	HRESULT hr = hrSuccess;
-	
 	if (strncasecmp(strCommand.c_str(), "LHLO", strlen("LHLO")) == 0)
 		eCommand = LMTP_Command_LHLO;
 	else if (strncasecmp(strCommand.c_str(), "MAIL FROM:", strlen("MAIL FROM:")) == 0)
@@ -82,9 +78,8 @@ HRESULT LMTP::HrGetCommand(const string &strCommand, LMTP_Command &eCommand)
 	else if (strncasecmp(strCommand.c_str(), "QUIT", strlen("QUIT")) == 0)
 		eCommand = LMTP_Command_QUIT;
 	else
-		hr = MAPI_E_CALL_FAILED;
-	
-	return hr;
+		return MAPI_E_CALL_FAILED;
+	return hrSuccess;
 }
 
 /** 
@@ -96,14 +91,10 @@ HRESULT LMTP::HrGetCommand(const string &strCommand, LMTP_Command &eCommand)
  */
 HRESULT LMTP::HrResponse(const string &strResponse)
 {
-	HRESULT hr;
-
 	ec_log_debug("< %s", strResponse.c_str());
-	hr = m_lpChannel->HrWriteLine(strResponse);
+	auto hr = m_lpChannel->HrWriteLine(strResponse);
 	if (hr != hrSuccess)
-		ec_log_err("LMTP write error: %s (%x)",
-			GetMAPIErrorMessage(hr), hr);
-
+		kc_perror("LMTP write error", hr);
 	return hr;
 }
 
@@ -176,37 +167,27 @@ HRESULT LMTP::HrCommandRCPTTO(const string &strTo, string *strUnresolved)
  */
 HRESULT LMTP::HrCommandDATA(FILE *tmp)
 {
-	HRESULT hr;
 	std::string inBuffer;
 	std::string message;
-	int offset;
-	ssize_t ret, to_write;
 
-	hr = HrResponse("354 2.1.5 Start mail input; end with <CRLF>.<CRLF>");
-	if (hr != hrSuccess) {
-		ec_log_err("Error during DATA communication with client: %s (%x).",
-			GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
+	auto hr = HrResponse("354 2.1.5 Start mail input; end with <CRLF>.<CRLF>");
+	if (hr != hrSuccess)
+		return kc_perror("Error during DATA communication with client", hr);
 
 	// Now the mail body needs to be read line by line until <CRLF>.<CRLF> is encountered
 	while (1) {
 		hr = m_lpChannel->HrReadLine(&inBuffer);
-		if (hr != hrSuccess) {
-			ec_log_err("Error during DATA communication with client: %s (%x).",
-				GetMAPIErrorMessage(hr), hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Error during DATA communication with client", hr);
+		if (inBuffer == ".")
+			break;
 
-			if (inBuffer == ".")
-				break;
-
-		offset = 0;
+		int offset = 0;
 		if (inBuffer[0] == '.')
 			offset = 1;			// "remove" escape point, since it wasn't the end of mail marker
 
-		to_write = inBuffer.size() - offset;
-		ret = fwrite((char *)inBuffer.c_str() + offset, 1, to_write, tmp);
+		ssize_t to_write = inBuffer.size() - offset;
+		ssize_t ret = fwrite(inBuffer.c_str() + offset, 1, to_write, tmp);
 		if (ret != to_write) {
 			ec_log_err("Error during DATA communication with client: %s", strerror(errno));
 			return MAPI_E_FAILURE;
@@ -228,16 +209,6 @@ HRESULT LMTP::HrCommandDATA(FILE *tmp)
 }
 
 /** 
- * Handle the very difficult QUIT command.
- * 
- * @return always hrSuccess
- */
-HRESULT LMTP::HrCommandQUIT()
-{
-	return hrSuccess;
-}
-
-/** 
  * Parse an address given in a MAIL FROM or RCPT TO command.
  * 
  * @param[in]  strInput a full MAIL FROM or RCPT TO command
@@ -248,18 +219,11 @@ HRESULT LMTP::HrCommandQUIT()
  */
 HRESULT LMTP::HrParseAddress(const std::string &strInput, std::string *strAddress)
 {
-	std::string strAddr;
-	size_t pos1;
-	size_t pos2;
-
-	pos1 = strInput.find('<');
-	pos2 = strInput.find('>', pos1);
-
+	auto pos1 = strInput.find('<');
+	auto pos2 = strInput.find('>', pos1);
 	if (pos1 == std::string::npos || pos2 == std::string::npos)
 		return MAPI_E_NOT_FOUND;
-
-	strAddr = strInput.substr(pos1+1, pos2-pos1-1);
-
+	auto strAddr = strInput.substr(pos1 + 1, pos2 - pos1 - 1);
 	trim(strAddr);
 	*strAddress = std::move(strAddr);
 	return hrSuccess;

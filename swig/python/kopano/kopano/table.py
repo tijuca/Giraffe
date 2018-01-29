@@ -23,15 +23,16 @@ from .defs import REV_TAG
 from .compat import fake_unicode as _unicode, repr as _repr
 
 if sys.hexversion >= 0x03000000:
-    from . import prop as _prop
+    from . import property_ as _prop
 else:
-    import prop as _prop
+    import property_ as _prop
 
 class Table(object):
     """Table class"""
 
-    def __init__(self, server, mapitable, proptag=None, restriction=None, order=None, columns=None):
+    def __init__(self, server, mapiobj, mapitable, proptag=None, restriction=None, order=None, columns=None):
         self.server = server
+        self.mapiobj = mapiobj
         self.mapitable = mapitable
         self.proptag = proptag
         if columns:
@@ -40,13 +41,19 @@ class Table(object):
             cols = mapitable.QueryColumns(TBL_ALL_COLUMNS) # some columns are hidden by default XXX result (if at all) depends on table implementation
             cols = cols or mapitable.QueryColumns(0) # fall-back
             mapitable.SetColumns(cols, 0)
+        if restriction:
+            self.mapitable.Restrict(restriction.mapiobj, TBL_BATCH)
 
     @property
     def header(self):
         return [_unicode(REV_TAG.get(c, hex(c))) for c in self.mapitable.QueryColumns(0)]
 
-    def rows(self, batch_size=100):
+    def rows(self, batch_size=100, page_start=None, page_limit=None):
         offset = 0
+        if page_limit is not None:
+            batch_size = page_limit
+        if page_start is not None:
+            self.mapitable.SeekRow(0, page_start)
         try:
             while True:
                 result = self.mapitable.QueryRows(batch_size, offset)
@@ -54,7 +61,10 @@ class Table(object):
                     break
 
                 for row in result:
-                    yield [_prop.Property(self.server.mapistore, c) for c in row]
+                    yield [_prop.Property(self.mapiobj, c) for c in row]
+
+                if page_limit is not None:
+                    break
                 offset += batch_size
 
         except MAPIErrorNotFound:
@@ -108,9 +118,6 @@ class Table(object):
         if not isinstance(tags, tuple):
             tags = (tags,)
         self.mapitable.SortTable(SSortOrderSet([SSort(abs(tag), TABLE_SORT_DESCEND if tag < 0 else TABLE_SORT_ASCEND) for tag in tags], 0, 0), 0)
-
-    def restrict(self, restriction):
-        return self.mapitable.Restrict(restriction.mapiobj, TBL_BATCH)
 
     def __iter__(self):
         return self.rows()

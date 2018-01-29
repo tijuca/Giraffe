@@ -19,8 +19,9 @@
 
 #include <iostream>
 #include <set>
+#include <string>
 #include <list>
-
+#include <utility>
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/mapiguidext.h>
@@ -30,8 +31,11 @@
 #include <kopano/stringutil.h>
 #include "fsck.h"
 
-using namespace std;
 using namespace KCHL;
+using std::endl;
+using std::cin;
+using std::cout;
+using std::string;
 
 static bool ReadYesNoMessage(const std::string &strMessage,
     const std::string &strAuto)
@@ -80,7 +84,6 @@ exit:
 static HRESULT FixProperty(LPMESSAGE lpMessage, const std::string &strName,
     ULONG ulTag, __UPV Value)
 {
-	HRESULT hr;
 	SPropValue ErrorProp;
 
 	ErrorProp.ulPropTag = ulTag;
@@ -91,7 +94,7 @@ static HRESULT FixProperty(LPMESSAGE lpMessage, const std::string &strName,
 		cout << "Invalid property tag: " << stringify(ulTag, true) << endl;
 		return MAPI_E_INVALID_PARAMETER;
 	}
-	hr = lpMessage->SetProps(1, &ErrorProp, NULL);
+	auto hr = lpMessage->SetProps(1, &ErrorProp, nullptr);
 	if (hr != hrSuccess) {
 		cout << "Failed to fix broken property." << endl;
 		return hr;
@@ -105,14 +108,13 @@ static HRESULT FixProperty(LPMESSAGE lpMessage, const std::string &strName,
 static HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName,
     string *lpClass)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropertyArray;
 	ULONG ulPropertyCount;
 	static constexpr const SizedSPropTagArray(3, PropertyTagArray) =
 		{3, {PR_SUBJECT_A, PR_NORMALIZED_SUBJECT_A, PR_MESSAGE_CLASS_A}};
 
-	hr = lpMessage->GetProps(PropertyTagArray, 0, &ulPropertyCount,
-	     &~lpPropertyArray);
+	auto hr = lpMessage->GetProps(PropertyTagArray, 0, &ulPropertyCount,
+	          &~lpPropertyArray);
 	if (FAILED(hr)) {
 		cout << "Failed to obtain all properties." << endl;
 		return hr;
@@ -140,7 +142,7 @@ static HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName,
 }
 
 static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
-    LPSRow lpRow)
+    const SRow *lpRow)
 {
 	HRESULT hr = hrSuccess;
 	object_ptr<IMessage> lpMessage;
@@ -148,14 +150,14 @@ static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 	string strName;
 	string strClass;
 
-	auto lpItemProperty = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
+	auto lpItemProperty = lpRow->cfind(PR_ENTRYID);
 	if (!lpItemProperty) {
 		cout << "Row does not contain an EntryID." << endl;
 		goto exit;
 	}
 	hr = lpFolder->OpenEntry(lpItemProperty->Value.bin.cb,
-	     reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
-	     &IID_IMessage, MAPI_MODIFY, &ulObjectType, &~lpMessage);
+	          reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
+	          &IID_IMessage, MAPI_MODIFY, &ulObjectType, &~lpMessage);
 	if (hr != hrSuccess) {
 		cout << "Failed to open EntryID." << endl;
 		goto exit;
@@ -212,7 +214,7 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 			break;
 
 		for (ULONG i = 0; i < lpRows->cRows; ++i) {
-			hr = ProcessFolderEntry(lpFsck, lpFolder, &lpRows->aRow[i]);
+			hr = ProcessFolderEntry(lpFsck, lpFolder, &lpRows[i]);
 			if (hr != hrSuccess)
 				// Move along, nothing to see.
 				cout << "Failed to validate entry." << endl;
@@ -252,17 +254,14 @@ HRESULT Fsck::ValidateFolder(LPMAPIFOLDER lpFolder,
 HRESULT Fsck::AddMissingProperty(LPMESSAGE lpMessage,
     const std::string &strName, ULONG ulTag, __UPV Value)
 {
-	HRESULT hr = hrSuccess;
-
 	cout << "Missing property " << strName << endl;
 
 	++this->ulProblems;
-	if (ReadYesNoMessage("Add missing property?", auto_fix)) {
-		hr = FixProperty(lpMessage, strName, ulTag, Value);
-		if (hr == hrSuccess)
-			++this->ulFixed;
-	}
-
+	if (!ReadYesNoMessage("Add missing property?", auto_fix))
+		return hrSuccess;
+	auto hr = FixProperty(lpMessage, strName, ulTag, Value);
+	if (hr == hrSuccess)
+		++this->ulFixed;
 	return hr;
 }
 
@@ -270,17 +269,14 @@ HRESULT Fsck::ReplaceProperty(LPMESSAGE lpMessage,
     const std::string &strName, ULONG ulTag, const std::string &strError,
     __UPV Value)
 {
-	HRESULT hr = hrSuccess;
-
 	cout << "Invalid property " << strName << " - " << strError << endl;
 
 	++this->ulProblems;
-	if (ReadYesNoMessage("Fix broken property?", auto_fix)) {
-		hr = FixProperty(lpMessage, strName, ulTag, Value);
-		if (hr == hrSuccess)
-			++this->ulFixed;
-	}
-
+	if (!ReadYesNoMessage("Fix broken property?", auto_fix))
+		return hrSuccess;
+	auto hr = FixProperty(lpMessage, strName, ulTag, Value);
+	if (hr == hrSuccess)
+		++this->ulFixed;
 	return hr;
 }
 
@@ -321,11 +317,9 @@ HRESULT Fsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &
 HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder,
     const SPropValue *lpItemProperty)
 {
-	HRESULT hr = hrSuccess;
-
 	if (!ReadYesNoMessage("Delete message?", auto_del))
-		return hr;
-	hr = DeleteEntry(lpFolder, lpItemProperty);
+		return hrSuccess;
+	auto hr = DeleteEntry(lpFolder, lpItemProperty);
 	if (hr == hrSuccess)
 		++this->ulDeleted;
 	return hr;
@@ -333,14 +327,13 @@ HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder,
 
 HRESULT Fsck::ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 {
-	HRESULT hr = hrSuccess;
 	bool bSubChanged = false;
 	object_ptr<IMAPITable> lpTable;
     ULONG cRows = 0;
 	static constexpr const SizedSPropTagArray(2, sptaProps) =
 		{2, {PR_ATTACH_NUM, PR_ATTACH_METHOD}};
 
-	hr = lpMessage->GetAttachmentTable(0, &~lpTable);
+	auto hr = lpMessage->GetAttachmentTable(0, &~lpTable);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpTable->GetRowCount(0, &cRows);
@@ -361,14 +354,14 @@ HRESULT Fsck::ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bC
 			break;
 
 		for (unsigned int i = 0; i < pRows->cRows; ++i) {
-			if (pRows->aRow[i].lpProps[1].ulPropTag != PR_ATTACH_METHOD ||
-			    pRows->aRow[i].lpProps[1].Value.ul != ATTACH_EMBEDDED_MSG)
+			if (pRows[i].lpProps[1].ulPropTag != PR_ATTACH_METHOD ||
+			    pRows[i].lpProps[1].Value.ul != ATTACH_EMBEDDED_MSG)
 				continue;
 
 			object_ptr<IAttach> lpAttach;
 			object_ptr<IMessage> lpSubMessage;
 			bSubChanged = false;
-			hr = lpMessage->OpenAttach(pRows->aRow[i].lpProps[0].Value.ul, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
+			hr = lpMessage->OpenAttach(pRows[i].lpProps[0].Value.ul, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 			if (hr != hrSuccess)
 				return hr;
 			hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_MODIFY, &~lpSubMessage);
@@ -377,12 +370,12 @@ HRESULT Fsck::ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bC
 			hr = ValidateRecursiveDuplicateRecipients(lpSubMessage, bSubChanged);
 			if (hr != hrSuccess)
 				return hr;
-			if (bSubChanged) {
-				hr = lpAttach->SaveChanges(KEEP_OPEN_READWRITE);
-				if (hr != hrSuccess)
-					return hr;
-				bChanged = bSubChanged;
-			}
+			if (!bSubChanged)
+				continue;
+			hr = lpAttach->SaveChanges(KEEP_OPEN_READWRITE);
+			if (hr != hrSuccess)
+				return hr;
+			bChanged = bSubChanged;
 		}
 	}
 
@@ -401,8 +394,6 @@ HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 	ULONG cRows = 0;
 	std::set<std::string> mapRecip;
 	std::list<unsigned int> mapiReciptDel;
-	std::string strData;
-	unsigned int i = 0;
 	static constexpr const SizedSPropTagArray(5, sptaProps) =
 		{5, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A,
 		PR_RECIPIENT_TYPE, PR_ENTRYID}};
@@ -428,28 +419,30 @@ HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 		if (pRows->cRows == 0)
 			break;
 
-		for (i = 0; i < pRows->cRows; ++i) {
-
-			if (pRows->aRow[i].lpProps[1].ulPropTag != PR_DISPLAY_NAME_A && pRows->aRow[i].lpProps[2].ulPropTag != PR_EMAIL_ADDRESS_A) {
-				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+		for (unsigned int i = 0; i < pRows->cRows; ++i) {
+			if (pRows[i].lpProps[1].ulPropTag != PR_DISPLAY_NAME_A &&
+			    pRows[i].lpProps[2].ulPropTag != PR_EMAIL_ADDRESS_A) {
+				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
 				continue;
 			}
 
 			// Invalid or missing entryid 
-			if (pRows->aRow[i].lpProps[4].ulPropTag != PR_ENTRYID || pRows->aRow[i].lpProps[4].Value.bin.cb == 0) {
-				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+			if (pRows[i].lpProps[4].ulPropTag != PR_ENTRYID ||
+			    pRows[i].lpProps[4].Value.bin.cb == 0) {
+				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
 				continue;
 			}
 
-			strData.clear();
-
-			if (pRows->aRow[i].lpProps[1].ulPropTag == PR_DISPLAY_NAME_A)   strData += pRows->aRow[i].lpProps[1].Value.lpszA;
-			if (pRows->aRow[i].lpProps[2].ulPropTag == PR_EMAIL_ADDRESS_A)  strData += pRows->aRow[i].lpProps[2].Value.lpszA;
-			if (pRows->aRow[i].lpProps[3].ulPropTag == PR_RECIPIENT_TYPE)   strData += stringify(pRows->aRow[i].lpProps[3].Value.ul);
-
-			auto res = mapRecip.insert(strData);
+			std::string strData;
+			if (pRows[i].lpProps[1].ulPropTag == PR_DISPLAY_NAME_A)
+				strData += pRows[i].lpProps[1].Value.lpszA;
+			if (pRows[i].lpProps[2].ulPropTag == PR_EMAIL_ADDRESS_A)
+				strData += pRows[i].lpProps[2].Value.lpszA;
+			if (pRows[i].lpProps[3].ulPropTag == PR_RECIPIENT_TYPE)
+				strData += stringify(pRows[i].lpProps[3].Value.ul);
+			auto res = mapRecip.emplace(std::move(strData));
 			if (res.second == false)
-				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
 		}
 	}
 	// modify

@@ -48,7 +48,7 @@ ZCMAPIProp::~ZCMAPIProp()
 		if (hr != hrSuccess)											\
 			goto exitm; \
 		dest.ulPropTag = propid;										\
-		m_mapProperties.insert(std::make_pair(PROP_ID(propid), dest));	\
+		m_mapProperties.emplace(PROP_ID(propid), dest); \
 		src = NULL;														\
 	} \
 }
@@ -65,7 +65,6 @@ ZCMAPIProp::~ZCMAPIProp()
 HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps, ULONG ulIndex)
 {
 	HRESULT hr = hrSuccess;
-//	LPSPropValue lpProp = NULL;
 	SPropValue sValue, sSource;
 	std::string strSearchKey;
 	convert_context converter;
@@ -76,7 +75,7 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	} else {
 		sValue.ulPropTag = PR_BODY;
 		sValue.Value.lpszW = empty;
-		m_mapProperties.insert(std::make_pair(PROP_ID(PR_BODY), sValue));
+		m_mapProperties.emplace(PROP_ID(PR_BODY), sValue);
 	}
 
 	lpProp = PCpropFindProp(lpProps, cValues, PR_BUSINESS_ADDRESS_CITY);
@@ -96,7 +95,7 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 
 	sValue.ulPropTag = PR_DISPLAY_TYPE;
 	sValue.Value.ul = DT_MAILUSER;
-	m_mapProperties.insert(std::make_pair(PROP_ID(PR_DISPLAY_TYPE), sValue));
+	m_mapProperties.emplace(PROP_ID(PR_DISPLAY_TYPE), sValue);
 
 	if (lpNames)
 		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
@@ -119,7 +118,7 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 
 	sValue.ulPropTag = PR_OBJECT_TYPE;
 	sValue.Value.ul = MAPI_MAILUSER;
-	m_mapProperties.insert(std::make_pair(PROP_ID(PR_OBJECT_TYPE), sValue));
+	m_mapProperties.emplace(PROP_ID(PR_OBJECT_TYPE), sValue);
 
 	if (lpNames)
 		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[3], PT_UNICODE));
@@ -172,10 +171,9 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	return hr;
 }
 
-HRESULT ZCMAPIProp::ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps)
+HRESULT ZCMAPIProp::ConvertDistList(ULONG cValues, LPSPropValue lpProps)
 {
 	HRESULT hr = hrSuccess;
-//	LPSPropValue lpProp = NULL;
 	SPropValue sValue, sSource;
 
 	sSource.ulPropTag = PR_ADDRTYPE;
@@ -188,11 +186,11 @@ HRESULT ZCMAPIProp::ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSP
 
 	sValue.ulPropTag = PR_DISPLAY_TYPE;
 	sValue.Value.ul = DT_PRIVATE_DISTLIST;
-	m_mapProperties.insert(std::make_pair(PROP_ID(PR_DISPLAY_TYPE), sValue));
+	m_mapProperties.emplace(PROP_ID(PR_DISPLAY_TYPE), sValue);
 
 	sValue.ulPropTag = PR_OBJECT_TYPE;
 	sValue.Value.ul = MAPI_DISTLIST;
-	m_mapProperties.insert(std::make_pair(PROP_ID(PR_OBJECT_TYPE), sValue));
+	m_mapProperties.emplace(PROP_ID(PR_OBJECT_TYPE), sValue);
 
 	lpProp = PCpropFindProp(lpProps, cValues, PR_RECORD_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_RECORD_KEY);
@@ -279,7 +277,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID,
 	if (m_ulObject == MAPI_MAILUSER)
 		hr = ConvertMailUser(ptrNameTags, cValues, ptrContactProps, ulIndex);
 	else
-		hr = ConvertDistList(ptrNameTags, cValues, ptrContactProps);
+		hr = ConvertDistList(cValues, ptrContactProps);
 
  exitm:
 	return hr;
@@ -469,7 +467,8 @@ HRESULT ZCMAPIProp::CopyProps(const SPropTagArray *, ULONG ui_param,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::GetNamesFromIDs(LPSPropTagArray * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG * lpcPropNames, LPMAPINAMEID ** lpppPropNames)
+HRESULT ZCMAPIProp::GetNamesFromIDs(SPropTagArray **tags, const GUID *propset,
+    ULONG flags, ULONG *nvals, MAPINAMEID ***names)
 {
 	return MAPI_E_NO_SUPPORT;
 }

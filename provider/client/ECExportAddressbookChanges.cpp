@@ -37,16 +37,7 @@
 ECExportAddressbookChanges::ECExportAddressbookChanges(ECMsgStore *lpStore) :
 	m_lpMsgStore(lpStore)
 {
-	ECSyncLog::GetLogger(&m_lpLogger);
-}
-
-ECExportAddressbookChanges::~ECExportAddressbookChanges() {
-	MAPIFreeBuffer(m_lpRawChanges);
-	MAPIFreeBuffer(m_lpChanges);
-	if(m_lpImporter)
-		m_lpImporter->Release();
-	if (m_lpLogger)
-		m_lpLogger->Release();
+	ECSyncLog::GetLogger(&~m_lpLogger);
 }
 
 HRESULT ECExportAddressbookChanges::QueryInterface(REFIID refiid, void **lppInterface) {
@@ -95,16 +86,13 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 			hr = lpStream->Read(&ulProcessed, sizeof(ULONG), &ulRead);
 			if(hr != hrSuccess)
 				return hr;
-
-			m_setProcessed.insert(ulProcessed);
+			m_setProcessed.emplace(ulProcessed);
 			--ulCount;
 		}
 	}
 
 	// ulFlags ignored
-    m_lpImporter = lpCollector;
-    m_lpImporter->AddRef();
-
+	m_lpImporter.reset(lpCollector);
 	memset(&abeid, 0, sizeof(ABEID));
 	
 	abeid.ulType = MAPI_ABCONT;
@@ -112,12 +100,10 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 	abeid.ulId = 1; // 1 is the first container
     
     // The parent source key is the entryid of the AB container that we're sync'ing
-	MAPIFreeBuffer(m_lpChanges);
-	m_lpChanges = NULL;
-	MAPIFreeBuffer(m_lpRawChanges);
-	m_lpRawChanges = NULL;
-
-    hr = m_lpMsgStore->lpTransport->HrGetChanges(std::string((char *)&abeid, sizeof(ABEID)), 0, m_ulChangeId, ICS_SYNC_AB, 0, NULL, &m_ulMaxChangeId, &m_ulChanges, &m_lpRawChanges);
+	m_lpChanges.reset();
+	hr = m_lpMsgStore->lpTransport->HrGetChanges(std::string(reinterpret_cast<const char *>(&abeid), sizeof(ABEID)),
+	     0, m_ulChangeId, ICS_SYNC_AB, 0, nullptr, &m_ulMaxChangeId,
+	     &m_ulChanges, &~m_lpRawChanges);
     if(hr != hrSuccess)
 		return hr;
 
@@ -140,12 +126,13 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 		 * - Add + Change = Add
 		 * - Change + Delete = Delete
 		 * - Add + (Change +) Delete = -
-		 * - Delete + Add = Delete + Add (eg. user changes from object class from/to contact)
+		 * - Delete + Add = Delete + Add (e.g. user changes from object class from/to contact)
 		 */
-		std::stable_sort(m_lpRawChanges, m_lpRawChanges + m_ulChanges, LeftPrecedesRight);
+		std::stable_sort(m_lpRawChanges.get(), m_lpRawChanges.get() + m_ulChanges, LeftPrecedesRight);
 
 		// Now go through the changes to remove multiple changes for the same object.
-		if ((hr = MAPIAllocateBuffer(sizeof(ICSCHANGE) * m_ulChanges, (void **)&m_lpChanges)) != hrSuccess)
+		hr = MAPIAllocateBuffer(sizeof(ICSCHANGE) * m_ulChanges, &~m_lpChanges);
+		if (hr != hrSuccess)
 			return hr;
 
 		for (ULONG i = 0; i < m_ulChanges; ++i) {
@@ -169,10 +156,12 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 					// This shouldn't happen since apparently we have another change for the same object.
 					if (lpLastChange->ulChangeType == ICS_AB_DELETE) {
 						// user was deleted and re-created (probably as different object class), so keep both events
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s",
+							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 						lpLastChange->ulChangeType = ICS_AB_CHANGE;
 					} else
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s",
+							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 					break;
 
 				case ICS_AB_CHANGE:
@@ -180,25 +169,30 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 					// multiple changes and we can't change an object that was just deleted.
 					// We'll ignore this in any case.
 					if (lpLastChange->ulChangeType != ICS_AB_NEW)
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s", lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s",
+							lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s",
+						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 					break;
 
 				case ICS_AB_DELETE:
 					if (lpLastChange->ulChangeType == ICS_AB_NEW) {
-						ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s",
+							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 						lpLastChange = NULL;	// An add and a delete results in nothing.
 					}
 					else if (lpLastChange->ulChangeType == ICS_AB_CHANGE) {
 						// We'll ignore the previous change and write the delete now. This way we allow another object
 						// with the same ID to be added after this object.
-						ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s",
+							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 						m_lpChanges[n++] = m_lpRawChanges[i];
 						lpLastChange = NULL;
 					}
 					break;
 				default:
-					ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s", m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
+						m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
 					break;
 				}
 			}
@@ -230,7 +224,8 @@ HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulPro
 		return MAPI_E_INVALID_PARAMETER;
 
 	auto eid = reinterpret_cast<const ABEID *>(m_lpChanges[m_ulThisChange].sSourceKey.lpb);
-	ZLOG_DEBUG(m_lpLogger, "abchange type=%04x, sourcekey=%s", m_lpChanges[m_ulThisChange].ulChangeType, bin2hex(m_lpChanges[m_ulThisChange].sSourceKey.cb, m_lpChanges[m_ulThisChange].sSourceKey.lpb).c_str());
+	ZLOG_DEBUG(m_lpLogger, "abchange type=%04x, sourcekey=%s", m_lpChanges[m_ulThisChange].ulChangeType,
+		bin2hex(m_lpChanges[m_ulThisChange].sSourceKey).c_str());
 
 	switch(m_lpChanges[m_ulThisChange].ulChangeType) {
     case ICS_AB_CHANGE:
@@ -250,17 +245,21 @@ HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulPro
 		hr = hrSuccess;
 
 	else if (hr == MAPI_E_INVALID_TYPE) {
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring invalid entry, type=%04x, sourcekey=%s", m_lpChanges[m_ulThisChange].ulChangeType, bin2hex(m_lpChanges[m_ulThisChange].sSourceKey.cb, m_lpChanges[m_ulThisChange].sSourceKey.lpb).c_str());
+		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring invalid entry, type=%04x, sourcekey=%s",
+			m_lpChanges[m_ulThisChange].ulChangeType,
+			bin2hex(m_lpChanges[m_ulThisChange].sSourceKey).c_str());
 		hr = hrSuccess;
 	}
 
 	else if (hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "failed type=%04x, hr=%s, sourcekey=%s", m_lpChanges[m_ulThisChange].ulChangeType, stringify(hr, true).c_str(), bin2hex(m_lpChanges[m_ulThisChange].sSourceKey.cb, m_lpChanges[m_ulThisChange].sSourceKey.lpb).c_str());
+		ZLOG_DEBUG(m_lpLogger, "failed type=%04x, hr=%s, sourcekey=%s",
+			m_lpChanges[m_ulThisChange].ulChangeType, stringify(hr, true).c_str(),
+			bin2hex(m_lpChanges[m_ulThisChange].sSourceKey).c_str());
 		return hr;
 	}
 
 	// Mark the change as processed
-	m_setProcessed.insert(m_lpChanges[m_ulThisChange].ulChangeId);
+	m_setProcessed.emplace(m_lpChanges[m_ulThisChange].ulChangeId);
 	++m_ulThisChange;
 
     if(lpulSteps)
@@ -347,10 +346,10 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
  * 4th rule.
  *
  * @param[in]	left
- *					An ICSCHANGE structure who's sSourceKey is interpreted as an ABEID stucture. It is compared to
+ *					An ICSCHANGE structure whose sSourceKey is interpreted as an ABEID stucture. It is compared to
  *					the right parameter.
  * @param[in]	right
- *					An ICSCHANGE structure who's sSourceKey is interpreted as an ABEID stucture. It is compared to
+ *					An ICSCHANGE structure whose sSourceKey is interpreted as an ABEID stucture. It is compared to
  *					the left parameter.
  *
  * @return		boolean

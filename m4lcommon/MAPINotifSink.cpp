@@ -228,7 +228,7 @@ ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotificatio
 		}
 
 		if (CopyNotification(&lpNotifications[i], lpNotif, lpNotif) == 0)
-			m_lstNotifs.push_back(std::move(lpNotif));
+			m_lstNotifs.emplace_back(std::move(lpNotif));
 	}
 	biglock.unlock();
 	m_hCond.notify_all();
@@ -240,21 +240,15 @@ HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNoti
 {
     HRESULT hr = hrSuccess;
     ULONG cNotifs = 0;
-    struct timespec t;
-    
-    double now = GetTimeOfDay();
-    now += (float)timeout / 1000;
-
-    t.tv_sec = now;
-    t.tv_nsec = (now-t.tv_sec) * 1000000000.0;
+	auto limit = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
 
 	ulock_normal biglock(m_hMutex);
 	if (!fNonBlock) {
-		while (m_lstNotifs.empty() && !m_bExit && (timeout == 0 || GetTimeOfDay() < now))
-			if (timeout > 0)
-				m_hCond.wait_for(biglock, std::chrono::milliseconds(timeout));
-			else
+		while (m_lstNotifs.empty() && !m_bExit && (timeout == 0 || std::chrono::steady_clock::now() < limit))
+			if (timeout == 0)
 				m_hCond.wait(biglock);
+			else if (m_hCond.wait_for(biglock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+				/* ignore status, we only wanted to wait */;
 	}
     
 	memory_ptr<NOTIFICATION> lpNotifications;

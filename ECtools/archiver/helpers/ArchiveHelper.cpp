@@ -157,7 +157,7 @@ HRESULT ArchiveHelper::Init()
  *
  * @param[out]	lpsUserEntryId
  *					Pointer to a entryid_t that will be populated with the entryid of the user
- *					who's store is attached to this archive.
+ *					whose store is attached to this archive.
  */
 HRESULT ArchiveHelper::GetAttachedUser(abentryid_t *lpsUserEntryId)
 {
@@ -171,8 +171,7 @@ HRESULT ArchiveHelper::GetAttachedUser(abentryid_t *lpsUserEntryId)
 	hr = HrGetOneProp(ptrFolder, PROP_ATTACHED_USER_ENTRYID, &~ptrPropValue);
 	if (hr != hrSuccess)
 		return hr;
-	
-	lpsUserEntryId->assign(ptrPropValue->Value.bin);
+	*lpsUserEntryId = ptrPropValue->Value.bin;
 	return hrSuccess;
 }
 
@@ -180,7 +179,7 @@ HRESULT ArchiveHelper::GetAttachedUser(abentryid_t *lpsUserEntryId)
  * Set the user that's attached to this archive.
  *
  * @param[in]	sUserEntryId
- *					The entryid of the user who's store is attached to this
+ *					The entryid of the user whose store is attached to this
  *					archive.
  */
 HRESULT ArchiveHelper::SetAttachedUser(const abentryid_t &sUserEntryId)
@@ -224,12 +223,10 @@ HRESULT ArchiveHelper::GetArchiveEntry(bool bCreate, SObjectEntry *lpsObjectEntr
 	hr = HrGetOneProp(ptrFolder, PR_ENTRYID, &~ptrFolderEntryId);
 	if (hr != hrSuccess)
 		return hr;
-	
-	lpsObjectEntry->sStoreEntryId.assign(ptrStoreEntryId->Value.bin);
+	lpsObjectEntry->sStoreEntryId = ptrStoreEntryId->Value.bin;
 	if (!m_strServerPath.empty())
 		lpsObjectEntry->sStoreEntryId.wrap(m_strServerPath);
-		
-	lpsObjectEntry->sItemEntryId.assign(ptrFolderEntryId->Value.bin);
+	lpsObjectEntry->sItemEntryId = ptrFolderEntryId->Value.bin;
 	return hrSuccess;
 }
 
@@ -353,6 +350,7 @@ HRESULT ArchiveHelper::SetPermissions(const abentryid_t &sUserEntryId, bool bWri
 	hr = MAPIAllocateBuffer(CbNewROWLIST(2), &~ptrRowList);
 	if (hr != hrSuccess)
 		return hr;
+	ptrRowList->cEntries = 0;
 
 	// First set permissions on the IPM Subtree since we'll simply overwrite
 	// them if the archive folder IS the IPM Subtree.
@@ -550,9 +548,9 @@ HRESULT ArchiveHelper::GetArchiveFolderFor(MAPIFolderPtr &ptrSourceFolder, Archi
 	hr = HrGetOneProp(ptrArchiveFolder, PR_ENTRYID, &~ptrFolderEntryId);
 	if (hr != hrSuccess)
 		return hr;
-	objectEntry.sStoreEntryId.assign(ptrStoreEntryId->Value.bin);
-	objectEntry.sItemEntryId.assign(ptrFolderEntryId->Value.bin);
-	lstFolderArchives.push_back(objectEntry);
+	objectEntry.sStoreEntryId = ptrStoreEntryId->Value.bin;
+	objectEntry.sItemEntryId = ptrFolderEntryId->Value.bin;
+	lstFolderArchives.emplace_back(objectEntry);
 	lstFolderArchives.sort();
 	lstFolderArchives.unique();
 	hr = ptrSourceFolderHelper->SetArchiveList(lstFolderArchives);
@@ -563,10 +561,8 @@ HRESULT ArchiveHelper::GetArchiveFolderFor(MAPIFolderPtr &ptrSourceFolder, Archi
 	hr = ptrSourceFolder->GetProps(sptaFolderPropsForReference, 0, &cValues, &~ptrPropArray);
 	if (hr != hrSuccess)
 		return hr;
-
-	objectEntry.sStoreEntryId.assign(ptrPropArray[1].Value.bin);
-	objectEntry.sItemEntryId.assign(ptrPropArray[0].Value.bin);
-
+	objectEntry.sStoreEntryId = ptrPropArray[1].Value.bin;
+	objectEntry.sItemEntryId = ptrPropArray[0].Value.bin;
 	hr = MAPIPropHelper::Create(ptrArchiveFolder.as<MAPIPropPtr>(), &ptrArchiveFolderHelper);
 	if (hr != hrSuccess)
 		return hr;

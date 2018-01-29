@@ -16,11 +16,14 @@
  */
 
 #include <kopano/platform.h>
+#include <iostream>
 #include <new>
+#include <utility>
 #include "archive.h"
 
 #include <kopano/ECLogger.h>
 #include <kopano/ECGetText.h>
+#include <kopano/MAPIErrors.h>
 #include <kopano/charset/convert.h>
 #include <kopano/mapi_ptr.h>
 
@@ -37,9 +40,12 @@
 #include <kopano/ECDebug.h>
 #include "PyMapiPlugin.h"
 
-using namespace std;
 using namespace KC::helpers;
 using namespace KC::operations;
+using std::endl;
+using std::list;
+using std::pair;
+using std::string;
 
 #ifdef UNICODE
 typedef std::wostringstream tostringstream;
@@ -48,7 +54,7 @@ typedef std::ostringstream tostringstream;
 #endif
 
 void ArchiveResult::AddMessage(MessagePtr ptrMessage) {
-	m_lstMessages.push_back(ptrMessage);
+	m_lstMessages.emplace_back(ptrMessage);
 }
 
 void ArchiveResult::Undo(IMAPISession *lpSession) {
@@ -104,9 +110,8 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 		ec_log_warn("Archive::HrArchiveMessageForDelivery(): GetProps failed %x", hr);
 		goto exit;
 	}
-
-	refMsgEntry.sStoreEntryId.assign(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin);
-	refMsgEntry.sItemEntryId.assign(ptrMsgProps[IDX_ENTRYID].Value.bin);
+	refMsgEntry.sStoreEntryId = ptrMsgProps[IDX_STORE_ENTRYID].Value.bin;
+	refMsgEntry.sItemEntryId = ptrMsgProps[IDX_ENTRYID].Value.bin;
 	hr = m_ptrSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb,
 	     reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb),
 	     &iid_of(ptrStore), MDB_WRITE, &~ptrStore);
@@ -171,8 +176,7 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 			ec_log_warn("Archive::HrArchiveMessageForDelivery(): CreateArchivedMessage failed %x", hr);
 			goto exit;
 		}
-
-		lstArchivedMessages.push_back({ptrArchivedMsg, ptrPSAction});
+		lstArchivedMessages.emplace_back(ptrArchivedMsg, ptrPSAction);
 	}
 
 	// Now save the messages one by one. On failure all saved messages need to be deleted.
@@ -187,11 +191,9 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 			ec_log_warn("Archive::HrArchiveMessageForDelivery(): ArchivedMessage GetProps failed %x", hr);
 			goto exit;
 		}
-
-		refArchiveEntry.sItemEntryId.assign(ptrArchivedMsgProps[IDX_ENTRYID].Value.bin);
-		refArchiveEntry.sStoreEntryId.assign(ptrArchivedMsgProps[IDX_STORE_ENTRYID].Value.bin);
-		lstReferences.push_back(refArchiveEntry);
-
+		refArchiveEntry.sItemEntryId = ptrArchivedMsgProps[IDX_ENTRYID].Value.bin;
+		refArchiveEntry.sStoreEntryId = ptrArchivedMsgProps[IDX_STORE_ENTRYID].Value.bin;
+		lstReferences.emplace_back(refArchiveEntry);
 		hr = msg.first->SaveChanges(KEEP_OPEN_READWRITE);
 		if (hr != hrSuccess) {
 			ec_log_warn("Archive::HrArchiveMessageForDelivery(): ArchivedMessage SaveChanges failed %x", hr);
@@ -268,7 +270,7 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 
 	hr = ptrStoreHelper->GetArchiveList(&lstArchives);
 	if (hr != hrSuccess) {
-		ec_log_err("Unable to obtain list of attached archives. hr=0x%08x", hr);
+		kc_perror("Unable to obtain list of attached archives", hr);
 		SetErrorMessage(hr, _("Unable to obtain list of attached archives."));
 		goto exit;
 	}
@@ -315,13 +317,13 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 		}
 		hr = ptrArchiveHelper->GetOutgoingFolder(&~ptrArchiveFolder);
 		if (hr != hrSuccess) {
-			ec_log_err("Failed to get outgoing archive folder. hr=0x%08x", hr);
+			kc_perror("Failed to get outgoing archive folder", hr);
 			SetErrorMessage(hr, _("Unable to get outgoing archive folder."));
 			goto exit;
 		}
 		hr = ptrArchiveFolder->CreateMessage(&iid_of(ptrArchivedMsg), 0, &~ptrArchivedMsg);
 		if (hr != hrSuccess) {
-			ec_log_err("Failed to create message in outgoing archive folder. hr=0x%08x", hr);
+			kc_perror("Failed to create message in outgoing archive folder", hr);
 			SetErrorMessage(hr, _("Unable to create archive message in outgoing archive folder."));
 			goto exit;
 		}
@@ -333,14 +335,14 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 		}
 
 		ec_log_info("Stored message in archive");
-		lstArchivedMessages.push_back({ptrArchivedMsg, ptrPSAction});
+		lstArchivedMessages.emplace_back(ptrArchivedMsg, ptrPSAction);
 	}
 
 	// Now save the messages one by one. On failure all saved messages need to be deleted.
 	for (const auto &msg : lstArchivedMessages) {
 		hr = msg.first->SaveChanges(KEEP_OPEN_READONLY);
 		if (hr != hrSuccess) {
-			ec_log_err("Failed to save message in archive. hr=0x%08x", hr);
+			kc_perror("Failed to save message in archive", hr);
 			SetErrorMessage(hr, _("Unable to save archived message."));
 			goto exit;
 		}

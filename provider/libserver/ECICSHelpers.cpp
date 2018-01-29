@@ -47,7 +47,7 @@ extern ECSessionManager*	g_lpSessionManager;
  **/
 class IDbQueryCreator {
 public:
-	virtual ~IDbQueryCreator(void) _kc_impdtor;
+	virtual ~IDbQueryCreator(void) = default;
 	virtual std::string CreateQuery() = 0;
 };
 
@@ -135,8 +135,7 @@ std::string IncrementalQueryCreator::CreateBaseQuery()
 				"  AND changes.sourcesync != " + stringify(m_ulSyncId);																/* And we didn't generate this change ourselves */
 
 	if(!m_sFolderSourceKey.empty()) 
-		strQuery += "  AND changes.parentsourcekey = " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size());	/* Where change took place in Folder X */
-
+		strQuery += "  AND changes.parentsourcekey = " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey); /* Where change took place in Folder X */
 	if (m_ulFlags & SYNC_NO_DELETIONS)
 		strQuery += " AND changes.change_type & " + stringify(ICS_ACTION_MASK) + " != " + stringify(ICS_SOFT_DELETE) +
 					" AND changes.change_type & " + stringify(ICS_ACTION_MASK) + " != " + stringify(ICS_HARD_DELETE);
@@ -189,8 +188,7 @@ std::string FullQueryCreator::CreateBaseQuery()
 				"JOIN indexedproperties as sourcekey ON sourcekey.hierarchyid = hierarchy.id AND sourcekey.tag=" + stringify(PROP_ID(PR_SOURCE_KEY)) + " "
 				"JOIN indexedproperties as parentsourcekey ON parentsourcekey.hierarchyid = hierarchy.parent AND parentsourcekey.tag=" + stringify(PROP_ID(PR_SOURCE_KEY)) +
 				" LEFT JOIN changes on changes.sourcekey=sourcekey.val_binary AND changes.parentsourcekey=parentsourcekey.val_binary AND changes.change_type=" + stringify(ICS_MESSAGE_NEW) + " ";
-				
-	strQuery +=	"WHERE parentsourcekey.val_binary = " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size()) +
+	strQuery += "WHERE parentsourcekey.val_binary = " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey) +
 				"  AND hierarchy.type=" + stringify(MAPI_MESSAGE) + " AND hierarchy.flags & 1024 = 0";
 	
 	if (m_ulFilteredSourceSync)
@@ -236,7 +234,7 @@ std::string NullQueryCreator::CreateOrderQuery()
  **/
 class IMessageProcessor {
 public:
-	virtual ~IMessageProcessor(void) _kc_impdtor;
+	virtual ~IMessageProcessor(void) = default;
 	virtual ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags) = 0;
 	virtual ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType) = 0;
 	virtual ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals) = 0;
@@ -577,7 +575,7 @@ ECRESULT ECGetContentChangesHelper::Init()
 
 	std::string strQuery = "SELECT MAX(id) FROM changes";
 	if(!m_sFolderSourceKey.empty())
-		strQuery += " WHERE parentsourcekey=" + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size());
+		strQuery += " WHERE parentsourcekey=" + m_lpDatabase->EscapeBinary(m_sFolderSourceKey);
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
@@ -618,8 +616,8 @@ ECRESULT ECGetContentChangesHelper::Init()
 	if (!m_setLegacyMessages.empty()) {
 		/*
 		 * The previous request was with a restriction, so we can't do an
-		 * incremental sync in any case, as that will only get us add's and
-		 * deletes for changes that happened after the last sync. But we
+		 * incremental sync in any case, as that will only get us additions and
+		 * deletions for changes that happened after the last sync. But we
 		 * can also have adds because certain older messages might not have
 		 * matched the previous restriction, but do match the current (where
 		 * no restriction is seen as a match-all restriction).
@@ -723,9 +721,9 @@ ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_ro
 		if (fMatch) {
 			er = m_lpMsgProcessor->ProcessAccepted(lpDBRow, lpDBLen, &ulChangeType, &ulFlags);
 			if (m_lpsRestrict != NULL)
-				m_setNewMessages.insert({SOURCEKEY(lpDBLen[icsSourceKey],
-					lpDBRow[icsSourceKey]), {SOURCEKEY(lpDBLen[icsParentSourceKey],
-					lpDBRow[icsParentSourceKey]), ICS_CHANGE_FLAG_NEW, ulFlags}});
+				m_setNewMessages.emplace(SOURCEKEY(lpDBLen[icsSourceKey],
+					lpDBRow[icsSourceKey]), SAuxMessageData(SOURCEKEY(lpDBLen[icsParentSourceKey],
+					lpDBRow[icsParentSourceKey]), ICS_CHANGE_FLAG_NEW, ulFlags));
 		} else {
 			er = m_lpMsgProcessor->ProcessRejected(lpDBRow, lpDBLen, &ulChangeType);
 		}
@@ -828,7 +826,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 		 * changes table.
 		 */
 		// Bump the changeid
-		std::string strQuery = "REPLACE INTO changes (sourcekey,parentsourcekey,sourcesync) VALUES (0, " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size()) + "," + stringify(m_ulSyncId) + ")";
+		auto strQuery = "REPLACE INTO changes (sourcekey,parentsourcekey,sourcesync) VALUES (0, " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey) + "," + stringify(m_ulSyncId) + ")";
 		er = m_lpDatabase->DoInsert(strQuery, &ulNewChange);
 		if (er != erSuccess)
 			return er;
@@ -847,7 +845,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 	 * at all is rare, having all messages isn't.
 	 **/
 	if (m_lpsRestrict && m_setNewMessages.empty())
-		m_setNewMessages.insert({SOURCEKEY(1, "\x00"), {m_sFolderSourceKey, 0, 0}});
+		m_setNewMessages.emplace(SOURCEKEY(1, "\x00"), SAuxMessageData(m_sFolderSourceKey, 0, 0));
 
 	if (m_setNewMessages.empty()) {
 		*lpulMaxChange = ulMaxChange;
@@ -865,7 +863,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 			ec_log_err("ECGetContentChangesHelper::Finalize(): row null or column null");
 			return KCERR_DATABASE_ERROR; /* this should never happen */
 		}
-		setChangeIds.insert(atoui(lpDBRow[0]));
+		setChangeIds.emplace(atoui(lpDBRow[0]));
 	}
 
 	if (!setChangeIds.empty()) {
@@ -918,8 +916,8 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 	strQuery = "INSERT INTO syncedmessages (sync_id,change_id,sourcekey,parentsourcekey) VALUES ";
 	for (const auto &p : m_setNewMessages)
 		strQuery += "(" + stringify(m_ulSyncId) + "," + stringify(ulMaxChange) + "," +
-			m_lpDatabase->EscapeBinary(p.first, p.first.size()) + "," +
-			m_lpDatabase->EscapeBinary(p.second.sParentSourceKey, p.second.sParentSourceKey.size()) + "),";
+			m_lpDatabase->EscapeBinary(p.first) + "," +
+			m_lpDatabase->EscapeBinary(p.second.sParentSourceKey) + "),";
 
 	strQuery.resize(strQuery.size() - 1);
 	er = m_lpDatabase->DoInsert(strQuery);
@@ -952,8 +950,8 @@ ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> 
 	ec_log(EC_LOGLEVEL_ICS, "MatchRestrictions: matching %zu rows", db_rows.size());
 
 	for (size_t i = 0; i < db_rows.size(); ++i) {
-		lpdata.push_back(reinterpret_cast<unsigned char *>(db_rows[i][icsSourceKey]));
-		cbdata.push_back(db_lengths[i][icsSourceKey]);
+		lpdata.emplace_back(reinterpret_cast<unsigned char *>(db_rows[i][icsSourceKey]));
+		cbdata.emplace_back(db_lengths[i][icsSourceKey]);
 	}
 
 	auto gcache = g_lpSessionManager->GetCacheManager();
@@ -964,8 +962,8 @@ ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> 
 	for (const auto &i : index_objs) {
 		sRow.ulObjId = i.second;
 		sRow.ulOrderId = 0;
-		lstRows.push_back(sRow);
-		source_keys.push_back({i.first.cbData, reinterpret_cast<const char *>(i.first.lpData)});
+		lstRows.emplace_back(sRow);
+		source_keys.emplace_back(i.first.cbData, reinterpret_cast<const char *>(i.first.lpData));
 		ulObjId = i.second; /* no need to split QueryRowData call per-objtype (always same) */
 	}
 
@@ -1001,7 +999,7 @@ ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> 
 		if(er != erSuccess)
 			goto exit;
 		if (fMatch)
-			matches.insert(source_keys[j]);
+			matches.emplace(std::move(source_keys[j]));
 	}
 
 	ec_log(EC_LOGLEVEL_ICS, "MatchRestrictions: %zu match(es) out of %d rows (%d properties)",
@@ -1039,8 +1037,7 @@ ECRESULT ECGetContentChangesHelper::GetSyncedMessages(unsigned int ulSyncId, uns
 			ec_log_err("ECGetContentChangesHelper::GetSyncedMessages(): row or columns null");
 			return KCERR_DATABASE_ERROR; /* this should never happen */
 		}
-
-		auto iResult = lpsetMessages->insert({SOURCEKEY(lpDBLen[0], lpDBRow[0]), SAuxMessageData(SOURCEKEY(lpDBLen[1], lpDBRow[1]), 1 << (lpDBRow[2] != nullptr ? atoui(lpDBRow[2]) : 0), lpDBRow[3] != nullptr ? atoui(lpDBRow[3]) : 0)});
+		auto iResult = lpsetMessages->emplace(SOURCEKEY(lpDBLen[0], lpDBRow[0]), SAuxMessageData(SOURCEKEY(lpDBLen[1], lpDBRow[1]), 1 << (lpDBRow[2] != nullptr ? atoui(lpDBRow[2]) : 0), lpDBRow[3] != nullptr ? atoui(lpDBRow[3]) : 0));
 		if (iResult.second == false && lpDBRow[2] != nullptr)
 			iResult.first->second.ulChangeTypes |= 1 << (lpDBRow[2]?atoui(lpDBRow[2]):0);
 	}

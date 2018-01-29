@@ -55,9 +55,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -112,48 +110,6 @@ const char *GetServerUnixSocket(const char *szPreferred)
 		return "";
 }
 
-/** 
- * Return the FQDN of this server (guessed).
- * 
- * @return hostname string
- */
-std::string GetServerFQDN()
-{
-	string retval = "localhost";
-	int rc;
-	char hostname[256] = {0};
-	struct addrinfo hints = {0};
-	struct addrinfo *aiResult = NULL;
-	struct sockaddr_in saddr = {0};
-
-	rc = gethostname(hostname, sizeof(hostname));
-	if (rc != 0)
-		goto exit;
-
-	retval = hostname;
-
-	rc = getaddrinfo(hostname, NULL, &hints, &aiResult);
-	if (rc != 0)
-		return retval;
-
-	// no need to set other contents of saddr struct, we're just intrested in the DNS lookup.
-	saddr = *((sockaddr_in*)aiResult->ai_addr);
-
-	// Name lookup is required, so set that flag
-	rc = getnameinfo((const sockaddr*)&saddr, sizeof(saddr), hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD);
-	if (rc != 0)
-		goto exit;
-
-	if (hostname[0] != '\0')
-		retval = hostname;
-
-exit:
-	if (aiResult)
-		freeaddrinfo(aiResult);
-
-	return retval;
-}
-
 /**
  * Creates a new profile with given information.
  *
@@ -193,9 +149,8 @@ static HRESULT CreateProfileTemp(const wchar_t *username,
 		ec_log_crit("CreateProfileTemp(): MAPIAdminProfiles failed %x: %s", hr, GetMAPIErrorMessage(hr));
 		return hr;
 	}
-
-	lpProfAdmin->DeleteProfile((LPTSTR)szProfName, 0);
-	hr = lpProfAdmin->CreateProfile((LPTSTR)szProfName, (LPTSTR)"", 0, 0);
+	lpProfAdmin->DeleteProfile(reinterpret_cast<const TCHAR *>(szProfName), 0);
+	hr = lpProfAdmin->CreateProfile(reinterpret_cast<const TCHAR *>(szProfName), reinterpret_cast<const TCHAR *>(""), 0, 0);
 	if (hr != hrSuccess) {
 		ec_log_crit("CreateProfileTemp(): CreateProfile failed %x: %s", hr, GetMAPIErrorMessage(hr));
 		return hr;
@@ -284,7 +239,7 @@ static HRESULT DeleteProfileTemp(const char *szProfName)
 	hr = MAPIAdminProfiles(0, &~lpProfAdmin);
 	if (hr != hrSuccess)
 		return hr;
-	return lpProfAdmin->DeleteProfile((LPTSTR)szProfName, 0);
+	return lpProfAdmin->DeleteProfile(reinterpret_cast<const TCHAR *>(szProfName), 0);
 }
 
 HRESULT HrOpenECAdminSession(IMAPISession **lppSession,
@@ -374,17 +329,17 @@ static HRESULT HrSearchECStoreEntryId(IMAPISession *lpMAPISession,
 		if (hr != hrSuccess || lpRows->cRows != 1)
 			return MAPI_E_NOT_FOUND;
 		if (bPublic) {
-			auto lpStoreProp = PCpropFindProp(lpRows->aRow[0].lpProps,lpRows->aRow[0].cValues, PR_MDB_PROVIDER);
+			auto lpStoreProp = lpRows[0].cfind(PR_MDB_PROVIDER);
 			if (lpStoreProp != NULL && memcmp(lpStoreProp->Value.bin.lpb, &KOPANO_STORE_PUBLIC_GUID, sizeof(MAPIUID)) == 0 )
 				break;
 		} else {
-			auto lpStoreProp = PCpropFindProp(lpRows->aRow[0].lpProps,lpRows->aRow[0].cValues, PR_RESOURCE_FLAGS);
+			auto lpStoreProp = lpRows[0].cfind(PR_RESOURCE_FLAGS);
 			if (lpStoreProp != NULL && lpStoreProp->Value.ul & STATUS_DEFAULT_STORE)
 				break;
 		}
 	}
 
-	lpEntryIDProp = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ENTRYID);
+	lpEntryIDProp = lpRows[0].cfind(PR_ENTRYID);
 	if (lpEntryIDProp == nullptr)
 		return MAPI_E_NOT_FOUND;
 
@@ -608,9 +563,7 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 		 * Assumption: This should be an old OneOffEntryID in the
 		 * windows-1252 charset.
 		 */
-		string str;
-
-		str = (char*)lpBuffer;
+		std::string str = lpBuffer;
 		// can be 0 length
 		hr = TryConvert(lpBuffer, rawsize(lpBuffer), "windows-1252", name);
 		if (hr != hrSuccess)
@@ -640,21 +593,6 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 
 /**
  * Convert string to e-mail header format, base64 encoded with
- * specified charset.
- *
- * @param[in]	input	Input string
- * @param[in]	charset	Charset of input string
- * @return				Output string in e-mail header format
- */
-std::string ToQuotedBase64Header(const std::string &input,
-    const std::string &charset)
-{
-	return "=?" + charset + "?B?" +
-	       base64_encode(input.c_str(), input.length()) += "?=";
-}
-
-/**
- * Convert string to e-mail header format, base64 encoded with
  * UTF-8 charset.
  *
  * @param[in]	input	Input wide string
@@ -662,106 +600,8 @@ std::string ToQuotedBase64Header(const std::string &input,
  */
 std::string ToQuotedBase64Header(const std::wstring &input)
 {
-	return ToQuotedBase64Header(convert_to<std::string>("UTF-8", input, rawsize(input), CHARSET_WCHAR), "UTF-8");
-}
-
-/**
- * Convert string to e-mail format, quoted-printable encoded with
- * specified charset. Can optionally add markings used in e-mail
- * headers. If no special quoted printable entities were required, it
- * will return the input string.
- *
- * @param[in]	input	Input string
- * @param[in]	charset	Charset of input string
- * @param[in]	header	Use extra markings to make the string valid for e-mail headers
- * @param[in]	imap	Also encode \ and " for IMAP
- * @return quoted printable valid string
- */
-std::string ToQuotedPrintable(const std::string &input,
-    const std::string &charset, bool header, bool imap)
-{
-	ULONG i;
-	string tmp;
-	bool qp = false;
-	const char digits[] = "0123456789ABCDEF";
-
-	if (charset.empty())
-		return input;
-
-	// only email headers have this prefix
-	if (header)
-		tmp = "=?"+charset+"?Q?";
-
-	for (i = 0; i < input.size(); ++i) {
-		if ((unsigned char)input[i] > 127) {
-			tmp.push_back('=');
-			tmp.push_back(digits[((unsigned char)input[i]>>4)]);
-			tmp.push_back(digits[((unsigned char)input[i]&0x0F)]);
-			qp = true;
-			continue;
-		}
-		switch ((unsigned char)input[i]) {
-		case ' ':
-			if (header)
-				tmp.push_back('_'); // only email headers need this, don't set qp marker if only spaces are found
-			else
-				tmp.push_back(input[i]); // leave email body unaffected
-			break;
-		case '\r':
-		case '\n':
-			// no idea how a user would enter a \r\n in the subject, but it s doable of course ;)
-			if (!header) {
-				tmp.push_back(input[i]); // leave email body unaffected
-				break;
-			}
-			tmp.push_back('=');
-			tmp.push_back(digits[((unsigned char)input[i]>>4)]);
-			tmp.push_back(digits[((unsigned char)input[i]&0x0F)]);
-			qp = true;
-			break;
-		case '\t':
-		case ',':
-		case ';':
-		case ':':
-		case '_':
-		case '@':
-		case '(':
-		case ')':
-		case '<':
-		case '>':
-		case '[':
-		case ']':
-		case '?':
-		case '=':
-			tmp.push_back('=');
-			tmp.push_back(digits[((unsigned char)input[i]>>4)]);
-			tmp.push_back(digits[((unsigned char)input[i]&0x0F)]);
-			qp = true;
-			break;
-		case '\\':
-		case '"':
-			// IMAP requires encoding of these 2 characters
-			if (!imap) {
-				tmp.push_back(input[i]);
-				break;
-			}
-			tmp.push_back('=');
-			tmp.push_back(digits[((unsigned char)input[i]>>4)]);
-			tmp.push_back(digits[((unsigned char)input[i]&0x0F)]);
-			qp = true;
-			break;
-		default:
-			tmp.push_back(input[i]);
-		};
-	}
-
-	if (header)
-		tmp += "?=";
-
-	if (qp)
-		return tmp;
-	else
-		return input;           // simple string was good enough
+	auto str = convert_to<std::string>("UTF-8", input, rawsize(input), CHARSET_WCHAR);
+	return "=?UTF-8?B?" + base64_encode(str.c_str(), str.length()) += "?=";
 }
 
 /**
@@ -941,14 +781,13 @@ static HRESULT HrResolveToSMTP(LPADRBOOK lpAdrBook,
 	hr = MAPIAllocateBuffer(CbNewADRLIST(1), &~lpAdrList);
 	if (hr != hrSuccess)
 		return hr;
-    
-    lpAdrList->cEntries = 1;
+	lpAdrList->cEntries = 0;
     lpAdrList->aEntries[0].cValues = 1;
 
     hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpAdrList->aEntries[0].rgPropVals);
     if(hr != hrSuccess)
 		return hr;
-        
+	++lpAdrList->cEntries;
     lpAdrList->aEntries[0].rgPropVals[0].ulPropTag = PR_DISPLAY_NAME_W;
     lpAdrList->aEntries[0].rgPropVals[0].Value.lpszW = (WCHAR *)strResolve.c_str();
     
@@ -957,8 +796,7 @@ static HRESULT HrResolveToSMTP(LPADRBOOK lpAdrBook,
 		return hr;
 	if (lpAdrList->cEntries != 1)
 		return MAPI_E_NOT_FOUND;
-    
-    lpEntryID = PCpropFindProp(lpAdrList->aEntries[0].rgPropVals, lpAdrList->aEntries[0].cValues, PR_ENTRYID);
+	lpEntryID = lpAdrList->aEntries[0].cfind(PR_ENTRYID);
 	if (lpEntryID == nullptr)
 		return MAPI_E_NOT_FOUND;
     hr = lpAdrBook->OpenEntry(lpEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEntryID->Value.bin.lpb), &IID_IMAPIProp, 0, &ulType, &~lpMailUser);
@@ -1012,8 +850,10 @@ static HRESULT HrResolveToSMTP(LPADRBOOK lpAdrBook,
  *
  * Also, the address will be resolved to SMTP if steps 1 and 2 did not provide one.
  */
-HRESULT HrGetAddress(LPADRBOOK lpAdrBook, LPSPropValue lpProps, ULONG cValues, ULONG ulPropTagEntryID, ULONG ulPropTagName, ULONG ulPropTagType, ULONG ulPropTagEmailAddress,
-					 std::wstring &strName, std::wstring &strType, std::wstring &strEmailAddress)
+HRESULT HrGetAddress(IAddrBook *lpAdrBook, const SPropValue *lpProps,
+    ULONG cValues, ULONG ulPropTagEntryID, ULONG ulPropTagName,
+    ULONG ulPropTagType, ULONG ulPropTagEmailAddress, std::wstring &strName,
+    std::wstring &strType, std::wstring &strEmailAddress)
 {
 	HRESULT hr = hrSuccess;
 	const SPropValue *lpEntryID = NULL;
@@ -1043,26 +883,25 @@ HRESULT HrGetAddress(LPADRBOOK lpAdrBook, LPSPropValue lpProps, ULONG cValues, U
 	}
 
 	if (lpEntryID == NULL || lpAdrBook == NULL ||
-		HrGetAddress(lpAdrBook, (LPENTRYID)lpEntryID->Value.bin.lpb, lpEntryID->Value.bin.cb, strName, strType, strEmailAddress) != hrSuccess)
-	{
+	    HrGetAddress(lpAdrBook, reinterpret_cast<const ENTRYID *>(lpEntryID->Value.bin.lpb), lpEntryID->Value.bin.cb, strName, strType, strEmailAddress) != hrSuccess) {
         // EntryID failed, try fallback
         if (lpName) {
 			if (PROP_TYPE(lpName->ulPropTag) == PT_UNICODE)
 				strName = lpName->Value.lpszW;
 			else
-				strName = converter.convert_to<wstring>(lpName->Value.lpszA);
+				strName = converter.convert_to<std::wstring>(lpName->Value.lpszA);
 		}
         if (lpType) {
 			if (PROP_TYPE(lpType->ulPropTag) == PT_UNICODE)
 				strType = lpType->Value.lpszW;
 			else
-				strType = converter.convert_to<wstring>(lpType->Value.lpszA);
+				strType = converter.convert_to<std::wstring>(lpType->Value.lpszA);
 		}
         if (lpAddress) {
 			if (PROP_TYPE(lpAddress->ulPropTag) == PT_UNICODE)
 				strEmailAddress = lpAddress->Value.lpszW;
 			else
-				strEmailAddress = converter.convert_to<wstring>(lpAddress->Value.lpszA);
+				strEmailAddress = converter.convert_to<std::wstring>(lpAddress->Value.lpszA);
 		}
     }
     		
@@ -1089,7 +928,9 @@ HRESULT HrGetAddress(LPADRBOOK lpAdrBook, LPSPropValue lpProps, ULONG cValues, U
  * address parts to be returned to the caller. If an SMTP address is available, returns the SMTP
  * address for the user, otherwise the ZARAFA addresstype and address is returned.
  */
-HRESULT HrGetAddress(LPADRBOOK lpAdrBook, LPENTRYID lpEntryID, ULONG cbEntryID, std::wstring &strName, std::wstring &strType, std::wstring &strEmailAddress)
+HRESULT HrGetAddress(IAddrBook *lpAdrBook, const ENTRYID *lpEntryID,
+    ULONG cbEntryID, std::wstring &strName, std::wstring &strType,
+    std::wstring &strEmailAddress)
 {
 	HRESULT hr = hrSuccess;
 	object_ptr<IMailUser> lpMailUser;
@@ -1209,7 +1050,7 @@ HRESULT DoSentMail(IMAPISession *lpSession, IMsgStore *lpMDBParam,
 // is retrieved from the passed lpProps/cValues property array
 class ECRowWrapper _kc_final : public IMAPIProp {
 public:
-	ECRowWrapper(LPSPropValue lpProps, ULONG cValues) : m_cValues(cValues), m_lpProps(lpProps) {};
+	ECRowWrapper(const SPropValue *lpProps, ULONG cValues) : m_cValues(cValues), m_lpProps(lpProps) {}
 	ULONG AddRef(void) _kc_override { return 1; } // no ref counting
 	ULONG Release(void) _kc_override { return 1; }
 	HRESULT QueryInterface(const IID &iid, LPVOID *lpvoid) _kc_override { return MAPI_E_INTERFACE_NOT_SUPPORTED; }
@@ -1221,10 +1062,11 @@ public:
 		HRESULT hr = hrSuccess;
 		BOOL bError;
 		ULONG i = 0;
-		LPSPropValue lpProps = NULL;
+		memory_ptr<SPropValue> lpProps;
 		convert_context converter;
 
-		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpTags->cValues, (void **) &lpProps)) != hrSuccess)
+		hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpTags->cValues, &~lpProps);
+		if (hr != hrSuccess)
 			return hr;
 
 		for (i = 0; i<lpTags->cValues; ++i) {
@@ -1260,7 +1102,7 @@ public:
 			}
 		}
 
-		*lppProps = lpProps;
+		*lppProps = lpProps.release();
 		*lpcValues = lpTags->cValues;
 
 		return hr;
@@ -1271,11 +1113,11 @@ public:
 	HRESULT DeleteProps(const SPropTagArray *, SPropProblemArray **) _kc_override { return MAPI_E_NO_SUPPORT; }
 	HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems) _kc_override { return MAPI_E_NO_SUPPORT; }
 	HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) _kc_override { return MAPI_E_NO_SUPPORT; }
-	HRESULT GetNamesFromIDs( LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames) _kc_override { return MAPI_E_NO_SUPPORT; }
+	HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override { return MAPI_E_NO_SUPPORT; }
 	HRESULT GetIDsFromNames( ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags) _kc_override { return MAPI_E_NO_SUPPORT; }
 private:
 	ULONG			m_cValues;
-	LPSPropValue	m_lpProps;
+	const SPropValue *m_lpProps;
 };
 
 static HRESULT TestRelop(ULONG relop, int result, bool* fMatch)
@@ -1336,28 +1178,28 @@ static HRESULT GetRestrictTagsRecursive(const SRestriction *lpRestriction,
 		hr = GetRestrictTagsRecursive(lpRestriction->res.resNot.lpRes, lpList, ulLevel+1);
 		break;
 	case RES_CONTENT:
-		lpList->push_back(lpRestriction->res.resContent.ulPropTag);
-		lpList->push_back(lpRestriction->res.resContent.lpProp->ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resContent.ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resContent.lpProp->ulPropTag);
 		break;
 	case RES_PROPERTY:
-		lpList->push_back(lpRestriction->res.resProperty.ulPropTag);
-		lpList->push_back(lpRestriction->res.resProperty.lpProp->ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resProperty.ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resProperty.lpProp->ulPropTag);
 		break;
 	case RES_COMPAREPROPS:
-		lpList->push_back(lpRestriction->res.resCompareProps.ulPropTag1);
-		lpList->push_back(lpRestriction->res.resCompareProps.ulPropTag2);
+		lpList->emplace_back(lpRestriction->res.resCompareProps.ulPropTag1);
+		lpList->emplace_back(lpRestriction->res.resCompareProps.ulPropTag2);
 		break;
 	case RES_BITMASK:
-		lpList->push_back(lpRestriction->res.resBitMask.ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resBitMask.ulPropTag);
 		break;
 	case RES_SIZE:
-		lpList->push_back(lpRestriction->res.resSize.ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resSize.ulPropTag);
 		break;
 	case RES_EXIST:
-		lpList->push_back(lpRestriction->res.resExist.ulPropTag);
+		lpList->emplace_back(lpRestriction->res.resExist.ulPropTag);
 		break;
 	case RES_SUBRESTRICTION:
-		lpList->push_back(lpRestriction->res.resSub.ulSubObject);
+		lpList->emplace_back(lpRestriction->res.resSub.ulSubObject);
 		break;
 	case RES_COMMENT:
 		hr = GetRestrictTagsRecursive(lpRestriction->res.resComment.lpRes, lpList, ulLevel+1);
@@ -1393,12 +1235,16 @@ static HRESULT GetRestrictTags(const SRestriction *lpRestriction,
 	return hrSuccess;
 }
 
-HRESULT TestRestriction(LPSRestriction lpCondition, ULONG cValues, LPSPropValue lpPropVals, const ECLocale &locale, ULONG ulLevel) {
+HRESULT TestRestriction(const SRestriction *lpCondition, ULONG cValues,
+    const SPropValue *lpPropVals, const ECLocale &locale, ULONG ulLevel)
+{
 	ECRowWrapper lpRowWrapper(lpPropVals, cValues);
 	return TestRestriction(lpCondition, static_cast<IMAPIProp *>(&lpRowWrapper), locale, ulLevel);
 }
 
-HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const ECLocale &locale, ULONG ulLevel) {
+HRESULT TestRestriction(const SRestriction *lpCondition, IMAPIProp *lpMessage,
+    const ECLocale &locale, ULONG ulLevel)
+{
 	HRESULT hr = hrSuccess;
 	ULONG c;
 	bool fMatch = false;
@@ -1492,7 +1338,7 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 			    (ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) == 0 && lpSearchData != NULL && lpSearchString != NULL && str_equals(lpSearchData, lpSearchString, locale)) ||
 			    (ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) && lpwSearchData != NULL && lpwSearchString != NULL && wcs_iequals(lpwSearchData, lpwSearchString, locale)) ||
 			    (ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) == 0 && lpwSearchData != NULL && lpwSearchString != NULL && wcs_equals(lpwSearchData, lpwSearchString, locale)) ||
-			    (ulPropType == PT_BINARY && lpSearchData != NULL && lpwSearchString != NULL && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
+			    (ulPropType == PT_BINARY && lpSearchData != NULL && lpSearchString != NULL && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
 				fMatch = true;
 			break;
 		case FL_PREFIX:
@@ -1602,8 +1448,7 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 			// there aren't any subobjects under the subobjects .. unless we count
 			// messages in PR_ATTACH_DATA_OBJ under attachments... Well we don't support
 			// that in any case ...)
-
-			hr = TestRestriction(lpCondition->res.resSub.lpRes, lpRowSet->aRow[0].cValues, lpRowSet->aRow[0].lpProps, locale, ulLevel+1);
+			hr = TestRestriction(lpCondition->res.resSub.lpRes, lpRowSet[0].cValues, lpRowSet[0].lpProps, locale, ulLevel+1);
 			if(hr == hrSuccess) {
 				fMatch = true;
 				break;
@@ -1673,9 +1518,9 @@ static HRESULT FindFolder(IMAPITable *lpTable, const wchar_t *folder,
 			break;
 		if (lpRowSet->cRows == 0)
 			return MAPI_E_NOT_FOUND;
-		if (wcscasecmp(lpRowSet->aRow[0].lpProps[0].Value.lpszW, folder) == 0)
+		if (wcscasecmp(lpRowSet[0].lpProps[0].Value.lpszW, folder) == 0)
 			// found the folder
-			return Util::HrCopyPropertyArray(&lpRowSet->aRow[0].lpProps[1], 1, lppFolderProp, &nValues);
+			return Util::HrCopyPropertyArray(&lpRowSet[0].lpProps[1], 1, lppFolderProp, &nValues);
 	}
 	return hr;
 }
@@ -1686,7 +1531,7 @@ static HRESULT FindFolder(IMAPITable *lpTable, const wchar_t *folder,
  * subtree not by passing the foldername.
  *
  * @param[in]	lpMDB	A store to open the folder in. If you pass the public store, set the matching bool to true.
- * @param[in]	folder	The name of the folder you want to open. Can be at any depth, eg. INBOX/folder name1/folder name2. Pass / as separator.
+ * @param[in]	folder	The name of the folder you want to open. Can be at any depth, e.g. INBOX/folder name1/folder name2. Pass / as separator.
  *						Pass NULL to open the IPM subtree of the passed store.
  * @param[in]	psep	The foldername separator in the folder parameter.
  * @param[in]	bIsPublic	The lpMDB parameter is the public store if true, otherwise false.
@@ -1736,13 +1581,13 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const wchar_t *folder, wchar_t psep,
 	// Loop through the folder string to find the wanted folder in the store
 	do {
 		object_ptr<IMAPITable> lpTable;
-		wstring subfld;
+		std::wstring subfld;
 
 		ptr = wcschr(folder, psep);
 		if (ptr)
-			subfld = wstring(folder, ptr-folder);
+			subfld.assign(folder, ptr - folder);
 		else
-			subfld = wstring(folder);
+			subfld = folder;
 		folder = ptr ? ptr+1 : NULL;
 		hr = lpFoundFolder->GetHierarchyTable(0, &~lpTable);
 		if (hr != hrSuccess) {
@@ -1819,7 +1664,7 @@ static HRESULT HrOpenUserMsgStore(IMAPISession *lpSession, IMsgStore *lpStore,
 	hr = lpStore->QueryInterface(IID_IExchangeManageStore, &~lpExchManageStore);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpExchManageStore->CreateStoreEntryID(NULL, (LPTSTR)lpszUser, MAPI_UNICODE, &cbStoreEntryID, &~lpStoreEntryID);
+	hr = lpExchManageStore->CreateStoreEntryID(nullptr, reinterpret_cast<const TCHAR *>(lpszUser), MAPI_UNICODE, &cbStoreEntryID, &~lpStoreEntryID);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpSession->OpenMsgStore(0, cbStoreEntryID, lpStoreEntryID, &IID_IMsgStore, MDB_WRITE, &~lpMsgStore);
@@ -1828,9 +1673,7 @@ static HRESULT HrOpenUserMsgStore(IMAPISession *lpSession, IMsgStore *lpStore,
 	return lpMsgStore->QueryInterface(IID_IMsgStore, reinterpret_cast<void **>(lppStore));
 }
 
-/*
- * NAMED PROPERTY util functions (used with PROPMAP_* macro's)
- */
+/* NAMED PROPERTY util functions (used with PROPMAP_* macros) */
 
 ECPropMapEntry::ECPropMapEntry(GUID guid, ULONG ulId) :
 	m_sGuid(guid)
@@ -1895,10 +1738,10 @@ ECPropMap::ECPropMap(size_t hint)
     
 void ECPropMap::AddProp(ULONG *lpId, ULONG ulType, const ECPropMapEntry &entry)
 {
-    // Add reference to proptag for later Resolve();
-    lstNames.push_back(entry);
-    lstVars.push_back(lpId);
-    lstTypes.push_back(ulType);
+	// Add reference to proptag for later Resolve();
+	lstNames.emplace_back(entry);
+	lstVars.emplace_back(lpId);
+	lstTypes.emplace_back(ulType);
 }
     
 HRESULT ECPropMap::Resolve(IMAPIProp *lpMAPIProp) {
@@ -2221,7 +2064,7 @@ static HRESULT OpenLocalFBMessage(DGMessageType eDGMsgType,
 	   && bCreateIfMissing) {
 		
 		// Open the inbox
-		hr = lpMsgStore->GetReceiveFolder((LPTSTR)"", 0, &cbEntryIDInbox, &~lpEntryIDInbox, &~lpszExplicitClass);
+		hr = lpMsgStore->GetReceiveFolder(reinterpret_cast<const TCHAR *>(""), 0, &cbEntryIDInbox, &~lpEntryIDInbox, &~lpszExplicitClass);
 		if(hr != hrSuccess)
 			return hr;
 		hr = lpMsgStore->OpenEntry(cbEntryIDInbox, lpEntryIDInbox, &IID_IMAPIFolder, MAPI_MODIFY, &ulType, &~lpInbox);
@@ -2439,10 +2282,10 @@ HRESULT HrGetRemoteAdminStore(IMAPISession *lpMAPISession, IMsgStore *lpMsgStore
 		return hr;
 	if (ulFlags & MAPI_UNICODE) {
 		std::wstring strMsgStoreDN = std::wstring(L"cn=") + (LPCWSTR)lpszServerName + L"/cn=Microsoft Private MDB";
-		hr = ptrEMS->CreateStoreEntryID((LPTSTR)strMsgStoreDN.c_str(), (LPTSTR)L"SYSTEM", MAPI_UNICODE|OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~ptrStoreId);
+		hr = ptrEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(strMsgStoreDN.c_str()), reinterpret_cast<const TCHAR *>(L"SYSTEM"), MAPI_UNICODE | OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~ptrStoreId);
 	} else {
 		std::string strMsgStoreDN = std::string("cn=") + (LPCSTR)lpszServerName + "/cn=Microsoft Private MDB";
-		hr = ptrEMS->CreateStoreEntryID((LPTSTR)strMsgStoreDN.c_str(), (LPTSTR)"SYSTEM", OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~ptrStoreId);
+		hr = ptrEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(strMsgStoreDN.c_str()), reinterpret_cast<const TCHAR *>("SYSTEM"), OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &~ptrStoreId);
 	}
 	if (hr != hrSuccess)
 		return hr;
@@ -2503,14 +2346,14 @@ HRESULT GetConfigMessage(LPMDB lpStore, const char* szMessageName, IMessage **lp
 	hr = ECPropertyRestriction(RELOP_EQ, PR_SUBJECT_A, &propSubject, ECRestriction::Cheap)
 	     .FindRowIn(ptrTable, BOOKMARK_BEGINNING, 0);
 	if (hr == hrSuccess) {
-		hr = ptrTable->QueryRows(1, 0, &ptrRows);
+		hr = ptrTable->QueryRows(1, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 	}
 
 	if (!ptrRows.empty()) {
 		// message found, open it
-		auto lpEntryID = PCpropFindProp(ptrRows[0].lpProps, ptrRows[0].cValues, PR_ENTRYID);
+		auto lpEntryID = ptrRows[0].cfind(PR_ENTRYID);
 		if (lpEntryID == NULL)
 			return MAPI_E_INVALID_ENTRYID;
 		hr = ptrFolder->OpenEntry(lpEntryID->Value.bin.cb,

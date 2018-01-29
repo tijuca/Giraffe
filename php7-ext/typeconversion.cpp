@@ -20,8 +20,10 @@
 #include <cmath>
 #include <mapiutil.h>
 #include "php-ext/phpconfig.h"
-
-using namespace std;
+#if __GNUC_PREREQ(5, 0) && !__GNUC_PREREQ(6, 0)
+using std::isfinite;
+using std::isnan;
+#endif
 
 extern "C" {
 	// Remove these defines to remove warnings
@@ -30,11 +32,6 @@ extern "C" {
 	#undef PACKAGE_NAME
 	#undef PACKAGE_STRING
 	#undef PACKAGE_BUGREPORT
-
-	#if !__GNUC_PREREQ(6,0)
-	#define zend_isnan(a) std::isnan(a)
-	#endif
-	
 	#include "php.h"
    	#include "php_globals.h"
 	#include "ext/standard/info.h"
@@ -60,7 +57,8 @@ extern "C" {
 // Calls MAPIAllocateMore or MAPIAllocateBuffer according to whether an lpBase was passed or not
 #define MAPI_ALLOC(n, lpBase, lpp) (lpBase ? MAPIAllocateMore(n, lpBase, lpp) : MAPIAllocateBuffer(n, lpp))
 // Frees the buffer with MAPIFreeBuffer if lpBase is NOT set, we can't directly free data allocated with MAPIAllocateMore ..
-#define MAPI_FREE(lpbase, lpp) { if(!lpBase) MAPIFreeBuffer(lpp); }
+#define MAPI_FREE(lpbase, lpp) \
+	do { if (lpBase == nullptr) MAPIFreeBuffer(lpp); } while (false)
 
 ZEND_EXTERN_MODULE_GLOBALS(mapi)
 
@@ -791,14 +789,17 @@ HRESULT PHPArraytoAdrList(zval *phpArray, void *lpBase, LPADRLIST *lppAdrList TS
 	MAPI_G(hr) = MAPI_ALLOC(CbNewADRLIST(count), lpBase, (void **)&lpAdrList);
 	if(MAPI_G(hr) != hrSuccess)
 		return MAPI_G(hr);
-
+	lpAdrList->cEntries = 0;
 	zend_hash_internal_pointer_reset(target_hash);
 
 	// FIXME: It is possible that the memory allocated is more than actually needed. We should first
 	//		  count the number of elements needed then allocate memory and then fill the memory.
 	//        but since this waste is probably very minimal, we could not care less about this.
+
 	for (unsigned int i = 0; i < count; ++i) {
 		entry = zend_hash_get_current_data(target_hash);
+		ZVAL_DEREF(entry);
+
 		if(Z_TYPE_P(entry) != IS_ARRAY) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "phparraytoadrlist array must include an array with array of propvalues");
 			MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -808,7 +809,7 @@ HRESULT PHPArraytoAdrList(zval *phpArray, void *lpBase, LPADRLIST *lppAdrList TS
 		MAPI_G(hr) = PHPArraytoPropValueArray(entry, lpBase, &countProperties, &pPropValue TSRMLS_CC);
 		if(MAPI_G(hr) != hrSuccess)
 			goto exit;
-			
+		++lpAdrList->cEntries;
 		lpAdrList->aEntries[countRecipients].ulReserved1 = 0;
 		lpAdrList->aEntries[countRecipients].rgPropVals = pPropValue;
 		lpAdrList->aEntries[countRecipients].cValues = countProperties;
@@ -817,9 +818,6 @@ HRESULT PHPArraytoAdrList(zval *phpArray, void *lpBase, LPADRLIST *lppAdrList TS
 		zend_hash_move_forward(target_hash);
 		++countRecipients;
 	}
-
-	lpAdrList->cEntries = countRecipients;
-
 	*lppAdrList = lpAdrList;
 
 exit:
@@ -863,7 +861,7 @@ HRESULT PHPArraytoRowList(zval *phpArray, void *lpBase, LPROWLIST *lppRowList TS
 	             reinterpret_cast<void **>(&lpRowList));
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
-
+	lpRowList->cEntries = 0;
 	zend_hash_internal_pointer_reset(target_hash);
 
 	// FIXME: It is possible that the memory allocated is more than actually needed. We should first
@@ -871,6 +869,8 @@ HRESULT PHPArraytoRowList(zval *phpArray, void *lpBase, LPROWLIST *lppRowList TS
 	//        but since this waste is probably very minimal, we could not care less about this.
 	for (unsigned int i = 0; i < count; ++i) {
 		entry = zend_hash_get_current_data(target_hash);
+		ZVAL_DEREF(entry);
+
 		if (Z_TYPE_P(entry) != IS_ARRAY) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "PHPArraytoRowList, Row not wrapped in array");
 			MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -895,6 +895,7 @@ HRESULT PHPArraytoRowList(zval *phpArray, void *lpBase, LPROWLIST *lppRowList TS
 				MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 				goto exit;
 			}
+			++lpRowList->cEntries;
 			lpRowList->aEntries[countRows].rgPropVals = pPropValue;
 			lpRowList->aEntries[countRows++].cValues = countProperties;
 		}else {
@@ -906,8 +907,6 @@ HRESULT PHPArraytoRowList(zval *phpArray, void *lpBase, LPROWLIST *lppRowList TS
 		// move the pointer to the next entry
 		zend_hash_move_forward(target_hash);
 	}
-	lpRowList->cEntries = countRows;
-
 	*lppRowList = lpRowList;
 
 exit:
@@ -2096,15 +2095,12 @@ HRESULT PHPArraytoSendingOptions(zval *phpArray, sending_options *lpSOPT)
 		} else if (strcmp(keyIndex->val, "use_tnef") == 0) {
 			convert_to_long_ex(entry);
 			lpSOPT->use_tnef = Z_LVAL_P(entry);
-		} else if (strcmp(keyIndex->val, "force_utf8") == 0) {
-			convert_to_boolean_ex(entry);
-			lpSOPT->force_utf8 = (Z_TYPE_P(entry) == IS_TRUE);
 		} else if (strcmp(keyIndex->val, "charset_upgrade") == 0) {
 			convert_to_string_ex(entry);
 			lpSOPT->charset_upgrade = Z_STRVAL_P(entry);
 		} else if (strcmp(keyIndex->val, "allow_send_to_everyone") == 0) {
 			convert_to_boolean_ex(entry);
-			lpSOPT->force_utf8 = (Z_TYPE_P(entry) == IS_TRUE);
+			lpSOPT->allow_send_to_everyone = (Z_TYPE_P(entry) == IS_TRUE);
 		} else {
 			// msg_in_msg and enable_dsn not allowed, others unknown
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown or disallowed sending option %s", keyIndex->val);
@@ -2151,7 +2147,7 @@ HRESULT PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT)
 		} else if (strcmp(keyIndex->val, "mark_as_read") == 0) {
 			convert_to_boolean_ex(entry);
 			lpDOPT->mark_as_read = (Z_TYPE_P(entry) == IS_TRUE);
-		} else if (strcmp(keyIndex->val, "add_imap_date") == 0) {
+		} else if (strcmp(keyIndex->val, "add_imap_data") == 0) {
 			convert_to_boolean_ex(entry);
 			lpDOPT->add_imap_data = (Z_TYPE_P(entry) == IS_TRUE);
 		} else if (strcmp(keyIndex->val, "parse_smime_signed") == 0) {

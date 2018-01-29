@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <string>
 #include <kopano/platform.h>
 #include <sys/un.h>
 #include "WSUtil.h"
@@ -43,7 +43,6 @@
 #include <kopano/ECGetText.h>
 #include "SOAPSock.h"
 
-using namespace std;
 using namespace KCHL;
 
 #define CONVERT_TO(_context, _charset, ...) ((_context) ? (_context)->convert_to<_charset>(__VA_ARGS__) : convert_to<_charset>(__VA_ARGS__))
@@ -385,7 +384,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 			dp->Value.err = MAPI_E_NOT_FOUND;
 			break;
 		}
-		string s = CONVERT_TO(lpConverter, string, sp->Value.lpszA, rawsize(sp->Value.lpszA), "UTF-8");
+		auto s = CONVERT_TO(lpConverter, std::string, sp->Value.lpszA, rawsize(sp->Value.lpszA), "UTF-8");
 		hr = ECAllocateMore(s.length() + 1, lpBase, reinterpret_cast<void **>(&dp->Value.lpszA));
 		if (hr != hrSuccess)
 			return hr;
@@ -398,8 +397,8 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 			dp->Value.err = MAPI_E_NOT_FOUND;
 			break;
 		}
-		wstring ws = CONVERT_TO(lpConverter, wstring, sp->Value.lpszA, rawsize(sp->Value.lpszA), "UTF-8");
-		hr = ECAllocateMore(sizeof(wstring::value_type) * (ws.length() + 1), lpBase, reinterpret_cast<void **>(&dp->Value.lpszW));
+		auto ws = CONVERT_TO(lpConverter, std::wstring, sp->Value.lpszA, rawsize(sp->Value.lpszA), "UTF-8");
+		hr = ECAllocateMore(sizeof(std::wstring::value_type) * (ws.length() + 1), lpBase, reinterpret_cast<void **>(&dp->Value.lpszW));
 		if (hr != hrSuccess)
 			return hr;
 		wcscpy(dp->Value.lpszW, ws.c_str());
@@ -581,7 +580,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 
 		for (unsigned int i = 0; i < dp->Value.MVszA.cValues; ++i) {
 			if (sp->Value.mvszA.__ptr[i] != NULL) {
-				string s = lpConverter->convert_to<string>(sp->Value.mvszA.__ptr[i], rawsize(sp->Value.mvszA.__ptr[i]), "UTF-8");
+				auto s = lpConverter->convert_to<std::string>(sp->Value.mvszA.__ptr[i], rawsize(sp->Value.mvszA.__ptr[i]), "UTF-8");
 				hr = ECAllocateMore(s.size() + 1, lpBase, reinterpret_cast<void **>(&dp->Value.MVszA.lppszA[i]));
 				if (hr != hrSuccess)
 					return hr;
@@ -619,8 +618,8 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 				dp->Value.MVszW.lppszW[i][0] = '\0';
 				continue;
 			}
-			wstring ws = lpConverter->convert_to<wstring>(sp->Value.mvszA.__ptr[i], rawsize(sp->Value.mvszA.__ptr[i]), "UTF-8");
-			hr = ECAllocateMore(sizeof(wstring::value_type) * (ws.length() + 1), lpBase,
+			auto ws = lpConverter->convert_to<std::wstring>(sp->Value.mvszA.__ptr[i], rawsize(sp->Value.mvszA.__ptr[i]), "UTF-8");
+			hr = ECAllocateMore(sizeof(std::wstring::value_type) * (ws.length() + 1), lpBase,
 			     reinterpret_cast<void **>(&dp->Value.MVszW.lppszW[i]));
 			if (hr != hrSuccess)
 				return hr;
@@ -737,8 +736,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 				hr = ECAllocateMore(CbNewADRLIST(sa->act.adrlist->__size), lpBase, reinterpret_cast<void **>(&da->lpadrlist));
 				if (hr != hrSuccess)
 					return hr;
-				da->lpadrlist->cEntries = sa->act.adrlist->__size;
-
+				da->lpadrlist->cEntries = 0;
 				for (gsoap_size_t j = 0; j < sa->act.adrlist->__size; ++j) {
 					da->lpadrlist->aEntries[j].ulReserved1 = 0;
 					da->lpadrlist->aEntries[j].cValues = sa->act.adrlist->__ptr[j].__size;
@@ -748,6 +746,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(SPropValue *dp, const struct propVal *sp,
 					     reinterpret_cast<void **>(&da->lpadrlist->aEntries[j].rgPropVals));
 					if (hr != hrSuccess)
 						return hr;
+					++da->lpadrlist->cEntries;
 					hr = CopySOAPRowToMAPIRow(&sa->act.adrlist->__ptr[j], da->lpadrlist->aEntries[j].rgPropVals, lpBase, lpConverter);
 					if (hr != hrSuccess)
 						return hr;
@@ -822,17 +821,6 @@ HRESULT CopySOAPRowToMAPIRow(void *lpProvider,
 		// If all fails, get the actual data from the server
 		CopySOAPPropValToMAPIPropVal(&lpsRowDst[j], &lpsRowSrc->__ptr[j], lpBase, lpConverter);
 	}
-	return hrSuccess;
-}
-
-HRESULT CopySOAPEntryId(const entryId *lpSrc, entryId *lpDst)
-{
-	if (lpSrc == NULL || lpDst == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-
-	lpDst->__size = lpSrc->__size;
-	lpDst->__ptr = s_alloc<unsigned char>(nullptr, lpDst->__size);
-	memcpy(lpDst->__ptr, lpSrc->__ptr, lpDst->__size);
 	return hrSuccess;
 }
 
@@ -1693,33 +1681,7 @@ static HRESULT SoapUserToUser(const struct user *lpUser, ECUSER *lpsUser,
 	lpsUser->ulIsAdmin		= lpUser->ulIsAdmin;
 	lpsUser->ulIsABHidden	= lpUser->ulIsABHidden;
 	lpsUser->ulCapacity		= lpUser->ulCapacity;
-
-	/**
-	 * If we're talking to a pre 6.40 server we won't get a object class,
-	 * only an is-non-active flag. Luckily we don't have to support that.
-	 * However, a 6.40.0 server will put the object class information in
-	 * that is-non-active field. We (6.40.1 and up) expect the object class
-	 * information in a dedicated object class field, and reverted the
-	 * is-non-active field to its original usage.
-	 *
-	 * We can easily determine what's the case here:
-	 *  If ulClass is missing (value == 0), we're dealing with a pre 6.40.1
-	 *  server. In that case the ulIsNonActive either contains is-non-active
-	 *  information or an object class. We can distinguish this since an
-	 *  object class has data in the high 16-bit of its value, the
-	 *  is-non-active field is either 0 or 1.
-	 *  If we detect a class, we put the class in the ulClass field.
-	 *  If we detect a is-non-active, we'll simply return an error since we're
-	 *  not required to be able to communicate with a pre 6.40.
-	 *  We could guess things here, but why bother?
-	 */
-	if (lpUser->ulObjClass == 0) {
-		if (OBJECTCLASS_TYPE(lpUser->ulIsNonActive) != 0)
-			lpsUser->ulObjClass = (objectclass_t)lpUser->ulIsNonActive;	// ulIsNonActive itself will be ignored by the offline server.
-		else
-			return MAPI_E_UNABLE_TO_COMPLETE;
-	} else
-		lpsUser->ulObjClass = (objectclass_t)lpUser->ulObjClass;
+	lpsUser->ulObjClass = (objectclass_t)lpUser->ulObjClass;
 
 	return hrSuccess;
 }
@@ -2392,14 +2354,15 @@ HRESULT CopyUserClientUpdateStatusFromSOAP(struct userClientUpdateStatusResponse
 static HRESULT ConvertString8ToUnicode(const char *lpszA, WCHAR **lppszW,
     void *base, convert_context &converter)
 {
-	wstring wide;
+	std::wstring wide;
 	WCHAR *lpszW = NULL;
 
 	if (lpszA == NULL || lppszW == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
 	TryConvert(lpszA, wide);
-	auto hr = ECAllocateMore((wide.length() + 1) * sizeof(wstring::value_type), base, reinterpret_cast<void **>(&lpszW));
+	auto hr = ECAllocateMore((wide.length() + 1) * sizeof(std::wstring::value_type),
+	          base, reinterpret_cast<void **>(&lpszW));
 	if (hr != hrSuccess)
 		return hr;
 	wcscpy(lpszW, wide.c_str());
@@ -2525,7 +2488,7 @@ HRESULT ConvertString8ToUnicode(LPSRow lpRow, void *base, convert_context &conve
 		} else if (PROP_TYPE(lpRow->lpProps[c].ulPropTag) == PT_ACTIONS) {
 			hr = ConvertString8ToUnicode((ACTIONS*)lpRow->lpProps[c].Value.lpszA, base ? base : lpRow->lpProps, converter);
 		} else if (base && PROP_TYPE(lpRow->lpProps[c].ulPropTag) == PT_STRING8) {
-			// only for "base" items: eg. the lpadrlist data, not the PR_RULE_NAME from the top-level
+			// only for "base" items: e.g. the lpadrlist data, not the PR_RULE_NAME from the top-level
 			hr = ConvertString8ToUnicode(lpRow->lpProps[c].Value.lpszA, &lpRow->lpProps[c].Value.lpszW, base, converter);
 			if (hr != hrSuccess)
 				return hr;

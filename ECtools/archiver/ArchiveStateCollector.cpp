@@ -18,6 +18,7 @@
 #include <kopano/zcdefs.h>
 #include <new>
 #include <utility>
+#include <kopano/memory.hpp>
 #include <kopano/platform.h>
 #include <kopano/userutil.h>
 #include "ArchiveStateCollector.h"
@@ -39,23 +40,16 @@ namespace details {
 	class MailboxDataCollector _kc_final : public DataCollector {
 	public:
 		MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger);
-		~MailboxDataCollector();
 		HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _kc_override;
 		HRESULT CollectData(LPMAPITABLE lpStoreTable) _kc_override;
 
 	private:
 		ArchiveStateCollector::ArchiveInfoMap &m_mapArchiveInfo;
-		ECLogger *m_lpLogger;
+		KCHL::object_ptr<ECLogger> m_lpLogger;
 	};
 
 	MailboxDataCollector::MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger): m_mapArchiveInfo(mapArchiveInfo), m_lpLogger(lpLogger)
 	{
-		m_lpLogger->AddRef();
-	}
-
-	MailboxDataCollector::~MailboxDataCollector()
-	{
-		m_lpLogger->Release();
 	}
 
 	HRESULT MailboxDataCollector::GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const
@@ -85,13 +79,11 @@ namespace details {
 
 	HRESULT MailboxDataCollector::CollectData(LPMAPITABLE lpStoreTable)
 	{
-		HRESULT hr;
-		SRowSetPtr ptrRows;
-
 		enum {IDX_ENTRYID, IDX_MAILBOX_OWNER_ENTRYID, IDX_STORE_ENTRYIDS, IDX_ITEM_ENTRYIDS, IDX_MAX};
 
 		while (true) {
-			hr = lpStoreTable->QueryRows(50, 0, &ptrRows);
+			SRowSetPtr ptrRows;
+			auto hr = lpStoreTable->QueryRows(50, 0, &~ptrRows);
 			if (hr != hrSuccess)
 				return hr;
 
@@ -116,24 +108,23 @@ namespace details {
 					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Mismatch in archive prop count, %u vs. %u", ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues, ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.cValues);
 					continue;
 				}
-
-				userId.assign(ptrRows[i].lpProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin);
-				auto res = m_mapArchiveInfo.insert(std::make_pair(userId, ArchiveStateCollector::ArchiveInfo()));
+				userId = ptrRows[i].lpProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin;
+				auto res = m_mapArchiveInfo.emplace(userId, ArchiveStateCollector::ArchiveInfo());
 				if (res.second == true)
 					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user id %s", userId.tostring().c_str());
 				else
 					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Updating row for user '" TSTRING_PRINTF "'", res.first->second.userName.c_str());
 
 				// Assign entryid
-				res.first->second.storeId.assign(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin);
+				res.first->second.storeId = ptrRows[i].lpProps[IDX_ENTRYID].Value.bin;
 
 				// Assign archives
 				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive(s)", ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues);
 				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues; ++j) {
 					SObjectEntry objEntry;
-					objEntry.sStoreEntryId.assign(entryid_t(ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.lpbin[j]));
-					objEntry.sItemEntryId.assign(entryid_t(ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.lpbin[j]));
-					res.first->second.lstArchives.push_back(std::move(objEntry));
+					objEntry.sStoreEntryId = ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.lpbin[j];
+					objEntry.sItemEntryId = ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.lpbin[j];
+					res.first->second.lstArchives.emplace_back(std::move(objEntry));
 				}
 			}
 		}
@@ -164,13 +155,8 @@ HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession, ECLo
  */
 ArchiveStateCollector::ArchiveStateCollector(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger)
 : m_ptrSession(ptrSession)
-, m_lpLogger(new ECArchiverLogger(lpLogger))
+, m_lpLogger(new ECArchiverLogger(lpLogger), false)
 { }
-
-ArchiveStateCollector::~ArchiveStateCollector()
-{
-	m_lpLogger->Release();
-}
 
 /**
  * Return an ArchiveStateUpdater instance that can update the current state
@@ -179,10 +165,8 @@ ArchiveStateCollector::~ArchiveStateCollector()
  */
 HRESULT ArchiveStateCollector::GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lpptrUpdater)
 {
-	HRESULT hr;
 	details::MailboxDataCollector mdc(m_mapArchiveInfo, m_lpLogger);
-
-	hr = PopulateUserList();
+	auto hr = PopulateUserList();
 	if (hr != hrSuccess)
 		return hr;
 
@@ -209,10 +193,9 @@ HRESULT ArchiveStateCollector::GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lp
  */
 HRESULT ArchiveStateCollector::PopulateUserList()
 {
-	HRESULT hr;
 	ABContainerPtr ptrABContainer;
 
-	hr = m_ptrSession->GetGAL(&~ptrABContainer);
+	auto hr = m_ptrSession->GetGAL(&~ptrABContainer);
 	if (hr != hrSuccess)
 		return hr;
 	hr = PopulateFromContainer(ptrABContainer);
@@ -242,7 +225,6 @@ HRESULT ArchiveStateCollector::PopulateUserList()
  */
 HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 {
-	HRESULT hr;
 	SPropValue sPropObjType;
 	SPropValue sPropDispType;
 	MAPITablePtr ptrTable;
@@ -258,7 +240,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 	sPropDispType.ulPropTag = PR_DISPLAY_TYPE;
 	sPropDispType.Value.ul = DT_MAILUSER;;
 
-	hr = lpContainer->GetContentsTable(0, &~ptrTable);
+	auto hr = lpContainer->GetContentsTable(0, &~ptrTable);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrTable->SetColumns(sptaUserProps, TBL_BATCH);
@@ -276,7 +258,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 		return hr;
 
 	while (true) {
-		hr = ptrTable->QueryRows(50, 0, &ptrRows);
+		hr = ptrTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -295,19 +277,19 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 			}
 
 			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user '" TSTRING_PRINTF "'", ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
-			auto iterator = m_mapArchiveInfo.insert(std::make_pair(abentryid_t(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin), ArchiveInfo())).first;
+			auto iterator = m_mapArchiveInfo.emplace(abentryid_t(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin), ArchiveInfo()).first;
 			iterator->second.userName.assign(ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
 
 			if (ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].ulPropTag == PR_EC_ARCHIVE_SERVERS) {
 				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive server(s)", ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues);
 				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues; ++j)
-					iterator->second.lstServers.push_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.LPPSZ[j]);
+					iterator->second.lstServers.emplace_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.LPPSZ[j]);
 			}
 
 			if (ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].ulPropTag == PR_EC_ARCHIVE_COUPLINGS) {
 				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive coupling(s)", ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues);
 				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues; ++j)
-					iterator->second.lstCouplings.push_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.LPPSZ[j]);
+					iterator->second.lstCouplings.emplace_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.LPPSZ[j]);
 			}
 		}
 	}

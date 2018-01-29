@@ -19,8 +19,6 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/mapi_ptr.h>
 
-using namespace std;
-
 namespace KC {
 
 /** 
@@ -53,25 +51,6 @@ HRESULT hasFeature(const char *feature, const SPropValue *lpProps)
 
 	for (ULONG i = 0; i < lpProps->Value.MVszA.cValues; ++i)
 		if (strcasecmp(lpProps->Value.MVszA.lppszA[i], feature) == 0)
-			return hrSuccess;
-	return MAPI_E_NOT_FOUND;
-}
-
-/** 
- * Checks if the given feature name is present in the MV list in the given prop
- * 
- * @param[in] feature check for this feature in the MV_STRING8 list in lpProps
- * @param[in] lpProps should be either PR_EC_(DIS/EN)ABLED_FEATURES_A
- * 
- * @return MAPI Error code
- */
-HRESULT hasFeature(const wchar_t *feature, const SPropValue *lpProps)
-{
-	if (!feature || !lpProps || PROP_TYPE(lpProps->ulPropTag) != PT_MV_UNICODE)
-		return MAPI_E_INVALID_PARAMETER;
-
-	for (ULONG i = 0; i < lpProps->Value.MVszW.cValues; ++i)
-		if (wcscasecmp(lpProps->Value.MVszW.lppszW[i], feature) == 0)
 			return hrSuccess;
 	return MAPI_E_NOT_FOUND;
 }
@@ -118,7 +97,7 @@ static HRESULT HrGetUserProp(IAddrBook *lpAddrBook, IMsgStore *lpStore,
  * 
  * @return Only return true if explicitly set in property
  */
-static bool checkFeature(const char *feature, IAddrBook *lpAddrBook,
+bool checkFeature(const char *feature, IAddrBook *lpAddrBook,
     IMsgStore *lpStore, ULONG ulPropTag)
 {
 	SPropValuePtr ptrProps;
@@ -130,11 +109,6 @@ static bool checkFeature(const char *feature, IAddrBook *lpAddrBook,
 	if (hr != hrSuccess)
 		return false;
 	return hasFeature(feature, ptrProps) == hrSuccess;
-}
-
-bool isFeatureDisabled(const char* feature, IAddrBook *lpAddrBook, IMsgStore *lpStore)
-{
-	return checkFeature(feature, lpAddrBook, lpStore, PR_EC_DISABLED_FEATURES_A);
 }
 
 } /* namespace */

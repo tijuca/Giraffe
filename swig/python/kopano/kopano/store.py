@@ -5,6 +5,7 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
+import json
 import uuid
 import sys
 
@@ -12,6 +13,8 @@ from MAPI import (
     MAPI_UNICODE, MAPI_MODIFY, KEEP_OPEN_READWRITE, PT_MV_BINARY,
     RELOP_EQ, TBL_BATCH, ECSTORE_TYPE_PUBLIC, FOLDER_SEARCH,
     MAPI_ASSOCIATED, MAPI_DEFERRED_ERRORS, ROW_REMOVE,
+    MAPINotifSink, fnevObjectModified, fnevObjectCreated,
+    fnevObjectMoved, fnevObjectDeleted
 )
 from MAPI.Defs import (
     bin2hex, HrGetOneProp, CHANGE_PROP_TYPE, PpropFindProp
@@ -34,30 +37,33 @@ from MAPI.Tags import (
     PR_WLINK_STORE_ENTRYID, PR_WLINK_TYPE, PR_WLINK_ENTRYID,
     PR_EXTENDED_FOLDER_FLAGS, PR_WB_SF_ID, PR_FREEBUSY_ENTRYIDS,
     PR_SCHDINFO_DELEGATE_ENTRYIDS, PR_SCHDINFO_DELEGATE_NAMES_W,
-    PR_DELEGATE_FLAGS, PR_MAPPING_SIGNATURE,
+    PR_DELEGATE_FLAGS, PR_MAPPING_SIGNATURE, PR_EC_WEBACCESS_SETTINGS_JSON
 )
 from MAPI.Struct import (
     SPropertyRestriction, SPropValue, ROWENTRY,
-    MAPIErrorNotFound, MAPIErrorInvalidEntryid
+    MAPIErrorNotFound, MAPIErrorInvalidEntryid,
+    MAPIErrorNoSupport
 )
 
 from .defs import (
-    RSF_PID_SUGGESTED_CONTACTS, RSF_PID_RSS_SUBSCRIPTION,
-    NAMED_PROPS_ARCHIVER
+    RSF_PID_SUGGESTED_CONTACTS, RSF_PID_TODO_SEARCH,
+    RSF_PID_RSS_SUBSCRIPTION, NAMED_PROPS_ARCHIVER
 )
 
-from .errors import NotFoundError
-from .base import Base
+from .errors import NotFoundError, NotSupportedError
+from .properties import Properties
 from .autoaccept import AutoAccept
 from .outofoffice import OutOfOffice
-from .prop import Property
+from .property_ import Property
 from .delegation import Delegation
 from .permission import Permission
 from .freebusy import FreeBusy
+from .table import Table
+from .restriction import Restriction
+from .notification import Sink, Notification
 
 from .compat import (
-    hex as _hex, unhex as _unhex, decode as _decode, encode as _encode,
-    repr as _repr
+    hex as _hex, unhex as _unhex, encode as _encode, repr as _repr,
 )
 
 if sys.hexversion >= 0x03000000:
@@ -79,7 +85,8 @@ else:
     import item as _item
     import utils as _utils
 
-class Store(Base):
+
+class Store(Properties):
     """Store class"""
 
     def __init__(self, guid=None, entryid=None, mapiobj=None, server=None):
@@ -95,28 +102,32 @@ class Store(Base):
 
         self.mapiobj = mapiobj
         # XXX: fails if store is orphaned and guid is given..
-        self._root = self.mapiobj.OpenEntry(None, None, 0)
+        self.__root = None
+
+    @property
+    def _root(self):
+        if self.__root is None:
+            self.__root = self.mapiobj.OpenEntry(None, None, 0)
+        return self.__root
 
     @property
     def entryid(self):
-        """ Store entryid """
-
+        """Store entryid"""
         return bin2hex(self.prop(PR_ENTRYID).value)
 
     @property
     def public(self):
+        """This is a public store."""
         return self.prop(PR_MDB_PROVIDER).mapiobj.Value == ZARAFA_STORE_PUBLIC_GUID
 
     @property
     def guid(self):
-        """ Store GUID """
-
+        """Store GUID"""
         return bin2hex(self.prop(PR_STORE_RECORD_KEY).value)
 
     @property
     def name(self):
-        """ User name ('public' for public store), or GUID """
-
+        """User name ('public' for public store), or GUID."""
         user = self.user
         if user:
             return user.name
@@ -127,12 +138,20 @@ class Store(Base):
 
     @property
     def hierarchyid(self):
+        """Hierarchy (database) id."""
         return self.prop(PR_EC_HIERARCHYID).value
 
     @property
-    def root(self):
-        """ :class:`Folder` designated as store root """
+    def webapp_settings(self):
+        """Webapp settings (JSON)."""
+        try:
+            return json.loads(self.user.store.prop(PR_EC_WEBACCESS_SETTINGS_JSON).value)
+        except NotFoundError:
+            pass
 
+    @property
+    def root(self):
+        """:class:`Folder` designated as store root."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -140,8 +159,7 @@ class Store(Base):
 
     @property
     def subtree(self):
-        """ :class:`Folder` designated as IPM.Subtree """
-
+        """:class:`Folder` designated as IPM.Subtree."""
         try:
             if self.public:
                 ipmsubtreeid = HrGetOneProp(self.mapiobj, PR_IPM_PUBLIC_FOLDERS_ENTRYID).Value
@@ -154,8 +172,7 @@ class Store(Base):
 
     @property
     def findroot(self):
-        """ :class:`Folder` designated as search-results root """
-
+        """:class:`Folder` designated as search-results root."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_FINDER_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -163,8 +180,7 @@ class Store(Base):
 
     @property
     def reminders(self):
-        """ :class:`Folder` designated as reminders """
-
+        """:class:`Folder` designated as reminders."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_REM_ONLINE_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -172,17 +188,21 @@ class Store(Base):
 
     @property
     def inbox(self):
-        """ :class:`Folder` designated as inbox """
-
+        """:class:`Folder` designated as inbox."""
         try:
             return _folder.Folder(self, _hex(self.mapiobj.GetReceiveFolder(u'IPM', MAPI_UNICODE)[0]))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
+    @inbox.setter
+    def inbox(self, folder):
+        # XXX can we get a list of current 'filters', or override all somehow?
+        for messageclass in (u'', u'IPM', u'REPORT.IPM'):
+            self.mapiobj.SetReceiveFolder(messageclass, MAPI_UNICODE, _unhex(folder.entryid))
+
     @property
     def junk(self):
-        """ :class:`Folder` designated as junk """
-
+        """:class:`Folder` designated as junk."""
         # PR_ADDITIONAL_REN_ENTRYIDS is a multi-value property, 4th entry is the junk folder
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_ADDITIONAL_REN_ENTRYIDS).Value[4]))
@@ -191,8 +211,7 @@ class Store(Base):
 
     @property
     def calendar(self):
-        """ :class:`Folder` designated as calendar """
-
+        """:class:`Folder` designated as calendar."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_APPOINTMENT_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -200,8 +219,7 @@ class Store(Base):
 
     @property
     def outbox(self):
-        """ :class:`Folder` designated as outbox """
-
+        """:class:`Folder` designated as outbox."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_OUTBOX_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -209,8 +227,7 @@ class Store(Base):
 
     @property
     def contacts(self):
-        """ :class:`Folder` designated as contacts """
-
+        """:class:`Folder` designated as contacts."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_CONTACT_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -218,8 +235,7 @@ class Store(Base):
 
     @property
     def common_views(self):
-        """ :class:`Folder` contains folders for managing views for the message store """
-
+        """:class:`Folder` contains folders for managing views for the message store."""
         try:
             return _folder.Folder(self, _hex(self.prop(PR_COMMON_VIEWS_ENTRYID).value))
         except NotFoundError:
@@ -227,8 +243,7 @@ class Store(Base):
 
     @property
     def drafts(self):
-        """ :class:`Folder` designated as drafts """
-
+        """:class:`Folder` designated as drafts."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_DRAFTS_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -236,8 +251,7 @@ class Store(Base):
 
     @property
     def wastebasket(self):
-        """ :class:`Folder` designated as wastebasket """
-
+        """:class:`Folder` designated as wastebasket."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_WASTEBASKET_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -245,8 +259,7 @@ class Store(Base):
 
     @property
     def journal(self):
-        """ :class:`Folder` designated as journal """
-
+        """:class:`Folder` designated as journal."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_JOURNAL_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -254,8 +267,7 @@ class Store(Base):
 
     @property
     def notes(self):
-        """ :class:`Folder` designated as notes """
-
+        """:class:`Folder` designated as notes."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_NOTE_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -263,8 +275,7 @@ class Store(Base):
 
     @property
     def sentmail(self):
-        """ :class:`Folder` designated as sentmail """
-
+        """:class:`Folder` designated as sentmail."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_SENTMAIL_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -272,8 +283,7 @@ class Store(Base):
 
     @property
     def tasks(self):
-        """ :class:`Folder` designated as tasks """
-
+        """:class:`Folder` designated as tasks."""
         try:
             return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_TASK_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
@@ -281,33 +291,57 @@ class Store(Base):
 
     @property
     def suggested_contacts(self):
-        """ :class`Folder` designated as Suggested contacts"""
-
+        """:class`Folder` designated as Suggested contacts."""
         try:
-            entryid = _utils.extract_ipm_ol2007_entryids(self.inbox.prop(PR_IPM_OL2007_ENTRYIDS).value, RSF_PID_SUGGESTED_CONTACTS)
-            return _folder.Folder(self, entryid)
+            return _folder.Folder(self, self._extract_ipm_ol2007_entryid(RSF_PID_SUGGESTED_CONTACTS))
+        except NotFoundError:
+            pass
+
+    @property
+    def todo_search(self):
+        """:class`Folder` designated as To-Do Search folder."""
+        try:
+            return _folder.Folder(self, self._extract_ipm_ol2007_entryid(RSF_PID_TODO_SEARCH))
         except NotFoundError:
             pass
 
     @property
     def rss(self):
-        """ :class`Folder` designated as RSS items"""
-
+        """:class`Folder` designated as RSS items."""
         try:
-            entryid = _utils.extract_ipm_ol2007_entryids(self.inbox.prop(PR_IPM_OL2007_ENTRYIDS).value, RSF_PID_RSS_SUBSCRIPTION)
-            return _folder.Folder(self, entryid)
+            return _folder.Folder(self, self._extract_ipm_ol2007_entryid(RSF_PID_RSS_SUBSCRIPTION))
         except NotFoundError:
             pass
 
-    def delete(self, objects):
-        """Delete properties, delegations or permissions from store.
+    def _extract_ipm_ol2007_entryid(self, offset):
+        #Extracts entryids from PR_IPM_OL2007_ENTRYIDS blob using logic from common/Util.cpp Util::ExtractAdditionalRenEntryID
+        blob = self.inbox.prop(PR_IPM_OL2007_ENTRYIDS).value
+        pos = 0
+        while True:
+            blocktype = _utils.unpack_short(blob, pos)
+            if blocktype == 0:
+                break
+            pos += 2
+
+            totallen = _utils.unpack_short(blob, pos)
+            pos += 2
+
+            if blocktype == offset:
+                pos += 2  # skip check
+                sublen = _utils.unpack_short(blob, pos)
+                pos += 2
+                return _hex(blob[pos:pos + sublen])
+            else:
+                pos += totallen
+        raise NotFoundError('entryid not found')
+
+    def delete(self, objects, soft=False):
+        """Delete properties, delegations, permissions, folders or items from store.
 
         :param props: The object(s) to delete
         """
-        if isinstance(objects, (Property, Delegation, Permission)):
-            objects = [objects]
-        else:
-            objects = list(objects)
+        objects = _utils.arg_objects(objects, (_folder.Folder, _item.Item, Property, Delegation, Permission), 'Store.delete')
+        # XXX directly delete inbox rule?
 
         props = [o for o in objects if isinstance(o, Property)]
         if props:
@@ -323,10 +357,21 @@ class Store(Base):
             acl_table = self.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, 0)
             acl_table.ModifyTable(0, [ROWENTRY(ROW_REMOVE, [SPropValue(PR_MEMBER_ID, perm.mapirow[PR_MEMBER_ID])])])
 
-    def folder(self, path=None, entryid=None, recurse=False, create=False):
-        """ Return :class:`Folder` with given path or entryid; raise exception if not found
+        others = [o for o in objects if isinstance(o, (_item.Item, _folder.Folder))]
+        if others:
+            self.root.delete(others, soft=soft)
 
+    def folder(self, path=None, entryid=None, recurse=False, create=False, guid=None):
+        """Return :class:`Folder` with given path/entryid.
+
+        :param path: The path of the folder
+        :param entryid: The entryid of the folder
+        :param create: Create folder if it doesn't exist
         """
+
+        if guid:
+            # 01 -> entryid format version, 03 -> object type (folder)
+            entryid = '00000000' + self.guid + '0100000003000000' + guid + '00000000'
 
         if entryid is not None:
             try:
@@ -337,37 +382,55 @@ class Store(Base):
         return self.subtree.folder(path, recurse=recurse, create=create)
 
     def get_folder(self, path=None, entryid=None):
-        """ Return :class:`folder <Folder>` with given name/entryid or *None* if not found """
+        """Return :class:`folder <Folder>` with given path/entryid or *None* if not found.
 
+        :param path: The path of the folder
+        :param entryid: The entryid of the folder
+        """
         try:
             return self.folder(path, entryid=entryid)
         except NotFoundError:
             pass
 
-    def folders(self, recurse=True, parse=True):
-        """ Return all :class:`folders <Folder>` in store
+    def create_folder(self, path=None, **kwargs):
+        """Create :class:`folder <Folder>` with given path.
+
+        :param path: The path of the folder
+        """
+        return self.subtree.create_folder(path, **kwargs)
+
+    def folders(self, recurse=True, parse=True, **kwargs):
+        """Return all :class:`folders <Folder>` in store.
 
         :param recurse: include all sub-folders
         :param system: include system folders
 
         """
-
         # parse=True
         if parse and getattr(self.server.options, 'folders', None):
             for path in self.server.options.folders:
-                yield self.folder(_decode(path)) # XXX can optparse output unicode?
+                yield self.folder(path)
             return
 
         if self.subtree:
-            for folder in self.subtree.folders(recurse=recurse):
+            for folder in self.subtree.folders(recurse=recurse, **kwargs):
                 yield folder
 
-    def item(self, entryid):
-        """ Return :class:`Item` with given entryid; raise exception of not found """ # XXX better exception?
+    def create_searchfolder(self, text=None): # XXX store.findroot.create_folder()?
+        mapiobj = self.findroot.mapiobj.CreateFolder(FOLDER_SEARCH, _encode(str(uuid.uuid4())), _encode('comment'), None, 0)
+        return _folder.Folder(self, mapiobj=mapiobj)
+
+    def item(self, entryid=None, guid=None):
+        """Return :class:`Item` with given entryid."""
 
         item = _item.Item() # XXX copy-pasting..
         item.store = self
         item.server = self.server
+
+        if guid:
+            # 01 -> entryid format version, 05 -> object type (message)
+            entryid = '00000000' + self.guid + '0100000005000000' + guid + '00000000'
+
         try:
             item.mapiobj = _utils.openentry_raw(self.mapiobj, _unhex(entryid), 0) # XXX soft-deleted item?
         except MAPIErrorNotFound:
@@ -376,18 +439,14 @@ class Store(Base):
 
     @property
     def size(self):
-        """ Store size """
-
+        """Store size."""
         return self.prop(PR_MESSAGE_SIZE_EXTENDED).value
 
     def config_item(self, name):
-        """
-        Retrieve the config item for the given `name`.
+        """Retrieve the config item for the given name.
 
         :param name: The config item name
-        Return :class:`Item` the config item
         """
-
         table = self.subtree.mapiobj.GetContentsTable(MAPI_DEFERRED_ERRORS | MAPI_ASSOCIATED)
         table.Restrict(SPropertyRestriction(RELOP_EQ, PR_SUBJECT, SPropValue(PR_SUBJECT, name)), 0)
         rows = table.QueryRows(1,0)
@@ -401,30 +460,28 @@ class Store(Base):
 
     @property
     def last_logon(self):
-        """ Return :datetime Last logon of a user on this store """
-
+        """Return :datetime Last logon of a user on this store."""
         return self.prop(PR_LAST_LOGON_TIME).value or None
 
     @property
     def last_logoff(self):
-        """ Return :datetime of the last logoff of a user on this store """
-
+        """Return :datetime of the last logoff of a user on this store."""
         return self.prop(PR_LAST_LOGOFF_TIME).value or None
 
     @property
     def outofoffice(self):
-        """ Return :class:`OutOfOffice` """
-
+        """Return :class:`OutOfOffice` settings."""
         # FIXME: If store is public store, return None?
         return OutOfOffice(self)
 
     @property
     def autoaccept(self):
+        """Return :class:`AutoAccept` settings."""
         return AutoAccept(self)
 
     @property
     def user(self):
-        """ Store :class:`owner <User>` """
+        """Store :class:`owner <User>`."""
         try:
             userid = HrGetOneProp(self.mapiobj, PR_MAILBOX_OWNER_ENTRYID).Value # XXX
             return _user.User(self.server.sa.GetUser(userid, MAPI_UNICODE).Username, self.server)
@@ -433,8 +490,7 @@ class Store(Base):
 
     @property
     def archive_store(self):
-        """ Archive :class:`Store` or *None* if not found """
-
+        """Archive :class:`Store`."""
         ids = self.mapiobj.GetIDsFromNames(NAMED_PROPS_ARCHIVER, 0) # XXX merge namedprops stuff
         PROP_STORE_ENTRYIDS = CHANGE_PROP_TYPE(ids[0], PT_MV_BINARY)
 
@@ -459,8 +515,7 @@ class Store(Base):
 
     @property
     def archive_folder(self):
-        """ Archive :class:`Folder` or *None* if not found """
-
+        """Archive :class:`Folder`."""
         ids = self.mapiobj.GetIDsFromNames(NAMED_PROPS_ARCHIVER, 0) # XXX merge namedprops stuff
         PROP_ITEM_ENTRYIDS = CHANGE_PROP_TYPE(ids[1], PT_MV_BINARY)
 
@@ -474,6 +529,7 @@ class Store(Base):
 
     @property
     def company(self):
+        """Store :class:`company <Company>`."""
         if self.server.multitenant:
             table = self.server.sa.OpenUserStoresTable(MAPI_UNICODE)
             table.Restrict(SPropertyRestriction(RELOP_EQ, PR_EC_STOREGUID, SPropValue(PR_EC_STOREGUID, _unhex(self.guid))), TBL_BATCH)
@@ -491,15 +547,12 @@ class Store(Base):
 
     @property
     def orphan(self):
+        """The store is orphaned."""
         if self.public:
             pubstore = self.company.public_store
             return (pubstore is None or pubstore.guid != self.guid)
         else:
             return (self.user.store is None or self.user.store.guid != self.guid)
-
-    def create_searchfolder(self, text=None): # XXX store.findroot.create_folder()?
-        mapiobj = self.findroot.mapiobj.CreateFolder(FOLDER_SEARCH, _encode(str(uuid.uuid4())), _encode('comment'), None, 0)
-        return _folder.Folder(self, mapiobj=mapiobj)
 
     def permissions(self):
         """Return all :class:`permissions <Permission>` set for this store."""
@@ -509,7 +562,7 @@ class Store(Base):
         """Return :class:`permission <Permission>` for user or group set for this store.
 
         :param member: user or group
-        :param create: create new permission for this store
+        :param create: create new permission for this user or group
         """
         return _utils.permission(self, member, create)
 
@@ -529,13 +582,23 @@ class Store(Base):
         return fbmsg, (entryids, names, flags)
 
     def delegations(self):
-        fbmsg, (entryids, names, flags) = self._fbmsg_delgs()
+        """Return all :class:`delegations <Delegation>`."""
+        _, (entryids, _, _) = self._fbmsg_delgs()
 
         for entryid in entryids.Value:
-            username = self.server.sa.GetUser(entryid, MAPI_UNICODE).Username
+            try:
+                username = self.server.sa.GetUser(entryid, MAPI_UNICODE).Username
+            except MAPIErrorNotFound:
+                raise NotFoundError("no user found with userid '%s'" % _hex(entryid))
             yield Delegation(self, self.server.user(username))
 
     def delegation(self, user, create=False, see_private=False):
+        """Return :class:`delegation <Delegation>` for user.
+
+        :param user: user
+        :param create: create new delegation for this user
+        :param see_private: user can see private items
+        """
         for delegation in self.delegations():
             if delegation.user == user:
                 return delegation
@@ -565,19 +628,21 @@ class Store(Base):
     def favorites(self):
         """Returns all favorite folders"""
 
-        table = self.common_views.mapiobj.GetContentsTable(MAPI_ASSOCIATED)
-        table.SetColumns([PR_MESSAGE_CLASS, PR_SUBJECT, PR_WLINK_ENTRYID, PR_WLINK_FLAGS, PR_WLINK_ORDINAL, PR_WLINK_STORE_ENTRYID, PR_WLINK_TYPE], 0)
-        table.Restrict(SPropertyRestriction(RELOP_EQ, PR_MESSAGE_CLASS, SPropValue(PR_MESSAGE_CLASS, "IPM.Microsoft.WunderBar.Link")), TBL_BATCH)
-
-        for row in table.QueryRows(-1, 0):
-            store_entryid = bin2hex(row[5].Value)
-
+        table = Table(
+            self.server,
+            self.mapiobj,
+            self.common_views.mapiobj.GetContentsTable(MAPI_ASSOCIATED),
+            restriction=Restriction(SPropertyRestriction(RELOP_EQ, PR_MESSAGE_CLASS,
+                                    SPropValue(PR_MESSAGE_CLASS, b"IPM.Microsoft.WunderBar.Link"))),
+            columns=[PR_WLINK_ENTRYID, PR_WLINK_STORE_ENTRYID],
+        )
+        for entryid, store_entryid in table:
             try:
                 if store_entryid == self.entryid: # XXX: Handle favorites from public stores
-                    yield self.folder(entryid=bin2hex(row[2].Value))
+                    yield self.folder(entryid=_hex(entryid.value))
                 else:
-                    store = Store(entryid=store_entryid, server=self.server)
-                    yield store.folder(entryid=bin2hex(row[2].Value))
+                    store = Store(entryid=_hex(store_entryid.value), server=self.server)
+                    yield store.folder(entryid=_hex(entryid.value))
             except NotFoundError:
                 pass
 
@@ -592,8 +657,7 @@ class Store(Base):
         return result
 
     def searches(self):
-        """Returns all permanent search folders """
-
+        """Return all permanent search folders."""
         findroot = self.root.folder('FINDER_ROOT') # XXX
 
         # extract special type of guid from search folder PR_EXTENDED_FOLDER_FLAGS to match against
@@ -632,12 +696,28 @@ class Store(Base):
 
     @property
     def freebusy(self):
+        """Return :class:`freebusy <Freebusy>` information."""
         return FreeBusy(self)
 
     def __eq__(self, s): # XXX check same server?
         if isinstance(s, Store):
             return self.guid == s.guid
         return False
+
+    def advise(self):
+        flags = fnevObjectModified | fnevObjectCreated \
+            | fnevObjectMoved | fnevObjectDeleted
+
+        sink = MAPINotifSink()
+        try:
+            self.mapiobj.Advise(None, flags, sink)
+        except MAPIErrorNoSupport:
+            raise NotSupportedError(
+                "No support for advise, please you use"
+                "server(notifications=True)"
+            )
+
+        return Sink(self, sink)
 
     def __ne__(self, s):
         return not self == s

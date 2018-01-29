@@ -38,7 +38,7 @@ ECFifoBuffer::ECFifoBuffer(size_type ulMaxSize)
  * @retval	erSuccess					The data was successfully written.
  * @retval	KCERR_INVALID_PARAMETER	lpBuf is NULL.
  * @retval	KCERR_NOT_ENOUGH_MEMORY	There was not enough memory available to store the data.
- * @retval	KCERR_TIMEOUT			Not all data was writting within the specified time limit.
+ * @retval	KCERR_TIMEOUT			Not all data was written within the specified time limit.
  *										The amount of data that was written is returned in lpcbWritten.
  * @retval	KCERR_NETWORK_ERROR		The buffer was closed prior to this call.
  */
@@ -46,7 +46,6 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 {
 	ECRESULT			er = erSuccess;
 	size_type			cbWritten = 0;
-	struct timespec		deadline = {0};
 	auto lpData = reinterpret_cast<const unsigned char *>(lpBuf);
 
 	if (lpBuf == NULL)
@@ -60,9 +59,6 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 			*lpcbWritten = 0;
 		return erSuccess;
 	}
-
-	if (ulTimeoutMs > 0)
-		deadline = GetDeadline(ulTimeoutMs);
 
 	ulock_normal locker(m_hMutex);
 	while (cbWritten < cbBuf) {
@@ -112,14 +108,13 @@ exit:
  *
  * @retval	erSuccess					The data was successfully written.
  * @retval	KCERR_INVALID_PARAMETER	lpBuf is NULL.
- * @retval	KCERR_TIMEOUT			Not all data was writting within the specified time limit.
+ * @retval	KCERR_TIMEOUT			Not all data was written within the specified time limit.
  *										The amount of data that was written is returned in lpcbWritten.
  */
 ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeoutMs, size_type *lpcbRead)
 {
 	ECRESULT		er = erSuccess;
 	size_type		cbRead = 0;
-	struct timespec	deadline = {0};
 	auto lpData = reinterpret_cast<unsigned char *>(lpBuf);
 
 	if (lpBuf == NULL)
@@ -134,9 +129,6 @@ ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeout
 		return erSuccess;
 	}
 
-	if (ulTimeoutMs > 0)
-		deadline = GetDeadline(ulTimeoutMs);
-	
 	ulock_normal locker(m_hMutex);
 	while (cbRead < cbBuf) {
 		while (IsEmpty()) {

@@ -32,7 +32,6 @@
 #include "kcore.hpp"
 #include "Mem.h"
 
-#include "DLLGlobal.h"
 #include "ECMSProvider.h"
 #include "ECABProvider.h"
 #include <iostream>
@@ -51,14 +50,18 @@
 
 #include "SSLUtil.h"
 #include "ClientUtil.h"
-#include "SymmetricCrypt.h"
 
 #include "EntryPoint.h"
 
 #include <kopano/charset/convstring.h>
 
-using namespace std;
 using namespace KCHL;
+
+extern LPMALLOC _pmalloc;
+extern LPALLOCATEBUFFER _pfnAllocBuf;
+extern LPALLOCATEMORE _pfnAllocMore;
+extern LPFREEBUFFER _pfnFreeBuf;
+extern HINSTANCE _hInstance;
 
 struct initprov {
 	IProviderAdmin *provadm;
@@ -79,15 +82,7 @@ typedef KCHL::object_ptr<IProfSect> ProfSectPtr;
 static const uint32_t MAPI_S_SPECIAL_OK = MAKE_MAPI_S(0x900);
 
 // Client wide variable
-tstring		g_strCommonFilesKopano;
-tstring		g_strUserLocalAppDataKopano;
-tstring		g_strKopanoDirectory;
-
-tstring		g_strManufacturer;
 tstring		g_strProductName;
-tstring		g_strProductNameShort;
-bool		g_isOEM;
-ULONG		g_ulLoadsim;
 
 // Map of msprovider with Profilename as key
 ECMapProvider	g_mapProviders;
@@ -97,14 +92,7 @@ class CKopanoApp {
 public:
     CKopanoApp() {
         ssl_threading_setup();
-		g_strManufacturer = KC_T("Kopano");
 		g_strProductName = KC_T("Kopano Core");
-		g_isOEM = false;
-		g_ulLoadsim = FALSE;
-
-		// FIXME for offline
-		// - g_strUserLocalAppDataKopano = ~/kopano ?
-		// - g_strKopanoDirectory = /usr/bin/ ?
     }
     ~CKopanoApp() {
         ssl_threading_cleanup();
@@ -119,11 +107,9 @@ static HRESULT RemoveAllProviders(ECMapProvider *mp)
 {
 	if (mp == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	for (const auto &p : *mp) {
-		if (p.second.lpMSProviderOnline)
-			p.second.lpMSProviderOnline->Release();
-		if (p.second.lpABProviderOnline)
-			p.second.lpABProviderOnline->Release();
+	for (auto &p : *mp) {
+		p.second.lpMSProviderOnline.reset();
+		p.second.lpABProviderOnline.reset();
 	}
 	return hrSuccess;
 }
@@ -520,7 +506,7 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 		return hr;
 
 	// Get the rows
-	hr = ptrTable->QueryRows(0xFF, 0, &ptrRows);
+	hr = ptrTable->QueryRows(0xFF, 0, &~ptrRows);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -531,7 +517,7 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 	// Scan the rows for message stores
 	for (ULONG curRow = 0; curRow < ptrRows.size(); ++curRow) {
 		//Get de UID of the provider to open the profile section
-		auto lpsProviderUID = PCpropFindProp(ptrRows[curRow].lpProps, ptrRows[curRow].cValues, PR_PROVIDER_UID);
+		auto lpsProviderUID = ptrRows[curRow].cfind(PR_PROVIDER_UID);
 		if(lpsProviderUID == NULL || lpsProviderUID->Value.bin.cb == 0) {
 			// Provider without a provider uid,  just move to the next
 			assert(false);
@@ -570,7 +556,6 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 	std::wstring	strUserName;
 	std::wstring	strUserPassword;
 	std::string		strServerPort;
-	std::string		strDefaultOfflinePath;
 	std::string		strType;
 	std::string		strDefStoreServer;
 	sGlobalProfileProps	sProfileProps;
@@ -582,8 +567,6 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 	object_ptr<WSTransport> lpTransport;
 	memory_ptr<SPropValue> lpsPropValue;
 	bool			bShowDialog = false;
-
-	MAPIERROR		*lpMapiError = NULL;
 	memory_ptr<BYTE> lpDelegateStores;
 	ULONG			cDelegateStores = 0;
 	convert_context	converter;
@@ -605,7 +588,6 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 
 	// Logon defaults
 	strType = "http";
-	strServerName = "";
 	strServerPort ="236";
 
 	switch(ulContext) {
@@ -699,7 +681,7 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 			// On incorrect password, and UI allowed, show incorrect password error
 			if((ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS)) {
 				// what do we do on linux?
-				cout << "Access Denied: Incorrect username and/or password." << endl;
+				std::cout << "Access Denied: Incorrect username and/or password." << std::endl;
 				hr = MAPI_E_UNCONFIGURED;
 				goto exit2;
 			}else if(!(ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS)){

@@ -84,12 +84,33 @@ static const struct _sLocalNames {
 
 #define SERVER_NAMED_OFFSET	0x8500
 
-ECNamedProp::ECNamedProp(WSTransport *lpTransport)
+/**
+ * Sort function
+ *
+ * It does not really matter *how* it sorts, as long as it is reproduceable.
+ */
+bool ltmap::operator()(const MAPINAMEID *a, const MAPINAMEID *b) const noexcept
 {
-	this->lpTransport = lpTransport;
-
-	lpTransport->AddRef();
+	auto r = memcmp(a->lpguid, b->lpguid, sizeof(GUID));
+	if (r < 0)
+		return false;
+	if (r > 0)
+		return true;
+	if (a->ulKind != b->ulKind)
+		return a->ulKind > b->ulKind;
+	switch (a->ulKind) {
+	case MNID_ID:
+		return a->Kind.lID > b->Kind.lID;
+	case MNID_STRING:
+		return wcscmp(a->Kind.lpwstrName, b->Kind.lpwstrName) < 0;
+	default:
+		return false;
+	}
 }
+
+ECNamedProp::ECNamedProp(WSTransport *tp) :
+	lpTransport(tp)
+{}
 
 ECNamedProp::~ECNamedProp()
 {
@@ -97,11 +118,11 @@ ECNamedProp::~ECNamedProp()
 	for (const auto &p : mapNames)
 		if (p.first)
 			ECFreeBuffer(p.first);
-	if(lpTransport)
-		lpTransport->Release();
 }
 
-HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
+HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
+    const GUID *lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames,
+    MAPINAMEID ***lpppPropNames)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i = 0;
@@ -272,7 +293,8 @@ HRESULT ECNamedProp::ResolveLocal(MAPINAMEID *lpName, ULONG *ulPropTag)
 	return MAPI_E_NOT_FOUND;
 }
 
-HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
+HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, const GUID *lpGuid,
+    ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	HRESULT hr = MAPI_E_NOT_FOUND;
 
@@ -291,7 +313,8 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 	return hr;
 }
 
-HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
+HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, const GUID *lpGuid,
+    ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	MAPINAMEID*	lpName = NULL; 
 
@@ -409,7 +432,7 @@ HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void
 	*lppDst = lpDst;
 
 exit:
-	if(hr != hrSuccess && !lpBase && lpDst)
+	if (hr != hrSuccess && lpBase == nullptr)
 		ECFreeBuffer(lpDst);
 
 	return hr;

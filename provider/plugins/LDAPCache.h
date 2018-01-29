@@ -39,9 +39,7 @@ class LDAPUserPlugin;
  */
 
 
-/**
- * Cache type, std::string is LDAP DN sting
- */
+/* Cache type, std::string is LDAP DN string */
 typedef std::map<objectid_t, std::string> dn_cache_t;
 typedef std::list<std::string> dn_list_t;
 
@@ -53,14 +51,12 @@ class LDAPCache _kc_final {
 private:
 	/* Protect mutex from being overriden */
 	std::recursive_mutex m_hMutex;
-	std::unique_ptr<dn_cache_t> m_lpCompanyCache;		/* CONTAINER_COMPANY */
-	std::unique_ptr<dn_cache_t> m_lpGroupCache;		/* OBJECTCLASS_DISTLIST */
-	std::unique_ptr<dn_cache_t> m_lpUserCache;		/* OBJECTCLASS_USER */
-	std::unique_ptr<dn_cache_t> m_lpAddressListCache; /* CONTAINER_ADDRESSLIST */
+	dn_cache_t m_lpCompanyCache; /* CONTAINER_COMPANY */
+	dn_cache_t m_lpGroupCache; /* OBJECTCLASS_DISTLIST */
+	dn_cache_t m_lpUserCache; /* OBJECTCLASS_USER */
+	dn_cache_t m_lpAddressListCache; /* CONTAINER_ADDRESSLIST */
 
 public:
-	LDAPCache();
-
 	/**
 	 * Check if the requested objclass class is cached.
 	 *
@@ -78,7 +74,7 @@ public:
 	 * @param[in]	lpCache
 	 *					The data to add to the cache.
 	 */
-	void setObjectDNCache(objectclass_t objclass, std::unique_ptr<dn_cache_t> lpCache);
+	void setObjectDNCache(objectclass_t objclass, dn_cache_t &&);
 
 	/**
 	 * Obtain the cached data
@@ -90,7 +86,7 @@ public:
 	 *						The objectclass for which the cache is requested
 	 * @return The cache data
 	 */
-	std::unique_ptr<dn_cache_t> getObjectDNCache(LDAPUserPlugin *lpPlugin, objectclass_t objclass);
+	dn_cache_t getObjectDNCache(LDAPUserPlugin *, objectclass_t);
 
 	/**
 	 * Helper function: Search the cache for the direct parent for a DN.
@@ -102,7 +98,7 @@ public:
 	 *					The DN for which the parent should be found.
 	 * @return The cache entry of the parent. Contents will be empty if no parent was found.
 	 */
-	static objectid_t getParentForDN(const std::unique_ptr<dn_cache_t> &lpCache, const std::string &dn);
+	static objectid_t getParentForDN(const dn_cache_t &, const std::string &dn);
 
 	/**
 	 * Helper function: List all DNs which are hierarchially below the given DN.
@@ -113,7 +109,7 @@ public:
 	 *					The DN for which the children should be found
 	 * @return The list of children for the DN
 	 */
-	static std::unique_ptr<dn_list_t> getChildrenForDN(const std::unique_ptr<dn_cache_t> &lpCache, const std::string &dn);
+	static dn_list_t getChildrenForDN(const dn_cache_t &, const std::string &dn);
 
 	/**
 	 * Search the cache to obtain the DN for an object based on the object id.
@@ -124,7 +120,7 @@ public:
 	 *					The objectid which should be found in the cache
 	 * @return the DN for the object id
 	 */
-	static std::string getDNForObject(const std::unique_ptr<dn_cache_t> &lpCache, const objectid_t &externid);
+	static std::string getDNForObject(const dn_cache_t &, const objectid_t &externid);
 
 	/**
 	 * Check if the given DN is present in the DN list
@@ -135,7 +131,7 @@ public:
 	 *					The DN which should be found in the list
 	 * @return TRUE if the DN is found in the list
 	 */
-	static bool isDNInList(const std::unique_ptr<dn_list_t> &lpList, const std::string &dn);
+	static bool isDNInList(const dn_list_t &, const std::string &dn);
 };
 
 /** @} */

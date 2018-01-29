@@ -1,4 +1,4 @@
-	/*
+/*
  * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -14,10 +14,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#include <iostream>
 #include <new>
+#include <string>
+#include <cerrno>
+#include <cstring>
 #include "config.h"
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
+#include <kopano/ECChannel.h>
 #include <kopano/ecversion.h>
 #include <kopano/stringutil.h>
 
@@ -57,8 +62,6 @@
 #include "ECICS.h"
 #include <openssl/ssl.h>
 
-using namespace std;
-
 // The following value is based on:
 // http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html#sysvar_thread_stack
 // Since the remote MySQL server can be 32 or 64 bit we'll just go with the value specified
@@ -69,30 +72,30 @@ using namespace std;
 // have to go with the safe value which is for 64-bit.
 #define MYSQL_MIN_THREAD_STACK (256*1024)
 
+using std::cout;
+using std::endl;
+using std::string;
+
 static const char upgrade_lock_file[] = "/tmp/kopano-upgrade-lock";
-
-// Reports information on the current state of the license
-void* ReportLicense(void *);
-
-static int running_server(char *, const char *, int, char **, int, char **);
-
 static int g_Quit = 0;
 static int daemonize = 1;
 static int restart_searches = 0;
 static bool m_bIgnoreDatabaseVersionConflict = false;
 static bool m_bIgnoreAttachmentStorageConflict = false;
-static bool m_bIgnoreDistributedKopanoConflict = false;
 static bool m_bForceDatabaseUpdate = false;
 static bool m_bIgnoreUnknownConfigOptions = false;
 static bool m_bIgnoreDbThreadStackSize = false;
 static pthread_t mainthread;
 
 ECConfig*			g_lpConfig = NULL;
+static bool g_listen_http, g_listen_https, g_listen_pipe;
 static ECLogger *g_lpLogger = nullptr;
 static ECLogger *g_lpAudit = nullptr;
 static ECScheduler *g_lpScheduler = nullptr;
 static ECSoapServerConnection *g_lpSoapServerConn = nullptr;
 static bool m_bDatabaseUpdateIgnoreSignals = false;
+
+static int running_server(char *, const char *, bool, int, char **, int, char **);
 
 // This is the callback function for libserver/* so that it can notify that a delayed soap
 // request has been handled.
@@ -242,38 +245,12 @@ static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 	for (int i = 0; i < ATTACH_PATHDEPTH_LEVEL1; ++i)
 		for (int j = 0; j < ATTACH_PATHDEPTH_LEVEL2; ++j) {
 			string path = (string)g_lpConfig->GetSetting("attachment_path") + PATH_SEPARATOR + stringify(i) + PATH_SEPARATOR + stringify(j);
-			CreatePath(path.c_str());
+			auto ret = CreatePath(path.c_str());
+			if (ret != 0) {
+				ec_log_err("Cannot create %s: %s", path.c_str(), strerror(errno));
+				return MAPI_E_UNABLE_TO_COMPLETE;
+			}
 		}
-	return erSuccess;
-}
-
-static ECRESULT check_distributed_kopano(ECDatabase *lpDatabase)
-{
-	ECRESULT er = erSuccess;
-	string strQuery;
-	DB_RESULT lpResult;
-	DB_ROW lpRow = NULL;
-	bool bConfigEnabled = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
-
-	er = lpDatabase->DoSelect("SELECT value FROM settings WHERE name = 'lock_distributed_kopano'", &lpResult);
-	if (er != erSuccess) {
-		ec_log_err("Unable to read from database");
-		return er;
-	}
-
-	lpRow = lpResult.fetch_row();
-	// If no value is found in the database any setting is valid
-	if (lpRow == NULL || lpRow[0] == NULL) 
-		return er;
-
-	// If any value is found, distributed is not allowed. The value specifies the reason.
-	if (bConfigEnabled) {
-		if (!m_bIgnoreDistributedKopanoConflict) {
-			ec_log_crit("Multiserver mode is locked, reason: '%s'. Contact Kopano for support.", lpRow[0]);
-			return KCERR_DATABASE_ERROR;
-		}
-		ec_log_warn("Ignoring multiserver mode lock as requested.");
-	}
 	return erSuccess;
 }
 
@@ -410,8 +387,6 @@ static ECRESULT check_server_fqdn(void)
 	ECRESULT er = erSuccess;
 	int rc;
 	char hostname[256] = {0};
-	struct sockaddr_in saddr = {0};
-	struct addrinfo hints = {0};
 	struct addrinfo *aiResult = NULL;
 	const char *option;
 
@@ -425,18 +400,13 @@ static ECRESULT check_server_fqdn(void)
 		return KCERR_NOT_FOUND;
 
 	// if we exit hereon after, hostname will always contain a correct hostname, which we can set in the config.
-
-	rc = getaddrinfo(hostname, NULL, &hints, &aiResult);
+	rc = getaddrinfo(hostname, nullptr, nullptr, &aiResult);
 	if (rc != 0) {
 		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
-
-	// no need to set other contents of saddr struct, we're just intrested in the DNS lookup.
-	saddr = *((sockaddr_in*)aiResult->ai_addr);
-
 	// Name lookup is required, so set that flag
-	rc = getnameinfo((const sockaddr*)&saddr, sizeof(saddr), hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD);
+	rc = getnameinfo(aiResult->ai_addr, aiResult->ai_addrlen, hostname, sizeof(hostname), nullptr, 0, NI_NAMEREQD);
 	if (rc != 0) {
 		er = KCERR_NOT_FOUND;
 		goto exit;
@@ -479,22 +449,20 @@ static ECRESULT check_server_configuration(void)
 		ec_log_err("WARNING: Unable to find FQDN, please specify in 'server_hostname'. Now using '%s'.", g_lpConfig->GetSetting("server_hostname"));
 
 	// all other checks are only required for multi-server environments
-	bCheck = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
-	if (!bCheck)
-		goto exit;
+	if (!parseBool(g_lpConfig->GetSetting("enable_distributed_kopano")))
+		return erSuccess;
 	
 	strServerName = g_lpConfig->GetSetting("server_name");
 	if (strServerName.empty()) {
 		ec_log_crit("ERROR: No 'server_name' specified while operating in multiserver mode.");
-		er = KCERR_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 		// unable to check any other server details if we have no name, skip other tests
-		goto exit;
 	}
 
 	er = g_lpSessionManager->CreateSessionInternal(&lpecSession);
 	if (er != erSuccess) {
 		ec_log_crit("Internal error 0x%08x while checking distributed configuration", er);
-		goto exit;
+		return er;
 	}
 
 	lpecSession->Lock();
@@ -507,7 +475,7 @@ static ECRESULT check_server_configuration(void)
 	}
 		
 	// Check the various connection parameters for consistency
-	if (parseBool(g_lpConfig->GetSetting("server_pipe_enabled")) == true) {
+	if (g_listen_pipe) {
 		if (sServerDetails.GetFilePath().empty()) {
 			ec_log_warn("WARNING: 'server_pipe_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
@@ -521,7 +489,7 @@ static ECRESULT check_server_configuration(void)
 		bHaveErrors = true;
 	}
 	
-	if (parseBool(g_lpConfig->GetSetting("server_tcp_enabled")) == true) {
+	if (g_listen_http) {
 		if (sServerDetails.GetHttpPath().empty()) {
 			ec_log_warn("WARNING: 'server_tcp_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
@@ -537,7 +505,7 @@ static ECRESULT check_server_configuration(void)
 		bHaveErrors = true;
 	}
 	
-	if (parseBool(g_lpConfig->GetSetting("server_ssl_enabled")) == true) {
+	if (g_listen_https) {
 		if (sServerDetails.GetSslPath().empty()) {
 			ec_log_warn("WARNING: 'server_ssl_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
@@ -554,11 +522,8 @@ static ECRESULT check_server_configuration(void)
 	}	
 	
 exit:
-	if (lpecSession) {
-		lpecSession->Unlock();
-		g_lpSessionManager->RemoveSessionInternal(lpecSession);
-	}
-
+	lpecSession->Unlock();
+	g_lpSessionManager->RemoveSessionInternal(lpecSession);
 	// we could return an error when bHaveErrors is set, but we currently find this not fatal as a sysadmin might be smarter than us.
 	if (bHaveErrors)
  		ec_log_warn("WARNING: Inconsistencies detected between local and LDAP based configuration.");
@@ -624,7 +589,7 @@ static int kc_reexec_with_allocator(char **argv, const char *lib)
 	setenv("KC_ALLOCATOR_DONE", lib, true);
 
 	/* Resolve "exe" symlink before exec to please the sysadmin */
-	std::vector<char> linkbuf(16);
+	std::vector<char> linkbuf(16); /* mutable std::string::data is C++17 only */
 	ssize_t linklen;
 	while (true) {
 		linklen = readlink("/proc/self/exe", &linkbuf[0], linkbuf.size());
@@ -650,6 +615,7 @@ int main(int argc, char* argv[])
 	int nReturn = 0;
 	const char *config = ECConfig::GetDefaultPath("server.cfg");
 	const char *default_config = config;
+	bool exp_config = false;
 
 	enum {
 		OPT_HELP = UCHAR_MAX + 1,
@@ -687,6 +653,7 @@ int main(int argc, char* argv[])
 		case 'c':
 		case OPT_CONFIG:
 			config = optarg;
+			exp_config = true;
 			break;
 		case OPT_HELP:
 			cout << "kopano-server " PROJECT_VERSION;
@@ -729,7 +696,7 @@ int main(int argc, char* argv[])
 			break;
 		};
 	}
-	nReturn = running_server(argv[0], config, argc, argv,
+	nReturn = running_server(argv[0], config, exp_config, argc, argv,
 	          argc - optind, &argv[optind]);
 	return nReturn;
 }
@@ -743,7 +710,73 @@ static void InitBindTextDomain(void)
 	bind_textdomain_codeset("kopano", "UTF-8");
 }
 
-static int running_server(char *szName, const char *szConfig,
+static int ksrv_listen_inet(ECSoapServerConnection *ssc, ECConfig *cfg)
+{
+	/* Modern directives */
+	auto http_sock  = kc_parse_bindaddrs(cfg->GetSetting("server_listen"), 236);
+	auto https_sock = kc_parse_bindaddrs(cfg->GetSetting("server_listen_tls"), 237);
+
+	/* Historic directives */
+	if (strcmp(g_lpConfig->GetSetting("server_tcp_enabled"), "yes") == 0) {
+		auto addr = cfg->GetSetting("server_bind");
+		auto port = cfg->GetSetting("server_tcp_port");
+		if (port[0] != '\0')
+			http_sock.emplace(addr, strtoul(port, nullptr, 10));
+	}
+	if (strcmp(g_lpConfig->GetSetting("server_ssl_enabled"), "yes") == 0) {
+		auto addr = cfg->GetSetting("server_bind");
+		auto port = cfg->GetSetting("server_ssl_port");
+		if (port[0] != '\0')
+			https_sock.emplace(addr, strtoul(port, nullptr, 10));
+	}
+
+	/* Launch */
+	for (const auto &spec : http_sock) {
+		auto er = ssc->ListenTCP(spec.first.c_str(), spec.second);
+		if (er != erSuccess)
+			return er;
+	}
+
+	auto keyfile = cfg->GetSetting("server_ssl_key_file", "", nullptr);
+	auto keypass = cfg->GetSetting("server_ssl_key_pass", "", nullptr);
+	auto cafile  = cfg->GetSetting("server_ssl_ca_file", "", nullptr);
+	auto capath  = cfg->GetSetting("server_ssl_ca_path", "", nullptr);
+	for (const auto &spec : https_sock) {
+		auto er = ssc->ListenSSL(spec.first.c_str(), spec.second,
+		          keyfile, keypass, cafile, capath);
+		if (er != erSuccess)
+			return er;
+	}
+	g_listen_http  = !http_sock.empty();
+	g_listen_https = !https_sock.empty();
+	return erSuccess;
+}
+
+static int ksrv_listen_pipe(ECSoapServerConnection *ssc, ECConfig *cfg)
+{
+	/*
+	 * Priority queue is always enabled, create as first socket, so this
+	 * socket is returned first too on activity. [This is no longer true…
+	 * need to create INET sockets beforehand because of privilege drop.]
+	 */
+	for (const auto &spec : tokenize(cfg->GetSetting("server_pipe_priority"), ' ', true)) {
+		auto er = ssc->ListenPipe(spec.c_str(), true);
+		if (er != erSuccess)
+			return er;
+	}
+	if (strcmp(g_lpConfig->GetSetting("server_pipe_enabled"), "yes") == 0) {
+		auto pipe_sock = tokenize(cfg->GetSetting("server_pipe_name"), ' ', true);
+		for (const auto &spec : pipe_sock) {
+			auto er = ssc->ListenPipe(spec.c_str(), false);
+			if (er != erSuccess)
+				return er;
+		}
+		g_listen_pipe = !pipe_sock.empty();
+	}
+	return erSuccess;
+}
+
+static int running_server(char *szName, const char *szConfig, bool exp_config,
     int argc, char **argv, int trim_argc, char **trim_argv)
 {
 	int retval = -1;
@@ -753,9 +786,6 @@ static int running_server(char *szName, const char *szConfig,
 	std::string		dbError;
 
 	// Connections
-	bool			bSSLEnabled = false;
-	bool			bPipeEnabled = false;
-	bool			bTCPEnabled = false;
 	bool			hosted = false;
 	bool			distributed = false;
 
@@ -778,14 +808,14 @@ static int running_server(char *szName, const char *szConfig,
 		// server connections
 		{ "server_bind",				"" },
 		{"server_tcp_port", "236", CONFIGSETTING_NONEMPTY},
-		{"server_tcp_enabled", "yes", CONFIGSETTING_NONEMPTY},
+		{"server_tcp_enabled", "no", CONFIGSETTING_NONEMPTY},
 		{"server_pipe_enabled", "yes", CONFIGSETTING_NONEMPTY},
 		{"server_pipe_name", KOPANO_SERVER_PIPE, CONFIGSETTING_NONEMPTY},
 		{"server_pipe_priority", KOPANO_SERVER_PRIO, CONFIGSETTING_NONEMPTY},
 		{ "server_recv_timeout",		"5", CONFIGSETTING_RELOADABLE },	// timeout before reading next XML request
 		{ "server_read_timeout",		"60", CONFIGSETTING_RELOADABLE }, // timeout during reading of XML request
 		{ "server_send_timeout",		"60", CONFIGSETTING_RELOADABLE },
-		{ "server_max_keep_alive_requests",	"100" },
+		{"server_max_keep_alive_requests", "100", CONFIGSETTING_UNUSED},
 		{"thread_stacksize", "512", CONFIGSETTING_UNUSED},
 		{ "allow_local_users",			"yes", CONFIGSETTING_RELOADABLE },			// allow any user connect through the Unix socket
 		{ "local_admin_users",			"root", CONFIGSETTING_RELOADABLE },			// this local user is admin
@@ -813,6 +843,8 @@ static int running_server(char *szName, const char *szConfig,
 #endif
 		{"server_ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL", CONFIGSETTING_RELOADABLE},
 		{"server_ssl_prefer_server_ciphers", "no", CONFIGSETTING_RELOADABLE},
+		{"server_listen", ""},
+		{"server_listen_tls", ""},
 		{ "sslkeys_path",				"/etc/kopano/sslkeys" },	// login keys
 		// Database options
 		{ "database_engine",			"mysql" },
@@ -879,7 +911,7 @@ static int running_server(char *szName, const char *szConfig,
 		{ "cache_store_size",			"1M", CONFIGSETTING_SIZE },		// 1Mb, store table cache (storeid, storeguid), 40 bytes
 		{ "cache_server_size",			"1M", CONFIGSETTING_SIZE },		// 1Mb
 		{ "cache_server_lifetime",		"30" },							// 30 minutes
-		// default no quota's. Note: quota values are in Mb, and thus have no size flag.
+		/* Default no quotas. Note: quota values are in Mb, and thus have no size flag. */
 		{ "quota_warn",				"0", CONFIGSETTING_RELOADABLE },
 		{ "quota_soft",				"0", CONFIGSETTING_RELOADABLE },
 		{ "quota_hard",				"0", CONFIGSETTING_RELOADABLE },
@@ -927,7 +959,7 @@ static int running_server(char *szName, const char *szConfig,
 		{ "max_deferred_records_folder", "20", CONFIGSETTING_RELOADABLE },
 		{ "enable_test_protocol",		"no", CONFIGSETTING_RELOADABLE },
 		{ "disabled_features", "imap pop3", CONFIGSETTING_RELOADABLE },
-		{ "counter_reset", "yes", CONFIGSETTING_RELOADABLE },
+		{ "counter_reset", "", CONFIGSETTING_UNUSED },
 		{ "mysql_group_concat_max_len", "21844", CONFIGSETTING_RELOADABLE },
 		{ "restrict_admin_permissions", "no", 0 },
 		{"embedded_attachment_limit", "20", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
@@ -952,7 +984,7 @@ static int running_server(char *szName, const char *szConfig,
 	// Load settings
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	
-	if (!g_lpConfig->LoadSettings(szConfig) ||
+	if (!g_lpConfig->LoadSettings(szConfig, !exp_config) ||
 	    g_lpConfig->ParseParams(trim_argc, trim_argv) < 0 ||
 	    (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
 		/* Create info logger without a timestamp to stderr. */
@@ -979,8 +1011,7 @@ static int running_server(char *szName, const char *szConfig,
 	ec_log_set(g_lpLogger);
 	if (m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())
 		LogConfigErrors(g_lpConfig);
-
-	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+	if (!TmpPath::instance.OverridePath(g_lpConfig))
 		ec_log_err("Ignoring invalid path-setting!");
 
 	g_lpAudit = CreateLogger(g_lpConfig, szName, "KopanoServer", true);
@@ -989,7 +1020,7 @@ static int running_server(char *szName, const char *szConfig,
 	else
 		ec_log_info("Audit logging not enabled.");
 
-	ec_log_info("Starting kopano-server version " PROJECT_VERSION " (pid %d)", getpid());
+	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-server version " PROJECT_VERSION " (pid %d)", getpid());
 	if (g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
 
@@ -1037,48 +1068,15 @@ static int running_server(char *szName, const char *szConfig,
 	kopano_get_server_stats = kcsrv_get_server_stats;
 	kopano_initlibrary(g_lpConfig->GetSetting("mysql_database_path"), g_lpConfig->GetSetting("mysql_config_file"));
 
-	if(!strcmp(g_lpConfig->GetSetting("server_pipe_enabled"), "yes"))
-		bPipeEnabled = true;
-	else
-		bPipeEnabled = false;
-
-	if(!strcmp(g_lpConfig->GetSetting("server_tcp_enabled"), "yes"))
-		bTCPEnabled = true;
-	else
-		bTCPEnabled = false;
-
-	if(!strcmp(g_lpConfig->GetSetting("server_ssl_enabled"), "yes"))
-		bSSLEnabled = true;
-	else
-		bSSLEnabled = false;
-
     soap_ssl_init(); // Always call this in the main thread once!
 
     ssl_threading_setup();
 
 	// setup connection handler
 	g_lpSoapServerConn = new ECSoapServerConnection(g_lpConfig);
-
-	// Setup a TCP connection
-	if (bTCPEnabled)
-	{
-		er = g_lpSoapServerConn->ListenTCP(g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("server_tcp_port")));
-		if (er != erSuccess)
-			goto exit;
-	}
-
-	// Setup SSL connection
-	if (bSSLEnabled) {
-		er = g_lpSoapServerConn->ListenSSL(g_lpConfig->GetSetting("server_bind"),		// servername
-							atoi(g_lpConfig->GetSetting("server_ssl_port")),		// sslPort
-							g_lpConfig->GetSetting("server_ssl_key_file","",NULL),	// key file
-							g_lpConfig->GetSetting("server_ssl_key_pass","",NULL),	// key password
-							g_lpConfig->GetSetting("server_ssl_ca_file","",NULL),	// CA certificate file which signed clients
-							g_lpConfig->GetSetting("server_ssl_ca_path","",NULL)	// CA certificate path of thrusted sources
-							);
-		if (er != erSuccess)
-			goto exit;
-	}
+	er = ksrv_listen_inet(g_lpSoapServerConn, g_lpConfig);
+	if (er != erSuccess)
+		goto exit;
 
 	struct rlimit limit;
 	limit.rlim_cur = KC_DESIRED_FILEDES;
@@ -1093,17 +1091,9 @@ static int running_server(char *szName, const char *szConfig,
 		er = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
-	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
-	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
+	er = ksrv_listen_pipe(g_lpSoapServerConn, g_lpConfig);
 	if (er != erSuccess)
 		goto exit;
-	// Setup a pipe connection
-	if (bPipeEnabled) {
-		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
-		if (er != erSuccess)
-			goto exit;
-	}
 	// Test database settings
 	lpDatabaseFactory = new ECDatabaseFactory(g_lpConfig);
 
@@ -1230,11 +1220,6 @@ static int running_server(char *szName, const char *szConfig,
 	if (er != erSuccess)
 		goto exit;
 
-	// check distributed mode started with, and maybe reject startup
-	er = check_distributed_kopano(lpDatabase);
-	if (er != erSuccess)
-		goto exit;
-
 	// check whether the thread_stack is large enough.
 	er = check_database_thread_stack(lpDatabase);
 	if (er != erSuccess)
@@ -1316,8 +1301,6 @@ exit:
 
 	SSL_library_cleanup(); //cleanup memory so valgrind is happy
 	kopano_unloadlibrary();
-	rand_free();
-
 	delete g_lpConfig;
 
 	if (g_lpLogger) {

@@ -16,6 +16,7 @@
  */
 #define _GNU_SOURCE 1
 #include <kopano/platform.h>
+#include <memory>
 #include <cerrno>
 #include <cstdlib>
 #include <fcntl.h>
@@ -27,8 +28,8 @@
 
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <sys/time.h> /* gettimeofday */
 #include <kopano/ECLogger.h>
+#include <kopano/memory.hpp>
 #include "TmpPath.h"
 
 namespace KC {
@@ -54,12 +55,10 @@ HRESULT FileTimeToUnixTime(const FILETIME &ft, time_t *t)
 	
 	if(sizeof(time_t) < 8) {
 		// On 32-bit systems, we cap the values at MAXINT and MININT
-		if(l < (__int64)INT_MIN) {
+		if (l < static_cast<__int64>(INT_MIN))
 			l = INT_MIN;
-		}
-		if(l > (__int64)INT_MAX) {
+		if (l > static_cast<__int64>(INT_MAX))
 			l = INT_MAX;
-		}
 	}
 
 	*t = (time_t)l;
@@ -225,70 +224,35 @@ double timespec2dbl(const struct timespec &t)
     return (double)t.tv_sec + t.tv_nsec/1000000000.0;
 }
 
-struct timespec GetDeadline(unsigned int ulTimeoutMs)
-{
-	struct timespec	deadline;
-	struct timeval	now;
-	gettimeofday(&now, NULL);
-
-	now.tv_sec += ulTimeoutMs / 1000;
-	now.tv_usec += 1000 * (ulTimeoutMs % 1000);
-	if (now.tv_usec >= 1000000) {
-		++now.tv_sec;
-		now.tv_usec -= 1000000;
-	}
-
-	deadline.tv_sec = now.tv_sec;
-	deadline.tv_nsec = now.tv_usec * 1000;
-
-	return deadline;
-}
-
 // Does mkdir -p <path>
 int CreatePath(const char *createpath)
 {
 	struct stat s;
-	char *path = strdup(createpath);
+	std::unique_ptr<char[], KCHL::cstdlib_deleter> path(strdup(createpath));
 
 	// Remove trailing slashes
-	size_t len = strlen(path);
+	size_t len = strlen(path.get());
 	while (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
 		path[--len] = 0;
 
-	if (stat(path, &s) == 0) {
-		free(path);
+	if (stat(path.get(), &s) == 0) {
 		if (s.st_mode & S_IFDIR)
 			return 0; // Directory is already there
 		return -1; // Item is not a directory
 	}
 	// We need to create the directory
 	// First, create parent directories
-	char *trail = strrchr(path, '/') > strrchr(path, '\\') ?
-	              strrchr(path, '/') : strrchr(path, '\\');
-	if (trail == NULL) {
+	char *trail = strrchr(path.get(), '/') > strrchr(path.get(), '\\') ?
+	              strrchr(path.get(), '/') : strrchr(path.get(), '\\');
+	if (trail == NULL)
 		// Should only happen if you are trying to create /path/to/dir
 		// in win32 or \path\to\dir in linux
-		free(path);
 		return -1;
-	}
 	*trail = '\0';
-	if (CreatePath(path) != 0) {
-		free(path);
+	if (CreatePath(path.get()) != 0)
 		return -1;
-	}
 	// Create the actual directory
-	int ret = mkdir(createpath, 0700);
-	free(path);
-	return ret;
-}
-
-double GetTimeOfDay()
-{
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-
-	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000); // usec = microsec = 1 millionth of a second
+	return mkdir(createpath, 0700);
 }
 
 void set_thread_name(pthread_t tid, const std::string & name)
@@ -344,27 +308,6 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 bool force_buffers_to_disk(const int fd)
 {
 	return fsync(fd) != -1;
-}
-
-void my_readahead(const int fd)
-{
-#ifdef LINUX
-	struct stat st;
-
-	if (fstat(fd, &st) == 0)
-		(void)readahead(fd, 0, st.st_size);
-#endif
-}
-
-void give_filesize_hint(const int fd, const off_t len)
-{
-#ifdef LINUX
-	// this helps preventing filesystem fragmentation as the
-	// kernel can now look for the best disk allocation
-	// pattern as it knows how much date is going to be
-	// inserted
-	posix_fallocate(fd, 0, len);
-#endif
 }
 
 void kcsrv_blocksigs(void)

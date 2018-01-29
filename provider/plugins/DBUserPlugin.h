@@ -73,7 +73,7 @@ public:
 	 * @throw objectnotfound When no object was found.
 	 * @throw toomanyobjects When more then one object was found.
 	 */
-	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company);
+	virtual objectsignature_t resolveName(objectclass_t objclass, const std::string &name, const objectid_t &company);
 
     /**
 	 * Authenticate user with username and password
@@ -89,7 +89,7 @@ public:
 	 * @throw runtime_error When a Database error occurred.
 	 * @throw login_error When no user was found or the password was incorrect.
 	 */
-	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company);
+	virtual objectsignature_t authenticateUser(const std::string &username, const std::string &password, const objectid_t &company);
 
     /**
 	 * Search for all objects which match the given string,
@@ -105,7 +105,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> searchObject(const std::string &match, unsigned int ulFlags);
+	virtual signatures_t searchObject(const std::string &match, unsigned int flags) override;
 
 	/**
 	 * Modify id of object in plugin
@@ -142,7 +142,7 @@ public:
 	 * @return The public store details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual std::unique_ptr<objectdetails_t> getPublicStoreDetails(void);
+	virtual objectdetails_t getPublicStoreDetails() override;
 
     /**
 	 * Obtain the objectdetails for a server
@@ -154,7 +154,7 @@ public:
 	 * @return The server details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual std::unique_ptr<serverdetails_t> getServerDetails(const std::string &server);
+	virtual serverdetails_t getServerDetails(const std::string &server) override;
 
 	/**
 	 * Obtain server list
@@ -162,7 +162,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual std::unique_ptr<serverlist_t> getServers(void);
+	virtual serverlist_t getServers() override;
 
     /**
 	 * Add relation between child and parent. This can be used

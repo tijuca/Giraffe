@@ -31,8 +31,6 @@
 #include <kopano/ECPluginSharedData.h>
 
 #include <kopano/stringutil.h>
-
-using namespace std;
 #include "ECDatabaseFactory.h"
 #include "DBUserPlugin.h"
 #include <kopano/ecversion.h>
@@ -56,6 +54,9 @@ unsigned long getUserPluginVersion()
 
 } /* extern "C" */
 
+using std::runtime_error;
+using std::string;
+
 DBUserPlugin::DBUserPlugin(std::mutex &pluginlock,
     ECPluginSharedData *shareddata) :
 	DBPlugin(pluginlock, shareddata)
@@ -71,12 +72,8 @@ void DBUserPlugin::InitPlugin()
 
 objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)
 {
-	objectid_t	id;
-	ECRESULT	er;
-	string		strQuery;
 	DB_RESULT lpResult;
 	DB_ROW		lpDBRow = NULL;
-	DB_LENGTHS	lpDBLen = NULL;
 	string signature;
 	const char *lpszSearchProperty;
 
@@ -119,7 +116,7 @@ objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string
 	 * company into a single line. Once those are all linked we can
 	 * set the WHERE restrictions to get the correct line.
 	 */
-	strQuery =
+	auto strQuery =
 		"SELECT DISTINCT o.externid, o.objectclass, modtime.value, user.value "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS user "
@@ -142,8 +139,7 @@ objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string
 			"AND modtime.objectid = o.id ";
 	if (objclass != OBJECTCLASS_UNKNOWN)
 		strQuery += "WHERE " + OBJECTCLASS_COMPARE_SQL("o.objectclass", objclass);
-
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
+	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 
@@ -153,15 +149,13 @@ objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string
 
 		if (strcasecmp(lpDBRow[3], name.c_str()) != 0)
 			continue;
-		lpDBLen = lpResult.fetch_row_lengths();
+		auto lpDBLen = lpResult.fetch_row_lengths();
 		if (lpDBLen == NULL || lpDBLen[0] == 0)
 			throw runtime_error(string("db_row_failed: object empty"));
 
 		if(lpDBRow[2] != NULL)
 			signature = lpDBRow[2];
-
-		id = objectid_t(string(lpDBRow[0], lpDBLen[0]), (objectclass_t)atoi(lpDBRow[1]));
-		return objectsignature_t(id, signature);
+		return objectsignature_t(objectid_t(std::string(lpDBRow[0], lpDBLen[0]), static_cast<objectclass_t>(atoi(lpDBRow[1]))), signature);
 	}
 
 	throw objectnotfound(name);
@@ -171,14 +165,8 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 {
 	objectid_t	objectid;
 	std::string signature;
-	ECRESULT	er;
-	string		strQuery;
 	DB_RESULT lpResult;
 	DB_ROW		lpDBRow = NULL;
-	DB_LENGTHS	lpDBLen = NULL;
-
-	std::string salt;
-	std::string strMD5;
 
 	/*
 	 * Join the DB_OBJECT_TABLE together twice. This is done because
@@ -186,7 +174,7 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 	 * company into a single line. Once those are all linked we can
 	 * set the WHERE restrictions to get the correct line.
 	 */
-	strQuery =
+	auto strQuery =
 		"SELECT pass.propname, pass.value, o.externid, modtime.value, op.value "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS op "
@@ -209,8 +197,7 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 		"AND op.propname = '" + (string)OP_LOGINNAME + "' "
 		"AND op.value = '" + m_lpDatabase->Escape(username) + "' "
 		"AND pass.propname = '" + (string)OP_PASSWORD "'";
-
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
+	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 
@@ -220,7 +207,7 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 
 		if (strcasecmp(lpDBRow[4], username.c_str()) != 0)
 			continue;
-		lpDBLen = lpResult.fetch_row_lengths();
+		auto lpDBLen = lpResult.fetch_row_lengths();
 		if (lpDBLen == NULL || lpDBLen[2] == 0)
 			throw runtime_error("Trying to authenticate failed: database error");
 
@@ -229,12 +216,12 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 
 		// Check Password
 		MD5_CTX crypt;
-		salt = lpDBRow[1];
+		std::string salt = lpDBRow[1];
 		salt.resize(8);
 		MD5_Init(&crypt);
 		MD5_Update(&crypt, salt.c_str(), salt.length());
 		MD5_Update(&crypt, password.c_str(), password.size());
-		strMD5 = salt + zcp_md5_final_hex(&crypt);
+		auto strMD5 = salt + zcp_md5_final_hex(&crypt);
 		if (strMD5.compare(lpDBRow[1]) == 0)
 			objectid = objectid_t(string(lpDBRow[2], lpDBLen[2]), ACTIVE_USER);	// Password is oke
 		else
@@ -248,10 +235,10 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 	throw login_error("Trying to authenticate failed: wrong username or password");
 }
 
-std::unique_ptr<signatures_t>
+signatures_t
 DBUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 {
-	const char *search_props[] =
+	static constexpr const char *const search_props[] =
 	{
 		OP_LOGINNAME, OP_FULLNAME, OP_EMAILADDRESS,	/* This will match all users */
 		OP_GROUPNAME,								/* This will match all groups */
@@ -260,8 +247,7 @@ DBUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 	};
 
 	LOG_PLUGIN_DEBUG("%s %s flags:%x", __FUNCTION__, match.c_str(), ulFlags);
-
-	return searchObjects(match.c_str(), search_props, NULL, ulFlags);
+	return searchObjects(match.c_str(), search_props, nullptr, ulFlags);
 }
 
 void DBUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId)
@@ -271,59 +257,52 @@ void DBUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &new
 
 void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails)
 {
-	string strQuery;
-	ECRESULT er = erSuccess;
 	DB_RESULT lpResult;
-	DB_ROW lpDBRow = NULL;
 
 	// check if user exist
-	strQuery =
+	auto strQuery =
 		"SELECT o.externid "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"WHERE o.externid='" + m_lpDatabase->Escape(objectid.id) + "' "
-			"AND " + OBJECTCLASS_COMPARE_SQL("o.objectclass", objectid.objclass);
-
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
+		"AND " + OBJECTCLASS_COMPARE_SQL("o.objectclass", objectid.objclass) + " LIMIT 2";
+	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 	if (lpResult.get_num_rows() != 1)
 		throw objectnotfound(objectid.id);
-	lpDBRow = lpResult.fetch_row();
+	auto lpDBRow = lpResult.fetch_row();
 	if(lpDBRow == NULL || lpDBRow[0] == NULL)
 		throw runtime_error(string("db_row_failed: object null"));
 
 	DBPlugin::setQuota(objectid, quotadetails);
 }
 
-std::unique_ptr<objectdetails_t> DBUserPlugin::getPublicStoreDetails(void)
+objectdetails_t DBUserPlugin::getPublicStoreDetails()
 {
 	throw notsupported("public store details");
 }
 
-std::unique_ptr<serverdetails_t>
-DBUserPlugin::getServerDetails(const std::string &server)
+serverdetails_t DBUserPlugin::getServerDetails(const std::string &server)
 {
 	throw notsupported("server details");
 }
 
-std::unique_ptr<serverlist_t> DBUserPlugin::getServers(void)
+serverlist_t DBUserPlugin::getServers()
 {
 	throw notsupported("server list");
 }
 
 void DBUserPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject)
 {
-	ECRESULT er = erSuccess;
-	string strQuery;
 	DB_RESULT lpResult;
 
 	// Check if parent exist
-	strQuery =
+	auto strQuery =
 		"SELECT o.externid "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"WHERE o.externid='" + m_lpDatabase->Escape(parentobject.id) + "' "
 			"AND " + OBJECTCLASS_COMPARE_SQL("o.objectclass", parentobject.objclass);
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
+	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 	if (lpResult.get_num_rows() != 1)

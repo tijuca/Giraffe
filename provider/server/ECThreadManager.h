@@ -19,6 +19,7 @@
 #define ECTHREADMANAGER_H
 
 #include <kopano/zcdefs.h>
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -35,7 +36,7 @@
  */
 struct WORKITEM {
     struct soap *soap;			// socket and state associated with the connection
-    double dblReceiveStamp;		// time at which activity was detected on the socket
+	KC::time_point dblReceiveStamp; /* time at which activity was detected on the socket */
 };
 
 struct ACTIVESOCKET _kc_final {
@@ -76,7 +77,7 @@ public:
 
 protected:
     // The destructor is protected since we self-cleanup; you cannot delete this object externally.
-	virtual ~ECWorkerThread(void) _kc_impdtor;
+	virtual ~ECWorkerThread(void) = default;
     static void *Work(void *param);
 
     pthread_t m_thread;
@@ -158,7 +159,7 @@ typedef SOAP_SOCKET (*CREATEPIPESOCKETCALLBACK)(void *lpParam);
 class ECDispatcher {
 public:
 	ECDispatcher(ECConfig *, CREATEPIPESOCKETCALLBACK, void *cbparam);
-	virtual ~ECDispatcher(void) _kc_impdtor;
+	virtual ~ECDispatcher(void) = default;
     
     // Statistics
     ECRESULT GetIdle(unsigned int *lpulIdle); 				// Idle threads
@@ -207,13 +208,11 @@ protected:
 	std::map<int, struct soap *> m_setListenSockets;
 	std::mutex m_mutexSockets;
 	bool m_bExit = false;
-	std::mutex m_mutexIdle;
-	unsigned int m_ulIdle = 0;
+	std::atomic<unsigned int> m_ulIdle{0};
 	CREATEPIPESOCKETCALLBACK m_lpCreatePipeSocketCallback;
 	void *					m_lpCreatePipeSocketParam;
 
 	// Socket settings (TCP + SSL)
-	int			m_nMaxKeepAlive;
 	int			m_nRecvTimeout;
 	int			m_nReadTimeout;
 	int			m_nSendTimeout;

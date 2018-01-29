@@ -17,7 +17,7 @@
 %include "cwstring.i"
 %cstring_output_allocate_size(char **lpOutput, ULONG *ulRead, MAPIFreeBuffer(*$1));
 
-%typemap(in) (const void *pv, ULONG cb) (int res, char *buf = 0, Py_ssize_t size, int alloc = 0)
+%typemap(in) (const void *pv, ULONG cb) (int res, char *buf = NULL, Py_ssize_t size, int alloc = 0)
 {
   if(PyBytes_AsStringAndSize($input, &buf, &size) == -1)
     %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
@@ -91,16 +91,10 @@
   %append_output(Object_from_FILETIME(*$1));
 }
 
-%typecheck(9999) FILETIME
-{
-  $1 = Object_is_FILETIME($input);
-}
-
-
 // ULONG+LP
 
 // Input
-%typemap(in, fragment="SWIG_AsCharPtrAndSize")				(ULONG cbEntryID, LPENTRYID lpEntryID) (int res, char *buf = 0, size_t size, int alloc = 0)
+%typemap(in, fragment="SWIG_AsCharPtrAndSize")				(ULONG cbEntryID, LPENTRYID lpEntryID) (int res, char *buf = NULL, size_t size, int alloc = 0)
 {
   if($input == Py_None) {
     $1 = 0;
@@ -133,7 +127,7 @@
 %apply (ULONG *OUTPUT, LPENTRYID *OUTPUT) {(ULONG* lpcbStoreId, LPENTRYID* lppStoreId), (ULONG* lpcbRootId, LPENTRYID *lppRootId), (ULONG *lpulOutput, LPBYTE *lpOutput)};
 
 // Optional In & Output
-%typemap(in) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) (int res, char *buf = 0, size_t size, int alloc = 0, ULONG cbEntryID = 0, KCHL::memory_ptr<ENTRYID> tmp) {
+%typemap(in) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) (int res, char *buf = NULL, size_t size, int alloc = 0, ULONG cbEntryID = 0, KCHL::memory_ptr<ENTRYID> tmp) {
   $1 = &cbEntryID;
 
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
@@ -175,7 +169,8 @@
 // Input
 %typemap(in,fragment="SWIG_AsCharPtrAndSize")	LPMAPIUID (int res, char *buf = NULL, size_t size, int alloc = 0),
 				LPCIID (int res, char *buf = NULL, size_t size, int alloc = 0),
-				LPGUID (int res, char *buf = NULL, size_t size, int alloc = 0)
+				LPGUID (int res, char *buf = NULL, size_t size, int alloc = 0),
+				GUID * (int res, char *buf = NULL, size_t size, int alloc = 0)
 {
   alloc = SWIG_OLDOBJ;
   if($input == Py_None)
@@ -297,7 +292,7 @@
 }
 
 // unsigned char *, unsigned int
-%typemap(in,numinputs=1) (unsigned char *, unsigned int) (int res, char *buf = 0, size_t size, int alloc = 0)
+%typemap(in,numinputs=1) (unsigned char *, unsigned int) (int res, char *buf = NULL, size_t size, int alloc = 0)
 {
 	res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
 	if (!SWIG_IsOK(res)) {
@@ -361,12 +356,6 @@
 
 // MAPIARRAY (List of objects)
 
-// Check
-%typecheck(9999)	(ULONG, MAPIARRAY)
-{
-	$1 = Object_is_list_of($input, &Object_is$2_mangle);
-}
-
 // Output
 %typemap(in,numinputs=0)	(ULONG *,MAPIARRAY *) (ULONG c, KCHL::memory_ptr< std::remove_pointer< std::remove_pointer< $2_type >::type >::type > tmp)
 {
@@ -418,7 +407,7 @@
 %apply (ULONG, MAPIARRAY) {(ULONG cValues, SPropValue *lpProps), (ULONG cValues, LPSPropValue lpProps), (ULONG cPropNames, LPMAPINAMEID* lppPropNames), (ULONG cInterfaces, LPCIID lpInterfaces), (ULONG cValuesConversion, SPropValue *lpPropArrayConversion), (ULONG cValuesConversion, LPSPropValue lpPropArrayConversion)};
 %apply MAPILIST {SPropTagArray *, LPSPropTagArray, LPENTRYLIST, ADRLIST *, LPADRLIST, LPFlagList};
 %apply MAPILIST *INPUT {SPropTagArray **, LPSPropTagArray *};
-%apply MAPISTRUCT {LPSRestriction, SSortOrderSet *, SPropValue *, LPSPropValue, LPNOTIFICATION};
+%apply MAPISTRUCT {SRestriction *, LPSRestriction, SSortOrderSet *, SPropValue *, LPSPropValue, LPNOTIFICATION};
 
 // Output
 %apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUTC, SPropValue **OUTPUTP), (ULONG *OUTPUTC, LPSPropValue *OUTPUTP), (ULONG *OUTPUTC, LPNOTIFICATION *OUTPUTP), (ULONG *OUTPUTC, LPMAPINAMEID **OUTPUTP)};

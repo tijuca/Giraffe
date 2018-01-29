@@ -25,6 +25,7 @@
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
 #include <kopano/Util.h>
+#include <kopano/memory.hpp>
 #include "IECPropStorage.h"
 
 #include "ECGenericProp.h"
@@ -38,14 +39,13 @@
 
 class ECParentStorage _kc_final : public ECUnknown, public IECPropStorage {
 	/*
-	  lpParentObject:	The property object of the parent (eg. ECMessage for ECAttach)
+	  lpParentObject:	The property object of the parent (e.g. ECMessage for ECAttach)
 	  ulUniqueId:		A unique client-side to find the object in the children list on the parent (PR_ATTACH_NUM (attachments) or PR_ROWID (recipients))
 	  ulObjId:			The hierarchy id on the server (0 for a new item)
 	  lpServerStorage:	A WSMAPIPropStorage interface which has the communication line to the server
 	 */
 protected:
 	ECParentStorage(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage);
-	virtual ~ECParentStorage();
 
 public:
 	static HRESULT Create(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage, ECParentStorage **lppParentStorage);
@@ -53,17 +53,8 @@ public:
 
 private:
 
-	// Get a list of the properties
-	virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags, ULONG *cValues, LPSPropValue *ppValues);
-
 	// Get a single (large) property
 	virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
-
-	// Not implemented
-	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0);
-
-	// Not implemented
-	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray);
 
 	// Save complete object, deletes/adds/modifies/creates
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
@@ -75,10 +66,10 @@ private:
 	virtual IECPropStorage* GetServerStorage();
 
 private:
-	ECGenericProp *m_lpParentObject;
+	KCHL::object_ptr<ECGenericProp> m_lpParentObject;
 	ULONG m_ulObjId;
 	ULONG m_ulUniqueId;
-	IECPropStorage *m_lpServerStorage;
+	KCHL::object_ptr<IECPropStorage> m_lpServerStorage;
 	ALLOC_WRAP_FRIEND;
 };
 

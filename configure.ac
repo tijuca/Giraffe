@@ -1,6 +1,13 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.4.0], [development@kopano.io])
-PACKAGE_ABI=8.4
+AC_INIT([kopano], [8.4.99], [development@kopano.io])
+
+dnl ABI tags are used to prevent inadvertent mixing of wildly different
+dnl versions of KC components without knowing it.
+dnl Development cycle: ABI changes frequently, don't bother with the tag
+dnl  -> versions 8.4.90 through 8.4.99 use ABI tag "8.4.90"
+dnl Maintenance cycle: ABI ought to not change, hence no tag change
+dnl  -> versions 8.5 through 8.5.89 use ABI tag "8.5"
+PACKAGE_ABI=8.4.90
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
 AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
@@ -21,8 +28,9 @@ AC_PROG_INSTALL
 AC_PROG_SED
 PKG_PROG_PKG_CONFIG
 
+# configure may rerun as part of git-checking out a different version,
+# so remove stale version
 rm -f version
-echo "$PACKAGE_VERSION" >version
 AC_SUBST([PACKAGE_ABI])
 abs_top_srcdir=`cd $srcdir; pwd`
 abs_top_builddir=`pwd`
@@ -69,6 +77,7 @@ ZCPPFLAGS="$ZCPPFLAGS \
 	-I\${top_builddir}/common/include \
 	-I\${top_srcdir}/common/include \
 	-I\${top_srcdir}/m4lcommon/include \
+	-I\${top_srcdir}/mapi4linux/include \
 	-I\${top_srcdir}/provider/common/include \
 	-I\${top_srcdir}/provider/libserver/include \
 	-I\${top_srcdir}/ECtools/archiver/include \
@@ -131,11 +140,10 @@ AC_MSG_CHECKING([specified Linux distribution name])
 AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, suse or sles]),
   [with_distro=${withval}],[with_distro=rhel])
 if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a \
-   "$with_distro" != "sles" -a "$with_distro" != "cbs4" -a \
-   "$with_distro" != "debian"; then
-	AC_MSG_ERROR([unknown distro])
+   "$with_distro" != "sles"; then
+	AC_MSG_ERROR([no initscript for $with_distro known])
 else
-	AC_MSG_RESULT([using $with_distro])
+	AC_MSG_RESULT([$with_distro])
 fi
 DISTRO=$with_distro
 ],
@@ -181,12 +189,6 @@ AC_ARG_ENABLE(coverage,
 		ZLDFLAGS="$ZLDFLAGS -lgcov"
 	  fi
     ])
-
-# MAPI config files
-AC_ARG_WITH(mapi-configdir,
-  AS_HELP_STRING([--with-mapi-configdir=PATH], [path to install the libmapi config (provider) files (default /etc/mapi)]),
-  [MAPICONFIGDIR=${withval}],[MAPICONFIGDIR='${sysconfdir}/mapi'])
-AC_SUBST(MAPICONFIGDIR)
 
 # user create scripts location
 AC_ARG_WITH(userscript-prefix,
@@ -268,8 +270,7 @@ LIBNCURSES_WITH_CONFIG
 
 AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h malloc.h])
 AC_CHECK_FUNCS([mallinfo timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
-AC_CHECK_MEMBERS([siginfo_t.si_fd], [], [], [#include <csignal>])
-
+AC_CHECK_MEMBERS([siginfo_t.si_fd siginfo_t.si_utime], [], [], [#include <csignal>])
 
 #
 # find required/optional libraries
@@ -295,15 +296,15 @@ PKG_CHECK_MODULES([XML2], [libxml-2.0])
 # Checks for MySQL 4.1 or better
 AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
   AC_PATH_PROGS([MYSQL_CONFIG], [mysql_config mariadb_config])
-  AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
+  AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql]),
     [MYSQL_CONFIG="$withval"])
-
+  AS_IF([test -z "$MYSQL_CONFIG"], [AC_MSG_ERROR([mysql config program not found])])
   MYSQL_INCLUDES=`$MYSQL_CONFIG --include`
   MYSQL_LIBS=`$MYSQL_CONFIG --libs`
-  MYSQL_VERSION=`$MYSQL_CONFIG --version`
+  MYSQL_VERSION=`$MYSQL_CONFIG --version` # see if it's there
 
   if test -z "$MYSQL_VERSION"; then
-    AC_MSG_ERROR(Cannot find mysql_config. Please use --with-mysql-config=PATH or install libmysqlclient-dev)
+    AC_MSG_ERROR([Cannot find a mysql installation. Please use --with-mysql-config=PATH or install libmysqlclient-dev.])
   fi
 
   AC_SUBST(MYSQL_INCLUDES)
@@ -407,20 +408,7 @@ GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -DHAVE_OPENSSL_SSL_H -DHAVE_ZLIB_H"
 GSOAP_LIBS="-lgsoapssl++"
 AC_SUBST(GSOAP_CFLAGS)
 AC_SUBST(GSOAP_LIBS)
-
-ICAL_CFLAGS=""
-ICAL_LIBS="-lical -licalss -licalvcal"
-AC_ARG_WITH(ical-prefix,
-  AS_HELP_STRING([--with-ical-prefix=PATH], [libical prefix, e.g. /usr/local, default /usr]),
-  [
-  ICAL_PREFIX="${withval}"
-  ICAL_CFLAGS="$ICAL_CFLAGS -I$ICAL_PREFIX/include"
-  # Hardcoding directories is bad… they may contain libraries of mismatching archictecture
-  ICAL_LIBS="$ICAL_LIBS -L$ICAL_PREFIX/lib -L$ICAL_PREFIX/lib64 -R$ICAL_PREFIX/lib -R$ICAL_PREFIX/lib64"
-  ])
-AC_SUBST(ICAL_CFLAGS)
-AC_SUBST(ICAL_LIBS)
-
+PKG_CHECK_MODULES([ICAL], [libical >= 0.42])
 PKG_CHECK_MODULES([curl], [libcurl], [], [:])
 CPPFLAGS="$CPPFLAGS $curl_CFLAGS"
 AC_CHECK_HEADERS([curl/curl.h])
@@ -516,15 +504,8 @@ AC_SEARCH_LIBS([clock_gettime], [rt], [
 	AS_IF([test "$LIBS" = "$LIBS_system"], [clock_LIBS=""], [clock_LIBS="-lrt"])
 ])
 LIBS="$LIBS_system"
-AC_SEARCH_LIBS([timer_create], [rt], [
-	AS_IF([test "$LIBS" = "$LIBS_system"], [timer_LIBS=""], [timer_LIBS="-lrt"])
-])
-dnl AC_SEARCH_LIBS does not set any define in config.h, so check again
-AC_CHECK_FUNCS([timer_create])
-LIBS="$LIBS_system"
 AC_SUBST([CRYPT_LIBS])
 AC_SUBST([clock_LIBS])
-AC_SUBST([timer_LIBS])
 PKG_CHECK_EXISTS([libssl],
 	[
 		PKG_CHECK_MODULES([SSL], [libssl], [], [ssl_LIBS=-lssl])
@@ -769,7 +750,6 @@ AC_CONFIG_FILES([Makefile
 		common/kopano.pc common/libkcmapi.sym common/libkcutil.sym
 		default.sym
 		mapi4linux/src/libmapi.sym
-		mapi4linux/src/libkchl.sym
 		provider/plugin.sym provider/provider.sym
 		provider/libkcserver.sym provider/libkcsoap.sym
 ])
@@ -781,13 +761,21 @@ AC_CONFIG_FILES([ECtools/backup/kopano-backup], [chmod +x ECtools/backup/kopano-
 AC_CONFIG_FILES([ECtools/cli/kopano-cli], [chmod +x ECtools/cli/kopano-cli])
 AC_CONFIG_FILES([ECtools/presence/kopano-presence], [chmod +x ECtools/presence/kopano-presence])
 AC_CONFIG_FILES([ECtools/migration-pst/kopano-migration-pst], [chmod +x ECtools/migration-pst/kopano-migration-pst])
+AC_CONFIG_FILES([ECtools/spamd/kopano-spamd], [chmod +x ECtools/spamd/kopano-spamd])
+AC_CONFIG_FILES([installer/linux/kopano-mr-accept.py], [chmod +x installer/linux/kopano-mr-accept.py])
+AC_CONFIG_FILES([installer/linux/kopano-mr-process.py], [chmod +x installer/linux/kopano-mr-process.py])
+AC_CONFIG_FILES([installer/linux/kopano-autorespond.py], [chmod +x installer/linux/kopano-autorespond.py])
+AC_CONFIG_FILES([ECtools/search/kopano_search/version.py], [])
+AC_CONFIG_FILES([ECtools/backup/kopano_backup/version.py], [])
+AC_CONFIG_FILES([ECtools/cli/kopano_cli/version.py], [])
+AC_CONFIG_FILES([ECtools/spamd/kopano_spamd/version.py], [])
+AC_CONFIG_FILES([swig/python/kopano/kopano/version.py], [])
 
 AC_OUTPUT
 $LN_TFSV "$abs_top_srcdir" "@"
 
 AC_MSG_RESULT([
 Install prefix	:	$prefix
-Mapiconfig dir	:	$MAPICONFIGDIR
 Userscript dir	:	$USERSCRIPTDIR
 Quota dir	:	$QUOTATEMPLATEDIR
 Search scripts dir	:	$SEARCHSCRIPTSDIR

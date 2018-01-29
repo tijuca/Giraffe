@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from .version import __version__
+
 import collections
 from contextlib import closing
 import codecs
@@ -72,27 +74,12 @@ CONFIG = {
     'search_engine': Config.string(default='xapian'),
     'suggestions': Config.boolean(default=True),
     'index_junk': Config.boolean(default=True),
+    'index_drafts': Config.boolean(default=True),
     'server_bind_name': Config.string(default='file:///var/run/kopano/search.sock'),
     'ssl_private_key_file': Config.path(default=None, check=False), # XXX don't check when default=None?
     'ssl_certificate_file': Config.path(default=None, check=False),
     'term_cache_size': Config.size(default=64000000),
 }
-
-def db_get(db_path, key):
-    """ get value from db file """
-    if not isinstance(key, bytes): # python3
-        key = key.encode('ascii')
-    with closing(bsddb.hashopen(db_path, 'c')) as db:
-        return db.get(key)
-
-def db_put(db_path, key, value):
-    """ store key, value in db file """
-    if not isinstance(key, bytes): # python3
-        key = key.encode('ascii')
-    with open(db_path+'.lock', 'w') as lockfile:
-        fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
-        with closing(bsddb.hashopen(db_path, 'c')) as db:
-            db[key] = value
 
 if sys.hexversion >= 0x03000000:
     unicode = str
@@ -103,17 +90,41 @@ if sys.hexversion >= 0x03000000:
     def _decode(s):
         return s
 
+    def _decode_ascii(s):
+        return s.decode('ascii')
+
     def _encode(s):
         return s.encode()
 else:
     def _is_unicode(s):
         return isinstance(s, unicode)
 
+    def _decode_ascii(s):
+        return s
+
     def _decode(s):
         return s.decode(getattr(sys.stdin, 'encoding', 'utf8') or 'utf8')
 
     def _encode(s):
         return s.encode(getattr(sys.stdin, 'encoding', 'utf8') or 'utf8')
+
+def db_get(db_path, key):
+    """ get value from db file """
+    if not isinstance(key, bytes): # python3
+        key = key.encode('ascii')
+    with closing(bsddb.hashopen(db_path, 'c')) as db:
+        value = db.get(key)
+        if value is not None:
+            return _decode_ascii(db.get(key))
+
+def db_put(db_path, key, value):
+    """ store key, value in db file """
+    if not isinstance(key, bytes): # python3
+        key = key.encode('ascii')
+    with open(db_path+'.lock', 'w') as lockfile:
+        fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
+        with closing(bsddb.hashopen(db_path, 'c')) as db:
+            db[key] = value
 
 class SearchWorker(kopano.Worker):
     """ process which handles search requests coming from outlook/webapp, according to our internal protocol """
@@ -146,7 +157,7 @@ class SearchWorker(kopano.Worker):
                         response(conn, 'OK:')
                     elif cmd == 'FIND':
                         pos = data.find(':')
-                        fields = map(int, data[:pos].split()[1:])
+                        fields = [int(x) for x in data[:pos].split()[1:]]
                         orig = data[pos+1:].lower()
                         # Limit number of terms (32) so people do not
                         # inadvertently DoS it if they paste prose.
@@ -173,8 +184,7 @@ class SearchWorker(kopano.Worker):
                             else:
                                 restrictions.append('('+' AND '.join('%s*' % term for term in terms)+')')
                         query = ' AND '.join(restrictions) # plugin doesn't have to use this relatively standard query format
-                        docids = plugin.search(server_guid, store_guid, folder_ids, fields_terms, query, self.log)
-                        docids = docids[:config['limit_results'] or len(docids)]
+                        docids = plugin.search(server_guid, store_guid, folder_ids, fields_terms, query, config['limit_results'], self.log)
                         response(conn, 'OK: '+' '.join(map(str, docids)))
                         self.log.info('found %d results in %.2f seconds', len(docids), time.time()-t0)
                         break
@@ -183,13 +193,16 @@ class SearchWorker(kopano.Worker):
                         response(conn, 'OK:')
                         self.log.info("queued store %s for reindexing", args[0])
                         break
+                    else:
+                        self.log.error("unknown command: %s", cmd)
+                        break
                 conn.close()
 
 class IndexWorker(kopano.Worker):
     """ process which gets folders from input queue and indexes them, putting the nr of changes in output queue """
 
     def main(self):
-        config, server, plugin = self.service.config, self.service.server, self.service.plugin
+        config, server, plugin = self.service.config, self.server, self.service.plugin
         state_db = os.path.join(config['index_path'], server.guid+'_state')
         while True:
             changes = 0
@@ -199,8 +212,9 @@ class IndexWorker(kopano.Worker):
                 folder = kopano.Folder(store, folderid)
                 path = folder.path
                 if path and \
-                   (folder not in (store.outbox, store.drafts)) and \
-                   (folder != store.junk or config['index_junk']):
+                   (folder != store.outbox) and \
+                   (folder != store.junk or config['index_junk']) and \
+                   (folder != store.drafts or config['index_drafts']):
                     suggestions = config['suggestions'] and folder != store.junk
                     self.log.info('syncing folder: "%s" "%s"', store.name, path)
                     importer = FolderImporter(server.guid, config, plugin, suggestions, self.log)
@@ -397,7 +411,7 @@ class Service(kopano.Service):
                 sys.exit(1)
 
 def main():
-    parser = kopano.parser('ckpsFl') # select common cmd-line options
+    parser = kopano.parser('ckpsFlV') # select common cmd-line options
     parser.add_option('-r', '--reindex', dest='reindex', action='append', default=[], help='Reindex user/store', metavar='USER')
     options, args = parser.parse_args()
     service = Service('search', config=CONFIG, options=options)

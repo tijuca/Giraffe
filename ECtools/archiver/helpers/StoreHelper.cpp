@@ -22,8 +22,6 @@
 #include <mapix.h>
 #include <mapiutil.h>
 #include "StoreHelper.h"
-using namespace std;
-
 #include <kopano/mapi_ptr.h>
 
 #include <kopano/mapiguidext.h>
@@ -373,7 +371,7 @@ HRESULT StoreHelper::GetSubFolder(MAPIFolderPtr &ptrFolder, const tstring &strFo
 	hr = ECPropertyRestriction(RELOP_EQ, PR_DISPLAY_NAME, &sResPropValue, ECRestriction::Cheap)
 	     .FindRowIn(ptrTable, BOOKMARK_BEGINNING, 0);
 	if (hr == hrSuccess) {
-		hr = ptrTable->QueryRows(1, TBL_NOADVANCE, &ptrRowSet);
+		hr = ptrTable->QueryRows(1, TBL_NOADVANCE, &~ptrRowSet);
 		if (hr != hrSuccess)
 			return hr;
 		if (ptrRowSet.size() != 1)

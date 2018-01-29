@@ -14,10 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <memory>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
+#include <kopano/tie.hpp>
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECGenericProp.h"
@@ -34,33 +35,14 @@
 #include <kopano/charset/convert.h>
 #include "EntryPoint.h"
 
-ECGenericProp::ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
+ECGenericProp::ECGenericProp(void *prov, ULONG type, BOOL mod,
     const char *szClassName) :
-	ECUnknown(szClassName)
+	ECUnknown(szClassName), ulObjType(type), fModify(mod), lpProvider(prov)
 {
-	this->ulObjType		= ulObjType;
-	this->fModify		= fModify;
-	this->lpProvider	= lpProvider;
 	this->HrAddPropHandlers(PR_EC_OBJECT,				DefaultGetProp,			DefaultSetPropComputed, (void*) this, FALSE, TRUE);
 	this->HrAddPropHandlers(PR_NULL,					DefaultGetProp,			DefaultSetPropIgnore,	(void*) this, FALSE, TRUE);
 	this->HrAddPropHandlers(PR_OBJECT_TYPE,				DefaultGetProp,			DefaultSetPropComputed, (void*) this);
 	this->HrAddPropHandlers(PR_ENTRYID,					DefaultGetProp,			DefaultSetPropComputed, (void*) this);
-}
-
-ECGenericProp::~ECGenericProp()
-{
-	if (m_sMapiObject)
-		FreeMapiObject(m_sMapiObject);
-
-	if(lstProps) {
-		for (auto &i : *lstProps)
-			i.second.DeleteProperty();
-		delete lstProps;
-	}
-
-	if(lpStorage)
-		lpStorage->Release();
-	MAPIFreeBuffer(m_lpEntryId);
 }
 
 HRESULT ECGenericProp::QueryInterface(REFIID refiid, void **lppInterface)
@@ -83,7 +65,7 @@ HRESULT ECGenericProp::SetProvider(void* lpProvider)
 HRESULT ECGenericProp::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId)
 {
 	assert(m_lpEntryId == NULL);
-	return Util::HrCopyEntryId(cbEntryId, lpEntryId, &m_cbEntryId, &m_lpEntryId);
+	return Util::HrCopyEntryId(cbEntryId, lpEntryId, &m_cbEntryId, &~m_lpEntryId);
 }
 
 // Add a property handler. Usually called by a subclass
@@ -109,9 +91,7 @@ HRESULT ECGenericProp::HrAddPropHandlers(ULONG ulPropTag, GetPropCallBack lpfnGe
 	sCallBack.lpParam = lpParam;
 	sCallBack.fRemovable = fRemovable;
 	sCallBack.fHidden = fHidden;
-
-	lstCallBack.insert(std::make_pair(PROP_ID(ulPropTag), sCallBack));
-
+	lstCallBack.emplace(PROP_ID(ulPropTag), sCallBack);
 	dwLastError = hr;
 	return hr;
 }
@@ -120,7 +100,6 @@ HRESULT ECGenericProp::HrAddPropHandlers(ULONG ulPropTag, GetPropCallBack lpfnGe
 HRESULT ECGenericProp::HrSetRealProp(const SPropValue *lpsPropValue)
 {
 	HRESULT					hr = hrSuccess;
-	ECProperty*				lpProperty = NULL;
 	ECPropertyEntryIterator	iterProps;
 	ECPropertyEntryIterator iterPropsFound;
 	ULONG ulPropId = 0;
@@ -134,49 +113,40 @@ HRESULT ECGenericProp::HrSetRealProp(const SPropValue *lpsPropValue)
 			SetSingleInstanceId(0, NULL);
 	}
 
-	if(lstProps == NULL) {
+	if (!m_props_loaded) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			goto exit;
 	}			
-
-	iterPropsFound = lstProps->end();
+	iterPropsFound = lstProps.end();
 	// Loop through all properties, get the first EXACT matching property, but delete ALL
 	// other properties with this PROP_ID and the wrong type - this makes sure you can SetProps() with 0x60010003,
 	// then with 0x60010102 and then with 0x60010040 for example.
-
-	iterProps = lstProps->find(PROP_ID(lpsPropValue->ulPropTag));
-	if (iterProps != lstProps->end()) {
+	iterProps = lstProps.find(PROP_ID(lpsPropValue->ulPropTag));
+	if (iterProps != lstProps.end()) {
 		if (iterProps->second.GetPropTag() != lpsPropValue->ulPropTag) {
 			// type is different, remove the property and insert a new item
-			m_setDeletedProps.insert(lpsPropValue->ulPropTag);
-
-			iterProps->second.DeleteProperty();
-
-			lstProps->erase(iterProps);
+			m_setDeletedProps.emplace(lpsPropValue->ulPropTag);
+			lstProps.erase(iterProps);
 		} else {
 			iterPropsFound = iterProps;
 		}
 	}
 
 	// Changing an existing property
-	if(iterPropsFound != lstProps->end()) {
+	if (iterPropsFound != lstProps.end()) {
 		iterPropsFound->second.HrSetProp(lpsPropValue);
 	} else { // Add new property
-		lpProperty = new ECProperty(lpsPropValue);
-
+		std::unique_ptr<ECProperty> lpProperty(new ECProperty(lpsPropValue));
 		if(lpProperty->GetLastError() != 0) {
 			hr = lpProperty->GetLastError();
 			goto exit;
 		}
-		lstProps->insert({PROP_ID(lpsPropValue->ulPropTag), ECPropertyEntry(lpProperty)});
+		lstProps.emplace(PROP_ID(lpsPropValue->ulPropTag), ECPropertyEntry(std::move(lpProperty)));
 	}
 
 	// Property is now added/modified and marked 'dirty' for saving
 exit:
-	if (hr != hrSuccess)
-		delete lpProperty;
-
 	dwLastError = hr;
 	return hr;
 }
@@ -196,7 +166,7 @@ HRESULT ECGenericProp::HrGetRealProp(ULONG ulPropTag, ULONG ulFlags, void *lpBas
 	HRESULT					hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
 	
-	if(lstProps == NULL || m_bReload == TRUE) {
+	if (!m_props_loaded || m_bReload) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			goto exit;
@@ -204,11 +174,15 @@ HRESULT ECGenericProp::HrGetRealProp(ULONG ulPropTag, ULONG ulFlags, void *lpBas
 	}			
 
 	// Find the property in our list
-	iterProps = lstProps->find(PROP_ID(ulPropTag));
+	iterProps = lstProps.find(PROP_ID(ulPropTag));
 
 	// Not found or property is not matching
-	if(iterProps == lstProps->end() || !( PROP_TYPE(ulPropTag) == PT_UNSPECIFIED || PROP_TYPE(ulPropTag) == PROP_TYPE(iterProps->second.GetPropTag()) ||
-		(((ulPropTag & MV_FLAG) == (iterProps->second.GetPropTag( ) & MV_FLAG)) && PROP_TYPE(ulPropTag&~MV_FLAG) == PT_STRING8 && PROP_TYPE(iterProps->second.GetPropTag()&~MV_FLAG) == PT_UNICODE) ))
+	if (iterProps == lstProps.end() ||
+	    !(PROP_TYPE(ulPropTag) == PT_UNSPECIFIED ||
+	    PROP_TYPE(ulPropTag) == PROP_TYPE(iterProps->second.GetPropTag()) ||
+	    (((ulPropTag & MV_FLAG) == (iterProps->second.GetPropTag() & MV_FLAG)) &&
+	    PROP_TYPE(ulPropTag & ~MV_FLAG) == PT_STRING8 &&
+	    PROP_TYPE(iterProps->second.GetPropTag() & ~MV_FLAG) == PT_UNICODE)))
 	{
 		lpsPropValue->ulPropTag = PROP_TAG(PT_ERROR,PROP_ID(ulPropTag));
 		lpsPropValue->Value.err = MAPI_E_NOT_FOUND;
@@ -266,26 +240,22 @@ HRESULT ECGenericProp::HrDeleteRealProp(ULONG ulPropTag, BOOL fOverwriteRO)
 	HRESULT					hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
 
-	if(lstProps == NULL) {
+	if (!m_props_loaded) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			goto exit;
 	}			
 
 	// Now find the real value
-	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if(iterProps == lstProps->end()) {
+	iterProps = lstProps.find(PROP_ID(ulPropTag));
+	if (iterProps == lstProps.end()) {
 		// Couldn't find it!
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
 
-	m_setDeletedProps.insert(iterProps->second.GetPropTag());
-
-	iterProps->second.DeleteProperty();
-
-	lstProps->erase(iterProps);
-
+	m_setDeletedProps.emplace(iterProps->second.GetPropTag());
+	lstProps.erase(iterProps);
 exit:
 	dwLastError = hr;
 	return hr;
@@ -346,11 +316,6 @@ HRESULT	ECGenericProp::DefaultGetPropGetReal(ULONG ulPropTag, void* lpProvider, 
 	return lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue, lpProp->m_ulMaxPropSize);
 }
 
-HRESULT	ECGenericProp::DefaultGetPropNotFound(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
-{
-	return MAPI_E_NOT_FOUND;
-}
-
 HRESULT ECGenericProp::DefaultSetPropSetReal(ULONG ulPropTag, void *lpProvider,
     const SPropValue *lpsPropValue, void *lpParam)
 {
@@ -385,14 +350,14 @@ HRESULT ECGenericProp::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 	return hr;
 }
 
-// Sets all the properties 'clean', ie. un-dirty
+// Sets all the properties 'clean', i.e. un-dirty
 HRESULT ECGenericProp::HrSetClean()
 {
 	HRESULT hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
 
 	// also remove deleted marked properties, since the object isn't reloaded from the server anymore
-	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
+	for (iterProps = lstProps.begin(); iterProps != lstProps.end(); ++iterProps)
 		iterProps->second.HrSetClean();
 
 	m_setDeletedProps.clear();
@@ -474,10 +439,10 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 
 	if (!fModify)
 		return MAPI_E_NO_ACCESS;
-	if (m_sMapiObject == nullptr || lstProps == nullptr)
+	if (m_sMapiObject == nullptr || !m_props_loaded)
 		return MAPI_E_CALL_FAILED;
 	// no props -> succeed (no changes made)
-	if(lstProps->empty())
+	if (lstProps.empty())
 		goto exit;
 	if (lpStorage == nullptr)
 		// no way to save our properties !
@@ -490,29 +455,29 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	
 	for (auto l : m_setDeletedProps) {
 		// Make sure the property is not present in deleted/modified list
-		HrRemoveModifications(m_sMapiObject, l);
-		m_sMapiObject->lstDeleted.push_back(l);
+		HrRemoveModifications(m_sMapiObject.get(), l);
+		m_sMapiObject->lstDeleted.emplace_back(l);
 	}
 
-	for (auto &p : *lstProps) {
+	for (auto &p : lstProps) {
 		// Property is dirty, so we have to save it
 		if (p.second.FIsDirty()) {
 			// Save in the 'modified' list
 
 			// Make sure the property is not present in deleted/modified list
-			HrRemoveModifications(m_sMapiObject, p.second.GetPropTag());
+			HrRemoveModifications(m_sMapiObject.get(), p.second.GetPropTag());
 			// Save modified property
-			m_sMapiObject->lstModified.push_back(*p.second.GetProperty());
+			m_sMapiObject->lstModified.emplace_back(*p.second.GetProperty());
 			// Save in the normal properties list
-			m_sMapiObject->lstProperties.push_back(*p.second.GetProperty());
+			m_sMapiObject->lstProperties.emplace_back(*p.second.GetProperty());
 			continue;
 		}
 
 		// Normal property: either non-loaded or loaded
 		if (!p.second.FIsLoaded())	// skip pt_error anyway
-			m_sMapiObject->lstAvailable.push_back(p.second.GetPropTag());
+			m_sMapiObject->lstAvailable.emplace_back(p.second.GetPropTag());
 		else
-			m_sMapiObject->lstProperties.push_back(*p.second.GetProperty());
+			m_sMapiObject->lstProperties.emplace_back(*p.second.GetProperty());
 	}
 
 	m_sMapiObject->bChanged = true;
@@ -521,7 +486,7 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	// and its modifications in lstModified and lstDeleted.
 
 	// save to parent or server
-	hr = lpStorage->HrSaveObject(this->ulObjFlags, m_sMapiObject);
+	hr = lpStorage->HrSaveObject(this->ulObjFlags, m_sMapiObject.get());
 	if (hr != hrSuccess)
 		return hr;
 
@@ -532,9 +497,9 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	// Large properties received
 	for (auto tag : m_sMapiObject->lstAvailable) {
 		// ONLY if not present
-		auto ip = lstProps->find(PROP_ID(tag));
-		if (ip == lstProps->cend() || ip->second.GetPropTag() != tag)
-			lstProps->insert({PROP_ID(tag), ECPropertyEntry(tag)});
+		auto ip = lstProps.find(PROP_ID(tag));
+		if (ip == lstProps.cend() || ip->second.GetPropTag() != tag)
+			lstProps.emplace(PROP_ID(tag), ECPropertyEntry(tag));
 	}
 	m_sMapiObject->lstAvailable.clear();
 
@@ -570,10 +535,10 @@ exit:
 // Check if property is dirty (delete properties gives MAPI_E_NOT_FOUND)
 HRESULT ECGenericProp::IsPropDirty(ULONG ulPropTag, BOOL *lpbDirty)
 {
-	ECPropertyEntryIterator iterProps;
-
-	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if (iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()))
+	auto iterProps = lstProps.find(PROP_ID(ulPropTag));
+	if (iterProps == lstProps.end() ||
+	    (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED &&
+	    ulPropTag != iterProps->second.GetPropTag()))
 		return MAPI_E_NOT_FOUND;
 	
 	*lpbDirty = iterProps->second.FIsDirty();
@@ -591,10 +556,10 @@ HRESULT ECGenericProp::IsPropDirty(ULONG ulPropTag, BOOL *lpbDirty)
  */
 HRESULT ECGenericProp::HrSetCleanProperty(ULONG ulPropTag)
 {
-	ECPropertyEntryIterator iterProps;
-
-	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if (iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()))
+	auto iterProps = lstProps.find(PROP_ID(ulPropTag));
+	if (iterProps == lstProps.end() ||
+	    (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED &&
+	    ulPropTag != iterProps->second.GetPropTag()))
 		return MAPI_E_NOT_FOUND;
 	
 	iterProps->second.HrSetClean();
@@ -630,19 +595,12 @@ exit:
 	return hr;
 }
 
-HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadProps)
+HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *storage, BOOL fLoadProps)
 {
 	HRESULT hr;
 	SPropValue sPropValue;
 
-	if(this->lpStorage)
-		this->lpStorage->Release();
-
-	this->lpStorage = lpStorage;
-
-	if(lpStorage)
-		lpStorage->AddRef();
-
+	lpStorage.reset(storage);
 	if(fLoadProps) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
@@ -660,11 +618,11 @@ HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadPro
 HRESULT ECGenericProp::HrLoadEmptyProps()
 {
 	scoped_rlock lock(m_hMutexMAPIObject);
-
-	assert(lstProps == NULL);
+	assert(!m_props_loaded);
 	assert(m_sMapiObject == NULL);
-	lstProps = new ECPropertyEntryMap;
-	AllocNewMapiObject(0, 0, ulObjType, &m_sMapiObject);
+	lstProps.clear(); /* release build has no asserts */
+	m_props_loaded = true;
+	m_sMapiObject.reset(new MAPIOBJECT(0, 0, ulObjType));
 	return hrSuccess;
 }
 
@@ -677,37 +635,28 @@ HRESULT ECGenericProp::HrLoadProps()
 		return MAPI_E_CALL_FAILED;
 
 	scoped_rlock lock(m_hMutexMAPIObject);
-
-	if (lstProps != NULL && m_bReload == FALSE)
+	if (m_props_loaded && !m_bReload)
 		goto exit; // already loaded
 
 	m_bLoading = TRUE;
 
 	if (m_sMapiObject != NULL) {
 		// remove what we know, (scenario: keep open r/w, drop props, get all again causes to know the server changes, incl. the hierarchy id)
-		FreeMapiObject(m_sMapiObject);
-		m_sMapiObject = NULL;
-
+		m_sMapiObject.reset();
 		// only remove my own properties: keep recipients and attachment tables
-		if (lstProps != NULL) {
-			for (auto &p : *lstProps)
-				p.second.DeleteProperty();
-			lstProps->clear();
-		}
+		lstProps.clear();
 		m_setDeletedProps.clear();
 	}
 
-	hr = lpStorage->HrLoadObject(&m_sMapiObject);
+	hr = lpStorage->HrLoadObject(&KCHL::unique_tie(m_sMapiObject));
 	if (hr != hrSuccess)
 		goto exit;
-
-	if (lstProps == NULL)
-		lstProps = new ECPropertyEntryMap;
+	m_props_loaded = true;
 
 	// Add *all* the entries as with empty values; values for these properties will be
 	// retrieved on-demand
 	for (auto tag : m_sMapiObject->lstAvailable)
-		lstProps->insert({PROP_ID(tag), ECPropertyEntry(tag)});
+		lstProps.emplace(PROP_ID(tag), ECPropertyEntry(tag));
 
 	// Load properties
 	for (const auto &pv : m_sMapiObject->lstProperties)
@@ -752,15 +701,13 @@ HRESULT ECGenericProp::HrLoadProp(ULONG ulPropTag)
 	ulPropTag = NormalizePropTag(ulPropTag);
 
 	scoped_rlock lock(m_hMutexMAPIObject);
-
-	if(lstProps == NULL || m_bReload == TRUE) {
+	if (!m_props_loaded || m_bReload) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			return hr;
 	}			
-
-	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if (iterProps == lstProps->end() ||
+	iterProps = lstProps.find(PROP_ID(ulPropTag));
+	if (iterProps == lstProps.end() ||
 	    (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED &&
 	    PROP_TYPE(ulPropTag) != PROP_TYPE(iterProps->second.GetPropTag())))
 		return MAPI_E_NOT_FOUND;
@@ -845,14 +792,14 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArr
 	ECPropCallBackIterator	iterCallBack;
 	ECPropertyEntryIterator	iterProps;
 	
-	if(lstProps == NULL) {
+	if (!m_props_loaded) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			return hr;
 	}			
 
 	// The size of the property tag array is never larger than (static properties + generated properties)
-	hr = ECAllocateBuffer(CbNewSPropTagArray(lstProps->size() + lstCallBack.size()),
+	hr = ECAllocateBuffer(CbNewSPropTagArray(lstProps.size() + lstCallBack.size()),
 	     &~lpPropTagArray);
 	if (hr != hrSuccess)
 		return hr;
@@ -889,7 +836,7 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArr
 	}
 
 	// Then add the others, if not added yet
-	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps) {
+	for (iterProps = lstProps.begin(); iterProps != lstProps.end(); ++iterProps) {
 		if (HrGetHandler(iterProps->second.GetPropTag(), nullptr, nullptr, nullptr) == 0)
 			continue;
 		ULONG ulPropTag = iterProps->second.GetPropTag();
@@ -1035,7 +982,8 @@ HRESULT ECGenericProp::CopyProps(const SPropTagArray *, ULONG ui_param,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECGenericProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
+HRESULT ECGenericProp::GetNamesFromIDs(SPropTagArray **tags, const GUID *propset,
+    ULONG flags, ULONG *nvals, MAPINAMEID ***names)
 {
 	return MAPI_E_NO_SUPPORT;
 }

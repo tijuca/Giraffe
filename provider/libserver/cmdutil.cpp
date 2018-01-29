@@ -29,6 +29,7 @@
 #include <kopano/mapiext.h>
 #include <kopano/memory.hpp>
 #include <kopano/EMSAbTag.h>
+#include <kopano/tie.hpp>
 #include <edkmdb.h>
 #include "ECMAPI.h"
 
@@ -50,7 +51,6 @@
 #define FIELD_NR_NAMESTR	(FIELD_NR_MAX + 2)
 #define FIELD_NR_NAMEGUID	(FIELD_NR_MAX + 3)
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -83,8 +83,8 @@ ECRESULT GetSourceKey(unsigned int ulObjId, SOURCEKEY *lpSourceKey)
  * ns__saveObject
  * importMessageFromStream
  *
- * It does a recursive delete of objects in the hierarchytable, according to the flags given
- * which is any combination of
+ * It does a recursive deletion of objects in the hierarchytable, according to
+ * the flags given, which is any combination of:
  *
  * EC_DELETE_FOLDERS		- Delete subfolders
  * EC_DELETE_MESSAGES		- Delete messages
@@ -202,7 +202,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 	     iListObjectId != lpsObjectList->end(); ++iListObjectId)
 	{
 		sItem.fRoot = true;
-		// Lock the root records's parent counter to maintain locking order (counters/content/storesize/committimemax)
+		/* Lock the root records' parent counter to maintain locking order (counters/content/storesize/committimemax) */
 		er  = lpCacheManager->GetObject(*iListObjectId, &ulParent, NULL, NULL, NULL);
 		if(er != erSuccess)
 		    goto exit;
@@ -247,7 +247,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 			}
 
 			// Loop protection, don't insert duplicates.
-			if (setIDs.insert(atoui(lpDBRow[0])).second == false)
+			if (setIDs.emplace(atoui(lpDBRow[0])).second == false)
 				continue;
 		
 			sItem.ulId = atoui(lpDBRow[0]);
@@ -278,8 +278,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 				GetSourceKey(sItem.ulId, &sItem.sSourceKey);
 				GetSourceKey(sItem.ulParent, &sItem.sParentSourceKey);
 			}
-
-			lstDeleteItems.push_back(sItem);
+			lstDeleteItems.emplace_back(sItem);
 		}
 	}
 
@@ -301,7 +300,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 				continue;
 
 			// Loop protection, don't insert duplicates.
-			if (setIDs.insert(atoui(lpDBRow[0])).second == false)
+			if (setIDs.emplace(atoui(lpDBRow[0])).second == false)
 				continue;
 
 			// Add this object as a node to the end of the list
@@ -334,8 +333,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 				GetSourceKey(sItem.ulId, &sItem.sSourceKey);
 				GetSourceKey(sItem.ulParent, &sItem.sParentSourceKey);
 			}
-			
-			lstDeleteItems.push_back(sItem);
+			lstDeleteItems.emplace_back(sItem);
 		}
 	}
 	
@@ -376,7 +374,7 @@ ECRESULT DeleteObjectUpdateICS(ECSession *lpSession, unsigned int ulFlags, ECLis
 }
 
 /** 
- * Check if the delete of the object should actually occur in the sync
+ * Check if the deletion of the object should actually occur in the sync
  * scope. Checks the syncedmessages table.
  * 
  * @param lpDatabase Database object
@@ -394,10 +392,10 @@ static ECRESULT CheckICSDeleteScope(ECDatabase *lpDatabase,
 	     iterDeleteItems != lstDeleted.end(); ) {
 		er = CheckWithinLastSyncedMessagesSet(lpDatabase, ulSyncId, iterDeleteItems->sSourceKey);
 		if (er == KCERR_NOT_FOUND) {
-			// ignore delete of message
+			/* Ignore deletion of message. */
 			ec_log_debug("Message not in sync scope, ignoring delete");
 			FreeDeleteItem(&(*iterDeleteItems));
-			lstDeleted.erase(iterDeleteItems++);
+			iterDeleteItems = lstDeleted.erase(iterDeleteItems);
 		} else if (er != erSuccess)
 			return er;
 		else
@@ -605,7 +603,7 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage, unsigned int ulFlags, ECListDeleteItems &lstDeleteItems, bool bNoTransaction, ECListDeleteItems &lstDeleted)
 {
 	ECRESULT er = erSuccess;
-	object_ptr<ECAttachmentStorage> lpInternalAttachmentStorage;
+	std::shared_ptr<ECAttachmentStorage> lpInternalAttachmentStorage;
 	std::list<ULONG> lstDeleteAttachments;
 	std::string strInclause;
 	std::string strOGQInclause;
@@ -629,11 +627,8 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 	}
 
 	if (!lpAttachmentStorage) {
-		er = CreateAttachmentStorage(lpDatabase, &~lpInternalAttachmentStorage);
-		if (er != erSuccess)
-			goto exit;
-
-		lpAttachmentStorage = lpInternalAttachmentStorage;
+		lpInternalAttachmentStorage.reset(g_lpSessionManager->get_atxconfig()->new_handle(lpDatabase));
+		lpAttachmentStorage = lpInternalAttachmentStorage.get();
 	}
 
 	for (auto iterDeleteItems = lstDeleteItems.crbegin();
@@ -660,15 +655,15 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 
 			// make new list for attachment deletes. messages can have imap "attachment".
 			if (iterDeleteItems->ulObjType == MAPI_ATTACH || (iterDeleteItems->ulObjType == MAPI_MESSAGE && iterDeleteItems->ulParentType == MAPI_FOLDER))
-				lstDeleteAttachments.push_back(iterDeleteItems->ulId);
+				lstDeleteAttachments.emplace_back(iterDeleteItems->ulId);
 
-			lstToBeDeleted.push_front(*iterDeleteItems);
+			lstToBeDeleted.emplace_front(*iterDeleteItems);
 
 			if(!(ulFlags&EC_DELETE_STORE) && iterDeleteItems->ulParentType == MAPI_FOLDER && iterDeleteItems->fRoot) {
 				// Track counter changes
 				memset(&pi, 0, sizeof(pi));
 				pi.ulStoreId = iterDeleteItems->ulStoreId;
-				mapFolderCounts.insert(std::make_pair(iterDeleteItems->ulParent, pi));
+				mapFolderCounts.emplace(iterDeleteItems->ulParent, pi);
 
 				if(iterDeleteItems->ulObjType == MAPI_MESSAGE) {
 					if(iterDeleteItems->ulFlags == MAPI_ASSOCIATED) {
@@ -699,8 +694,9 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 		}
 
 		// Start transaction
+		kd_trans atx;
 		if (!bNoTransaction) {
-			er = lpAttachmentStorage->Begin();
+			atx = lpAttachmentStorage->Begin(er);
 			if (er != erSuccess)
 				goto exit;
 
@@ -777,7 +773,7 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 
 		// Commit the transaction
 		if (!bNoTransaction) {
-			er = lpAttachmentStorage->Commit();
+			er = atx.commit();
 			if (er != erSuccess)
 				goto exit;
 
@@ -792,12 +788,8 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 	} // while iterDeleteItems != end()
 
 exit:
-	if (er != erSuccess && !bNoTransaction) {
-		if(lpInternalAttachmentStorage)
-			lpInternalAttachmentStorage->Rollback();
-
+	if (er != erSuccess && !bNoTransaction)
 		lpDatabase->Rollback();
-	}
 	return er;
 }
 
@@ -885,13 +877,13 @@ ECRESULT DeleteObjectNotifications(ECSession *lpSession, unsigned int ulFlags, E
 					MSGFLAG_DELETED, di.ulParent, di.ulId, di.ulObjType);
 		} else {
 			// We need to send a table change notifications later on
-			mapTableChangeNotifications[di.ulParent].insert(TABLECHANGENOTIFICATION(di.ulObjType, di.ulFlags & MSGFLAG_NOTIFY_FLAGS));
+			mapTableChangeNotifications[di.ulParent].emplace(di.ulObjType, di.ulFlags & MSGFLAG_NOTIFY_FLAGS);
 			if ((ulFlags & EC_DELETE_HARD_DELETE) != EC_DELETE_HARD_DELETE)
-				mapTableChangeNotifications[di.ulParent].insert(TABLECHANGENOTIFICATION(di.ulObjType, (di.ulFlags & MSGFLAG_NOTIFY_FLAGS) | MSGFLAG_DELETED));
+				mapTableChangeNotifications[di.ulParent].emplace(di.ulObjType, (di.ulFlags & MSGFLAG_NOTIFY_FLAGS) | MSGFLAG_DELETED);
 		}
 		// @todo: Is this correct ???
 		if (di.fRoot)
-			 lstParent.push_back(di.ulParent);
+			 lstParent.emplace_back(di.ulParent);
 	}
 
 	// We have a list of all the folders in which something was deleted, so get a unique list
@@ -1046,7 +1038,7 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 
 	// Remove search results for deleted folders
 	if (ulFlags & EC_DELETE_STORE)
-		lpSearchFolders->RemoveSearchFolder(*lpsObjectList->begin());
+		lpSearchFolders->RemoveSearchFolder(lpsObjectList->front());
 	else
 		for (const auto &di : lstDeleteItems)
 			if (di.ulObjType == MAPI_FOLDER &&
@@ -1086,12 +1078,10 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 
 		// Update local commit time on top level folders
 		for (const auto &di : lstDeleteItems) {
-			bool k = !(ulFlags & EC_DELETE_HARD_DELETE) &&
-				di.fRoot && di.ulParentType == MAPI_FOLDER &&
+			bool k = di.fRoot && di.ulParentType == MAPI_FOLDER &&
 				di.ulObjType == MAPI_MESSAGE;
 			if (!k)
 				continue;
-			// directly hard-delete the item is not supported for updating PR_LOCAL_COMMIT_TIME_MAX
 			er = WriteLocalCommitTimeMax(NULL, lpDatabase, di.ulParent, NULL);
 			if (er != erSuccess) {
 				ec_log_info("Error while updating folder access time after delete, error code %u", er);
@@ -1228,8 +1218,7 @@ ECRESULT UpdateTProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned in
 ECRESULT UpdateTProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned int ulFolderId, unsigned int ulObjId) {
     ECListInt list;
     
-    list.push_back(ulObjId);
-    
+	list.emplace_back(ulObjId);
     return UpdateTProp(lpDatabase, ulPropTag, ulFolderId, &list);
 }
 
@@ -1304,8 +1293,7 @@ ECRESULT MapEntryIdToObjectId(ECSession *lpecSession, ECDatabase *lpDatabase, UL
 		ec_log_crit("ERROR: Collision detected while setting entryid. objectid=%u, entryid=%s, user=%u", ulObjId, bin2hex(sEntryId.__size, sEntryId.__ptr).c_str(), lpecSession->GetSecurity()->GetUserId());
 		return KCERR_DATABASE_ERROR;
 	}
-
-	strQuery = "INSERT INTO indexedproperties (hierarchyid,tag,val_binary) VALUES("+stringify(ulObjId)+", 0x0FFF, "+lpDatabase->EscapeBinary(sEntryId.__ptr, sEntryId.__size)+")";
+	strQuery = "INSERT INTO indexedproperties (hierarchyid,tag,val_binary) VALUES(" + stringify(ulObjId) + ", 4095, " + lpDatabase->EscapeBinary(sEntryId.__ptr, sEntryId.__size) + ")";
 	er = lpDatabase->DoInsert(strQuery);
 	if(er != erSuccess)
 		return er;
@@ -1617,15 +1605,11 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	ECRESULT er = erSuccess;
 	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
-	std::string strQuery;
-	string strCC;		// Content count
-	string strACC;		// Assoc. content count
-	string strDMC;		// Deleted message count
-	string strDAC;		// Deleted assoc message count
-	string strCFC;		// Child folder count
-	string strDFC;		// Deleted folder count
-	string strCU;		// Content unread
-	
+	/*
+	 * Content count, assoc. content count, deleted message count,
+	 * child folder count, deleted folder count, content unread.
+	 */
+	std::string strQuery, strCC, strACC, strDMC, strDAC, strCFC, strDFC, strCU;
 	unsigned int ulAffected = 0;
 	unsigned int ulParent = 0;
 	auto sesmgr = lpSession->GetSessionManager();
@@ -1777,7 +1761,7 @@ exit:
  *
  * @param[in] lpDatabase Database handle
  * @param[in] ulPropTag Property tag to scan for 
- * @param[in] lpData Data if the indexed property
+ * @param[in] lpData Data of the indexed property
  * @param[in] cbSize Bytes in lpData
  * @return result
  */
@@ -1872,7 +1856,7 @@ static ECRESULT LockFolders(ECDatabase *lpDatabase, bool bShared,
     if(setParents.empty())
 		return erSuccess;
     
-    strQuery = "SELECT * FROM properties WHERE hierarchyid IN(";
+    strQuery = "SELECT 1 FROM properties WHERE hierarchyid IN(";
     
 	for (auto pa_id : setParents) {
 		strQuery += stringify(pa_id);
@@ -1906,11 +1890,11 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     for (const auto &s : setIds) {
 		if (g_lpSessionManager->GetCacheManager()->QueryObjectFromProp(ulTag, s.size(),
 		    reinterpret_cast<unsigned char *>(const_cast<char *>(s.data())), &ulId) != erSuccess) {
-			setUncached.insert(s);
+			setUncached.emplace(s);
 			continue;
 		}
 		if (ulTag == PROP_ID(PR_SOURCE_KEY)) {
-			setFolders.insert(ulId);
+			setFolders.emplace(ulId);
 			continue;
 		} else if (ulTag != PROP_ID(PR_ENTRYID)) {
 			assert(false);
@@ -1920,12 +1904,12 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
 		EntryId eid(s);
 		try {
 			if (eid.type() == MAPI_FOLDER)
-				setFolders.insert(ulId);
+				setFolders.emplace(ulId);
 			else if (eid.type() == MAPI_MESSAGE)
-				setMessages.insert(ulId);
+				setMessages.emplace(ulId);
 			else
 				assert(false);
-		} catch (runtime_error &e) {
+		} catch (std::runtime_error &e) {
 			ec_log_err("eid.type(): %s\n", e.what());
 			return MAPI_E_CORRUPT_DATA;
 		}
@@ -1933,7 +1917,7 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
 
     if(!setUncached.empty()) {    
         // For the items that were uncached, go directly to their parent (or the item itself for folders) in the DB
-        strQuery = "SELECT hierarchyid, hierarchy.type, hierarchy.parent FROM indexedproperties JOIN hierarchy ON hierarchy.id=indexedproperties.hierarchyid WHERE tag = " + stringify(ulTag) + " AND val_binary IN(";
+        strQuery = "SELECT hierarchyid, hierarchy.type, hierarchy.parent, hierarchy.owner, hierarchy.flags FROM indexedproperties JOIN hierarchy ON hierarchy.id=indexedproperties.hierarchyid WHERE tag = " + stringify(ulTag) + " AND val_binary IN(";
         for (auto i = setUncached.cbegin(); i != setUncached.cend(); ++i) {
             if (i != setUncached.cbegin())
                 strQuery += ",";
@@ -1946,13 +1930,17 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
             return er;
         
         while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
-            if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL)
+            if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL || lpDBRow[4] == NULL)
                 continue;
-                
+			if(atoui(lpDBRow[1]) != MAPI_MESSAGE && atoui(lpDBRow[1]) != MAPI_FOLDER)
+				continue;
+
             if(atoui(lpDBRow[1]) == MAPI_MESSAGE)
-                setFolders.insert(atoui(lpDBRow[2]));
+				setFolders.emplace(atoui(lpDBRow[2]));
             else if(atoui(lpDBRow[1]) == MAPI_FOLDER)
-                setFolders.insert(atoui(lpDBRow[0]));
+				setFolders.emplace(atoui(lpDBRow[0]));
+
+			g_lpSessionManager->GetCacheManager()->SetObject(atoui(lpDBRow[0]), atoui(lpDBRow[2]), atoui(lpDBRow[3]), atoui(lpDBRow[4]), atoui(lpDBRow[1]));
         }
     }
         
@@ -1961,9 +1949,9 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
         unsigned int ulParent = 0;
         
 		if (g_lpSessionManager->GetCacheManager()->QueryParent(i, &ulParent) == erSuccess)
-			setFolders.insert(ulParent);
+			setFolders.emplace(ulParent);
 		else
-			setUncachedMessages.insert(i);
+			setUncachedMessages.emplace(i);
     }
     
     // Query uncached parents from the database
@@ -1983,8 +1971,7 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
         while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
             if(lpDBRow[0] == NULL)
                 continue;
-                
-            setFolders.insert(atoui(lpDBRow[0]));
+			setFolders.emplace(atoui(lpDBRow[0]));
         }    
     }
         
@@ -2034,13 +2021,11 @@ ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsign
 	try {
 		if (entryid.type() == MAPI_STORE)
 			return lpDatabase->Begin();
-	} catch (runtime_error &e) {
+	} catch (std::runtime_error &e) {
 		ec_log_err("entryid.type(): %s\n", e.what());
 		return KCERR_INVALID_PARAMETER;
 	}
-    
-    set.insert(entryid);
-    
+	set.emplace(entryid);
     return BeginLockFolders(lpDatabase, set, ulFlags);
 }
 
@@ -2064,6 +2049,8 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 	DB_ROW lpDBRow = NULL;
 	DB_LENGTHS lpDBLen = NULL;
 
+	static const std::set<ULONG> excluded_properties = { PR_EC_WEBACCESS_SETTINGS, PR_EC_RECIPIENT_HISTORY, PR_EC_WEBACCESS_SETTINGS_JSON, PR_EC_RECIPIENT_HISTORY_JSON, PR_EC_WEBAPP_PERSISTENT_SETTINGS_JSON };
+
 	if (ulObjId == 0 && ulParentId == 0)
 		return KCERR_INVALID_PARAMETER;
 
@@ -2079,14 +2066,12 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 				"JOIN hierarchy FORCE INDEX (parenttypeflags) "
 			        "ON properties.hierarchyid=hierarchy.id ";
 
-		strQuery +=
-		    "LEFT JOIN names "
-			    "ON (properties.tag-0x8501)=names.id ";
+		strQuery += "LEFT JOIN names ON properties.tag-34049=names.id ";
 		if (ulObjId)
 			strQuery += "WHERE hierarchyid=" + stringify(ulObjId);
 		else
 			strQuery += "WHERE hierarchy.parent=" + stringify(ulParentId);
-		strQuery += " AND (tag <= 0x8500 OR names.id IS NOT NULL)";
+		strQuery += " AND (tag <= 34048 OR names.id IS NOT NULL)";
 
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
@@ -2109,7 +2094,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
         ulPropTag = PROP_TAG(atoi(lpDBRow[FIELD_NR_TYPE]),atoi(lpDBRow[FIELD_NR_TAG]));
         
         if (PROP_ID(ulPropTag) > 0x8500 && lpNamedPropDefs) {
-			auto resInsert = lpNamedPropDefs->insert({ulPropTag, {}});
+			auto resInsert = lpNamedPropDefs->emplace(ulPropTag, NAMEDPROPDEF());
             if (resInsert.second) {
                 // New entry
                 if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
@@ -2148,7 +2133,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
             sChild.lpPropVals = new DynamicPropValArray(soap, 20);
             
             // First property for this child
-			iterChild = lpChildProps->insert({ulChildId, sChild}).first;
+			iterChild = lpChildProps->emplace(ulChildId, sChild).first;
         }
         
         er = iterChild->second.lpPropTags->AddPropTag(ulPropTag);
@@ -2157,7 +2142,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 
         er = GetPropSize(lpDBRow, lpDBLen, &ulSize);
 
-        if(er == erSuccess && (ulMaxSize == 0 || ulSize < ulMaxSize)) {
+        if(er == erSuccess && (ulMaxSize == 0 || ulSize < ulMaxSize) && excluded_properties.find(ulPropTag) == excluded_properties.cend()) {
             // the size of this property is small enough to send in the initial loading sequence
             
             er = CopyDatabasePropValToSOAPPropVal(soap, lpDBRow, lpDBLen, &sPropVal);
@@ -2185,16 +2170,14 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 				"JOIN hierarchy "
 				    "ON mvproperties.hierarchyid=hierarchy.id ";
 
-		strQuery +=
-			"LEFT JOIN names "
-			    "ON (mvproperties.tag-0x8501)=names.id ";
+		strQuery += "LEFT JOIN names ON mvproperties.tag-34049=names.id ";
         if (ulObjId != 0)
             strQuery +=	"WHERE hierarchyid=" + stringify(ulObjId) +
-				" AND (tag <= 0x8500 OR names.id IS NOT NULL) "
+				" AND (tag <= 34048 OR names.id IS NOT NULL) "
 				" GROUP BY hierarchyid, tag";
         else
 			strQuery +=	"WHERE hierarchy.parent=" + stringify(ulParentId) +
-				" AND (tag <= 0x8500 OR names.id IS NOT NULL) "
+				" AND (tag <= 34048 OR names.id IS NOT NULL) "
 				"GROUP BY tag, mvproperties.type";
 
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
@@ -2217,7 +2200,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
         if (lpNamedPropDefs) {
             unsigned int ulPropTag = PROP_TAG(atoi(lpDBRow[FIELD_NR_TYPE]),atoi(lpDBRow[FIELD_NR_TAG]));
             if (PROP_ID(ulPropTag) > 0x8500) {
-				auto resInsert = lpNamedPropDefs->insert({ulPropTag, {}});
+				auto resInsert = lpNamedPropDefs->emplace(ulPropTag, NAMEDPROPDEF());
                 if (resInsert.second) {
                     // New entry
                     if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
@@ -2249,7 +2232,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
             sChild.lpPropVals = new DynamicPropValArray(soap, 20);
             
             // First property for this child
-			iterChild = lpChildProps->insert({ulChildId, sChild}).first;
+			iterChild = lpChildProps->emplace(ulChildId, sChild).first;
         }
         
         er = CopyDatabasePropValToSOAPPropVal(soap, lpDBRow, lpDBLen, &sPropVal);

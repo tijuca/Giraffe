@@ -26,8 +26,9 @@
 #include <kopano/IECInterfaces.hpp>
 #include "ics_client.hpp"
 #include <kopano/kcodes.h>
-
+#include <kopano/memory.hpp>
 #include <map>
+#include "ECMsgStore.h"
 
 namespace KC {
 class ECLogger;
@@ -94,15 +95,6 @@ private:
 	typedef std::map<syncid_t, changeid_t> SyncStateMap;
 
 	/**
-	 * Get the sync id from a ConnectionMap entry.
-	 *
-	 * @param[in]	sConnection
-	 *					The ConnectionMap entry from which to extract the sync id.
-	 * @return The sync id extracted from the the ConnectionMap entry.
-	 */
-	static ULONG					GetSyncId(const ConnectionMap::value_type &sConnection);
-
-	/**
 	 * Create a SyncStateMap entry from an SSyncState structure.
 	 *
 	 * @param[in]	sSyncState
@@ -139,13 +131,13 @@ private:
 	 */
 	HRESULT							PurgeStates();
 
-	ECMsgStore				*m_lpMsgStore;
-	IECChangeAdviseSink *m_lpChangeAdviseSink = nullptr;
 	ULONG m_ulFlags = 0, m_ulReloadId = 0;
 	std::recursive_mutex m_hConnectionLock;
 	ConnectionMap			m_mapConnections;
 	SyncStateMap			m_mapSyncStates;
-	ECLogger				*m_lpLogger;
+	KCHL::object_ptr<ECMsgStore> m_lpMsgStore;
+	KCHL::object_ptr<ECLogger> m_lpLogger;
+	KCHL::object_ptr<IECChangeAdviseSink> m_lpChangeAdviseSink;
 };
 
 #endif // ndef ECCHANGEADVISOR_H

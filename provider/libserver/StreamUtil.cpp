@@ -68,7 +68,6 @@
 	  <message>
 */
 
-using namespace std;
 using namespace KCHL;
 
 static inline bool operator<(const GUID &lhs, const GUID &rhs)
@@ -238,13 +237,11 @@ ECRESULT ECStreamSerializer::Skip(size_t size, size_t nmemb)
 	ECRESULT er = erSuccess;
 	char buffer[4096];
 	ULONG read = 0;
-	size_t total = 0;
 
-	while (total < nmemb * size) {
+	for (size_t total = 0; total < nmemb * size; total += read) {
 		er = m_lpBuffer->Read(buffer, std::min(sizeof(buffer), (size * nmemb) - total), &read);
 		if (er != erSuccess)
 			return er;
-		total += read;
 	}
 	return er;
 }
@@ -299,8 +296,8 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 	// Check the database
 	strQuery = 
 		"SELECT id FROM names "
-			"WHERE nameid=" + stringify(ulNameId) +
-			" AND guid=" + m_lpDatabase->EscapeBinary((unsigned char*)&guid, sizeof(guid));
+		"WHERE nameid=" + stringify(ulNameId) +
+		" AND guid=" + m_lpDatabase->EscapeBinary(&guid, sizeof(guid));
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
@@ -318,8 +315,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 		// Create the named property
 		strQuery = 
 			"INSERT INTO names (nameid, guid) "
-				"VALUES(" + stringify(ulNameId) + "," + m_lpDatabase->EscapeBinary((unsigned char*)&guid, sizeof(guid)) + ")";
-		
+			"VALUES(" + stringify(ulNameId) + "," + m_lpDatabase->EscapeBinary(&guid, sizeof(guid)) + ")";
 		er = m_lpDatabase->DoInsert(strQuery, lpulId);
 		if (er != erSuccess)
 			return er;
@@ -327,7 +323,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 	}
 
 	// *lpulId now contains the local propid, update the cache
-	m_mapNameIds.insert({key, *lpulId});
+	m_mapNameIds.emplace(key, *lpulId);
 	return erSuccess;
 }
 
@@ -349,9 +345,8 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 	// Check the database
 	strQuery = 
 		"SELECT id FROM names "
-			"WHERE namestring='" + m_lpDatabase->Escape(strNameString) + "'"
-			" AND guid=" + m_lpDatabase->EscapeBinary((unsigned char*)&guid, sizeof(guid));
-
+		"WHERE namestring='" + m_lpDatabase->Escape(strNameString) + "'"
+		" AND guid=" + m_lpDatabase->EscapeBinary(&guid, sizeof(guid));
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		return er;
@@ -368,8 +363,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 		// Create the named property
 		strQuery = 
 			"INSERT INTO names (namestring, guid) "
-				"VALUES('" + m_lpDatabase->Escape(strNameString) + "'," + m_lpDatabase->EscapeBinary((unsigned char*)&guid, sizeof(guid)) + ")";
-		
+			"VALUES('" + m_lpDatabase->Escape(strNameString) + "'," + m_lpDatabase->EscapeBinary(&guid, sizeof(guid)) + ")";
 		er = m_lpDatabase->DoInsert(strQuery, lpulId);
 		if (er != erSuccess)
 			return er;
@@ -377,7 +371,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 	}
 
 	// *lpulId now contains the local propid, update the cache
-	m_mapNameStrings.insert({key, *lpulId});
+	m_mapNameStrings.emplace(key, *lpulId);
 	return erSuccess;
 }
 
@@ -884,14 +878,12 @@ static ECRESULT SerializeProps(struct propValArray *lpPropVals,
 }
 
 static ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId,
-    string *lpstrBestBody)
+    std::string *lpstrBestBody)
 {
 	ECRESULT er = erSuccess;
 	DB_ROW 			lpDBRow = NULL;
 	DB_RESULT lpDBResult;
-	string strQuery;
-
-	strQuery = "SELECT tag FROM properties WHERE hierarchyid=" + stringify(ulObjId) + " AND tag IN (0x1009, 0x1013) ORDER BY tag LIMIT 1";
+	auto strQuery = "SELECT tag FROM properties WHERE hierarchyid=" + stringify(ulObjId) + " AND tag IN (4105, 4115) ORDER BY tag LIMIT 1";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
@@ -945,14 +937,13 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 	
 	// PR_SOURCE_KEY
 	if (bTop && ECGenProps::GetPropComputedUncached(soap, NULL, lpecSession, PR_SOURCE_KEY, ulObjId, 0, ulStoreId, 0, ulObjType, &sPropVal) == erSuccess)
-		sPropValList.push_back(sPropVal);
+		sPropValList.emplace_back(sPropVal);
 
 	if (bUseSQLMulti) {
 		er = lpDatabase->GetNextResult(&lpDBResult);
 	} else {
 		// szGetProps
-		string strMode = "0";
-		string strBestBody = "0";
+		std::string strMode = "0", strBestBody = "0";
 		if(ulFlags & SYNC_BEST_BODY) {
 			strMode = "1";
 			er = GetBestBody(lpDatabase, ulObjId, &strBestBody);
@@ -962,11 +953,11 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 			strMode = "2";
 		
 		strQuery = "SELECT " PROPCOLORDER ", 0, names.nameid, names.namestring, names.guid FROM properties "
-			"LEFT JOIN names ON (properties.tag-0x8501)=names.id WHERE hierarchyid=" + stringify(ulObjId) + " AND (tag <= 0x8500 OR names.id IS NOT NULL) "
-			"AND (tag NOT IN (0x1009, 0x1013) OR " + strMode + " = 0 OR (" + strMode + " = 1 AND tag = " + strBestBody + ") ) "
+			"LEFT JOIN names ON properties.tag-34049=names.id WHERE hierarchyid=" + stringify(ulObjId) + " AND (tag <= 34048 OR names.id IS NOT NULL) "
+			"AND (tag NOT IN (4105, 4115) OR " + strMode + " = 0 OR (" + strMode + " = 1 AND tag = " + strBestBody + ")) "
 			"UNION "
 			"SELECT " MVPROPCOLORDER ", 0, names.nameid, names.namestring, names.guid FROM mvproperties "
-			"LEFT JOIN names ON (mvproperties.tag-0x8501)=names.id WHERE hierarchyid=" + stringify(ulObjId) + " AND (tag <= 0x8500 OR names.id IS NOT NULL) "
+			"LEFT JOIN names ON mvproperties.tag-34049=names.id WHERE hierarchyid=" + stringify(ulObjId) + " AND (tag <= 34048 OR names.id IS NOT NULL) "
 			"GROUP BY tag, mvproperties.type"
 			;
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
@@ -1133,73 +1124,66 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 				goto exit;
 		}
 		
-		if(ulSubObjType == MAPI_ATTACH) {
-			unsigned int ulLen = 0;
-			
-			if (lpAttachmentStorage->ExistAttachment(ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN))) {
-				unsigned char *data = NULL;
-				size_t temp = 0;
-				er = lpAttachmentStorage->LoadAttachment(NULL, ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN), &temp, &data);
-				if (er != erSuccess)
-					goto exit;
+		if (ulSubObjType != MAPI_ATTACH)
+			continue;
 
-				ulLen = (unsigned int)temp;
-
-				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
-				if (er != erSuccess) {
-					s_free(NULL, data);
-					goto exit;
-				}
-
-				er = lpSink->Write(data, 1, ulLen);
-				s_free(NULL, data);
-				if (er != erSuccess)
-					goto exit;
-			} else {
-				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
-				if (er != erSuccess)
-					goto exit;
-			}
-
-			// start sub objects, can only be 0 or 1
-			if (bUseSQLMulti) {
-				er = lpStreamDatabase->GetNextResult(&lpDBResultAttachment);
-			} else {
-				strQuery = "SELECT id, hierarchy.type FROM hierarchy WHERE parent = " + stringify(ulSubObjId) + " LIMIT 1";
-				er = lpStreamDatabase->DoSelect(strQuery, &lpDBResultAttachment);
-			}
+		unsigned int ulLen = 0;
+		if (lpAttachmentStorage->ExistAttachment(ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN))) {
+			unsigned char *data = NULL;
+			size_t temp = 0;
+			er = lpAttachmentStorage->LoadAttachment(NULL, ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN), &temp, &data);
 			if (er != erSuccess)
 				goto exit;
-			/* Force value to 0 or 1, we cannot output more than one submessage. */
-			ulLen = lpDBResultAttachment.get_num_rows() >= 1 ? 1 : 0;
+			ulLen = (unsigned int)temp;
+			er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
+			if (er != erSuccess) {
+				s_free(NULL, data);
+				goto exit;
+			}
+			er = lpSink->Write(data, 1, ulLen);
+			s_free(NULL, data);
+			if (er != erSuccess)
+				goto exit;
+		} else {
 			er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
 			if (er != erSuccess)
 				goto exit;
-												
-			lpDBRow = lpDBResultAttachment.fetch_row();
-			if(lpDBRow != NULL) {
-				if(lpDBRow[0] == NULL) {
-					er = KCERR_DATABASE_ERROR;
-					ec_log_err("SerializeMessage(): column null");
-					goto exit;
-				}
-				
-				ulSubObjType = atoi(lpDBRow[1]);
-				er = lpSink->Write(&ulSubObjType, sizeof(ulSubObjType), 1);
-				if (er != erSuccess)
-					goto exit;
-				ulSubObjId = atoi(lpDBRow[0]);
-				er = lpSink->Write(&ulSubObjId, sizeof(ulSubObjId), 1);
-				if (er != erSuccess)
-					goto exit;
-
-				// Recurse into subobject, depth is ignored when not using sql procedures
-				er = SerializeMessage(lpecSession, lpStreamDatabase, lpAttachmentStorage, lpStreamCaps, ulSubObjId, ulSubObjType, ulStoreId, lpsGuid, ulFlags, lpSink, false);
-				if (er != erSuccess)
-					goto exit;
-			}
 		}
 
+		// start sub objects, can only be 0 or 1
+		if (bUseSQLMulti) {
+			er = lpStreamDatabase->GetNextResult(&lpDBResultAttachment);
+		} else {
+			strQuery = "SELECT id, hierarchy.type FROM hierarchy WHERE parent = " + stringify(ulSubObjId) + " LIMIT 1";
+			er = lpStreamDatabase->DoSelect(strQuery, &lpDBResultAttachment);
+		}
+		if (er != erSuccess)
+			goto exit;
+		/* Force value to 0 or 1, we cannot output more than one submessage. */
+		ulLen = lpDBResultAttachment.get_num_rows() >= 1 ? 1 : 0;
+		er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
+		if (er != erSuccess)
+			goto exit;
+		lpDBRow = lpDBResultAttachment.fetch_row();
+		if (lpDBRow == nullptr)
+			continue;
+		if (lpDBRow[0] == NULL) {
+			er = KCERR_DATABASE_ERROR;
+			ec_log_err("SerializeMessage(): column null");
+			goto exit;
+		}
+		ulSubObjType = atoi(lpDBRow[1]);
+		er = lpSink->Write(&ulSubObjType, sizeof(ulSubObjType), 1);
+		if (er != erSuccess)
+			goto exit;
+		ulSubObjId = atoi(lpDBRow[0]);
+		er = lpSink->Write(&ulSubObjId, sizeof(ulSubObjId), 1);
+		if (er != erSuccess)
+			goto exit;
+		// Recurse into subobject, depth is ignored when not using sql procedures
+		er = SerializeMessage(lpecSession, lpStreamDatabase, lpAttachmentStorage, lpStreamCaps, ulSubObjId, ulSubObjType, ulStoreId, lpsGuid, ulFlags, lpSink, false);
+		if (er != erSuccess)
+			goto exit;
 	}
 
 	if(bTop && bUseSQLMulti)
@@ -1555,8 +1539,7 @@ static ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 			er = lpDatabase->DoInsert(strQuery);
 			if (er != erSuccess)
 				goto exit;
-
-			setInserted.insert(lpsPropval->ulPropTag);
+			setInserted.emplace(lpsPropval->ulPropTag);
 			gcache->SetObjectProp(PROP_ID(PR_SOURCE_KEY), lpsPropval->Value.bin->__size, lpsPropval->Value.bin->__ptr, ulObjId);
 			goto next_property;
 		}
@@ -1599,26 +1582,10 @@ static ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 				// Cache the written value
 				sObjectTableKey key(ulObjId, 0);
 				gcache->SetCell(&key, lpsPropval->ulPropTag, lpsPropval);
-				
-				if (0) {
-					// FIXME do we need this code? Currently we get always a deferredupdate!
-					// Please also update cmd.cpp:WriteProps
-					er = WriteSingleProp(lpDatabase, ulObjId, ulParentId, lpsPropval, true, lpDatabase->GetMaxAllowedPacket(), strInsertTProp);
-					if (er == KCERR_TOO_BIG) {
-						er = lpDatabase->DoInsert(strInsertTProp);
-						if (er == erSuccess) {
-							strInsertTProp.clear();
-							er = WriteSingleProp(lpDatabase, ulObjId, ulParentId, lpsPropval, true, lpDatabase->GetMaxAllowedPacket(), strInsertTProp);
-						}
-					}
-					if(er != erSuccess)
-						goto exit;
-				}
 			}
 		}
 
-		setInserted.insert(lpsPropval->ulPropTag);
-
+		setInserted.emplace(lpsPropval->ulPropTag);
 next_property:
 		soap_destroy(soap);
 		soap_end(soap);
@@ -1632,26 +1599,11 @@ next_property:
 			goto exit;
 	}
 
-	if(ulParentType == MAPI_FOLDER) {
-		if (0) {
-			/* Modification, just directly write the tproperties
-			 * The idea behind this is that we'd need some serious random-access reads to properties later when flushing
-			 * tproperties, and we have the properties in memory now anyway. Also, modifications usually are just a few properties, causing
-			 * only minor random I/O on tproperties, and a tproperties flush reads all the properties, not just the modified ones.
-			 */
-			if (!strInsertTProp.empty()) {
-				er = lpDatabase->DoInsert(strInsertTProp);
-				if (er != erSuccess)
-					goto exit;
-			}
-		} else {
-			// Instead of writing directly to tproperties, save a delayed write request (flushed on table open).
-			if (ulParentId != CACHE_NO_PARENT) {
-                er = ECTPropsPurge::AddDeferredUpdateNoPurge(lpDatabase, ulParentId, 0, ulObjId);
-				if(er != erSuccess)
-					goto exit;
-			}
-		}
+	if(ulParentType == MAPI_FOLDER && ulParentId != CACHE_NO_PARENT) {
+		// Instead of writing directly to tproperties, save a delayed write request (flushed on table open).
+		er = ECTPropsPurge::AddDeferredUpdateNoPurge(lpDatabase, ulParentId, 0, ulObjId);
+		if(er != erSuccess)
+			goto exit;
 	}
 
 	if (bNewItem && ulParentType == MAPI_FOLDER && RealObjType(ulObjType, ulParentType) == MAPI_MESSAGE) {
@@ -1660,8 +1612,7 @@ next_property:
 			er = lpecSession->GetNewSourceKey(&sSourceKey);
 			if (er != erSuccess)
 				goto exit;
-
-			strQuery = "INSERT INTO indexedproperties(hierarchyid,tag,val_binary) VALUES(" + stringify(ulObjId) + "," + stringify(PROP_ID(PR_SOURCE_KEY)) + "," + lpDatabase->EscapeBinary(sSourceKey, sSourceKey.size()) + ")";
+			strQuery = "INSERT INTO indexedproperties(hierarchyid,tag,val_binary) VALUES(" + stringify(ulObjId) + "," + stringify(PROP_ID(PR_SOURCE_KEY)) + "," + lpDatabase->EscapeBinary(sSourceKey) + ")";
 			er = lpDatabase->DoInsert(strQuery);
 			if (er != erSuccess)
 				goto exit;
@@ -1842,7 +1793,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 			
 			// Update MSGFLAG_HASATTACH in the same way. We can assume PR_MESSAGE_FLAGS is already available, so we
 			// just do an update (instead of REPLACE INTO)
-			strQuery = (std::string)"UPDATE properties SET val_ulong = val_ulong " + (fHasAttach ? " | 0x10 " : " & ~0x10") + " WHERE hierarchyid = " + stringify(ulObjId) + " AND tag = " + stringify(PROP_ID(PR_MESSAGE_FLAGS)) + " AND type = " + stringify(PROP_TYPE(PR_MESSAGE_FLAGS));
+			strQuery = std::string("UPDATE properties SET val_ulong = val_ulong ") + (fHasAttach ? " | 16 " : " & ~16") + " WHERE hierarchyid = " + stringify(ulObjId) + " AND tag = " + stringify(PROP_ID(PR_MESSAGE_FLAGS)) + " AND type = " + stringify(PROP_TYPE(PR_MESSAGE_FLAGS));
 			er = lpDatabase->DoUpdate(strQuery);
 			if(er != erSuccess)
 				goto exit;

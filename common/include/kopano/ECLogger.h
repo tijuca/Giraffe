@@ -19,9 +19,11 @@
 #ifndef ECLOGGER_H
 #define ECLOGGER_H
 
+#include <atomic>
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <pthread.h>
 #include <csignal>
@@ -29,6 +31,7 @@
 #include <cstdio>
 #include <string>
 #include <kopano/lockhelper.hpp>
+#include <kopano/memory.hpp>
 #ifndef KC_LIKE_PRINTF
 #	define KC_LIKE_PRINTF(_fmt, _va)
 #endif
@@ -96,8 +99,7 @@ enum logprefix { LP_NONE, LP_TID, LP_PID };
  */
 class _kc_export ECLogger {
 	private:
-		std::mutex m_mutex;
-		unsigned m_ulRef;
+		std::atomic<unsigned> m_ulRef{1};
 
 	protected:
 		/**
@@ -242,7 +244,7 @@ class _kc_export_dycast ECLogger_File _kc_final : public ECLogger {
 		_kc_hidden std::string DoPrefix(void);
 
 	public:
-		ECLogger_File(const unsigned int max_ll, const bool add_timestamp, const char *const filename, const bool compress);
+		ECLogger_File(unsigned int max_ll, bool add_timestamp, const char *filename, bool compress);
 		~ECLogger_File(void);
 		_kc_hidden std::string EmitLevel(unsigned int level);
 		_kc_hidden void reinit_buffer(size_t size);
@@ -264,7 +266,7 @@ class _kc_export_dycast ECLogger_File _kc_final : public ECLogger {
  */
 class _kc_export_dycast ECLogger_Syslog _kc_final : public ECLogger {
 	private:
-		char *m_ident;
+	std::unique_ptr<char[], KCHL::cstdlib_deleter> m_ident;
 	static const int levelmap[16]; /* converts to syslog levels */
 
 	public:
@@ -308,12 +310,10 @@ extern _kc_export ECLogger *StartLoggerProcess(ECConfig *, ECLogger *file_logger
  */
 class _kc_export ECLogger_Tee _kc_final : public ECLogger {
 	private:
-		typedef std::list<ECLogger*> LoggerList;
-		LoggerList m_loggers;
+	std::list<KCHL::object_ptr<ECLogger>> m_loggers;
 
 	public:
 		ECLogger_Tee();
-		_kc_hidden ~ECLogger_Tee(void);
 		_kc_hidden virtual void Reset(void) _kc_override;
 		_kc_hidden virtual bool Log(unsigned int level) _kc_override;
 		_kc_hidden virtual void Log(unsigned int level, const std::string &msg) _kc_override;
@@ -322,7 +322,6 @@ class _kc_export ECLogger_Tee _kc_final : public ECLogger {
 		void AddLogger(ECLogger *lpLogger);
 };
 
-extern _kc_export bool ec_log_has_target(void);
 extern _kc_export ECLogger *ec_log_get(void);
 extern _kc_export void ec_log_set(ECLogger *);
 extern _kc_export void ec_log(unsigned int level, const char *msg, ...) KC_LIKE_PRINTF(2, 3);
@@ -336,6 +335,8 @@ extern _kc_export void ec_log(unsigned int level, const std::string &msg);
 #define ec_log_notice(...)  ec_log(EC_LOGLEVEL_NOTICE, __VA_ARGS__)
 #define ec_log_info(...)    ec_log(EC_LOGLEVEL_INFO, __VA_ARGS__)
 #define ec_log_debug(...)   ec_log(EC_LOGLEVEL_DEBUG, __VA_ARGS__)
+#define kc_perror(s, r)     (ec_log(EC_LOGLEVEL_ERROR, s ": %s (%x)", GetMAPIErrorMessage(r), (r)), (r))
+#define kc_perrorf(s, r)    (ec_log(EC_LOGLEVEL_ERROR, "%s: " s ": %s (%x)", __PRETTY_FUNCTION__, GetMAPIErrorMessage(r), (r)), (r))
 
 extern _kc_export ECLogger *CreateLogger(ECConfig *, const char *argv0, const char *service, bool audit = false);
 extern _kc_export int DeleteLogger(ECLogger *);

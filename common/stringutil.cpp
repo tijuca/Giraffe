@@ -27,6 +27,7 @@
 #include <kopano/ECIConv.h>
 #include <kopano/ECLogger.h>
 #include <openssl/md5.h>
+#include <mapidefs.h>
 
 namespace KC {
 
@@ -187,11 +188,11 @@ std::vector<std::wstring> tokenize(const std::wstring &strInput, const WCHAR sep
 	while (*begin != '\0') {
 		end = wcschr(begin, sep);
 		if (!end) {
-			vct.push_back(begin);
+			vct.emplace_back(begin);
 			break;
 		}
 		if (!bFilterEmpty || std::distance(begin,end) > 0)
-			vct.push_back(std::wstring(begin,end));
+			vct.emplace_back(begin, end);
 		begin = end+1;
 	}
 
@@ -207,11 +208,11 @@ std::vector<std::string> tokenize(const std::string &strInput, const char sep, b
 	while (begin < last) {
 		end = strchr(begin, sep);
 		if (!end) {
-			vct.push_back(begin);
+			vct.emplace_back(begin);
 			break;
 		}
 		if (!bFilterEmpty || std::distance(begin,end) > 0)
-			vct.push_back(std::string(begin,end));
+			vct.emplace_back(begin, end);
 		begin = end+1;
 	}
 
@@ -284,20 +285,20 @@ std::string hex2bin(const std::wstring &input)
 
 std::string bin2hex(size_t inLength, const void *vinput)
 {
-	std::string buffer;
 	if (vinput == nullptr)
-		return buffer;
+		return "";
 	if (inLength > 2048)
 		ec_log_warn("Unexpectedly large bin2hex call, %zu bytes\n", inLength);
 	else if (inLength > 64)
 		ec_log_debug("Unexpectedly large bin2hex call, %zu bytes\n", inLength);
-	static const char digits[] = "0123456789ABCDEF";
-	auto input = static_cast<const unsigned char *>(vinput);
-
-	buffer.reserve(inLength * 2);
-	for (size_t i = 0; i < inLength; ++i) {
-		buffer += digits[input[i]>>4];
-		buffer += digits[input[i]&0x0F];
+	static constexpr const char digits[] = "0123456789ABCDEF";
+	auto input = static_cast<const char *>(vinput);
+	std::string buffer;
+	buffer.resize(inLength * 2);
+	for (size_t j = 0; inLength-- > 0; j += 2) {
+		buffer[j]   = digits[(*input >> 4) & 0x0F];
+		buffer[j+1] = digits[*input & 0x0F];
+		++input;
 	}
 
 	return buffer;
@@ -306,6 +307,11 @@ std::string bin2hex(size_t inLength, const void *vinput)
 std::string bin2hex(const std::string &input)
 {
 	return bin2hex(input.size(), input.c_str());
+}
+
+std::string bin2hex(const SBinary &b)
+{
+	return bin2hex(b.cb, b.lpb);
 }
 
 /** 
@@ -486,9 +492,7 @@ void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
 		// skips /r if /r/n found together in the text
 		if (*iInput == '\r' && (iInput + 1 != strInput.end() && *(iInput + 1) == '\n')) 
 			continue;
-		else
-			strOutput.append(1, *iInput);
-		
+		strOutput.append(1, *iInput);
 	}
 	*lpstrOutput = std::move(strOutput);
 }
@@ -643,16 +647,6 @@ std::string zcp_md5_final_hex(MD5_CTX *ctx)
 		s.push_back(hex[md[z] & 0xF]);
 	}
 	return s;
-}
-
-std::string string_strip_nuls(const std::string &i)
-{
-	std::string o;
-	/* Expectation: no NULs to begin with. Hence reserving the entire size. */
-	o.reserve(i.size());
-	std::copy_if(i.cbegin(), i.cend(), std::back_inserter(o),
-		[](char c) { return c != '\0'; });
-	return o;
 }
 
 std::wstring string_strip_nuls(const std::wstring &i)

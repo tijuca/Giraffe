@@ -18,6 +18,8 @@
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
+#include <cstdint>
+#include <cstdlib>
 #include <kopano/ECChannel.h>
 #include <kopano/stringutil.h>
 #include <csignal>
@@ -240,14 +242,12 @@ HRESULT ECChannel::HrFreeCtx() {
 	return hrSuccess;
 }
 
-ECChannel::ECChannel(int fd) {
+ECChannel::ECChannel(int inputfd) :
+	fd(inputfd), peer_atxt(), peer_sockaddr()
+{
 	int flag = 1;
-    
-	this->fd = fd;
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&flag), sizeof(flag)) < 0)
 		/* silence Coverity */;
-	*peer_atxt = '\0';
-	memset(&peer_sockaddr, 0, sizeof(peer_sockaddr));
 }
 
 ECChannel::~ECChannel() {
@@ -744,7 +744,7 @@ int zcp_peeraddr_is_local(const struct sockaddr *peer_sockaddr,
 int zcp_peerfd_is_local(int fd)
 {
 	struct sockaddr_storage peer_sockaddr;
-	socklen_t peer_socklen = sizeof(sockaddr);
+	socklen_t peer_socklen = sizeof(peer_sockaddr);
 	auto sa = reinterpret_cast<struct sockaddr *>(&peer_sockaddr);
 	int ret = getsockname(fd, sa, &peer_socklen);
 	if (ret < 0)
@@ -935,6 +935,42 @@ HRESULT HrAccept(int ulListenFD, ECChannel **lppChannel)
 	ec_log_info("Accepted connection from %s", lpChannel->peer_addr());
 	*lppChannel = lpChannel.release();
 	return hrSuccess;
+}
+
+std::set<std::pair<std::string, uint16_t>>
+kc_parse_bindaddrs(const char *longline, uint16_t defport)
+{
+	std::set<std::pair<std::string, uint16_t>> socks;
+
+	for (auto &&spec : tokenize(longline, ' ', true)) {
+		std::string host;
+		uint16_t port;
+		char *e = nullptr;
+		auto x = spec.find('[');
+		auto y = spec.find(']', x + 1);
+		if (x == 0 && y != std::string::npos) {
+			host = spec.substr(x + 1, y - x - 1);
+			y = spec.find(':', y);
+			if (y != std::string::npos) {
+				port = strtoul(spec.c_str() + y + 1, &e, 10);
+				if (e == nullptr || *e != '\0')
+					port = defport;
+			}
+		} else {
+			y = spec.find(':');
+			if (y != std::string::npos) {
+				port = strtoul(spec.c_str() + y + 1, &e, 10);
+				if (e == nullptr || *e != '\0')
+					port = defport;
+				spec.erase(y);
+			}
+			host = std::move(spec);
+			if (host == "*")
+				host.clear();
+		}
+		socks.emplace(std::move(host), port);
+	}
+	return socks;
 }
 
 } /* namespace */

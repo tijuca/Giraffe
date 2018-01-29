@@ -19,6 +19,7 @@
 #define copier_INCLUDED
 
 #include <memory>
+#include <kopano/memory.hpp>
 #include <kopano/zcdefs.h>
 #include "operations.h"
 #include "postsaveaction.h"
@@ -63,7 +64,6 @@ public:
 	class _kc_export Helper { // For lack of a better name
 	public:
 		Helper(ArchiverSessionPtr, ECLogger *, const InstanceIdMapperPtr &, const SPropTagArray *exclprop, LPMAPIFOLDER folder);
-		~Helper(void);
 
 		/**
 		 * Create a copy of a message in the archive, effectively archiving the message.
@@ -107,7 +107,7 @@ public:
 		ArchiveFolderMap m_mapArchiveFolders;
 
 		ArchiverSessionPtr m_ptrSession;
-		ECLogger *m_lpLogger;
+		KCHL::object_ptr<ECLogger> m_lpLogger;
 		const SPropTagArray *m_lpExcludeProps;
 		MAPIFolderPtr m_ptrFolder;
 		InstanceIdMapperPtr m_ptrMapper;
@@ -116,7 +116,7 @@ public:
 private:
 	_kc_hidden HRESULT EnterFolder(LPMAPIFOLDER) _kc_override;
 	_kc_hidden HRESULT LeaveFolder(void) _kc_override;
-	_kc_hidden HRESULT DoProcessEntry(ULONG n, const LPSPropValue &prop) _kc_override;
+	_kc_hidden HRESULT DoProcessEntry(const SRow &proprow) override;
 
 	/**
 	 * Perform an initial archive of a message. This will be used to archive
@@ -176,10 +176,9 @@ private:
 	 *
 	 * @param[in]	lpMessage		The message to process
 	 * @param[in]	lpFolder		The parent folder
-	 * @param[in]	cProps			The amount of props found in lpProps
-	 * @param[in]	lpProps			A list of properties containing the information to open the correct message.
+	 * @param[in]	row			A list of properties containing the information to open the correct message.
 	 */
-	_kc_hidden HRESULT ExecuteSubOperations(LPMESSAGE, LPMAPIFOLDER, ULONG n, const LPSPropValue props);
+	_kc_hidden HRESULT ExecuteSubOperations(IMessage *, IMAPIFolder *, const SRow &);
 
 	/**
 	 * Move an archive message to the special history folder.
@@ -196,7 +195,7 @@ private:
 	 * Open the history message referenced by lpArchivedMsg and update its reference. Continue doing that for all
 	 * history messages.
 	 *
-	 * @param[in]	lpArchivedMsg		The archived message who's predecessor to update.
+	 * @param[in]	lpArchivedMsg		The archived message whose predecessor to update.
 	 * @param[in]	refMsgEntry			The SObjectEntry describing to reference
 	 * @param[in]	ptrTransaction		A Transaction object used to save and delete the proper messages when everything is setup
 	 */

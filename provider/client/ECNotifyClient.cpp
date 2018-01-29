@@ -35,11 +35,13 @@
 
 #define MAX_NOTIFS_PER_CALL 64
 
+using namespace KCHL;
+
 struct ECADVISE {
 	ULONG cbKey;
 	BYTE *lpKey;
 	ULONG ulEventMask;
-	IMAPIAdviseSink *lpAdviseSink;
+	object_ptr<IMAPIAdviseSink> lpAdviseSink;
 	ULONG ulConnection;
 	GUID guid;
 	ULONG ulSupportConnection;
@@ -49,15 +51,13 @@ struct ECCHANGEADVISE {
 	ULONG ulSyncId;
 	ULONG ulChangeId;
 	ULONG ulEventMask;
-	IECChangeAdviseSink *lpAdviseSink;
+	object_ptr<IECChangeAdviseSink> lpAdviseSink;
 	ULONG ulConnection;
 	GUID guid;
 };
 
-using namespace KCHL;
-
 static inline std::pair<ULONG,ULONG> SyncAdviseToConnection(const SSyncAdvise &sSyncAdvise) {
-	return std::make_pair(sSyncAdvise.sSyncState.ulSyncId,sSyncAdvise.ulConnection);
+	return {sSyncAdvise.sSyncState.ulSyncId, sSyncAdvise.ulConnection};
 }
 
 ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
@@ -68,9 +68,9 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
 	ECSESSIONID ecSessionId;
 
 	if(m_ulProviderType == MAPI_STORE)
-		m_lpTransport = ((ECMsgStore*)m_lpProvider)->lpTransport;
+		m_lpTransport.reset(static_cast<ECMsgStore *>(m_lpProvider)->lpTransport);
 	else if(m_ulProviderType == MAPI_ADDRBOOK)
-		m_lpTransport = ((ECABLogon*)m_lpProvider)->m_lpTransport;
+		m_lpTransport.reset(static_cast<ECABLogon *>(m_lpProvider)->m_lpTransport);
 	else
 		throw std::runtime_error("Unknown m_ulProviderType");
 
@@ -79,7 +79,7 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
 		throw std::runtime_error("ECNotifyClient/HrGetSessionId failed");
 
     /* Get the session group that this session belongs to */
-	if (g_ecSessionManager.GetSessionGroupData(m_ecSessionGroupId, m_lpTransport->GetProfileProps(), &m_lpSessionGroup) != hrSuccess)
+	if (g_ecSessionManager.GetSessionGroupData(m_ecSessionGroupId, m_lpTransport->GetProfileProps(), &~m_lpSessionGroup) != hrSuccess)
 		throw std::runtime_error("ECNotifyClient/GetSessionGroupData failed");
 
 	if (m_lpSessionGroup->GetOrCreateNotifyMaster(&m_lpNotifyMaster) != hrSuccess)
@@ -92,10 +92,7 @@ ECNotifyClient::~ECNotifyClient()
 {
 	if (m_lpNotifyMaster)
 		m_lpNotifyMaster->ReleaseSession(this);
-
-	if (m_lpSessionGroup)
-		m_lpSessionGroup->Release();
-
+	m_lpSessionGroup.reset();
     /*
      * We MAY have been the last person using the session group. Tell the session group manager
      * to look at the session group and delete it if necessary
@@ -107,21 +104,8 @@ ECNotifyClient::~ECNotifyClient()
 	 * advises when the session is removed.
 	 */
 	ulock_rec biglock(m_hMutex);
-	for (const auto &i : m_mapAdvise) {
-		if (i.second->lpAdviseSink != NULL)
-			i.second->lpAdviseSink->Release();
-		MAPIFreeBuffer(i.second);
-	}
 	m_mapAdvise.clear();
-
-	for (const auto &i : m_mapChangeAdvise) {
-		if (i.second->lpAdviseSink != NULL)
-			i.second->lpAdviseSink->Release();
-		MAPIFreeBuffer(i.second);
-	}
-
 	m_mapChangeAdvise.clear();
-	biglock.unlock();
 }
 
 HRESULT ECNotifyClient::Create(ULONG ulProviderType, void *lpProvider, ULONG ulFlags, LPMAPISUP lpSupport, ECNotifyClient**lppNotifyClient)
@@ -175,8 +159,7 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	if (hr != hrSuccess)
 		return hr;
 	memcpy(pEcAdvise->lpKey, lpKey, cbKey);
-	
-	pEcAdvise->lpAdviseSink	= lpAdviseSink;
+	pEcAdvise->lpAdviseSink.reset(lpAdviseSink);
 	pEcAdvise->ulEventMask	= ulEventMask;
 	pEcAdvise->ulSupportConnection = 0;
 
@@ -186,9 +169,6 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	hr = m_lpNotifyMaster->ReserveConnection(&ulConnection);
 	if(hr != hrSuccess)
 		return hr;
-
-	// Add reference on the notify sink
-	lpAdviseSink->AddRef();
 
 #ifdef NOTIFY_THROUGH_SUPPORT_OBJECT
 	memory_ptr<NOTIFKEY> lpKeySupport;
@@ -212,7 +192,7 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 
 	{
 		scoped_rlock biglock(m_hMutex);
-		m_mapAdvise.insert({ulConnection, pEcAdvise.release()});
+		m_mapAdvise.emplace(ulConnection, std::move(pEcAdvise));
 	}
 
 	// Since we're ready to receive notifications now, register ourselves with the master
@@ -240,7 +220,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
 	
 	pEcAdvise->ulSyncId = ulSyncId;
 	pEcAdvise->ulChangeId = ulChangeId;
-	pEcAdvise->lpAdviseSink = lpChangeAdviseSink;
+	pEcAdvise->lpAdviseSink.reset(lpChangeAdviseSink);
 	pEcAdvise->ulEventMask = fnevKopanoIcsChange;
 
 	/*
@@ -254,8 +234,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
 	 */
 	{
 		scoped_rlock biglock(m_hMutex);
-		lpChangeAdviseSink->AddRef();
-		m_mapChangeAdvise.insert({ulConnection, pEcAdvise.release()});
+		m_mapChangeAdvise.emplace(ulConnection, std::move(pEcAdvise));
 	}
 
 	// Since we're ready to receive notifications now, register ourselves with the master
@@ -282,20 +261,12 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 	if (iIterAdvise != m_mapAdvise.cend()) {
 		if(iIterAdvise->second->ulSupportConnection)
 			m_lpSupport->Unsubscribe(iIterAdvise->second->ulSupportConnection);
-
-		if (iIterAdvise->second->lpAdviseSink != NULL)
-			iIterAdvise->second->lpAdviseSink->Release();
-
-		MAPIFreeBuffer(iIterAdvise->second);
 		m_mapAdvise.erase(iIterAdvise);	
 		return hr;
 	}
 	auto iIterChangeAdvise = m_mapChangeAdvise.find(ulConnection);
 	if (iIterChangeAdvise == m_mapChangeAdvise.cend())
 		return hr;
-	if (iIterChangeAdvise->second->lpAdviseSink != NULL)
-		iIterChangeAdvise->second->lpAdviseSink->Release();
-	MAPIFreeBuffer(iIterChangeAdvise->second);
 	m_mapChangeAdvise.erase(iIterChangeAdvise);
 	return hr;
 }
@@ -332,7 +303,7 @@ HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates,
 		if (hr != hrSuccess)
 			goto exit;
 		sSyncAdvise.sSyncState = state;
-		lstAdvises.push_back(std::move(sSyncAdvise));
+		lstAdvises.emplace_back(std::move(sSyncAdvise));
 	}
 
 	hr = m_lpTransport->HrSubscribeMulti(lstAdvises, fnevKopanoIcsChange);
@@ -436,10 +407,8 @@ HRESULT ECNotifyClient::ReleaseAll()
 {
 	scoped_rlock biglock(m_hMutex);
 
-	for (auto &p : m_mapAdvise) {
-		p.second->lpAdviseSink->Release();
-		p.second->lpAdviseSink = NULL;
-	}
+	for (auto &p : m_mapAdvise)
+		p.second->lpAdviseSink.reset();
 	return hrSuccess;
 }
 
@@ -458,8 +427,7 @@ HRESULT ECNotifyClient::NotifyReload()
 	notif.ulEventType = fnevTableModified;
 	notif.tab = &table;
 	notif.tab->ulTableEvent = TABLE_RELOAD;
-	
-	notifications.push_back(&notif);
+	notifications.emplace_back(&notif);
 
 	// The transport used for this notifyclient *may* have a broken session. Inform the
 	// transport that the session may be broken and it should verify that all is well.
@@ -487,7 +455,7 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 		hr = CopySOAPNotificationToMAPINotification(m_lpProvider, notp, &tmp);
 		if (hr != hrSuccess)
 			continue;
-		notifications.push_back(tmp);
+		notifications.emplace_back(tmp);
 	}
 
 	ulock_rec biglock(m_hMutex);
@@ -566,7 +534,7 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 		hr = CopySOAPChangeNotificationToSyncState(notp, &tmp, lpSyncStates);
 		if (hr != hrSuccess)
 			continue;
-		syncStates.push_back(tmp);
+		syncStates.emplace_back(tmp);
 	}
 
 	/* Search for the right connection */

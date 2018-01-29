@@ -34,9 +34,7 @@
 
 #include <kopano/stringutil.h>
 #include "ECMsgStorePublic.h"
-#include "ECMemTablePublic.h"
 
-#include "favoritesutil.h"
 #include <kopano/charset/convstring.h>
 
 #include <kopano/ECGetText.h>
@@ -45,7 +43,8 @@
 using namespace KCHL;
 
 ECMAPIFolderPublic::ECMAPIFolderPublic(ECMsgStore *lpMsgStore, BOOL fModify, WSMAPIFolderOps *lpFolderOps, enumPublicEntryID ePublicEntryID) : 
-		ECMAPIFolder(lpMsgStore, fModify, lpFolderOps, "IMAPIFolderPublic") 
+	ECMAPIFolder(lpMsgStore, fModify, lpFolderOps, "IMAPIFolderPublic"),
+	m_ePublicEntryID(ePublicEntryID)
 {
 	HrAddPropHandlers(PR_ACCESS,		GetPropHandler,		DefaultSetPropComputed, (void *)this);
 	HrAddPropHandlers(PR_ACCESS_LEVEL,	GetPropHandler,		DefaultSetPropComputed, (void *)this);
@@ -65,9 +64,6 @@ ECMAPIFolderPublic::ECMAPIFolderPublic(ECMsgStore *lpMsgStore, BOOL fModify, WSM
 	HrAddPropHandlers(PR_SUBFOLDERS,			GetPropHandler,		DefaultSetPropComputed, (void *)this);
 
 	HrAddPropHandlers(PR_ORIGINAL_ENTRYID,		GetPropHandler,		DefaultSetPropComputed, (void *)this, FALSE, TRUE);
-	
-
-	m_ePublicEntryID = ePublicEntryID;
 }
 
 HRESULT	ECMAPIFolderPublic::QueryInterface(REFIID refiid, void **lppInterface)
@@ -323,7 +319,6 @@ HRESULT ECMAPIFolderPublic::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTab
 {
 	HRESULT hr = hrSuccess;
 	object_ptr<ECMemTableView> lpView;
-	object_ptr<ECMemTablePublic> lpMemTable;
 
 	if( m_ePublicEntryID == ePE_IPMSubtree)
 	{
@@ -335,20 +330,7 @@ HRESULT ECMAPIFolderPublic::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTab
 			return hr;
 		return lpView->QueryInterface(IID_IMAPITable, (void **)lppTable);
 	} else if( m_ePublicEntryID == ePE_Favorites || m_ePublicEntryID == ePE_FavoriteSubFolder) {
-
-		// FIXME: if exchange support CONVENIENT_DEPTH than we must implement this
-		if (ulFlags & (SHOW_SOFT_DELETES | CONVENIENT_DEPTH))
-			return MAPI_E_NO_SUPPORT;
-		hr = ECMemTablePublic::Create(this, &~lpMemTable);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpMemTable->Init(ulFlags&MAPI_UNICODE);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpMemTable->HrGetView(createLocaleFromName(""), ulFlags & MAPI_UNICODE, &~lpView);
-		if(hr != hrSuccess)
-			return hr;
-		return lpView->QueryInterface(IID_IMAPITable, reinterpret_cast<void **>(lppTable));
+		return MAPI_E_NO_SUPPORT;
 	} else {
 		return ECMAPIFolder::GetHierarchyTable(ulFlags, lppTable);
 	}
@@ -437,7 +419,7 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 
 	//Get the interface of destinationfolder
 	if(lpInterface == NULL || *lpInterface == IID_IMAPIFolder)
-		hr = ((IMAPIFolder*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
+		lpMapiFolder.reset(static_cast<IMAPIFolder *>(lpDestFolder));
 	else if(*lpInterface == IID_IMAPIContainer)
 		hr = ((IMAPIContainer*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IUnknown)
@@ -476,30 +458,19 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 	return this->lpFolderOps->HrCopyFolder(cbEntryID, lpEntryID, lpPropArray[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropArray[0].Value.bin.lpb), convstring(lpszNewFolderName, ulFlags), ulFlags, 0);
 }
 
-HRESULT ECMAPIFolderPublic::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
+HRESULT ECMAPIFolderPublic::DeleteFolder(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulUIParam, IMAPIProgress *lpProgress,
+    ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-	ULONG ulObjType = 0;
 	memory_ptr<SPropValue> lpProp;
-
-	if (ValidateZEntryId(cbEntryID, reinterpret_cast<BYTE *>(lpEntryID), MAPI_FOLDER) == false)
+	if (!ValidateZEntryId(cbEntryID, reinterpret_cast<const BYTE *>(lpEntryID), MAPI_FOLDER))
 		return MAPI_E_INVALID_ENTRYID;
 	if (cbEntryID <= 4 || !(lpEntryID->abFlags[3] & KOPANO_FAVORITE))
 		return ECMAPIFolder::DeleteFolder(cbEntryID, lpEntryID,
 		       ulUIParam, lpProgress, ulFlags);
 
-	// remove the shortcut from the shortcut folder
-	object_ptr<IMAPIFolder> lpFolder, lpShortcutFolder;
-	hr = OpenEntry(cbEntryID, lpEntryID, &iid_of(lpFolder), 0, &ulObjType, &~lpFolder);
-	if (hr != hrSuccess)
-		return hr;
-	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpProp);
-	if (hr != hrSuccess)
-		return hr;
-	hr = ((ECMsgStorePublic *)GetMsgStore())->GetDefaultShortcutFolder(&~lpShortcutFolder);
-	if (hr != hrSuccess)
-		return hr;
-	return DelFavoriteFolder(lpShortcutFolder, lpProp);
+	// favorite folder not supported
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECMAPIFolderPublic::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
@@ -516,7 +487,7 @@ HRESULT ECMAPIFolderPublic::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterfa
 	
 	//Get the interface of destinationfolder
 	if(lpInterface == NULL || *lpInterface == IID_IMAPIFolder)
-		hr = ((IMAPIFolder*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
+		lpMapiFolder.reset(static_cast<IMAPIFolder *>(lpDestFolder));
 	else if(*lpInterface == IID_IMAPIContainer)
 		hr = ((IMAPIContainer*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IUnknown)

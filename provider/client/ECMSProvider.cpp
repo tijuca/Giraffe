@@ -15,6 +15,7 @@
  *
  */
 #include <new>
+#include <string>
 #include <kopano/platform.h>
 #include <mapi.h>
 #include <mapiutil.h>
@@ -44,13 +45,11 @@
 #include <cwchar>
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
-#include "DLLGlobal.h"
 #include <edkmdb.h>
 #include <kopano/mapiext.h>
 #include <csignal>
 #include <kopano/charset/convstring.h>
 
-using namespace std;
 using namespace KCHL;
 
 ECMSProvider::ECMSProvider(ULONG ulFlags, const char *szClassName) :
@@ -91,12 +90,7 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	BOOL			fIsDefaultStore = FALSE;
 	ULONG			ulStoreType = 0;
 	MAPIUID			guidMDBProvider;
-	BOOL			bOfflineStore = FALSE;
 	sGlobalProfileProps	sProfileProps;
-
-	// Always suppress UI when running in a service
-	if(m_ulFlags & MAPI_NT_SERVICE)
-		ulFlags |= MDB_NO_DIALOG;
 
 	// If the EntryID is not configured, return MAPI_E_UNCONFIGURED, this will
 	// cause MAPI to call our configuration entry point (MSGServiceEntry)
@@ -160,7 +154,7 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	hr = CreateMsgStoreObject(reinterpret_cast<const char *>(sProfileProps.strProfileName.c_str()),
 	     lpMAPISup, cbEntryID, lpEntryID, ulFlags,
 	     sProfileProps.ulProfileFlags, lpTransport, &guidMDBProvider,
-	     false, fIsDefaultStore, bOfflineStore, &~lpECMsgStore);
+	     false, fIsDefaultStore, false, &~lpECMsgStore);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -185,8 +179,6 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	return lpECMSLogon->QueryInterface(IID_IMSLogon, reinterpret_cast<void **>(lppMSLogon));
 }
 
-//FIXME: What todo with offline??
-//TODO: online/offline state???
 HRESULT ECMSProvider::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
     const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID,
     ULONG ulFlags, LPCIID lpInterface, ULONG cbSpoolSecurity,
@@ -201,7 +193,6 @@ HRESULT ECMSProvider::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	object_ptr<IProfSect> lpProfSect;
 	ULONG cValues = 0;
 	LPSPropValue lpsPropArray = NULL;
-	bool bOfflineStore = false;
 	sGlobalProfileProps	sProfileProps;
 	wchar_t *strSep = NULL;
 
@@ -249,15 +240,12 @@ HRESULT ECMSProvider::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	if(hr != hrSuccess)
 		return hr;
 	hr = LogonByEntryID(lpTransport, &sProfileProps, cbEntryID, lpEntryID);
-	if(hr != hrSuccess) {
-		if (ulFlags & MDB_NO_DIALOG)
-			return MAPI_E_FAILONEPROVIDER;
+	if (hr != hrSuccess)
 		return MAPI_E_UNCONFIGURED;
-	}
 
 	// Get a message store object
 	hr = CreateMsgStoreObject((LPSTR)sProfileProps.strProfileName.c_str(), lpMAPISup, cbEntryID, lpEntryID, ulFlags, sProfileProps.ulProfileFlags, lpTransport,
-	     &guidMDBProvider, true, true, bOfflineStore, &~lpMsgStore);
+	     &guidMDBProvider, true, true, false, &~lpMsgStore);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -306,7 +294,7 @@ HRESULT ECMSProvider::LogonByEntryID(object_ptr<WSTransport> &lpTransport,
     sGlobalProfileProps *lpsProfileProps, ULONG cbEntryID, ENTRYID *lpEntryID)
 {
 	HRESULT hr;
-	string		extractedServerPath;		// The extracted server path
+	std::string extractedServerPath; // The extracted server path
 	bool		bIsPseudoUrl = false;
 
 	assert(lpTransport != nullptr);
@@ -328,7 +316,7 @@ HRESULT ECMSProvider::LogonByEntryID(object_ptr<WSTransport> &lpTransport,
 		return hr;
 	}
 
-	string strServerPath; // The resolved server path
+	std::string strServerPath; // The resolved server path
 	bool bIsPeer;
 
 	hr = lpTransport->HrLogon(*lpsProfileProps);
@@ -470,10 +458,7 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 	}
 
 	if(hr != hrSuccess) {
-		if(ulFlags & MDB_NO_DIALOG) {
-			hr = MAPI_E_FAILONEPROVIDER;
-			goto exit;
-		} else if(hr == MAPI_E_NETWORK_ERROR) {
+		if (hr == MAPI_E_NETWORK_ERROR) {
 			hr = MAPI_E_FAILONEPROVIDER; //for disable public folders, so you can work offline
 			goto exit;
 		} else if (hr == MAPI_E_LOGON_FAILED) {

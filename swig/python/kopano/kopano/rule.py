@@ -10,11 +10,13 @@ from MAPI.Tags import (
     PR_RULE_CONDITION
 )
 
-from .compat import repr as _repr, fake_unicode as _unicode
+from .compat import repr as _repr
 
 from .restriction import Restriction
 
 class Rule(object):
+    """Rule class"""
+
     def __init__(self, mapirow):
         self.mapirow = mapirow
         self.name = mapirow[PR_RULE_NAME_W]

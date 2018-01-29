@@ -7,6 +7,7 @@
 #include <mapicode.h>
 #include <mapiutil.h>
 #include <kopano/CommonUtil.h>
+#include <kopano/ecversion.h>
 #include <kopano/memory.hpp>
 #include <kopano/IECInterfaces.hpp>
 #include <kopano/mapi_ptr.h>
@@ -198,7 +199,6 @@ public:
 %include "IECSpooler.i"
 %include "IECTestProtocol.i"
 %include "IECMultiStoreTable.i"
-%include "IECLicense.i"
 %include "IECExportChanges.i"
 %include "helpers.i"
 %include "ecdefs.i"
@@ -269,7 +269,6 @@ swig_type_info *TypeFromIID(REFIID iid)
   TYPECASE(IECChangeAdvisor)
   TYPECASE(IECChangeAdviseSink)
   TYPECASE(IECSingleInstance)
-  TYPECASE(IECLicense)
   TYPECASE(IProxyStoreObject)
   TYPECASE(IECImportContentsChanges)
   TYPECASE(IECImportHierarchyChanges)
@@ -302,7 +301,6 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IECChangeAdvisor)
   IIDCASE(IECChangeAdviseSink)
   IIDCASE(IECSingleInstance)
-  IIDCASE(IECLicense)
   IIDCASE(IProxyStoreObject)
   IIDCASE(IECImportContentsChanges)
   IIDCASE(IECImportHierarchyChanges)
@@ -321,6 +319,7 @@ LPCIID IIDFromType(const char *type)
 typedef IUnknownImplementor<IStream> Stream;
 %}
 
+%constant char *PROJECT_VERSION = PROJECT_VERSION;
 
 %feature("director") Stream;
 %feature("nodirector") Stream::QueryInterface;

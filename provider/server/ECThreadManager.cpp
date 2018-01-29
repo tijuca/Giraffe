@@ -16,7 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
 #include <mutex>
+#include <string>
 #include "ECThreadManager.h"
 
 #include <cmath>
@@ -42,7 +44,7 @@
 	case x: \
 		return #x;
 
-using namespace std;
+using std::string;
 
 static string GetSoapError(int err)
 {
@@ -120,7 +122,7 @@ ECPriorityWorkerThread::ECPriorityWorkerThread(ECThreadManager *lpManager,
     ECDispatcher *lpDispatcher) :
 	ECWorkerThread(lpManager, lpDispatcher, true)
 {
-    if (pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0)
+	if (pthread_create(&m_thread, NULL, ECWorkerThread::Work, static_cast<ECWorkerThread *>(this)) != 0)
 		ec_log_crit("Unable to start thread: %s", strerror(errno));
     else
 	set_thread_name(m_thread, "ECPriorityWorkerThread");
@@ -178,15 +180,14 @@ void *ECWorkerThread::Work(void *lpParam)
 			err = 0;
 
 			// Record start of handling of this request
-			double dblStart = GetTimeOfDay(), dblEnd = 0;
-			
+			auto dblStart = std::chrono::steady_clock::now();
 			// Reset last session ID so we can use it reliably after the call is done
 			auto info = soap_info(lpWorkItem->soap);
 			info->ulLastSessionId = 0;
             // Pass information on start time of the request into soap->user, so that it can be applied to the correct
             // session after XML parsing
 			clock_gettime(CLOCK_THREAD_CPUTIME_ID, &info->threadstart);
-			info->start = GetTimeOfDay();
+			info->start = decltype(dblStart)::clock::now();
 			info->szFname = nullptr;
 			info->fdone = NULL;
 
@@ -236,7 +237,7 @@ done:
 			if (info->fdone != nullptr)
 				info->fdone(lpWorkItem->soap, info->fdoneparam);
 
-            dblEnd = GetTimeOfDay();
+			auto dblEnd = decltype(dblStart)::clock::now();
 
             // Tell the session we're done processing the request for this session. This will also tell the session that this
             // thread is done processing the item, so any time spent in this thread until now can be accounted in that session.
@@ -244,9 +245,8 @@ done:
             
 		// Track cpu usage server-wide
 		g_lpStatsCollector->Increment(SCN_SOAP_REQUESTS);
-		g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, int64_t((dblEnd - dblStart) * 1000));
-		g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, int64_t((dblEnd - lpWorkItem->dblReceiveStamp) * 1000));
-
+			g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, std::chrono::duration_cast<std::chrono::milliseconds>(dblEnd - dblStart).count());
+			g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, std::chrono::duration_cast<std::chrono::milliseconds>(dblEnd - lpWorkItem->dblReceiveStamp).count());
         }
 
 	// Clear memory used by soap calls. Note that this does not actually
@@ -279,7 +279,7 @@ ECThreadManager::ECThreadManager(ECDispatcher *lpDispatcher,
     // Start our worker threads
 	m_lpPrioWorker = new ECPriorityWorkerThread(this, lpDispatcher);
 	for (unsigned int i = 0; i < ulThreads; ++i)
-		m_lstThreads.push_back(new ECWorkerThread(this, lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, lpDispatcher));
 }
 
 ECThreadManager::~ECThreadManager()
@@ -305,7 +305,7 @@ ECRESULT ECThreadManager::ForceAddThread(int nThreads)
 {
 	scoped_lock l_thr(m_mutexThreads);
 	for (int i = 0; i < nThreads; ++i)
-		m_lstThreads.push_back(new ECWorkerThread(this, m_lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, m_lpDispatcher));
 	return erSuccess;
 }
 
@@ -327,7 +327,7 @@ ECRESULT ECThreadManager::SetThreadCount(unsigned int ulThreads)
     m_ulThreads = ulThreads;
 
     while(ulThreads > m_lstThreads.size())
-		m_lstThreads.push_back(new ECWorkerThread(this, m_lpDispatcher));
+		m_lstThreads.emplace_back(new ECWorkerThread(this, m_lpDispatcher));
     // If we are OVER the number of threads, then the code in NotifyIdle() will bring this down
     return erSuccess;
 }
@@ -421,7 +421,6 @@ ECDispatcher::ECDispatcher(ECConfig *lpConfig,
 	m_lpConfig = lpConfig;
 
 	// Default socket settings
-	m_nMaxKeepAlive = atoi(m_lpConfig->GetSetting("server_max_keep_alive_requests"));
 	m_nRecvTimeout = atoi(m_lpConfig->GetSetting("server_recv_timeout"));
 	m_nReadTimeout = atoi(m_lpConfig->GetSetting("server_read_timeout"));
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
@@ -441,17 +440,15 @@ ECRESULT ECDispatcher::GetThreadCount(unsigned int *lpulThreads, unsigned int *l
 // Get the age (in seconds) of the next-in-line item in the queue, or 0 if the queue is empty
 ECRESULT ECDispatcher::GetFrontItemAge(double *lpdblAge)
 {
-    double dblNow = GetTimeOfDay();
-    double dblAge = 0;
+	auto now = std::chrono::steady_clock::now();
     
 	scoped_lock lock(m_mutexItems);
     if(m_queueItems.empty() && m_queuePrioItems.empty())
-        dblAge = 0;
+		*lpdblAge = 0;
     else if (m_queueItems.empty()) // normal items queue is more important when checking queue age
-        dblAge = dblNow - m_queuePrioItems.front()->dblReceiveStamp;
+		*lpdblAge = dur2dbl(now - m_queuePrioItems.front()->dblReceiveStamp);
 	else
-        dblAge = dblNow - m_queueItems.front()->dblReceiveStamp;
-    *lpdblAge = dblAge;
+		*lpdblAge = dur2dbl(now - m_queueItems.front()->dblReceiveStamp);
     return erSuccess;
 }
 
@@ -466,12 +463,9 @@ ECRESULT ECDispatcher::GetQueueLength(unsigned int *lpulLength)
 
 ECRESULT ECDispatcher::AddListenSocket(struct soap *soap)
 {
-	soap->max_keep_alive = m_nMaxKeepAlive;
 	soap->recv_timeout = m_nReadTimeout; // Use m_nReadTimeout, the value for timeouts during XML reads
 	soap->send_timeout = m_nSendTimeout;
-
-    m_setListenSockets.insert(std::make_pair(soap->socket, soap));
-    
+	m_setListenSockets.emplace(soap->socket, soap);
     return erSuccess;
 }
 
@@ -481,7 +475,7 @@ ECRESULT ECDispatcher::QueueItem(struct soap *soap)
 	CONNECTION_TYPE ulType;
 
 	item->soap = soap;
-	item->dblReceiveStamp = GetTimeOfDay();
+	item->dblReceiveStamp = std::chrono::steady_clock::now();
 	ulType = SOAP_CONNECTION_TYPE(soap);
 
 	scoped_lock lock(m_mutexItems);
@@ -523,15 +517,11 @@ ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait, bool bPri
 		return KCERR_NOT_FOUND;
     } else {
         // No item waiting
-		ulock_normal l_idle(m_mutexIdle);
 		++m_ulIdle;
-		l_idle.unlock();
 
 		/* If requested, wait until item is available */
 		condItems.wait(l_item);
-		l_idle.lock();
 		--m_ulIdle;
-		l_idle.unlock();
 
         if (queue->empty() || m_bExit)
             // Condition fired, but still nothing there. Probably exit requested or wrong queue signal
@@ -552,31 +542,25 @@ ECRESULT ECDispatcher::NotifyDone(struct soap *soap)
     if(m_bExit) {	
 		kopano_end_soap_connection(soap);
         soap_free(soap);
-    } else {
-		--soap->max_keep_alive;
-		if (soap->max_keep_alive == 0)
-			soap->keep_alive = 0;
-        if(soap->socket != SOAP_INVALID_SOCKET) {
-			SOAP_SOCKET	socket;
-			socket = soap->socket;
-            ACTIVESOCKET sActive;
-            
-            sActive.soap = soap;
-            time(&sActive.ulLastActivity);
-            
-			ulock_normal l_sock(m_mutexSockets);
-			m_setSockets.insert(std::make_pair(soap->socket, sActive));
-			l_sock.unlock();
-            // Notify select restart, send socket number which is done
-			NotifyRestart(socket);
-        } else {
-            // SOAP has closed the socket, no need to requeue
-			kopano_end_soap_connection(soap);
-            soap_free(soap);
-        }
-    }
-    
-    return erSuccess;
+		return erSuccess;
+	}
+	if (soap->socket == SOAP_INVALID_SOCKET) {
+		// SOAP has closed the socket, no need to requeue
+		kopano_end_soap_connection(soap);
+		soap_free(soap);
+		return erSuccess;
+	}
+
+	SOAP_SOCKET socket = soap->socket;
+	ACTIVESOCKET sActive;
+	sActive.soap = soap;
+	time(&sActive.ulLastActivity);
+	ulock_normal l_sock(m_mutexSockets);
+	m_setSockets.emplace(soap->socket, sActive);
+	l_sock.unlock();
+	// Notify select restart, send socket number which is done
+	NotifyRestart(socket);
+	return erSuccess;
 }
 
 // Set the nominal thread count
@@ -599,7 +583,6 @@ ECRESULT ECDispatcher::SetThreadCount(unsigned int ulThreads)
 
 ECRESULT ECDispatcher::DoHUP()
 {
-	m_nMaxKeepAlive = atoi(m_lpConfig->GetSetting("server_max_keep_alive_requests"));
 	m_nRecvTimeout = atoi(m_lpConfig->GetSetting("server_recv_timeout"));
 	m_nReadTimeout = atoi(m_lpConfig->GetSetting("server_read_timeout"));
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
@@ -748,7 +731,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
 			// EOF occurred, just close the socket and remove it from the socket list
 			kopano_end_soap_connection(iterSockets->second.soap);
 			soap_free(iterSockets->second.soap);
-			m_setSockets.erase(iterSockets++);
+				iterSockets = m_setSockets.erase(iterSockets);
 				continue;
 			}
 			// Actual data waiting, push it on the processing queue
@@ -757,7 +740,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
 			// Remove socket from listen list for now, since we're already handling data there and don't
 			// want to interfere with the thread that is now handling that socket. It will be passed back
 			// to us when the request is done.
-			m_setSockets.erase(iterSockets++);
+			iterSockets = m_setSockets.erase(iterSockets);
 		}
 		l_sock.unlock();
 
@@ -785,9 +768,16 @@ ECRESULT ECDispatcherSelect::MainLoop()
 			ulType = SOAP_CONNECTION_TYPE(p.second);
 			if (ulType == CONNECTION_TYPE_NAMED_PIPE ||
 			    ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
-				int socket = accept(newsoap->master, NULL, 0);
-				newsoap->errnum = errno;
-				newsoap->socket = socket;
+				socklen_t socklen = sizeof(newsoap->peer.storage);
+				newsoap->socket = accept(newsoap->master, &newsoap->peer.addr, &socklen);
+				newsoap->peerlen = socklen;
+				if (newsoap->socket == SOAP_INVALID_SOCKET ||
+				    socklen > sizeof(newsoap->peer.storage)) {
+					newsoap->peerlen = 0;
+					memset(&newsoap->peer, 0, sizeof(newsoap->peer));
+				}
+				/* Do like gsoap's soap_accept would */
+				newsoap->keep_alive = -(((newsoap->imode | newsoap->omode) & SOAP_IO_KEEPALIVE) != 0);
 			} else {
 				soap_accept(newsoap);
 			}
@@ -807,7 +797,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
 			g_lpStatsCollector->Increment(SCN_SERVER_CONNECTIONS);
 			sActive.soap = newsoap;
 			l_sock.lock();
-			m_setSockets.insert(std::make_pair(sActive.soap->socket, sActive));
+			m_setSockets.emplace(sActive.soap->socket, sActive);
 			l_sock.unlock();
 		}
 	}
@@ -872,12 +862,17 @@ ECDispatcherEPoll::ECDispatcherEPoll(ECConfig *lpConfig,
 	ECDispatcher(lpConfig, lpCallback, lpCallbackParam)
 {
 	m_fdMax = getdtablesize();
+	if (m_fdMax < 0)
+		throw std::runtime_error("getrlimit failed");
 	m_epFD = epoll_create(m_fdMax);
+	if (m_epFD < 0)
+		throw std::runtime_error("epoll_create failed");
 }
 
 ECDispatcherEPoll::~ECDispatcherEPoll()
 {
-	close(m_epFD);
+	if (m_epFD >= 0)
+		close(m_epFD);
 }
 
 ECRESULT ECDispatcherEPoll::MainLoop()
@@ -951,10 +946,13 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 				time(&sActive.ulLastActivity);
 
 				ulType = SOAP_CONNECTION_TYPE(iterListenSockets->second);
-				if (ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+				if (ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
 					newsoap->socket = accept(newsoap->master, NULL, 0);
-				else
+					/* Do like gsoap's soap_accept would */
+					newsoap->keep_alive = -(((newsoap->imode | newsoap->omode) & SOAP_IO_KEEPALIVE) != 0);
+				} else {
 					soap_accept(newsoap);
+				}
 
 				if(newsoap->socket == SOAP_INVALID_SOCKET) {
 					if (ulType == CONNECTION_TYPE_NAMED_PIPE)
@@ -981,8 +979,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 
 					// directly make worker thread active
                     sActive.soap = newsoap;
-                    m_setSockets.insert(std::make_pair(sActive.soap->socket, sActive));
-
+					m_setSockets.emplace(sActive.soap->socket, sActive);
 					NotifyRestart(newsoap->socket);
 				}
 

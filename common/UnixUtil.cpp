@@ -34,7 +34,6 @@
 #include <sys/resource.h>
 
 #include <string>
-using namespace std;
 
 namespace KC {
 
@@ -148,7 +147,7 @@ static int linux_sysctl1(const char *tunable)
 	auto fp = fopen(tunable, "r");
 	if (fp == nullptr)
 		return -1; /* indeterminate */
-	char c = fgetc(fp);
+	auto c = fgetc(fp);
 	fclose(fp);
 	return c == EOF ? '\0' : c;
 }
@@ -414,6 +413,7 @@ bool unix_system(const char *lpszLogName, const std::vector<std::string> &cmd,
 	auto cmdtxt = "\"" + kc_join(cmd, "\" \"") + "\"";
 	int fdin = 0, fdout = 0;
 	int pid = unix_popen_rw(argv.get(), &fdin, &fdout, env);
+	ec_log_debug("Running command: %s", cmdtxt.c_str());
 	if (pid < 0) {
 		ec_log_debug("popen(%s) failed: %s", cmdtxt.c_str(), strerror(errno));
 		return false;
@@ -438,7 +438,7 @@ bool unix_system(const char *lpszLogName, const std::vector<std::string> &cmd,
 	if (waitpid(pid, &status, 0) < 0)
 		return false;
 	if (status == -1) {
-		ec_log_err(string("System call \"system\" failed: ") + strerror(errno));
+		ec_log_err(std::string("System call \"system\" failed: ") + strerror(errno));
 		return false;
 	}
 	bool rv = true;

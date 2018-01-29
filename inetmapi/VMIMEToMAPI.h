@@ -67,10 +67,12 @@ public:
 
 	HRESULT convertVMIMEToMAPI(const std::string &input, IMessage *lpMessage);
 	HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope, std::string *lpBody, std::string *lpBodyStructure);
+	HRESULT createIMAPBody(const std::string &input, vmime::shared_ptr<vmime::message>, IMessage *lpMessage);
+	HRESULT createIMAPEnvelope(vmime::shared_ptr<vmime::message>, IMessage* lpMessage);
 
 private:
 	delivery_options m_dopt;
-	LPADRBOOK m_lpAdrBook;
+	IAddrBook *m_lpAdrBook = nullptr;
 	KCHL::object_ptr<IABContainer> m_lpDefaultDir;
 	sMailState m_mailState;
 	convert_context m_converter;
@@ -104,11 +106,7 @@ private:
 
 	std::string mailboxToEnvelope(vmime::shared_ptr<vmime::mailbox>);
 	std::string addressListToEnvelope(vmime::shared_ptr<vmime::addressList> mbox);
-	HRESULT createIMAPEnvelope(vmime::shared_ptr<vmime::message>, IMessage* lpMessage);
 	std::string createIMAPEnvelope(vmime::shared_ptr<vmime::message>);
-
-	HRESULT createIMAPBody(const std::string &input, vmime::shared_ptr<vmime::message>, IMessage* lpMessage);
-
 	HRESULT messagePartToStructure(const std::string &input, vmime::shared_ptr<vmime::bodyPart>, std::string *lpSimple, std::string *lpExtended);
 	HRESULT bodyPartToStructure(const std::string &input, vmime::shared_ptr<vmime::bodyPart>, std::string *lpSimple, std::string *lpExtended);
 	std::string getStructureExtendedFields(vmime::shared_ptr<vmime::header> vmHeaderPart);

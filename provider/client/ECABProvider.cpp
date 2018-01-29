@@ -38,14 +38,11 @@
 #include "pcutil.hpp"
 #include <kopano/ECGetText.h>
 
-using namespace std;
 using namespace KCHL;
 
 ECABProvider::ECABProvider(ULONG ulFlags, const char *szClassName) :
-    ECUnknown(szClassName)
-{
-	m_ulFlags = ulFlags;
-}
+	ECUnknown(szClassName), m_ulFlags(ulFlags)
+{}
 
 HRESULT ECABProvider::Create(ECABProvider **lppECABProvider)
 {
@@ -160,9 +157,7 @@ HRESULT ECABProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam,
 		return MAPI_E_INVALID_PARAMETER;
 
 	if(hr != hrSuccess) {
-		if (ulFlags & MDB_NO_DIALOG)
-			return MAPI_E_FAILONEPROVIDER;
-		else if(hr == MAPI_E_NETWORK_ERROR)
+		if (hr == MAPI_E_NETWORK_ERROR)
 			/* for disable public folders, so you can work offline */
 			return MAPI_E_FAILONEPROVIDER;
 		else if (hr == MAPI_E_LOGON_FAILED)

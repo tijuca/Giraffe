@@ -216,14 +216,10 @@ unsigned int ECTableRow::GetObjectSize(void) const
 	return ulSize;
 }
 
-ECKeyTable::ECKeyTable()
+ECKeyTable::ECKeyTable() :
+	lpRoot(new ECTableRow(sObjectTableKey(), {}, false)), lpCurrent(lpRoot)
 {
-	sObjectTableKey sKey;
-	memset(&sKey, 0, sizeof(sObjectTableKey));
-	lpRoot = new ECTableRow(std::move(sKey), {}, false);
-	this->lpRoot->fRoot = true;
-	this->lpCurrent = lpRoot;
-
+	lpRoot->fRoot = true;
 	// The start of bookmark, the first 3 (0,1,2) are default
 	m_ulBookmarkPosition = 3;
 }
@@ -372,8 +368,8 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 
 		// Move cursor to next node (or previous if this was the last row)
 		if (lpCurrent == lpRow) {
-			this->SeekRow(EC_SEEK_CUR, -1, NULL);
-			this->SeekRow(EC_SEEK_CUR, 1, NULL);
+			SeekRow(EC_SEEK_CUR, -1, nullptr);
+			SeekRow(EC_SEEK_CUR, 1, nullptr);
 		}
 
 		// Delete this uncoupled node
@@ -538,7 +534,7 @@ ECRESULT ECKeyTable::Clear()
 
 	lpRow = lpRoot;
 
-	// Depth-first delete of all nodes (excluding root)
+	/* Depth-first deletion of all nodes (excluding root) */
 	while(lpRow) {
 		if(lpRow->lpLeft) 
 			lpRow = lpRow->lpLeft;
@@ -575,8 +571,7 @@ ECRESULT ECKeyTable::Clear()
 ECRESULT ECKeyTable::SeekId(const sObjectTableKey *lpsRowItem)
 {
 	scoped_rlock biglock(mLock);
-
-	auto iterMap = this->mapRow.find(*lpsRowItem);
+	auto iterMap = mapRow.find(*lpsRowItem);
 	if (iterMap == mapRow.cend())
 		return KCERR_NOT_FOUND;
 	lpCurrent = iterMap->second;
@@ -618,7 +613,7 @@ ECRESULT ECKeyTable::CreateBookmark(unsigned int* lpulbkPosition)
 
 	// set unique bookmark id higher
 	ulbkPosition = m_ulBookmarkPosition++;
-	m_mapBookmarks.insert({ulbkPosition, sbkPosition});
+	m_mapBookmarks.emplace(ulbkPosition, sbkPosition);
 	*lpulbkPosition = ulbkPosition;
 	return erSuccess;
 }
@@ -656,15 +651,13 @@ ECRESULT ECKeyTable::InvalidateBookmark(ECTableRow *lpRow)
 
 ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSought)
 {
-	ECRESULT er = erSuccess;
 	int lDestRow = 0;
 	unsigned int ulCurrentRow = 0;
 	unsigned int ulRowCount = 0;
 	ECTableRow *lpRow = NULL;
 	scoped_rlock biglock(mLock);
 
-	er = this->GetRowCount(&ulRowCount, &ulCurrentRow);
-
+	auto er = GetRowCount(&ulRowCount, &ulCurrentRow);
 	if(er != erSuccess)
 		return er;
 
@@ -823,7 +816,7 @@ ECRESULT ECKeyTable::QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList
 	while(ulRows && lpCurrent) {
 		
 		if(!lpCurrent->fHidden || bShowHidden) {
-    		lpRowList->push_back(lpCurrent->sKey);
+			lpRowList->emplace_back(lpCurrent->sKey);
 		--ulRows;
         }
 		
@@ -1057,9 +1050,7 @@ ECRESULT ECKeyTable::GetRowsBySortPrefix(sObjectTableKey *lpsRowItem, ECObjectTa
         // Stop when lpCurrent > prefix, so prefix < lpCurrent
 		if (ECTableRow::rowcompareprefix(dat.size(), dat, lpCurrent->m_cols))
             break;
-            
-        lpRowList->push_back(lpCurrent->sKey);
-            
+		lpRowList->emplace_back(lpCurrent->sKey);
         Next();
     }
     
@@ -1085,8 +1076,7 @@ ECRESULT ECKeyTable::HideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lp
         // Stop hiding when lpCurrent > prefix, so prefix < lpCurrent
 		if (ECTableRow::rowcompareprefix(dat.size(), dat, lpCurrent->m_cols))
             break;
-            
-        lpHiddenList->push_back(lpCurrent->sKey);
+		lpHiddenList->emplace_back(lpCurrent->sKey);
         lpCurrent->fHidden = true;
         
         UpdateCounts(lpCurrent); // FIXME SLOW
@@ -1134,7 +1124,7 @@ ECRESULT ECKeyTable::UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *
 
         // Only unhide items with the same amount of sort columns as the first row (ensures we only expand the first layer)
 		if (lpCurrent->m_cols.size() == ulFirstCols) {
-            lpUnhiddenList->push_back(lpCurrent->sKey);
+			lpUnhiddenList->emplace_back(lpCurrent->sKey);
             lpCurrent->fHidden = false;
 
             UpdateCounts(lpCurrent); // FIXME SLOW

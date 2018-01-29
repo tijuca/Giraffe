@@ -97,9 +97,8 @@ struct LEAFINFO {
     ECCategory *lpCategory;
 };
 
-typedef std::map<sObjectTableKey, ECCategory *, ObjectTableKeyCompare> ECCategoryMap;
-typedef std::map<sObjectTableKey, LEAFINFO, ObjectTableKeyCompare> ECLeafMap;
-
+typedef std::map<sObjectTableKey, ECCategory *> ECCategoryMap;
+typedef std::map<sObjectTableKey, LEAFINFO> ECLeafMap;
 class ECGenericObjectTable;
 typedef ECRESULT (*QueryRowDataCallBack)(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool table_data, bool table_limit);
 
@@ -202,8 +201,7 @@ protected:
 	virtual ECRESULT	ReloadKeyTable();
 	ECRESULT GetBinarySortKey(struct propVal *in, ECSortCol &out);
 	ECRESULT	GetSortFlags(unsigned int ulPropTag, unsigned char *lpFlags);
-
-	virtual ECRESULT GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount);
+	virtual ECRESULT GetMVRowCount(std::list<unsigned int> &&ids, std::map<unsigned int, unsigned int> &count);
 	virtual ECRESULT ReloadTable(enumReloadType eType);
 	virtual ECRESULT	Load();
 

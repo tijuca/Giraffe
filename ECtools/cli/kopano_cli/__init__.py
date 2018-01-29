@@ -1,15 +1,17 @@
 #!/usr/bin/env python
+from .version import __version__
+
 import getpass
 import locale
 import sys
 import traceback
 
-from MAPI.Tags import PR_EC_STATSTABLE_SYSTEM, PR_DISPLAY_NAME, PR_EC_STATS_SYSTEM_VALUE, PR_EC_RESYNC_ID
+from MAPI.Tags import PR_EC_STATSTABLE_SYSTEM, PR_DISPLAY_NAME, PR_EC_STATS_SYSTEM_VALUE
 import kopano
 from kopano.parser import _true, _int, _name, _guid, _bool, _list_name, _date, _path
 
 def parser_opt_args():
-    parser = kopano.parser('skpcuGCf')
+    parser = kopano.parser('skpcuGCfVUP')
     parser.add_option('--debug', help='Debug mode', **_true())
     parser.add_option('--lang', help='Create folders in this language')
     parser.add_option('--sync', help='Synchronize users and groups with external source', **_true())
@@ -64,7 +66,7 @@ def parser_opt_args():
     parser.add_option('--quota-hard', help='Hardquota limit in MB', **_int())
     parser.add_option('--quota-soft', help='Softquota limit in MB', **_int())
     parser.add_option('--quota-warn', help='Warnquota limit in MB', **_int())
-    parser.add_option('--ooo-active', help='Out-of-office is active', **_bool())
+    parser.add_option('--ooo', help='Out-of-office is enabled', **_bool())
     parser.add_option('--ooo-clear', help='Clear Out-of-office settings', **_true())
     parser.add_option('--ooo-subject', help='Out-of-office subject', **_name())
     parser.add_option('--ooo-message', help='Out-of-office message (path to file)', **_path())
@@ -86,7 +88,7 @@ UPDATE_MATRIX = {
     ('email', 'add_sendas', 'remove_sendas'): ('users', 'groups'),
     ('fullname', 'password', 'password_prompt', 'admin_level', 'active', 'reset_folder_count'): ('users',),
     ('mr_accept', 'mr_accept_conflicts', 'mr_accept_recurring', 'hook_archive', 'unhook_archive'): ('users',),
-    ('ooo_active', 'ooo_clear', 'ooo_subject', 'ooo_message', 'ooo_from', 'ooo_until'): ('users',),
+    ('ooo', 'ooo_clear', 'ooo_subject', 'ooo_message', 'ooo_from', 'ooo_until'): ('users',),
     ('add_feature', 'remove_feature', 'add_delegation', 'remove_delegation'): ('users',),
     ('send_only_to_delegates',): ('users',),
     ('add_permission', 'remove_permission'): ('global', 'companies', 'users'),
@@ -176,6 +178,8 @@ def list_permissions(store):
 
 def user_counts(server): # XXX allowed/available
     stats = server.table(PR_EC_STATSTABLE_SYSTEM).dict_(PR_DISPLAY_NAME, PR_EC_STATS_SYSTEM_VALUE)
+    if sys.hexversion >= 0x03000000: # XXX shouldn't be necessary
+        stats = dict([(s.decode('ascii'), stats[s].decode('ascii')) for s in stats])
     print('User counts:')
     fmt = '\t{:>12}{:>10}'
     print(fmt.format('', 'Used'))
@@ -212,8 +216,8 @@ def user_details(user):
             print(_encode('    '+dlg.user.name+':'+','.join(dlg.flags)))
         print(fmt.format('Auto-accept meeting requests:', yesno(user.autoaccept.enabled)))
         if user.autoaccept.enabled:
-            print(fmt.format('    Decline conflicting:', yesno(not user.autoaccept.conflicts)))
-            print(fmt.format('    Decline recurring:', yesno(not user.autoaccept.recurring)))
+            print(fmt.format('    Accept conflicting:', yesno(user.autoaccept.conflicts)))
+            print(fmt.format('    Accept recurring:', yesno(user.autoaccept.recurring)))
 
         ooo = 'disabled'
         if user.outofoffice.enabled:
@@ -337,17 +341,6 @@ def user_options(name, options, server):
         for folder in [user.root] + list(user.folders()):
             folder.recount()
 
-    if options.fullname:
-        user.fullname = options.fullname
-    if options.password:
-        user.password = options.password
-    if options.password_prompt:
-        user.password = getpass.getpass("Password for '%s': " % user.name)
-    if options.admin_level is not None:
-        user.admin_level = options.admin_level
-    if options.active is not None:
-        user.active = options.active
-
     if options.mr_accept is not None:
         user.autoaccept.enabled = options.mr_accept
     if options.mr_accept_conflicts is not None:
@@ -364,8 +357,8 @@ def user_options(name, options, server):
     delegation_options(user, options, server)
     permission_options(user.store, options, server)
 
-    if options.ooo_active is not None:
-        user.outofoffice.enabled = options.ooo_active
+    if options.ooo is not None:
+        user.outofoffice.enabled = options.ooo
     if options.ooo_clear:
         user.outofoffice.subject = None
         user.outofoffice.message = None
@@ -374,11 +367,22 @@ def user_options(name, options, server):
     if options.ooo_subject is not None:
         user.outofoffice.subject = options.ooo_subject
     if options.ooo_message is not None:
-        user.outofoffice.message = file(options.ooo_message).read()
+        user.outofoffice.message = open(options.ooo_message).read()
     if options.ooo_from is not None:
         user.outofoffice.start = options.ooo_from
     if options.ooo_until is not None:
         user.outofoffice.end = options.ooo_until
+
+    if options.fullname:
+        user.fullname = options.fullname
+    if options.password:
+        user.password = options.password
+    if options.password_prompt:
+        user.password = getpass.getpass("Password for '%s': " % user.name)
+    if options.admin_level is not None:
+        user.admin_level = options.admin_level
+    if options.active is not None:
+        user.active = options.active
 
     if options.details:
         user_details(user)
@@ -485,9 +489,11 @@ def global_options(options, server):
         user_counts(server)
 
     if not (options.companies or options.groups or options.users):
-        for company in server.companies(parse=False):
+        companies = list(server.companies(parse=False))
+        for i, company in enumerate(companies):
             company_overview_options(company, options, server)
-            print
+            if i < len(companies)-1:
+                print
         company_update_options(server.company('Default'), options, server)
 
 def check_options(options, server):

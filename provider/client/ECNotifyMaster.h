@@ -18,6 +18,7 @@
 #ifndef ECNOTIFYMASTER_H
 #define ECNOTIFYMASTER_H
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <mutex>
@@ -28,6 +29,7 @@
 #include <kopano/ECUnknown.h>
 #include <kopano/Util.h>
 #include <kopano/kcodes.h>
+#include <kopano/memory.hpp>
 
 class ECNotifyClient;
 class ECNotifyMaster;
@@ -47,6 +49,10 @@ private:
 	NOTIFYCALLBACK	m_fnCallback;
 };
 
+/*
+ * ECNotifyClient is owned by ECABLogon/ECMsgStore, so the list basically
+ * consists of weak pointers (and must not be changed to object_ptr).
+ */
 typedef std::list<ECNotifyClient*> NOTIFYCLIENTLIST;
 typedef std::map<ULONG, ECNotifySink> NOTIFYCONNECTIONCLIENTMAP;
 typedef std::map<ULONG, NOTIFYLIST> NOTIFYCONNECTIONMAP;
@@ -75,16 +81,17 @@ private:
 
 	static void* NotifyWatch(void *pTmpNotifyClient);
 
-	/* List of Clients attached to this master */
+	/* List of Clients attached to this master. */
 	NOTIFYCLIENTLIST			m_listNotifyClients;
 
-	/* List of all connections, mapped to client */
+	/* List of all connections, mapped to client. */
 	NOTIFYCONNECTIONCLIENTMAP	m_mapConnections;
 
 	/* Connection settings */
+	/* weak ptr: ECNotifyMaster is owned by SessionGroupData */
 	SessionGroupData *m_lpSessionGroupData;
-	WSTransport *m_lpTransport = nullptr;
-	ULONG m_ulConnection = 0;
+	KCHL::object_ptr<WSTransport> m_lpTransport;
+	std::atomic<unsigned int> m_ulConnection{1};
 
 	/* Threading information */
 	std::recursive_mutex m_hMutex;

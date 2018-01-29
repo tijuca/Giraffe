@@ -66,29 +66,21 @@ Include and process
 Example: !include common.cfg
 .RE
 .SH "EXPLANATION OF THE SERVER SETTINGS PARAMETERS"
-.PP
+.TP
+\fBserver_listen\fP
+A space-separated list of address:port specifiers for where the server should
+listen for unencrypted connections. IPv6 addresses need to be enclosed in
+brackets (as in \fB[2a01:db1::]:236\fP), and the asterisk is the multi-protocol
+address wildcard.
+.TP
 \fBserver_bind\fR
-.RS 4
-IP address to bind to. Leave empty to bind to all addresses. Keep in mind that both Webaccess and Outlook must be able to connect. The Webaccess normally connects on ::1/127.0.0.1, and Outlook from remote networks.
-.sp
-Default: (empty)
-.RE
-.PP
-\fBserver_tcp_enabled\fR
-.RS 4
-Enable direct TCP connections.
-.sp
-Default:
-\fIyes\fR
-.RE
-.PP
-\fBserver_tcp_port\fR
-.RS 4
-Port to listen on.
-.sp
-Default:
-\fI236\fR
-.RE
+This historic directive specifies a single IPv4/IPv6 address to bind to. Its
+use is discouraged in favor of \fBserver_listen\fP and \fBserver_listen_tls\fP.
+.TP
+\fBserver_tcp_enabled\fP, \fBserver_tcp_port\fP
+These historic directive specify the single port to bind to for unencrypted
+connections. Their use is discouraged in favor of \fBserver_listen\fP. The
+address is mandated by \fBserver_bind\fP.
 .PP
 \fBserver_pipe_enabled\fR
 .RS 4
@@ -120,14 +112,6 @@ TCP and SSL send timeout in seconds. The send timeout is the amount of time that
 .sp
 Default:
 \fI60\fR
-.RE
-.PP
-\fBserver_max_keep_alive_requests\fR
-.RS 4
-Limits the number of requests allowed per connection.
-.sp
-Default:
-\fI100\fR
 .RE
 .PP
 \fBserver_pipe_name\fR
@@ -307,6 +291,19 @@ The level of output for logging in the range from 0 to 5. 0 means no logging, 5 
 .sp
 Default:
 \fI2\fR
+.sp
+Extended logging per component is available for development and can be combined to log multiple components at the same time.
+.TS
+allbox;
+c c.
+Component	Value
+SQL	0x00010000
+USERPLUGIN	0x00020000
+CACHE	0x00040000
+USERCACHE	0x00080000
+SOAP	0x00100000
+ICS	0x00200000
+.TE
 .RE
 .PP
 \fBlog_timestamp\fR
@@ -466,22 +463,18 @@ Default:
 \fI6\fR
 .RE
 .SH "EXPLANATION OF THE SSL SETTINGS PARAMETERS"
-.PP
-\fBserver_ssl_enabled\fR
-.RS 4
-Enable direct SSL connections. When this option is enabled, you must set the following ssl options correctly, otherwise the server may or will not start.
-.sp
-Default:
-\fIno\fR
-.RE
-.PP
-\fBserver_ssl_port\fR
-.RS 4
-The portnumber to accept SSL connections on.
-.sp
-Default:
-\fI237\fR
-.RE
+.TP
+\fBserver_listen_tls\fP
+A space-separated list of address:port specifiers for where the server should
+listen for TLS connections, similar to the \fBserver_listen\fP directive. The
+default value is empty, which means no ports will be listened on for TLS. When
+this option is used, you must set the SSL key options correctly, otherwise the
+server not start.
+.TP
+\fBserver_ssl_enabled\fP, \fBserver_ssl_port\fP
+These historic directive specify the single port to bind to for SSL
+connections. Their use is discouraged in favor of \fBserver_listen_tls\fP. The
+address is mandated by \fBserver_bind\fP.
 .PP
 \fBserver_ssl_key_file\fR
 .RS 4
@@ -589,14 +582,6 @@ Watchdog max age. The maximum age in ms of a task before a new thread is started
 .sp
 Default:
 \fI500\fR
-.RE
-.PP
-\fBserver_max_keep_alive_requests\fR
-.RS 4
-Maximum SOAP keep_alive value.
-.sp
-Default:
-\fI100\fR
 .RE
 .PP
 \fBserver_recv_timeout\fR
@@ -957,7 +942,7 @@ Default:
 .RS 4
 The hostname of the entry point to the S3 cloud where the bucket is located.
 .sp
-If you are using miniio or an other S3 compatible implementation that is using another port, you can specify the port with hostname:port.
+If you are using minio or another S3 compatible implementation that is using another port, you can specify the port with hostname:port.
 .RE
 .PP
 \fBattachment_s3_region\fR
@@ -1168,14 +1153,6 @@ Default:
 \fIyes\fR
 .RE
 .PP
-\fBcounter_reset\fR
-.RS 4
-The counter_reset option forces a recount of items in the folder each time a folder is opened. Although this is not strictly necessary, it is a precaution to make sure that counters are always correct. When enabled, this does incur a performance penalty, especially on large (>50000 items) folders. Each time a counter_reset found an incorrect item count, it increments the system statistic counter_resyncs. If it is at 0 on your system, then this option has had no effect except for slowing it down.
-.sp
-Default:
-\fIyes\fR
-.RE
-.PP
 \fBproxy_header\fR
 .RS 4
 In normal operation, a cluster of kopano\-server nodes is served by sending redirections back to the clients requesting information. The redirection URL is built from the server\*(Aqs information in the LDAP database. However, in some cases it is useful to place the kopano\-server instances behind a reverse HTTP proxy. In this case the redirected URL returned to the client cannot be the \*(Aqnormal\*(Aq hostname, but must be a URL that is handled by the proxy.
@@ -1214,7 +1191,7 @@ threads, watchdog_max_age, watchdog_frequency, max_deferred_records, max_deferre
 .RS 4
 .RE
 .PP
-counter_reset, user_safe_mode, enable_enhanced_ics, client_update_log_level, client_update_path, client_update_log_path
+user_safe_mode, enable_enhanced_ics, client_update_log_level, client_update_path, client_update_log_path
 .RS 4
 .RE
 .PP

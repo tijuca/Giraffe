@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <list>
 #include <memory>
 #include <string>
 #include <kopano/lockhelper.hpp>
@@ -70,7 +71,6 @@
        
 #include "ECSession.h"
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -420,7 +420,7 @@ ECRESULT ECGenericObjectTable::ReloadTable(enumReloadType eType)
 		if (bMVColsNew == true)
 			assert(false); //FIXME: error 1 mv prop set!!!
 		bMVColsNew = true;
-		listMVPropTag.push_back(lpsPropTagArray->__ptr[i]);
+		listMVPropTag.emplace_back(lpsPropTagArray->__ptr[i]);
 	}
 	
 	//Check for mvi props
@@ -430,7 +430,7 @@ ECRESULT ECGenericObjectTable::ReloadTable(enumReloadType eType)
 		if (bMVSortNew == true)
 			assert(false);
 		bMVSortNew = true;
-		listMVPropTag.push_back(lpsSortOrderArray->__ptr[i].ulPropTag);
+		listMVPropTag.emplace_back(lpsSortOrderArray->__ptr[i].ulPropTag);
 	}
 
 	listMVPropTag.sort();
@@ -450,7 +450,7 @@ ECRESULT ECGenericObjectTable::ReloadTable(enumReloadType eType)
 	// Get all the Single Row IDs from the ID map
 	for (const auto &p : mapObjects)
 		if (p.first.ulOrderId == 0)
-			listRows.push_back(p.first);
+			listRows.emplace_back(p.first);
 	if(mapObjects.empty())
 		goto skip;
 
@@ -490,7 +490,8 @@ skip:
  *
  * @return Kopano error code
  */
-ECRESULT ECGenericObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount)
+ECRESULT ECGenericObjectTable::GetMVRowCount(std::list<unsigned int> &&ids,
+    std::map<unsigned int, unsigned int> &count)
 {
 	return KCERR_NO_SUPPORT;
 }
@@ -595,7 +596,7 @@ ECRESULT ECGenericObjectTable::ReloadKeyTable()
 
 	// Get all the Row IDs from the ID map
 	for (const auto &p : mapObjects)
-		listRows.push_back(p.first);
+		listRows.emplace_back(p.first);
 
 	// Reset the key table
 	lpKeyTable->Clear();
@@ -896,7 +897,7 @@ ECRESULT ECGenericObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int
 
 		// if we use a restriction, memory usage goes up, so only fetch 20 rows at a time
 		for (size_t i = 0; i < (lpsRestrictPropTagArray ? 20 : 256) && iterRows != lpRows->cend(); ++i) {
-			sQueryRows.push_back(*iterRows);
+			sQueryRows.emplace_back(*iterRows);
 			++iterRows;
 		}
 
@@ -1012,8 +1013,7 @@ ECRESULT ECGenericObjectTable::AddTableNotif(ECKeyTable::UpdateType ulAction, sO
 	struct rowSet		*lpRowSetNotif = NULL;
     
     if(ulAction == ECKeyTable::TABLE_ROW_ADD || ulAction == ECKeyTable::TABLE_ROW_MODIFY) {
-        lstItems.push_back(sRowItem);
-        
+		lstItems.emplace_back(sRowItem);
         er = m_lpfnQueryRowData(this, NULL, lpSession, &lstItems, this->lpsPropTagArray, m_lpObjectData, &lpRowSetNotif, true, true);
         if(er != erSuccess)
             goto exit;
@@ -1251,9 +1251,7 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
             // If the row exists, we simply get the data from the properties of this row, including all properties used
             // in the current sort.
             ECObjectTableList list;
-            
-            list.push_back(sKey);
-            
+			list.emplace_back(sKey);
             er = m_lpfnQueryRowData(this, &xmlsoap, lpSession, &list, lpsPropTagArray, m_lpObjectData, &lpsRowSet, false, true);
             if(er != erSuccess)
                 goto exit;
@@ -1380,7 +1378,7 @@ ECRESULT ECGenericObjectTable::UpdateRow(unsigned int ulType, unsigned int ulObj
 {
     std::list<unsigned int> lstObjId;
     
-    lstObjId.push_back(ulObjId);
+	lstObjId.emplace_back(ulObjId);
 	return UpdateRows(ulType, &lstObjId, ulFlags, false);
 }
 
@@ -1442,8 +1440,7 @@ ECRESULT ECGenericObjectTable::UpdateRows(unsigned int ulType, std::list<unsigne
         // Filter out any item we cannot access (for example, in search-results tables)
 		for (const auto &obj_id : *lstObjId)
 			if (CheckPermissions(obj_id) == erSuccess)
-				lstFilteredIds.push_back(obj_id);
-
+				lstFilteredIds.emplace_back(obj_id);
         // Use our filtered list now
         lstObjId = &lstFilteredIds;
     	break;
@@ -1465,14 +1462,9 @@ ECRESULT ECGenericObjectTable::UpdateRows(unsigned int ulType, std::list<unsigne
 	case ECKeyTable::TABLE_ROW_DELETE:
 		// Delete the object ID from our object list, and all items with that object ID (including various order IDs)
 		for (const auto &obj_id : *lstObjId) {
-			auto iterMapObject = this->mapObjects.find(sObjectTableKey(obj_id, 0));
-			while (iterMapObject != this->mapObjects.cend()) {
-				if (iterMapObject->first.ulObjId == obj_id)
-                    ecRowsItem.push_back(iterMapObject->first);
-				else if (iterMapObject->first.ulObjId != obj_id)
-                    break;
-                ++iterMapObject;
-            }
+			for (auto mo = this->mapObjects.find(sObjectTableKey(obj_id, 0));
+			     mo != this->mapObjects.cend() && mo->first.ulObjId == obj_id; ++mo)
+				ecRowsItem.emplace_back(mo->first);
             
 		for (const auto &row : ecRowsItem) {
 			this->mapObjects.erase(row);
@@ -1484,47 +1476,52 @@ ECRESULT ECGenericObjectTable::UpdateRows(unsigned int ulType, std::list<unsigne
 		break;
 
 	case ECKeyTable::TABLE_ROW_MODIFY:
-	case ECKeyTable::TABLE_ROW_ADD:
+	case ECKeyTable::TABLE_ROW_ADD: {
+		std::list<unsigned int> ids;
+		std::map<unsigned int, unsigned int> count;
+
 		for (const auto &obj_id : *lstObjId) {
 			/* Add the object to our list of objects */
-			ecRowsItem.push_back({obj_id, 0});
+			ecRowsItem.emplace_back(obj_id, 0);
+			if (!IsMVSet())
+				continue;
+			ids.emplace_back(obj_id);
+		}
 
-            if(IsMVSet() == true) {
-                // get new mvprop count
-                er = GetMVRowCount(obj_id, &cMVNew);
-                if (er != erSuccess)
-                    assert(false);// What now???
+		// get new mvprop count
+		if (ids.size() > 0) {
+			er = GetMVRowCount(std::move(ids), count);
+			if (er != erSuccess)
+				return er;
+		}
 
-                // get old mvprops count
-                cMVOld = 0;
-                auto iterMapObject = this->mapObjects.find(sObjectTableKey(obj_id, 0));
-                while (iterMapObject != this->mapObjects.cend()) {
-                    if (iterMapObject->first.ulObjId == obj_id) {
-                        ++cMVOld;
-                        if(cMVOld > cMVNew && (ulFlags&OBJECTTABLE_NOTIFY) == OBJECTTABLE_NOTIFY) {
-
-                            auto iterToDelete = iterMapObject;
-                            --iterMapObject;
-                            sRow = iterToDelete->first;
-                            //Delete of map
-                            this->mapObjects.erase(iterToDelete->first);
-                            
-                            DeleteRow(sRow, ulFlags);
-                            
-                            RemoveCategoryAfterRemoveRow(sRow, ulFlags);
-                        }//if(cMVOld > cMVNew)
-                    } else if (iterMapObject->first.ulObjId != obj_id)
-                        break;
-                    ++iterMapObject;
-                }
-                
-                sRow = sObjectTableKey(obj_id, 0);
-                for (i = 1; i < cMVNew; ++i) { // 0 already added
-                    sRow.ulOrderId = i;
-                    ecRowsItem.push_back(sRow);
-                }
-            }
-        }
+		for (const auto &pair : count) {
+			auto obj_id = pair.first;
+			cMVNew = pair.second;
+			// get old mvprops count
+			cMVOld = 0;
+			for (auto iterMapObject = this->mapObjects.find(sObjectTableKey(obj_id, 0));
+			     iterMapObject != this->mapObjects.cend();
+			     ++iterMapObject) {
+				if (iterMapObject->first.ulObjId != obj_id)
+					break;
+				++cMVOld;
+				if (cMVOld <= cMVNew || !(ulFlags & OBJECTTABLE_NOTIFY))
+					continue;
+				auto iterToDelete = iterMapObject;
+				--iterMapObject;
+				sRow = iterToDelete->first;
+				// Delete of map
+				this->mapObjects.erase(iterToDelete->first);
+				DeleteRow(sRow, ulFlags);
+				RemoveCategoryAfterRemoveRow(sRow, ulFlags);
+			}
+			sRow = sObjectTableKey(obj_id, 0);
+			for (i = 1; i < cMVNew; ++i) { // 0 already added
+				sRow.ulOrderId = i;
+				ecRowsItem.emplace_back(sRow);
+			}
+		}
         
         // Remember that the specified row is available		
 		for (const auto &row : ecRowsItem)
@@ -1535,6 +1532,7 @@ ECRESULT ECGenericObjectTable::UpdateRows(unsigned int ulType, std::list<unsigne
 		if(er != erSuccess)
 			return er;
 		break;
+	}
 	case ECKeyTable::TABLE_CHANGE:
 		// The whole table needs to be reread
 		this->Clear();
@@ -1547,7 +1545,8 @@ ECRESULT ECGenericObjectTable::UpdateRows(unsigned int ulType, std::list<unsigne
 	return er;
 }
 
-ECRESULT ECGenericObjectTable::GetRestrictPropTagsRecursive(struct restrictTable *lpsRestrict, list<ULONG> *lpPropTags, ULONG ulLevel)
+ECRESULT ECGenericObjectTable::GetRestrictPropTagsRecursive(struct restrictTable *lpsRestrict,
+    std::list<ULONG> *lpPropTags, ULONG ulLevel)
 {
 	ECRESULT		er = erSuccess;
 
@@ -1586,7 +1585,7 @@ ECRESULT ECGenericObjectTable::GetRestrictPropTagsRecursive(struct restrictTable
 		break;
 
 	case RES_CONTENT:
-		lpPropTags->push_back(lpsRestrict->lpContent->ulPropTag);
+		lpPropTags->emplace_back(lpsRestrict->lpContent->ulPropTag);
 		break;
 
 	case RES_PROPERTY:
@@ -1594,30 +1593,30 @@ ECRESULT ECGenericObjectTable::GetRestrictPropTagsRecursive(struct restrictTable
 			lpPropTags->insert(lpPropTags->end(), sANRProps, sANRProps + ARRAY_SIZE(sANRProps));
 			
 		else {
-			lpPropTags->push_back(lpsRestrict->lpProp->lpProp->ulPropTag);
-			lpPropTags->push_back(lpsRestrict->lpProp->ulPropTag);
+			lpPropTags->emplace_back(lpsRestrict->lpProp->lpProp->ulPropTag);
+			lpPropTags->emplace_back(lpsRestrict->lpProp->ulPropTag);
 		}
 		break;
 
 	case RES_COMPAREPROPS:
-		lpPropTags->push_back(lpsRestrict->lpCompare->ulPropTag1);
-		lpPropTags->push_back(lpsRestrict->lpCompare->ulPropTag2);
+		lpPropTags->emplace_back(lpsRestrict->lpCompare->ulPropTag1);
+		lpPropTags->emplace_back(lpsRestrict->lpCompare->ulPropTag2);
 		break;
 
 	case RES_BITMASK:
-		lpPropTags->push_back(lpsRestrict->lpBitmask->ulPropTag);
+		lpPropTags->emplace_back(lpsRestrict->lpBitmask->ulPropTag);
 		break;
 
 	case RES_SIZE:
-		lpPropTags->push_back(lpsRestrict->lpSize->ulPropTag);
+		lpPropTags->emplace_back(lpsRestrict->lpSize->ulPropTag);
 		break;
 
 	case RES_EXIST:
-		lpPropTags->push_back(lpsRestrict->lpExist->ulPropTag);
+		lpPropTags->emplace_back(lpsRestrict->lpExist->ulPropTag);
 		break;
 
 	case RES_SUBRESTRICTION:
-	    lpPropTags->push_back(PR_ENTRYID); // we need the entryid in subrestriction searches, because we need to know which object to subsearch
+		lpPropTags->emplace_back(PR_ENTRYID); // we need the entryid in subrestriction searches, because we need to know which object to subsearch
 		break;
 	}
 	return erSuccess;
@@ -1637,7 +1636,8 @@ ECRESULT ECGenericObjectTable::GetRestrictPropTagsRecursive(struct restrictTable
  * @param[out] lppPropTags PropTagArray with proptags from lpsRestrict and lstPrefix
  * @return ECRESULT
  */
-ECRESULT ECGenericObjectTable::GetRestrictPropTags(struct restrictTable *lpsRestrict, std::list<ULONG> *lstPrefix, struct propTagArray **lppPropTags)
+ECRESULT ECGenericObjectTable::GetRestrictPropTags(struct restrictTable *lpsRestrict,
+    std::list<ULONG> *lstPrefix, struct propTagArray **lppPropTags)
 {
 	struct propTagArray *lpPropTagArray;
 
@@ -1739,7 +1739,7 @@ ECRESULT ECGenericObjectTable::MatchRowRestrict(ECCacheManager *lpCacheManager,
 		fMatch = !fMatch;
 		break;
 
-	case RES_CONTENT:
+	case RES_CONTENT: {
 		if (lpsRestrict->lpContent == NULL ||
 		    lpsRestrict->lpContent->lpProp == NULL)
 			return KCERR_INVALID_TYPE;
@@ -1776,82 +1776,74 @@ ECRESULT ECGenericObjectTable::MatchRowRestrict(ECCacheManager *lpCacheManager,
 		if(lpProp == NULL) {
 			fMatch = false;
 			break;
+		}
+		unsigned int ulScan = 1;
+		if (ulPropTagRestrict & MV_FLAG)
+		{
+			if (PROP_TYPE(ulPropTagRestrict) == PT_MV_TSTRING)
+				ulScan = lpProp->Value.mvszA.__size;
+			else
+				ulScan = lpProp->Value.mvbin.__size;
+		}
+		ulPropType = PROP_TYPE(ulPropTagRestrict) & ~MVI_FLAG;
+		if (PROP_TYPE(ulPropTagValue) == PT_TSTRING) {
+			lpSearchString = lpsRestrict->lpContent->lpProp->Value.lpszA;
+			ulSearchStringSize = (lpSearchString) ? strlen(lpSearchString) : 0;
 		} else {
-			unsigned int ulScan = 1;
-			if(ulPropTagRestrict & MV_FLAG)
+			lpSearchString = (char *)lpsRestrict->lpContent->lpProp->Value.bin->__ptr;
+			ulSearchStringSize = lpsRestrict->lpContent->lpProp->Value.bin->__size;
+		}
+
+		// Default match is false
+		fMatch = false;
+		for (unsigned int ulPos = 0; ulPos < ulScan; ++ulPos) {
+			if (ulPropTagRestrict & MV_FLAG)
 			{
-				if(PROP_TYPE(ulPropTagRestrict) == PT_MV_TSTRING)
-					ulScan = lpProp->Value.mvszA.__size;
-				else
-					ulScan = lpProp->Value.mvbin.__size;
-			}
-
-			ulPropType = PROP_TYPE(ulPropTagRestrict)&~MVI_FLAG;
-			
-
-			if(PROP_TYPE(ulPropTagValue) == PT_TSTRING) {
-				lpSearchString = lpsRestrict->lpContent->lpProp->Value.lpszA;
-				ulSearchStringSize = (lpSearchString)?strlen(lpSearchString):0;
-			}else {
-				lpSearchString = (char*)lpsRestrict->lpContent->lpProp->Value.bin->__ptr;
-				ulSearchStringSize = lpsRestrict->lpContent->lpProp->Value.bin->__size;
-			}
-					
-			// Default match is false
-			fMatch = false;
-
-			for (unsigned int ulPos = 0; ulPos < ulScan; ++ulPos) {
-				if(ulPropTagRestrict & MV_FLAG)
-				{
-					if(PROP_TYPE(ulPropTagRestrict) == PT_MV_TSTRING)	{
-						lpSearchData = lpProp->Value.mvszA.__ptr[ulPos];
-						ulSearchDataSize = (lpSearchData)?strlen(lpSearchData):0;
-					}else {
-						lpSearchData = (char*)lpProp->Value.mvbin.__ptr[ulPos].__ptr;
-						ulSearchDataSize = lpProp->Value.mvbin.__ptr[ulPos].__size;
-					}
-				}else {
-					if(PROP_TYPE(ulPropTagRestrict) == PT_TSTRING)	{
-						lpSearchData = lpProp->Value.lpszA;
-						ulSearchDataSize = (lpSearchData)?strlen(lpSearchData):0;
-					}else {
-						lpSearchData = (char*)lpProp->Value.bin->__ptr;
-						ulSearchDataSize = lpProp->Value.bin->__size;
-					}
+				if (PROP_TYPE(ulPropTagRestrict) == PT_MV_TSTRING) {
+					lpSearchData = lpProp->Value.mvszA.__ptr[ulPos];
+					ulSearchDataSize = (lpSearchData) ? strlen(lpSearchData) : 0;
+				} else {
+					lpSearchData = (char *)lpProp->Value.mvbin.__ptr[ulPos].__ptr;
+					ulSearchDataSize = lpProp->Value.mvbin.__ptr[ulPos].__size;
 				}
-
-				ulFuzzyLevel = lpsRestrict->lpContent->ulFuzzyLevel;
-				switch(ulFuzzyLevel & 0xFFFF) {
-				case FL_FULLSTRING:
-					if(ulSearchDataSize == ulSearchStringSize)
-						if ((ulPropType == PT_TSTRING &&  (ulFuzzyLevel & FL_IGNORECASE) && u8_iequals(lpSearchData, lpSearchString, locale)) ||
-							(ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_equals(lpSearchData, lpSearchString, locale)) ||
-							(ulPropType != PT_TSTRING && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
-							fMatch = true;							
-					break;
-
-				case FL_PREFIX: 
-					if(ulSearchDataSize >= ulSearchStringSize)
-						if ((ulPropType == PT_TSTRING &&  (ulFuzzyLevel & FL_IGNORECASE) && u8_istartswith(lpSearchData, lpSearchString, locale)) ||
-							(ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_startswith(lpSearchData, lpSearchString, locale)) ||
-							(ulPropType != PT_TSTRING && memcmp(lpSearchData, lpSearchString, ulSearchStringSize) == 0))
-							fMatch = true;
-					break;
-
-				case FL_SUBSTRING: 
-					if ((ulPropType == PT_TSTRING &&  (ulFuzzyLevel & FL_IGNORECASE) && u8_icontains(lpSearchData, lpSearchString, locale)) ||
-						(ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_contains(lpSearchData, lpSearchString, locale)) ||
-						(ulPropType != PT_TSTRING && memsubstr(lpSearchData, ulSearchDataSize, lpSearchString, ulSearchStringSize) == 0))
-						fMatch = true;
-					break;
-				}
-
-				if(fMatch)
-					break;
+			} else if (PROP_TYPE(ulPropTagRestrict) == PT_TSTRING) {
+				lpSearchData = lpProp->Value.lpszA;
+				ulSearchDataSize = (lpSearchData) ? strlen(lpSearchData) : 0;
+			} else {
+				lpSearchData = (char *)lpProp->Value.bin->__ptr;
+				ulSearchDataSize = lpProp->Value.bin->__size;
 			}
+
+			ulFuzzyLevel = lpsRestrict->lpContent->ulFuzzyLevel;
+			switch (ulFuzzyLevel & 0xFFFF) {
+			case FL_FULLSTRING:
+				if (ulSearchDataSize != ulSearchStringSize)
+					break;
+				if ((ulPropType == PT_TSTRING && (ulFuzzyLevel & FL_IGNORECASE) && u8_iequals(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_equals(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType != PT_TSTRING && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
+					fMatch = true;
+				break;
+			case FL_PREFIX:
+				if (ulSearchDataSize < ulSearchStringSize)
+					break;
+				if ((ulPropType == PT_TSTRING && (ulFuzzyLevel & FL_IGNORECASE) && u8_istartswith(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_startswith(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType != PT_TSTRING && memcmp(lpSearchData, lpSearchString, ulSearchStringSize) == 0))
+					fMatch = true;
+				break;
+			case FL_SUBSTRING:
+				if ((ulPropType == PT_TSTRING && (ulFuzzyLevel & FL_IGNORECASE) && u8_icontains(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType == PT_TSTRING && ((ulFuzzyLevel & FL_IGNORECASE) == 0) && u8_contains(lpSearchData, lpSearchString, locale)) ||
+				    (ulPropType != PT_TSTRING && memsubstr(lpSearchData, ulSearchDataSize, lpSearchString, ulSearchStringSize) == 0))
+					fMatch = true;
+				break;
+			}
+			if (fMatch)
+				break;
 		}
 		break;
-
+	}
 	case RES_PROPERTY:
 		if (lpsRestrict->lpProp == NULL ||
 		    lpsRestrict->lpProp->lpProp == NULL)
@@ -1909,11 +1901,10 @@ ECRESULT ECGenericObjectTable::MatchRowRestrict(ECCacheManager *lpCacheManager,
 				lpProp = FindProp(lpPropVals, sANRProps[j]);
 
                 // We need this because CompareProp will fail if the types are not the same
-                if(lpProp) {
-                    lpProp->ulPropTag = lpsRestrict->lpProp->lpProp->ulPropTag;
-                    CompareProp(lpProp, lpsRestrict->lpProp->lpProp, locale, &lCompare); //IGNORE error
-                } else
-                	continue;
+				if (lpProp == nullptr)
+					continue;
+				lpProp->ulPropTag = lpsRestrict->lpProp->lpProp->ulPropTag;
+				CompareProp(lpProp, lpsRestrict->lpProp->lpProp, locale, &lCompare); // IGNORE error
                 	
 				// PR_ANR has special semantics, lCompare is 1 if the substring is found, 0 if not
 				
@@ -1930,40 +1921,38 @@ ECRESULT ECGenericObjectTable::MatchRowRestrict(ECCacheManager *lpCacheManager,
             
             // Finished for this restriction
             break;
-		}else {
+		}
 
-			// find using original restriction proptag
-			lpProp = FindProp(lpPropVals, lpsRestrict->lpProp->ulPropTag);
-			if(lpProp == NULL) {
-				if(lpsRestrict->lpProp->ulType == RELOP_NE)
-					fMatch = true;
-				else
-					fMatch = false;
+		// find using original restriction proptag
+		lpProp = FindProp(lpPropVals, lpsRestrict->lpProp->ulPropTag);
+		if (lpProp == NULL) {
+			if (lpsRestrict->lpProp->ulType == RELOP_NE)
+				fMatch = true;
+			else
+				fMatch = false;
+			break;
+		}
+
+		if ((ulPropTagRestrict & MV_FLAG)) {
+			er = CompareMVPropWithProp(lpProp, lpsRestrict->lpProp->lpProp, lpsRestrict->lpProp->ulType, locale, &fMatch);
+			if (er != erSuccess)
+			{
+				assert(false);
+				er = erSuccess;
+				fMatch = false;
 				break;
 			}
-			
-			if((ulPropTagRestrict&MV_FLAG)) {
-				er = CompareMVPropWithProp(lpProp, lpsRestrict->lpProp->lpProp, lpsRestrict->lpProp->ulType, locale, &fMatch);
-				if(er != erSuccess)
-				{
-					assert(false);
-					er = erSuccess;
-					fMatch = false;
-					break;	
-				}
-			} else {
-				er = CompareProp(lpProp, lpsRestrict->lpProp->lpProp, locale, &lCompare);
-				if(er != erSuccess)
-				{
-					assert(false);
-					er = erSuccess;
-					fMatch = false;
-					break;	
-				}
-				
-				fMatch = match(lpsRestrict->lpProp->ulType, lCompare);
-			}
-		}// if(ulPropTagRestrict == PR_ANR)
+			break;
+		}
+		er = CompareProp(lpProp, lpsRestrict->lpProp->lpProp, locale, &lCompare);
+		if (er != erSuccess)
+		{
+			assert(false);
+			er = erSuccess;
+			fMatch = false;
+			break;
+		}
+		fMatch = match(lpsRestrict->lpProp->ulType, lCompare);
 		break;
 		
 	case RES_COMPAREPROPS:
@@ -2105,25 +2094,23 @@ ECRESULT ECGenericObjectTable::MatchRowRestrict(ECCacheManager *lpCacheManager,
 			return KCERR_INVALID_TYPE;
 	    if(lpSubResults == NULL) {
 	        fMatch = false;
-        } else {
-            // Find out if this object matches this subrestriction with the passed
-            // subrestriction results.
-         
-            if(lpSubResults->size() <= ulSubRestrict) {
-                fMatch = false; // No results in the results list for this subquery ??
-            } else {
-				fMatch = false;
-
-				sEntryId.__ptr = lpProp->Value.bin->__ptr;
-				sEntryId.__size = lpProp->Value.bin->__size;
-				if(lpCacheManager->GetObjectFromEntryId(&sEntryId, &ulResId) == erSuccess)
-				{
-					auto r = (*lpSubResults)[ulSubRestrict].find(ulResId); // If the item is in the set, it matched
-					if (r != (*lpSubResults)[ulSubRestrict].cend())
-						fMatch = true;
-				}
-            }
-        }
+			break;
+		}
+		// Find out if this object matches this subrestriction with the passed
+		// subrestriction results.
+		if (lpSubResults->size() <= ulSubRestrict) {
+			fMatch = false; // No results in the results list for this subquery ??
+			break;
+		}
+		fMatch = false;
+		sEntryId.__ptr = lpProp->Value.bin->__ptr;
+		sEntryId.__size = lpProp->Value.bin->__size;
+		if (lpCacheManager->GetObjectFromEntryId(&sEntryId, &ulResId) == erSuccess)
+		{
+			auto r = (*lpSubResults)[ulSubRestrict].find(ulResId); // If the item is in the set, it matched
+			if (r != (*lpSubResults)[ulSubRestrict].cend())
+				fMatch = true;
+		}
 		break;
 
 	default:
@@ -2349,8 +2336,7 @@ ECRESULT ECGenericObjectTable::AddCategoryBeforeAddRow(sObjectTableKey sObjKey, 
 			// Add the category into our sorted-category list and numbered-category list
             assert(m_mapSortedCategories.find(row) == m_mapSortedCategories.end());
             m_mapCategories[sCatRow] = lpCategory;
-            lpCategory->iSortedCategory = m_mapSortedCategories.insert(std::make_pair(row, sCatRow)).first;
-
+			lpCategory->iSortedCategory = m_mapSortedCategories.emplace(row, sCatRow).first;
 			// Update the keytable with the effective sort columns
 			er = UpdateKeyTableRow(lpCategory, &sCatRow, lpProps, i+1, fHidden, &sPrevRow, &ulAction);
 			if (er != erSuccess)
@@ -2597,7 +2583,6 @@ ECRESULT ECGenericObjectTable::RemoveCategoryAfterRemoveRow(sObjectTableKey sObj
     sObjectTableKey sPrevRow(0,0);
     ECLeafMap::const_iterator iterLeafs;
     ECKeyTable::UpdateType ulAction;
-    ECCategory *lpCategory = NULL;
     ECCategory *lpParent = NULL;
     bool fModified = false;
     bool fHidden = false;
@@ -2613,10 +2598,9 @@ ECRESULT ECGenericObjectTable::RemoveCategoryAfterRemoveRow(sObjectTableKey sObj
         goto exit;
     }
     
-    lpCategory = iterLeafs->second.lpCategory;
-
     // Loop through this category and all its parents
-    while(lpCategory) {
+	for (auto lpCategory = iterLeafs->second.lpCategory;
+	     lpCategory != nullptr; lpCategory = lpParent) {
     	ulDepth = lpCategory->m_ulDepth;
     	
         lpParent = lpCategory->m_lpParent;
@@ -2674,46 +2658,39 @@ ECRESULT ECGenericObjectTable::RemoveCategoryAfterRemoveRow(sObjectTableKey sObj
 			}
 		}
             
-        if(lpCategory->GetCount() == 0) {
-            // The category row is empty and must be removed
-            ECTableRow *lpRow = NULL; // reference to the row in the keytable
-            
-            er = lpKeyTable->GetRow(&sCatRow, &lpRow);
-            if(er != erSuccess) {
-		assert(false);
-            	goto exit;
+		if (lpCategory->GetCount() != 0) {
+			if (ulFlags & OBJECTTABLE_NOTIFY) {
+				// The category row has changed; the counts have updated, send a notification
+				if (lpKeyTable->GetPreviousRow(&sCatRow, &sPrevRow) != erSuccess)
+					sPrevRow.ulOrderId = sPrevRow.ulObjId = 0;
+				AddTableNotif(ECKeyTable::TABLE_ROW_MODIFY, sCatRow, &sPrevRow);
 			}
-        	
-        	// Remove the category from the sorted categories map
-        	m_mapSortedCategories.erase(lpCategory->iSortedCategory);
-        	
-        	// Remove the category from the keytable
-			lpKeyTable->UpdateRow(ECKeyTable::TABLE_ROW_DELETE, &sCatRow, {}, nullptr, false, &ulAction);
+			continue;
+		}
+		// The category row is empty and must be removed
+		ECTableRow *lpRow = NULL; // reference to the row in the keytable
+		er = lpKeyTable->GetRow(&sCatRow, &lpRow);
+		if (er != erSuccess) {
+			assert(false);
+			goto exit;
+		}
 
-            // Remove the category from the category map
-            assert(m_mapCategories.find(sCatRow) != m_mapCategories.end());
-            m_mapCategories.erase(sCatRow);
-            
-            // Free the category itself
-            delete lpCategory;
-            
-            // Send the notification
-            if (ulAction == ECKeyTable::TABLE_ROW_DELETE && (ulFlags & OBJECTTABLE_NOTIFY))
+		// Remove the category from the sorted categories map
+		m_mapSortedCategories.erase(lpCategory->iSortedCategory);
+
+		// Remove the category from the keytable
+		lpKeyTable->UpdateRow(ECKeyTable::TABLE_ROW_DELETE, &sCatRow, {}, nullptr, false, &ulAction);
+
+		// Remove the category from the category map
+		assert(m_mapCategories.find(sCatRow) != m_mapCategories.end());
+		m_mapCategories.erase(sCatRow);
+
+		// Free the category itself
+		delete lpCategory;
+
+		// Send the notification
+		if (ulAction == ECKeyTable::TABLE_ROW_DELETE && (ulFlags & OBJECTTABLE_NOTIFY))
                 AddTableNotif(ulAction, sCatRow, NULL);
-        } else {    
-            if(ulFlags & OBJECTTABLE_NOTIFY) {
-                // The category row has changed; the counts have updated, send a notification
-                
-                if(lpKeyTable->GetPreviousRow(&sCatRow, &sPrevRow) != erSuccess) {
-                    sPrevRow.ulOrderId = 0;
-                    sPrevRow.ulObjId = 0;
-                }
-                
-                AddTableNotif(ECKeyTable::TABLE_ROW_MODIFY, sCatRow, &sPrevRow);
-            }
-        }
-        
-        lpCategory = lpParent;
     }
 
     // Remove the leaf from the leaf map
@@ -2930,7 +2907,7 @@ ECRESULT ECCategory::UpdateMinMax(const sObjectTableKey &sKey, unsigned int i, s
 		
 	auto iterMinMax = m_mapMinMax.find(sKey);
 	if (iterMinMax == m_mapMinMax.cend()) {
-		m_mapMinMax.insert(std::make_pair(sKey, lpNew));
+		m_mapMinMax.emplace(sKey, lpNew);
 	} else {
 		FreePropVal(iterMinMax->second, true); // NOTE this may free lpNewValue, so you can't use that anymore now
 		iterMinMax->second = lpNew;

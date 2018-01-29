@@ -28,6 +28,7 @@ enum {
   #include "config.h"
   #endif
   #include <kopano/platform.linux.h>
+#include <chrono>
 #include <string>
 #include <type_traits>
 #include <cstddef>
@@ -54,23 +55,7 @@ void	RTimeToFileTime(LONG rtime, FILETIME *pft);
 extern _kc_export void FileTimeToRTime(const FILETIME *, LONG *rtime);
 extern _kc_export HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime);
 extern _kc_export HRESULT RTimeToUnixTime(LONG rtime, time_t *unixtime);
-extern _kc_export double GetTimeOfDay(void);
-
-inline double difftimeval(struct timeval *ptstart, struct timeval *ptend) {
-	return 1000000 * (ptend->tv_sec - ptstart->tv_sec) + (ptend->tv_usec - ptstart->tv_usec);
-}
-
 extern _kc_export struct tm *gmtime_safe(const time_t *timer, struct tm *result);
-
-/**
- * Creates the deadline timespec, which is the current time plus the specified
- * amount of milliseconds.
- *
- * @param[in]	ulTimeoutMs		The timeout in ms.
- * @return		The required timespec.
- */
-struct timespec GetDeadline(unsigned int ulTimeoutMs);
-
 extern _kc_export double timespec2dbl(const struct timespec &);
 extern bool operator==(const FILETIME &, const FILETIME &) noexcept;
 extern _kc_export bool operator >(const FILETIME &, const FILETIME &) noexcept;
@@ -90,7 +75,6 @@ extern _kc_export int CreatePath(const char *);
 // Random-number generators
 extern _kc_export void rand_init(void);
 extern _kc_export int rand_mt(void);
-extern _kc_export void rand_free(void);
 extern _kc_export void rand_get(char *p, int n);
 extern _kc_export char *get_password(const char *prompt);
 
@@ -109,8 +93,6 @@ extern _kc_export ssize_t read_retry(int, void *, size_t);
 extern _kc_export ssize_t write_retry(int, const void *, size_t);
 
 extern _kc_export void set_thread_name(pthread_t, const std::string &);
-extern _kc_export void my_readahead(int fd);
-extern _kc_export void give_filesize_hint(int fd, off_t len);
 
 extern _kc_export bool force_buffers_to_disk(int fd);
 extern _kc_export int ec_relocate_fd(int);
@@ -127,6 +109,13 @@ template<typename T> constexpr const IID &iid_of();
 template<typename T> static inline constexpr const IID &iid_of(const T &)
 {
 	return iid_of<typename std::remove_cv<typename std::remove_pointer<T>::type>::type>();
+}
+
+using time_point = std::chrono::time_point<std::chrono::steady_clock>;
+
+template<typename T> static constexpr inline double dur2dbl(const T &t)
+{
+	return std::chrono::duration_cast<std::chrono::duration<double>>(t).count();
 }
 
 #if (defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) || \

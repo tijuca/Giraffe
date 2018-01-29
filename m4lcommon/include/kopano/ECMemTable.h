@@ -21,6 +21,7 @@
 #include <kopano/zcdefs.h>
 #include <vector>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -120,8 +121,8 @@ public:
 	_kc_hidden virtual HRESULT SeekRow(BOOKMARK origin, LONG row_coutn, LONG *rows_sought);
 	_kc_hidden virtual HRESULT SeekRowApprox(ULONG numerator, ULONG denominator);
 	_kc_hidden virtual HRESULT QueryPosition(ULONG *row, ULONG *numerator, ULONG *denominator);
-	_kc_hidden virtual HRESULT FindRow(LPSRestriction, BOOKMARK origin, ULONG flags);
-	_kc_hidden virtual HRESULT Restrict(LPSRestriction, ULONG flags);
+	_kc_hidden virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) _kc_override;
+	_kc_hidden virtual HRESULT Restrict(const SRestriction *, ULONG flags) _kc_override;
 	_kc_hidden virtual HRESULT CreateBookmark(BOOKMARK *pos);
 	_kc_hidden virtual HRESULT FreeBookmark(BOOKMARK pos);
 	_kc_hidden virtual HRESULT SortTable(const SSortOrderSet *sort_crit, ULONG flags);
@@ -140,7 +141,7 @@ private:
 	_kc_hidden HRESULT QueryRowData(ECObjectTableList *row_list, LPSRowSet *rows);
 	_kc_hidden HRESULT Notify(ULONG table_event, sObjectTableKey *row_item, sObjectTableKey *prev_row);
 
-	ECKeyTable *			lpKeyTable;
+	ECKeyTable lpKeyTable;
 	SSortOrderSet *lpsSortOrderSet = nullptr;
 	LPSPropTagArray			lpsPropTags;		// Columns
 	SRestriction *lpsRestriction = nullptr;

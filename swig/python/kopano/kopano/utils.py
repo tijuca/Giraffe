@@ -27,7 +27,7 @@ from MAPI.Struct import (
 )
 
 from .compat import unhex as _unhex, hex as _hex
-from .errors import NotFoundError
+from .errors import Error, NotFoundError
 
 if sys.hexversion >= 0x03000000:
     from . import table as _table
@@ -90,33 +90,17 @@ def rectime_to_unixtime(t):
 def unixtime_to_rectime(t):
     return int(t / 60) + 194074560
 
-def extract_ipm_ol2007_entryids(blob, offset):
-    # Extracts entryids from PR_IPM_OL2007_ENTRYIDS blob using
-    # logic from common/Util.cpp Util::ExtractAdditionalRenEntryID.
-    pos = 0
-    while True:
-        blocktype = unpack_short(blob, pos)
-        if blocktype == 0:
-            break
-        pos += 2
-
-        totallen = unpack_short(blob, pos)
-        pos += 2
-
-        if blocktype == offset:
-            pos += 2 # skip check
-            sublen = unpack_short(blob, pos)
-            pos += 2
-            return _hex(blob[pos:pos + sublen])
-        else:
-            pos += totallen
-
 def permissions(obj):
         try:
             acl_table = obj.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, 0)
         except MAPIErrorNotFound:
             return
-        table = _table.Table(obj.server, acl_table.GetTable(0), PR_ACL_TABLE)
+        table = _table.Table(
+            obj.server,
+            obj.mapiobj,
+            acl_table.GetTable(0),
+            PR_ACL_TABLE,
+        )
         for row in table.dict_rows():
             yield _permission.Permission(acl_table, row, obj.server)
 
@@ -173,26 +157,34 @@ def human_to_bytes(s):
         prefix[s] = 1 << (i + 1) * 10
     return int(num * prefix[letter])
 
-# XXX check doc for exact format, check php version
-def _get_timezone(date, tz_data):
-    if tz_data is None:
-        return 0
-
-    timezone, _, timezonedst, _, dstendmonth, dstendweek, dstendhour, _, _, _, dststartmonth, dststartweek, dststarthour, _, _ = struct.unpack('<lllllHHllHlHHlH', tz_data)
-
+def _in_dst(date, dststartmonth, dststartweek, dststarthour, dstendmonth, dstendweek, dstendhour):
     dststart = datetime.datetime(date.year, dststartmonth, 1) + \
         datetime.timedelta(seconds=dststartweek*7*24*60*60 + dststarthour*60*60)
 
     dstend = datetime.datetime(date.year, dstendmonth, 1) + \
         datetime.timedelta(seconds=dstendweek*7*24*60*60 + dstendhour*60*60)
 
-    dst = False
     if dststart <= dstend:
         if dststart < date < dstend:
-            dst = True
+            return True
     else:
         if data < dstend or data > dststart:
-            dst = True
+            return True
+
+# XXX check doc for exact format, check php version
+def _get_timezone(date, tz_data, align_dst=False):
+    if tz_data is None:
+        return 0
+
+    timezone, _, timezonedst, _, dstendmonth, dstendweek, dstendhour, _, _, _, dststartmonth, dststartweek, dststarthour, _, _ = struct.unpack('<lllllHHllHlHHlH', tz_data)
+
+    dst = _in_dst(date, dststartmonth, dststartweek, dststarthour, dstendmonth, dstendweek, dstendhour)
+
+    # TODO use DST-aware datetimes?
+    if align_dst and not _in_dst(datetime.datetime.now(),
+       dststartmonth, dststartweek, dststarthour,
+       dstendmonth, dstendweek, dstendhour):
+        dst = not dst
 
     if dst:
         return timezone + timezonedst
@@ -202,5 +194,18 @@ def _get_timezone(date, tz_data):
 def _from_gmt(date, tz_data):
     return date - datetime.timedelta(minutes=_get_timezone(date, tz_data))
 
-def _to_gmt(date, tz_data):
-    return date + datetime.timedelta(minutes=_get_timezone(date, tz_data))
+def _to_gmt(date, tz_data, align_dst=False):
+    return date + datetime.timedelta(minutes=_get_timezone(date, tz_data, align_dst=align_dst))
+
+def arg_objects(arg, supported_classes, method_name):
+    if isinstance(arg, supported_classes):
+        objects = [arg]
+    else:
+        try:
+            objects = list(arg)
+        except TypeError:
+            raise Error('invalid argument to %s' % method_name)
+
+    if [o for o in objects if not isinstance(o, supported_classes)]:
+        raise Error('invalid argument to %s' % method_name)
+    return objects

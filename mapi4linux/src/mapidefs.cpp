@@ -16,8 +16,10 @@
  */
 
 #include <kopano/platform.h>
+#include <list>
 #include <memory>
 #include <new>
+#include <string>
 #include <utility>
 #include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
@@ -40,7 +42,6 @@
 
 #include <set>
 
-using namespace std;
 using namespace KCHL;
 
 // ---
@@ -66,7 +67,7 @@ HRESULT M4LMAPIProp::SaveChanges(ULONG ulFlags) {
 HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
     ULONG ulFlags, ULONG *lpcValues, SPropValue **lppPropArray)
 {
-	list<LPSPropValue>::const_iterator i;
+	std::list<SPropValue *>::const_iterator i;
 	ULONG c;
 	memory_ptr<SPropValue> props;
 	HRESULT hr = hrSuccess;
@@ -86,13 +87,13 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 			// perform unicode conversion if required
 			if ((ulFlags & MAPI_UNICODE) && PROP_TYPE((*i)->ulPropTag) == PT_STRING8) {
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_UNICODE);
-				unicode = converter.convert_to<wstring>((*i)->Value.lpszA);
+				unicode = converter.convert_to<std::wstring>((*i)->Value.lpszA);
 				sConvert.Value.lpszW = (WCHAR*)unicode.c_str();
 
 				lpCopy = &sConvert;
 			} else if ((ulFlags & MAPI_UNICODE) == 0 && PROP_TYPE((*i)->ulPropTag) == PT_UNICODE) {
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_STRING8);
-				ansi = converter.convert_to<string>((*i)->Value.lpszW);
+				ansi = converter.convert_to<std::string>((*i)->Value.lpszW);
 				sConvert.Value.lpszA = (char*)ansi.c_str();
 
 				lpCopy = &sConvert;
@@ -124,7 +125,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 			{
 				// string8 to unicode
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_UNICODE);
-				unicode = converter.convert_to<wstring>((*i)->Value.lpszA);
+				unicode = converter.convert_to<std::wstring>((*i)->Value.lpszA);
 				sConvert.Value.lpszW = (WCHAR*)unicode.c_str();
 				lpCopy = &sConvert;
 			}
@@ -134,7 +135,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 			{
 				// unicode to string8
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_STRING8);
-				ansi = converter.convert_to<string>((*i)->Value.lpszW);
+				ansi = converter.convert_to<std::string>((*i)->Value.lpszW);
 				sConvert.Value.lpszA = (char *)ansi.c_str();
 				lpCopy = &sConvert;
 			}
@@ -149,7 +150,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 				if (hr != hrSuccess)
 					return hr;
 				for (ULONG c = 0; c < (*i)->Value.MVszA.cValues; ++c) {
-					unicode = converter.convert_to<wstring>((*i)->Value.MVszA.lppszA[c]);
+					unicode = converter.convert_to<std::wstring>((*i)->Value.MVszA.lppszA[c]);
 					hr = MAPIAllocateMore(unicode.length() * sizeof(WCHAR) + sizeof(WCHAR), props, (void**)&sConvert.Value.MVszW.lppszW[c]);
 					if (hr != hrSuccess)
 						return hr;
@@ -168,7 +169,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 				if (hr != hrSuccess)
 					return hr;
 				for (ULONG c = 0; c < (*i)->Value.MVszW.cValues; ++c) {
-					ansi = converter.convert_to<string>((*i)->Value.MVszW.lppszW[c]);
+					ansi = converter.convert_to<std::string>((*i)->Value.MVszW.lppszW[c]);
 					hr = MAPIAllocateMore(ansi.length() + 1, props, (void**)&sConvert.Value.MVszA.lppszA[c]);
 					if (hr != hrSuccess)
 						return hr;
@@ -209,7 +210,7 @@ HRESULT M4LMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfa
 HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
     SPropProblemArray **lppProblems)
 {
-	list<LPSPropValue>::iterator i, del;
+	std::list<SPropValue *>::iterator i, del;
 	ULONG c;
 	LPSPropValue pv = NULL;
 
@@ -252,7 +253,7 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
 			MAPIFreeBuffer(pv);
 			return hr;
 		}
-		properties.push_back(pv);
+		properties.emplace_back(pv);
 	}
 	return hrSuccess;
 }
@@ -290,8 +291,9 @@ HRESULT M4LMAPIProp::CopyProps(const SPropTagArray *lpIncludeProps,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPIProp::GetNamesFromIDs(LPSPropTagArray* lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG* lpcPropNames,
-				     LPMAPINAMEID** lpppPropNames) {
+HRESULT M4LMAPIProp::GetNamesFromIDs(SPropTagArray **tags, const GUID *propset,
+    ULONG flags, ULONG *nvals, MAPINAMEID ***names)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
@@ -403,11 +405,13 @@ HRESULT M4LMAPITable::QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG 
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, ULONG ulFlags) {
+HRESULT M4LMAPITable::FindRow(const SRestriction *, BOOKMARK origin, ULONG fl)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags) {
+HRESULT M4LMAPITable::Restrict(const SRestriction *, ULONG flags)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
@@ -639,7 +643,7 @@ HRESULT M4LProviderAdmin::CreateProvider(const TCHAR *lpszProvider,
 	entry->servicename = szService;
 	if(lpUID)
 		*lpUID = entry->uid;
-	msa->providers.push_back(std::move(entry));
+	msa->providers.emplace_back(std::move(entry));
 	// We should really call the MSGServiceEntry with MSG_SERVICE_PROVIDER_CREATE, but there
 	// isn't much use at the moment. (since we don't store the profile data on disk? or why not?)
 	// another rumor is that that is only called once per service, not once per created provider. huh?
@@ -822,7 +826,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 			continue;
 
 		std::copy(lpPropArray->aulPropTag, lpPropArray->aulPropTag + lpPropArray->cValues, std::inserter(stProps, stProps.begin()));
-		lHierarchies.push_back(std::move(lpABHierarchy));
+		lHierarchies.emplace_back(std::move(lpABHierarchy));
 	}
 
 	// remove key row
@@ -853,11 +857,9 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 				return hr;
 			if (lpsRows->cRows == 0)
 				break;
-
-			lpsRows->aRow[0].lpProps[stProps.size()].ulPropTag = PR_ROWID;
-			lpsRows->aRow[0].lpProps[stProps.size()].Value.ul = n++;
-
-			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, lpsRows->aRow[0].lpProps, lpsRows->aRow[0].cValues);
+			lpsRows[0].lpProps[stProps.size()].ulPropTag = PR_ROWID;
+			lpsRows[0].lpProps[stProps.size()].Value.ul  = n++;
+			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, nullptr, lpsRows[0].lpProps, lpsRows[0].cValues);
 			if(hr != hrSuccess)
 				return hr;
 		}

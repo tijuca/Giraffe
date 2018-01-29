@@ -30,14 +30,10 @@
 
 using namespace KCHL;
 
-M4LMAPIGetSession::M4LMAPIGetSession(LPMAPISESSION new_session) {
+M4LMAPIGetSession::M4LMAPIGetSession(IMAPISession *new_session) :
+	session(new_session)
+{
 	assert(new_session != NULL);
-	session = new_session;
-	session->AddRef();
-}
-
-M4LMAPIGetSession::~M4LMAPIGetSession() {
-	session->Release();
 }
 
 HRESULT M4LMAPIGetSession::GetMAPISession(LPUNKNOWN *lppSession)
@@ -65,15 +61,12 @@ M4LMAPISupport::M4LMAPISupport(LPMAPISESSION new_session, LPMAPIUID lpUid,
 	session(new_session), service(lpService)
 {
 	if(lpUid) {
-    	this->lpsProviderUID = new MAPIUID;
-        memcpy(this->lpsProviderUID, lpUid, sizeof(MAPIUID));
-		return;
+		lpsProviderUID.reset(new MAPIUID);
+		memcpy(lpsProviderUID.get(), lpUid, sizeof(MAPIUID));
 	}
-        this->lpsProviderUID = NULL;
 }
 
 M4LMAPISupport::~M4LMAPISupport() {
-	delete lpsProviderUID;
 	for (const auto &i : m_advises)
 		MAPIFreeBuffer(i.second.lpKey);
 }
@@ -103,7 +96,7 @@ HRESULT M4LMAPISupport::Subscribe(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulF
 	memcpy(lpNewKey, lpKey, sizeof(*lpKey));
 	l_adv.lock();
 	++m_connections;
-	m_advises.insert({m_connections, {lpNewKey, ulEventMask, ulFlags, lpAdviseSink}});
+	m_advises.emplace(m_connections, M4LSUPPORTADVISE(lpNewKey, ulEventMask, ulFlags, lpAdviseSink));
 	*lpulConnection = m_connections;
 	return hrSuccess;
 }
@@ -141,7 +134,7 @@ HRESULT M4LMAPISupport::OpenProfileSection(const MAPIUID *lpUid, ULONG ulFlags,
     IProfSect **lppProfileObj)
 {
 	if (lpUid == NULL)
-		lpUid = lpsProviderUID;
+		lpUid = lpsProviderUID.get();
 	return session->OpenProfileSection(lpUid, nullptr, ulFlags, lppProfileObj);
 }
 
@@ -409,7 +402,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 	MAPITablePtr ptrRecipientTable;
 	SRowSetPtr ptrRow;
 	AddrBookPtr ptrAddrBook;
-	std::set<std::vector<unsigned char> > setFilter;
+	std::set<std::string> setFilter;
 	SPropTagArrayPtr ptrColumns;
 
 	hr = session->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~ptrAddrBook);
@@ -433,30 +426,28 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 		MAPITablePtr ptrMemberTable;
 		SRowSetPtr ptrMembers;
 
-		hr = ptrRecipientTable->QueryRows(1, 0L, &ptrRow);
+		hr = ptrRecipientTable->QueryRows(1, 0L, &~ptrRow);
 		if (hr != hrSuccess)
 			return hr;
 		if (ptrRow.size() == 0)
 			break;
-
-		lpAddrType = PCpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_ADDRTYPE);
+		lpAddrType = ptrRow[0].cfind(PR_ADDRTYPE);
 		if (!lpAddrType)
 			continue;
 		if (_tcscmp(lpAddrType->Value.LPSZ, KC_T("MAPIPDL")))
 			continue;
-
-		lpDLEntryID = PCpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_ENTRYID);
+		lpDLEntryID = ptrRow[0].cfind(PR_ENTRYID);
 		if (!lpDLEntryID)
 			continue;
 
-		if (setFilter.find(std::vector<unsigned char>(lpDLEntryID->Value.bin.lpb, lpDLEntryID->Value.bin.lpb + lpDLEntryID->Value.bin.cb)) != setFilter.end()) {
+		if (setFilter.find(std::string(lpDLEntryID->Value.bin.lpb, lpDLEntryID->Value.bin.lpb + lpDLEntryID->Value.bin.cb)) != setFilter.end()) {
 			// already expanded this group so continue without opening
 			hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRow.get());
 			if (hr != hrSuccess)
 				return hr;
 			continue;
 		}
-		setFilter.insert(std::vector<unsigned char>(lpDLEntryID->Value.bin.lpb, lpDLEntryID->Value.bin.lpb + lpDLEntryID->Value.bin.cb));
+		setFilter.emplace(lpDLEntryID->Value.bin.lpb, lpDLEntryID->Value.bin.lpb + lpDLEntryID->Value.bin.cb);
 		hr = ptrAddrBook->OpenEntry(lpDLEntryID->Value.bin.cb,
 		     reinterpret_cast<ENTRYID *>(lpDLEntryID->Value.bin.lpb),
 		     &iid_of(ptrDistList), 0, &ulObjType, &~ptrDistList);
@@ -478,7 +469,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 
 		// Get all recipients in distlist, and add to message.
 		// If another distlist is here, it will expand in the next loop.
-		hr = ptrMemberTable->QueryRows(-1, fMapiUnicode, &ptrMembers);
+		hr = ptrMemberTable->QueryRows(-1, fMapiUnicode, &~ptrMembers);
 		if (hr != hrSuccess)
 			continue;
 
@@ -490,7 +481,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 					continue;
 
 				// prop is unknown, find prop in recip, and copy value
-				auto lpRecipProp = PCpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, CHANGE_PROP_TYPE(ptrMembers[c].lpProps[i].ulPropTag, PT_UNSPECIFIED));
+				auto lpRecipProp = ptrRow[0].cfind(CHANGE_PROP_TYPE(ptrMembers[c].lpProps[i].ulPropTag, PT_UNSPECIFIED));
 				if (lpRecipProp)
 					ptrMembers[c].lpProps[i] = *lpRecipProp;
 				// else: leave property unknown

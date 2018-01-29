@@ -196,7 +196,7 @@ struct ns:getStoreTypeResponse {
 };
 
 
-// Warning, this is synched with MAPI's types!
+/* Warning, this is synced with MAPI's types! */
 enum SortOrderType { EC_TABLE_SORT_ASCEND=0, EC_TABLE_SORT_DESCEND, EC_TABLE_SORT_COMBINE, EC_TABLE_SORT_CATEG_MAX = 4, EC_TABLE_SORT_CATEG_MIN = 8};
 
 struct sortOrder {
@@ -429,11 +429,6 @@ struct userobjectArray {
 	struct userobject *__ptr;
 };
 
-struct ns:userobjectResponse {
-	struct userobjectArray *pUserObjectArray;
-	unsigned int er;
-};
-
 struct ns:getOwnerResponse {
 	unsigned int ulOwner;
 	entryId sOwner;
@@ -603,7 +598,7 @@ struct user {
 	char		*lpszMailAddress;
 	char		*lpszFullName;
 	char		*lpszServername;
-	unsigned int 	ulIsNonActive;
+	unsigned int 	ulIsNonActive; // unused
 	unsigned int 	ulIsAdmin;
 	unsigned int	ulIsABHidden;
 	unsigned int	ulCapacity;
@@ -845,21 +840,6 @@ struct ns:resolvePseudoUrlResponse {
 	unsigned int er;
 };
 
-struct licenseCapabilities {
-    int __size;
-    char **__ptr;
-};
-
-struct ns:getLicenseCapaResponse {
-    struct licenseCapabilities sCapabilities;
-    unsigned int er;
-};
-
-struct ns:getLicenseUsersResponse {
-	unsigned int ulUsers;
-	unsigned int er;
-};
-
 struct server {
 	char *lpszName;
 	char *lpszFilePath;
@@ -981,7 +961,6 @@ int ns__logoff(ULONG64 ulSessionId, unsigned int *result);
 
 int ns__getRights(ULONG64 ulSessionId, entryId sEntryId, int ulType, struct ns:rightsResponse *lpsRightResponse);
 int ns__setRights(ULONG64 ulSessionId, entryId sEntryId, struct rightsArray *lpsrightsArray, unsigned int *result);
-int ns__getUserObjectList(ULONG64 ulSessionId, unsigned int ulCompanyId, entryId sCompanyId, int ulType, struct ns:userobjectResponse *lpsUserObjectResponse);
 
 /* loads a big prop from an object */
 int ns__loadProp(ULONG64 ulSessionId, entryId sEntryId, unsigned int ulObjId, unsigned int ulPropTag, struct ns:loadPropResponse *lpsResponse);
@@ -1036,7 +1015,6 @@ int ns__tableMulti(ULONG64 ulSessionId, struct tableMultiRequest sRequest, struc
 int ns__submitMessage(ULONG64 ulSessionId, entryId sEntryId, unsigned int ulFlags, unsigned int *result);
 int ns__finishedMessage(ULONG64 ulSessionId, entryId sEntryId, unsigned int ulFlags, unsigned int *result);
 int ns__abortSubmit(ULONG64 ulSessionId, entryId sEntryId, unsigned int *result);
-int ns__isMessageInQueue(ULONG64 ulSessionId, entryId sEntryId, unsigned int *result);
 
 // Get user ID / store for username (username == NULL for current user)
 int ns__resolveStore(ULONG64 ulSessionId, struct xsd__base64Binary sStoreGuid, struct ns:resolveUserStoreResponse *lpsResponse);
@@ -1106,9 +1084,6 @@ int ns__getRemoteAdminList(ULONG64 ecSessionId, unsigned int ulCompanyId, entryI
 int ns__checkExistObject(ULONG64 ulSessionId, entryId sEntryId, unsigned int ulFlags, unsigned int *result);
 
 int ns__readABProps(ULONG64 ulSessionId, entryId sEntryId, struct ns:readPropsResponse *readPropsResponse);
-int ns__writeABProps(ULONG64 ulSessionId, entryId sEntryId, struct propValArray *aPropVal, unsigned int *result);
-int ns__deleteABProps(ULONG64 ulSessionId, entryId sEntryId, struct propTagArray *lpsPropTags, unsigned int *result);
-int ns__loadABProp(ULONG64 ulSessionId, entryId sEntryId, unsigned int ulPropTag, struct ns:loadPropResponse *lpsResponse);
 
 int ns__abResolveNames(ULONG64 ulSessionId, struct propTagArray* lpaPropTag, struct rowSet* lpsRowSet, struct flagArray* lpaFlags, unsigned int ulFlags, struct ns:abResolveNamesResponse* lpsABResolveNames);
 
@@ -1135,8 +1110,6 @@ int ns__getSyncStates(ULONG64 ulSessionId, struct mv_long ulaSyncId, struct ns:g
 
 // Licensing
 int ns__getLicenseAuth(ULONG64 ulSessionId, struct xsd__base64Binary sAuthData, struct ns:getLicenseAuthResponse *lpsResponse);
-int ns__getLicenseCapa(ULONG64 ulSessionId, unsigned int ulServiceType, struct ns:getLicenseCapaResponse *lpsResponse);
-int ns__getLicenseUsers(ULONG64 ulSessionId, unsigned int ulServiceType, struct ns:getLicenseUsersResponse *lpsResponse);
 
 // Multi Server
 int ns__resolvePseudoUrl(ULONG64 ulSessionId, const char *lpszPseudoUrl, struct ns:resolvePseudoUrlResponse *lpsResponse);

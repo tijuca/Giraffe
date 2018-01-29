@@ -138,47 +138,25 @@ the unique_tie function makes it possible to do without the explicit temporary
 	somefunction(&unique_tie(g));
 
 
-== Exception-based wrappers ==
+== adrlist_ptr, rowset_ptr, rowlist_ptr ==
 
-A group of experimental classes which always return objects while
-error codes are signalled via exceptions (rather than return codes).
-This makes it possible to write code which is so terse that I am not
-convinced yet using these classes everywhere is a good idea (it makes
-it harder to identify which function exactly failed).
+There are three extra typedefs for the purpose of portraying the "individual
+allocation" strategy often used for ADRLIST, SRowSet and ROWLIST:
 
-Traditional:
+	typedef memory_ptr<ADRLIST, rowlist_delete> adrlist_ptr;
+	typedef memory_ptr<SRowSet, rowlist_delete> rowset_ptr;
+	typedef memory_ptr<ROWLIST, rowlist_delete> rowlist_ptr;
 
-	//IMsgStore *store;
-	IMAPIFolder *rcv;
-	IMessage *msg;
-	IUnknown *entry;
-	int ret = store->GetReceiveFolder(&rcv);
-	if (ret != hrSuccess)
-		goto exit;
-	ret = store->OpenEntry(rcv, &iid_of(entry), MAPI_MODIFY, &entry);
-	if (ret != hrSuccess)
-		goto exit;
-	ret = entry->CreateMessage(nullptr, 0, &msg);
-	if (ret != hrSuccess)
-		goto exit;
-	msg->foo(); //...
-	exit:
-	if (ret != hrSuccess)
-		fprintf(stderr, "%s\n", GetMAPIErrorDescription(ret));
-	if (rcv != nullptr)
-		rcv->Release();
+(https://msdn.microsoft.com/en-us/library/office/cc842180.aspx) When every
+SPropValue within such a type is allocated independently — with
+MAPIAllocateBuffer rather than MAPIAllocateMore —, the rowlist deleter must be
+used. Conversely, if a certain block of code depends on that the SPropValue not
+be freed, such as when the SPropValue is a local automatic, then rowlist_ptr
+must *not* be used.
 
-New:
-
-	//KStore store;
-	try {
-		auto new_msg = store
-			.open_entry(store.get_receive_folder(), nullptr, MAPI_MODIFY)
-			.create_message(nullptr, 0)
-		new_msg->foo(); //...
-	} catch (KMAPIError &e) {
-		fprintf(stderr, "%s\n", e.what());
-	}
-
-This group of classes is the only one that require Makefile.am to be augmented
-with libkchl.la / -lkchl.
+	memory_ptr<ROWLIST> rowlist;
+	SPropValue foo;
+	MAPIAllocateMemory(CbNewROWLIST(1), &~rowlist);
+	foo.ulPropTag = PR_FOO;
+	rowlist->aEntries[0].rgPropVals = &foo;
+	rowlist->cEntries = 1;

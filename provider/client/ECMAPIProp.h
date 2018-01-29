@@ -18,6 +18,7 @@
 #ifndef ECMAPIPROP_H
 #define ECMAPIPROP_H
 
+#include <kopano/memory.hpp>
 #include <kopano/zcdefs.h>
 #include "kcore.hpp"
 #include <kopano/IECInterfaces.hpp>
@@ -32,7 +33,7 @@ class ECMsgStore;
 class ECMAPIProp : public ECGenericProp, public IECSecurity {
 protected:
 	ECMAPIProp(void *provider, ULONG obj_type, BOOL modify, const ECMAPIProp *root, const char *class_name = nullptr);
-	virtual ~ECMAPIProp();
+	virtual ~ECMAPIProp() = default;
 
 public:
 	/**
@@ -56,7 +57,7 @@ public:
 	virtual HRESULT SaveChanges(ULONG ulFlags);
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames);
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 	virtual HRESULT GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga);
 
 	virtual HRESULT HrSetSyncId(ULONG ulSyncId);
@@ -89,7 +90,7 @@ public:
 private:
 	BOOL m_bICSObject = false; // coming from the ICS system
 	ULONG m_ulSyncId = 0, m_cbParentID = 0;
-	ENTRYID *m_lpParentID = nullptr; // Overrides the parentid from the server
+	KCHL::memory_ptr<ENTRYID> m_lpParentID; /* Overrides the parentid from the server */
 
 public:
 	const ECMAPIProp *m_lpRoot; // Points to the 'root' object that was opened by OpenEntry; normally points to 'this' except for Attachments and Submessages

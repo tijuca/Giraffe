@@ -46,8 +46,6 @@
 // When this is a store EID, the szServer field is also set, and the ulId
 // points to the top-level object for the store. The other fields are the same.
 
-
-#pragma pack(push,1)
 // Entryid from version 6
 // Entryid version 1 (48 bytes)
 struct EID {
@@ -60,14 +58,14 @@ struct EID {
 	CHAR	szServer[1];
 	CHAR	szPadding[3];
 
-	EID(USHORT usType, const GUID &guid, const GUID &uniqueId, USHORT usFlags = 0)
+	EID(USHORT type, const GUID &g, const GUID &id, USHORT flags = 0)
 	{
 		memset(this, 0, sizeof(EID));
-		this->ulVersion = 1; //Always last version
-		this->usType = usType;
-		this->usFlags = usFlags;
-		this->guid = guid;
-		this->uniqueId = uniqueId;
+		ulVersion = 1; /* Always latest version */
+		usType = type;
+		usFlags = flags;
+		guid = g;
+		uniqueId = id;
 	}
 
 	EID(const EID *oldEID)
@@ -97,12 +95,12 @@ struct EID_V0 {
 	CHAR	szServer[1];
 	CHAR	szPadding[3];
 
-	EID_V0(USHORT usType, const GUID &guid, ULONG ulId)
+	EID_V0(USHORT type, const GUID &g, ULONG id)
 	{
 		memset(this, 0, sizeof(EID_V0));
-		this->usType = usType;
-		this->guid = guid;
-		this->ulId = ulId;
+		usType = type;
+		guid = g;
+		ulId = id;
 	}
 
 	EID_V0(const EID_V0 *oldEID)
@@ -118,8 +116,6 @@ struct EID_V0 {
 	}
 };
 
-#pragma pack(pop)
-
 /* 36 bytes */
 struct ABEID {
 	BYTE	abFlags[4];
@@ -130,11 +126,12 @@ struct ABEID {
 	CHAR	szExId[1];
 	CHAR	szPadding[3];
 
-	ABEID(ULONG ulType, const GUID &guid, ULONG ulId) {
+	ABEID(ULONG type, const GUID &g, ULONG id)
+	{
 		memset(this, 0, sizeof(ABEID));
-		this->ulType = ulType;
-		this->guid = guid;
-		this->ulId = ulId;
+		ulType = type;
+		guid = g;
+		ulId = id;
 	}
 
 	ABEID(const ABEID *oldEID)
@@ -175,12 +172,12 @@ struct SIEID {
 	CHAR	szServerId[1];
 	CHAR	szPadding[3];
 
-	SIEID(ULONG ulType, const GUID &guid, ULONG ulId)
+	SIEID(ULONG type, const GUID &g, ULONG id)
 	{
 		memset(this, 0, sizeof(SIEID));
-		this->ulType = ulType;
-		this->guid = guid;
-		this->ulId = ulId;
+		ulType = type;
+		guid = g;
+		ulId = id;
 	}
 
 	SIEID(const SIEID *oldEID)
@@ -376,6 +373,8 @@ typedef EID * PEID;
 //
 // Don't allow uid based authentication (Unix socket only)
 #define KOPANO_LOGON_NO_UID_AUTH		0x0001
+// Don't register session after authentication
+#define KOPANO_LOGON_NO_REGISTER_SESSION	0x0002
 
 // MTOM IDs
 #define MTOM_ID_EXPORTMESSAGES			"idExportMessages"

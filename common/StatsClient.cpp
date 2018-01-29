@@ -68,11 +68,8 @@ static void *submitThread(void *p)
 }
 
 StatsClient::StatsClient(ECLogger *l) :
-	logger(l)
-{
-	memset(&addr, 0, sizeof(addr));
-	memset(&countsSubmitThread, 0, sizeof(countsSubmitThread));
-}
+	addr(), logger(l), countsSubmitThread()
+{}
 
 int StatsClient::startup(const std::string &collectorSocket)
 {
@@ -84,15 +81,14 @@ int StatsClient::startup(const std::string &collectorSocket)
 		return -errno; /* maybe log a bit */
 	}
 
-	srand(time(NULL));
-
+	rand_init();
 	logger -> Log(EC_LOGLEVEL_DEBUG, "StatsClient binding socket");
 
-	for (unsigned int retry = 0; retry < 3; ++retry) {
+	for (unsigned int retry = 3; retry > 0; --retry) {
 		struct sockaddr_un laddr;
 		memset(&laddr, 0, sizeof(laddr));
 		laddr.sun_family = AF_UNIX;
-		int ret = snprintf(laddr.sun_path, sizeof(laddr.sun_path), "%s/.%x%x.sock", TmpPath::getInstance() -> getTempPath().c_str(), rand(), rand());
+		ret = snprintf(laddr.sun_path, sizeof(laddr.sun_path), "%s/.%x%x.sock", TmpPath::instance.getTempPath().c_str(), rand(), rand());
 		if (ret >= 0 &&
 		    static_cast<size_t>(ret) >= sizeof(laddr.sun_path)) {
 			ec_log_err("%s: Random path too long (%s...) for AF_UNIX socket",
@@ -193,7 +189,7 @@ void StatsClient::countAdd(const std::string & key, const std::string & key_sub,
 
 	auto doubleIterator = countsMapDouble.find(kp);
 	if (doubleIterator == countsMapDouble.cend())
-		countsMapDouble.insert(std::pair<std::string, double>(kp, n));
+		countsMapDouble.emplace(kp, n);
 	else
 		doubleIterator -> second += n;
 }
@@ -204,7 +200,7 @@ void StatsClient::countAdd(const std::string & key, const std::string & key_sub,
 
 	auto int64Iterator = countsMapInt64.find(kp);
 	if (int64Iterator == countsMapInt64.cend())
-		countsMapInt64.insert(std::pair<std::string, int64_t>(kp, n));
+		countsMapInt64.emplace(kp, n);
 	else
 		int64Iterator -> second += n;
 }

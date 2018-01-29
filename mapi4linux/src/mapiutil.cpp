@@ -293,6 +293,10 @@ HRESULT HrGetOneProp(IMAPIProp *lpProp, ULONG ulPropTag,
 	if(HR_FAILED(hr))
 		return hr;
 	if (cValues != 1 || lpPropVal->ulPropTag != ulPropTag)
+		/*
+		 * This proptag check should filter out the case of
+		 * hr==MAPI_W_ERRORS_RETURNED (lpPropVal->ulPropTag==PT_ERROR).
+		 */
 		return MAPI_E_NOT_FOUND;
 	*lppPropVal = lpPropVal.release();
 	return hrSuccess;
@@ -326,7 +330,7 @@ HRESULT CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease,
 }
 
 #pragma pack(push, 1)
-struct CONVERSATION_INDEX {
+struct CONVERSATION_INDEX { /* 22 bytes */
 	char ulReserved1;
 	char ftTime[5];
 	GUID guid;
