@@ -95,8 +95,7 @@ Description: Complete and feature rich groupware solution - archiver
 
 Package: kopano-backup
 Architecture: all
-Depends: ${shlibs:Depends},
- ${misc:Depends},
+Depends: ${misc:Depends},
  python,
  python-dateutil,
  python-kopano (>= ${source:Version}),
@@ -243,8 +242,7 @@ Description: Complete and feature rich groupware solution - presence daemon
 
 Package: kopano-search
 Architecture: all
-Depends: ${shlibs:Depends},
- ${misc:Depends},
+Depends: ${misc:Depends},
  catdoc,
  file,
  gawk,
@@ -314,7 +312,7 @@ Architecture: any
 Section: python
 Depends: ${misc:Depends},
  ${shlibs:Depends},
- ${python:Depends},
+ python,
 XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python MAPI bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -328,8 +326,7 @@ Package: python-kopano
 Architecture: all
 Section: python
 Depends: ${misc:Depends},
- ${shlibs:Depends},
- ${python:Depends},
+ python,
  python-mapi,
 XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python bindings
