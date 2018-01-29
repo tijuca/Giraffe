@@ -1,20 +1,15 @@
 %module(directors="1") MAPICore
 
 %{
-#undef LOCK_WRITE
 #include <kopano/platform.h>
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
 #include <kopano/CommonUtil.h>
-#include <kopano/IECServiceAdmin.h>
+#include <kopano/ecversion.h>
 #include <kopano/memory.hpp>
-#include "IECSpooler.h"
-#include "IECTestProtocol.h"
-#include "IECMultiStoreTable.h"
-#include "IECExportChanges.h"
-#include <kopano/IECLicense.h>
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/mapi_ptr.h>
 
 // DIRTIEST HACK IN THE WORLD WARNING: we need to fix the broken swig output for mapi_wrap.h .....
@@ -32,7 +27,10 @@ class MAPIInitializer {
 	MAPIInitializer(void)
 	{
 		MAPIINIT_0 init = {0, MAPI_MULTITHREAD_NOTIFICATIONS};
-		MAPIInitialize(&init);
+		if (MAPIInitialize(&init) != erSuccess) {
+			fprintf(stderr, "Could not initialize MAPI\n");
+			abort();
+		}
 	}
 	~MAPIInitializer(void)
 	{
@@ -105,12 +103,6 @@ enum STREAM_SEEK {
     STREAM_SEEK_END     = 2
 };
 
-enum LOCKTYPE {
-    LOCK_WRITE          = 1,
-    LOCK_EXCLUSIVE      = 2,
-    LOCK_ONLYONCE       = 4
-};
-
 enum STATFLAG {
     STATFLAG_DEFAULT    = 0,
     STATFLAG_NONAME     = 1,
@@ -125,7 +117,7 @@ enum STATFLAG {
 }
 
 /* IStream Interface */
-class ISequentialStream : public IUnknown {
+class ISequentialStream : public virtual IUnknown {
 public:
 	// Hard to typemap so using other method below
     // virtual HRESULT Read(void *OUTPUT, ULONG cb, ULONG *OUTPUT) = 0;
@@ -136,7 +128,7 @@ public:
 			char *buffer;
 			StreamPtr ptrStream;
 
-			if (self->QueryInterface(ptrStream.iid(), &~ptrStream) == hrSuccess) {
+			if (self->QueryInterface(iid_of(ptrStream), &~ptrStream) == hrSuccess) {
 				const LARGE_INTEGER liMove = {0, 0};
 				ULARGE_INTEGER liPosition;
 				STATSTG statbuf;
@@ -155,7 +147,9 @@ public:
 			if (hr != hrSuccess)
 				return hr;
 
-			self->Read(buffer, cb, ulRead);
+			hr = self->Read(buffer, cb, ulRead);
+			if (hr != hrSuccess)
+				return hr;
 
 			*lpOutput = buffer;
 			return hrSuccess;
@@ -169,7 +163,7 @@ public:
 
 %feature("notabstract") IStream;
 
-class IStream : public ISequentialStream {
+class IStream : public virtual ISequentialStream {
 public:
     virtual HRESULT Seek(LARGE_INTEGER dlibMove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition) = 0;
     virtual HRESULT SetSize(ULARGE_INTEGER libNewSize) = 0;
@@ -205,7 +199,6 @@ public:
 %include "IECSpooler.i"
 %include "IECTestProtocol.i"
 %include "IECMultiStoreTable.i"
-%include "IECLicense.i"
 %include "IECExportChanges.i"
 %include "helpers.i"
 %include "ecdefs.i"
@@ -276,7 +269,6 @@ swig_type_info *TypeFromIID(REFIID iid)
   TYPECASE(IECChangeAdvisor)
   TYPECASE(IECChangeAdviseSink)
   TYPECASE(IECSingleInstance)
-  TYPECASE(IECLicense)
   TYPECASE(IProxyStoreObject)
   TYPECASE(IECImportContentsChanges)
   TYPECASE(IECImportHierarchyChanges)
@@ -309,7 +301,6 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IECChangeAdvisor)
   IIDCASE(IECChangeAdviseSink)
   IIDCASE(IECSingleInstance)
-  IIDCASE(IECLicense)
   IIDCASE(IProxyStoreObject)
   IIDCASE(IECImportContentsChanges)
   IIDCASE(IECImportHierarchyChanges)
@@ -328,6 +319,7 @@ LPCIID IIDFromType(const char *type)
 typedef IUnknownImplementor<IStream> Stream;
 %}
 
+%constant char *PROJECT_VERSION = PROJECT_VERSION;
 
 %feature("director") Stream;
 %feature("nodirector") Stream::QueryInterface;

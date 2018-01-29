@@ -21,24 +21,16 @@
 
 namespace KC {
 
-inputStreamMAPIAdapter::inputStreamMAPIAdapter(IStream *lpStream)
-{
-	this->lpStream = lpStream;
-	if (lpStream)
-		lpStream->AddRef();
-}
-
-inputStreamMAPIAdapter::~inputStreamMAPIAdapter()
-{
-	if (lpStream)
-		lpStream->Release();
-}
+inputStreamMAPIAdapter::inputStreamMAPIAdapter(IStream *s) :
+	lpStream(s)
+{}
 
 size_t inputStreamMAPIAdapter::read(unsigned char *data, size_t count)
 {
 	ULONG ulSize = 0;
 
-	lpStream->Read(data, count, &ulSize);
+	if (lpStream->Read(data, count, &ulSize) != hrSuccess)
+		return 0;
 	if (ulSize != count)
 		this->ateof = true;
 
@@ -69,6 +61,20 @@ size_t inputStreamMAPIAdapter::skip(size_t count)
 		this->ateof = true;
 
 	return ulSize.QuadPart;
+}
+
+outputStreamMAPIAdapter::outputStreamMAPIAdapter(IStream *s) :
+	lpStream(s)
+{}
+
+void outputStreamMAPIAdapter::writeImpl(const vmime::byte_t *data, size_t count)
+{
+	lpStream->Write(data, count, NULL);
+}
+
+void outputStreamMAPIAdapter::flush()
+{
+    // just ignore the call, or call Commit() ?
 }
 
 } /* namespace */

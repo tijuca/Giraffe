@@ -35,11 +35,10 @@
 #include <mapix.h>
 
 #include <kopano/ECUnknown.h>
-#include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
 #include <kopano/ECGuid.h>
-
-
+#include <kopano/Util.h>
+#include <kopano/memory.hpp>
 #include "ECFBBlockList.h"
 
 namespace KC {
@@ -47,10 +46,11 @@ namespace KC {
 /**
  * Implementatie of the IFreeBusySupport interface
  */
-class _kc_export ECFreeBusySupport _kc_final : public ECUnknown {
+class _kc_export ECFreeBusySupport _kc_final :
+    public ECUnknown, public IFreeBusySupport,
+    public IFreeBusySupportOutlook2000 {
 private:
 	_kc_hidden ECFreeBusySupport(void);
-	_kc_hidden ~ECFreeBusySupport(void);
 public:
 	static HRESULT Create(ECFreeBusySupport** lppFreeBusySupport);
 
@@ -78,29 +78,15 @@ public:
 		_kc_hidden virtual HRESULT GetFBPublishMonthRange(void *) { return E_NOTIMPL; }
 		_kc_hidden virtual HRESULT PublishRangeChanged(void) { return E_NOTIMPL; }
 		_kc_hidden virtual HRESULT CleanTombstone(void) { return E_NOTIMPL; }
-		_kc_hidden virtual HRESULT GetDelegateInfoEx(FBUser sFBUser, unsigned int *lpulStatus, unsigned int *lpulStart, unsigned int *lpulEnd);
+		_kc_hidden virtual HRESULT GetDelegateInfoEx(FBUser, unsigned int *status, unsigned int *start, unsigned int *end) { return E_NOTIMPL; }
 		_kc_hidden virtual HRESULT PushDelegateInfoToWorkspace(void) { return E_NOTIMPL; }
 
-	// Interface for Outlook 2002 and up
-	class _kc_hidden xFreeBusySupport _kc_final : public IFreeBusySupport {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IFreeBusySupport.hpp>
-		virtual HRESULT __stdcall CleanTombstone(void) _kc_override;
-	} m_xFreeBusySupport;
-
-	// Interface for Outlook 2000
-	class _kc_hidden xFreeBusySupportOutlook2000 _kc_final :
-	    public IFreeBusySupportOutlook2000
-	{
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IFreeBusySupport.hpp>
-	} m_xFreeBusySupportOutlook2000;
-
 private:
-	IMAPISession *m_lpSession = nullptr;
-	IMsgStore *m_lpPublicStore = nullptr, *m_lpUserStore = nullptr;
-	IMAPIFolder *m_lpFreeBusyFolder = nullptr;
+	KCHL::object_ptr<IMAPISession> m_lpSession;
+	KCHL::object_ptr<IMsgStore> m_lpPublicStore, m_lpUserStore;
+	KCHL::object_ptr<IMAPIFolder> m_lpFreeBusyFolder;
 	unsigned int	m_ulOutlookVersion;
+	ALLOC_WRAP_FRIEND;
 };
 
 } /* namespace */

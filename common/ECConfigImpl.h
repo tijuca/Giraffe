@@ -19,9 +19,6 @@
 #define ECCONFIGIMPL_H
 
 #include <kopano/zcdefs.h>
-
-using namespace std;
-
 #include <kopano/ECConfig.h>
 
 #include <map>
@@ -40,13 +37,7 @@ struct settingkey_t {
 	char s[256];
 	unsigned short ulFlags;
 	unsigned short ulGroup;
-};
-
-struct settingcompare {
-	bool operator()(const settingkey_t &a, const settingkey_t &b) const
-	{
-		return strcmp(a.s, b.s) < 0;
-	}
+	bool operator<(const settingkey_t &o) const noexcept { return strcmp(s, o.s) < 0; }
 };
 
 #define MAXLINELEN 4096
@@ -54,7 +45,7 @@ struct settingcompare {
 class ECConfigImpl;
 
 /* Note: char* in map is allocated ONCE to 1024, and GetSetting will always return the same pointer to this buffer */
-typedef std::map<settingkey_t, char*, settingcompare> settingmap_t;
+typedef std::map<settingkey_t, char *> settingmap_t;
 typedef bool (ECConfigImpl::*directive_func_t)(const char *, unsigned int);
 struct directive_t {
 	const char			*lpszDirective;
@@ -75,9 +66,9 @@ class ECConfigImpl _kc_final : public ECConfig {
 public:
 	ECConfigImpl(const configsetting_t *lpDefaults, const char *const *lpszDirectives);
 	~ECConfigImpl();
-	bool LoadSettings(const char *file) _kc_override;
+	virtual bool LoadSettings(const char *file, bool ignore_missing = false) _kc_override;
 	virtual int ParseParams(int argc, char **argv) _kc_override;
-	const char *GetSettingsPath(void) _kc_override { return m_szConfigFile; }
+	const char *GetSettingsPath() const _kc_override { return m_szConfigFile; }
 	bool ReloadSettings(void) _kc_override;
 	bool AddSetting(const char *name, const char *value, const unsigned int group = 0) _kc_override;
 	const char *GetSetting(const char *name) _kc_override;

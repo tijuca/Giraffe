@@ -23,6 +23,7 @@
 #define ECSESSIONGROUP
 
 #include <kopano/zcdefs.h>
+#include <atomic>
 #include <condition_variable>
 #include <list>
 #include <map>
@@ -77,12 +78,12 @@ public:
 	 */
 	virtual void Lock();
 	virtual void Unlock();
-	virtual bool IsLocked(void) const { return m_ulRefCount > 0; }
+	virtual bool IsLocked(void) const _kc_final { return m_ulRefCount > 0; }
 
 	/*
 	 * Returns the SessionGroupId
 	 */
-	virtual ECSESSIONGROUPID GetSessionGroupId(void) const { return m_sessionGroupId; }
+	virtual ECSESSIONGROUPID GetSessionGroupId(void) const _kc_final { return m_sessionGroupId; }
 
 	/*
 	 * Add/Remove Session from group
@@ -143,7 +144,7 @@ private:
 	ECSESSIONID m_getNotifySession = 0;
 
 	/* Thread safety mutex/event */
-	unsigned int m_ulRefCount = 0;
+	std::atomic<unsigned int> m_ulRefCount{0};
 	std::mutex m_hThreadReleasedMutex;
 	std::condition_variable m_hThreadReleased;
 

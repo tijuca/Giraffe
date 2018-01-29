@@ -52,15 +52,16 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 }
 
 // Input
-%typemap(in) 				(ULONG, MAPIARRAY) ($1_type cArray = 0, $2_type lpArray = NULL)
+%typemap(in) 				(ULONG, MAPIARRAY) (KCHL::memory_ptr< std::remove_const< std::remove_pointer< $2_type >::type >::type > tmp)
 {
 	ULONG len;
-	$2 = List_to$2_mangle($input, &len);
+	tmp.reset(const_cast<std::add_pointer< std::remove_const< std::remove_pointer< $2_type >::type >::type >::type>(List_to$2_mangle($input, &len)));
 	$1 = len;
 	if(PyErr_Occurred()) goto fail;
+        $2 = tmp;
 }
 
-%typemap(in) 			(MAPIARRAY, ULONG) ($2_type cArray = 0, $1_type lpArray = NULL)
+%typemap(in) 			(MAPIARRAY, ULONG)
 {
 	ULONG len;
 	$1 = List_to$1_mangle($input, &len);
@@ -91,17 +92,11 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
         $1 = tmp;
 }
 
-%typemap(in)				LPROWLIST
+%typemap(in)				LPROWLIST (KCHL::rowlist_ptr tmp)
 {
-	$1 = List_to_LPROWLIST($input);
+	tmp.reset(List_to_LPROWLIST($input));
 	if(PyErr_Occurred()) goto fail;
-}
-
-%typemap(arginit) LPROWLIST
-	"$1 = NULL;"
-%typemap(freearg)	LPROWLIST
-{
-        FreeProws((LPSRowSet)$1);
+	$1 = tmp;
 }
 
 %typemap(in)				MAPISTRUCT (KCHL::memory_ptr<std::remove_const<std::remove_pointer<$type>::type>::type> tmp)
@@ -365,7 +360,7 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
     $input = SWIG_FromCharPtrAndSize((char*)$2_name, $1_name);
 }
 
-%typemap(directorin,noblock=1)	LPCIID, LPGUID
+%typemap(directorin,noblock=1)	LPCIID, LPGUID, GUID *
 {
 	LPCIID __iid = $1_name;
 	$input = SWIG_FromCharPtrAndSize((char*)$1_name, sizeof(GUID));
@@ -431,7 +426,8 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 {
     Py_ssize_t size = 0;
     char *s = NULL;
-    PyString_AsStringAndSize(DAO_RESULT, &s, &size);
+    if(PyString_AsStringAndSize(DAO_RESULT, &s, &size) == -1)
+        %dirout_fail(0, "$type");
 
 	memcpy($1_name, s, size);
 

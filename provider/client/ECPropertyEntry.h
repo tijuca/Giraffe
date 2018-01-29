@@ -18,11 +18,34 @@
 #ifndef ECPROPERTYENTRY_H
 #define ECPROPERTYENTRY_H
 
+#include <memory>
 #include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 
-#include "ECInvariantChecker.h"
+namespace KC {
+
+template<typename Type> class ECInvariantChecker _kc_final {
+	public:
+	ECInvariantChecker(const Type *p) : m_p(p) { m_p->CheckInvariant(); }
+	~ECInvariantChecker() { m_p->CheckInvariant(); }
+	private:
+	const Type *m_p;
+};
+
+#ifdef DEBUG
+#	define DEBUG_CHECK_INVARIANT do { this->CheckInvariant(); } while (false)
+#	define DEBUG_GUARD guard __g(this);
+#else
+#	define DEBUG_CHECK_INVARIANT do { } while (false)
+#	define DEBUG_GUARD
+#endif
+
+#define DECL_INVARIANT_GUARD(__class) typedef ECInvariantChecker<__class> guard;
+#define DECL_INVARIANT_CHECK void CheckInvariant() const;
+#define DEF_INVARIANT_CHECK(__class) void __class::CheckInvariant() const
+
+} /* namespace KC */
 
 // C++ class to represent a property in the property list.
 class ECProperty _kc_final {
@@ -59,16 +82,15 @@ private:
 class ECPropertyEntry _kc_final {
 public:
 	ECPropertyEntry(ULONG ulPropTag);
-	ECPropertyEntry(ECProperty *property);
+	ECPropertyEntry(std::unique_ptr<ECProperty> &&);
+	ECPropertyEntry(ECPropertyEntry &&) = default;
 	~ECPropertyEntry();
 
 	HRESULT			HrSetProp(ECProperty *property);
 	HRESULT HrSetProp(const SPropValue *);
 	HRESULT			HrSetClean();
-
-	ECProperty *	GetProperty() { return lpProperty; }
+	ECProperty *GetProperty() const { return lpProperty.get(); }
 	ULONG			GetPropTag() const { return ulPropTag; }
-	void			DeleteProperty();
 	BOOL			FIsDirty() const { return fDirty; }
 	BOOL			FIsLoaded() const { return lpProperty != NULL; }
 
@@ -77,8 +99,8 @@ public:
 private:
 	DECL_INVARIANT_GUARD(ECPropertyEntry)
 
-	ECProperty		*lpProperty;
 	ULONG			ulPropTag;
+	std::unique_ptr<ECProperty> lpProperty;
 	BOOL fDirty = true;
 };
 

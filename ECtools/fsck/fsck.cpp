@@ -19,6 +19,9 @@
 
 #include <iostream>
 #include <map>
+#include <memory>
+#include <string>
+#include <utility>
 #include <climits>
 #include <getopt.h>
 #include <kopano/automapi.hpp>
@@ -39,17 +42,15 @@
 #include <kopano/ECLogger.h>
 #include "fsck.h"
 
-using namespace std;
 using namespace KCHL;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::string;
 
 string auto_fix;
 string auto_del;
-
-/*
- * Some typedefs to make typing easier. ;)
- */
-typedef pair<string, Fsck* > CHECKMAP_P;
-typedef map<string, Fsck* > CHECKMAP;
+typedef std::map<std::string, std::unique_ptr<Fsck>> CHECKMAP;
 
 enum {
 	OPT_HELP = UCHAR_MAX + 1,
@@ -140,11 +141,10 @@ static void disclaimer(bool acceptDisclaimer)
 
 HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray)
 {
-	HRESULT hr;
 	memory_ptr<MAPINAMEID *> lppArray;
 	LPMAPINAMEID lpBuffer = NULL;
 
-	hr = MAPIAllocateBuffer(ulSize * sizeof(LPMAPINAMEID), &~lppArray);
+	auto hr = MAPIAllocateBuffer(ulSize * sizeof(LPMAPINAMEID), &~lppArray);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -161,11 +161,10 @@ HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray)
 HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount, const ULONG *lpTag,
     LPSPropValue *lppPropertyArray)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropTagArray> lpPropertyTagArray;
 	ULONG ulPropertyCount = 0;
 
-	hr = MAPIAllocateBuffer(sizeof(SPropTagArray) + (sizeof(ULONG) * ulCount), &~lpPropertyTagArray);
+	auto hr = MAPIAllocateBuffer(sizeof(SPropTagArray) + (sizeof(ULONG) * ulCount), &~lpPropertyTagArray);
 	if (hr != hrSuccess)
 		return hr;
 	lpPropertyTagArray->cValues = ulCount;
@@ -181,10 +180,9 @@ HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount, const ULONG *lpTag,
 HRESULT ReadNamedProperties(LPMESSAGE lpMessage, ULONG ulCount, LPMAPINAMEID *lppTag,
 			    LPSPropTagArray *lppPropertyTagArray, LPSPropValue *lppPropertyArray)
 {
-	HRESULT hr;
 	ULONG ulReadCount = 0;
 
-	hr = lpMessage->GetIDsFromNames(ulCount, lppTag, 0, lppPropertyTagArray);
+	auto hr = lpMessage->GetIDsFromNames(ulCount, lppTag, 0, lppPropertyTagArray);
 	if(hr != hrSuccess) {
 		cout << "Failed to obtain IDs from names." << endl;
 		/*
@@ -196,24 +194,21 @@ HRESULT ReadNamedProperties(LPMESSAGE lpMessage, ULONG ulCount, LPMAPINAMEID *lp
 	}
 
 	hr = lpMessage->GetProps(*lppPropertyTagArray, 0, &ulReadCount, lppPropertyArray);
-	if (FAILED(hr)) {
+	if (FAILED(hr))
 		cout << "Failed to obtain all properties." << endl;
-		return hr;
-	}
-	return hrSuccess;
+	return hr;
 }
 
 static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
     string *lpClass, ULONG *lpFolderType)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropertyArray;
 	ULONG ulPropertyCount = 0;
 	static constexpr const SizedSPropTagArray(3, PropertyTagArray) =
 		{3, {PR_DISPLAY_NAME_A, PR_CONTAINER_CLASS_A, PR_FOLDER_TYPE}};
 
-	hr = lpFolder->GetProps(PropertyTagArray, 0, &ulPropertyCount,
-	     &~lpPropertyArray);
+	auto hr = lpFolder->GetProps(PropertyTagArray, 0, &ulPropertyCount,
+	          &~lpPropertyArray);
 	if (FAILED(hr)) {
 		cout << "Failed to obtain all properties." << endl;
 		return hr;
@@ -242,24 +237,22 @@ static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
 
 static HRESULT
 RunFolderValidation(const std::set<std::string> &setFolderIgnore,
-    LPMAPIFOLDER lpRootFolder, LPSRow lpRow, CHECKMAP checkmap)
+    IMAPIFolder *lpRootFolder, const SRow *lpRow, const CHECKMAP &checkmap)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpFolder;
-	Fsck *lpFsck = NULL;
 	ULONG ulObjectType = 0;
 	string strName;
 	string strClass;
 	ULONG ulFolderType = 0;
 
-	auto lpItemProperty = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
+	auto lpItemProperty = lpRow->cfind(PR_ENTRYID);
 	if (!lpItemProperty) {
 		cout << "Row does not contain an EntryID." << endl;
-		return hr;
+		return hrSuccess;
 	}
-	hr = lpRootFolder->OpenEntry(lpItemProperty->Value.bin.cb,
-	     reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
-	     &IID_IMAPIFolder, 0, &ulObjectType, &~lpFolder);
+	auto hr = lpRootFolder->OpenEntry(lpItemProperty->Value.bin.cb,
+	          reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
+	          &IID_IMAPIFolder, 0, &ulObjectType, &~lpFolder);
 	if (hr != hrSuccess) {
 		cout << "Failed to open EntryID." << endl;
 		return hr;
@@ -292,14 +285,10 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
 
 	for (const auto &i : checkmap)
 		if (i.first == strClass) {
-			lpFsck = i.second;
-			break;
+			i.second->ValidateFolder(lpFolder, strName);
+			return hrSuccess;
 		}
 
-	if (lpFsck != nullptr) {
-		lpFsck->ValidateFolder(lpFolder, strName);
-		return hrSuccess;
-	}
 	cout << "Ignoring folder: ";
 	cout << "\"" << strName << "\" (" << strClass << ")" << endl;
 	return hrSuccess;
@@ -307,9 +296,8 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
 
 static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
     const char *strPass, const char *strAltUser, bool bPublic,
-    CHECKMAP checkmap)
+    const CHECKMAP &checkmap)
 {
-	HRESULT hr = hrSuccess;
 	AutoMAPI mapiinit;
 	object_ptr<IMAPISession> lpSession;
 	object_ptr<IMsgStore> lpStore, lpAltStore;
@@ -322,14 +310,12 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
     // user
     ULONG			cbUserStoreEntryID = 0;
 	memory_ptr<ENTRYID> lpUserStoreEntryID, lpEntryIDSrc;
-	wstring strwUsername;
-	wstring strwAltUsername;
-	wstring strwPassword;
+	std::wstring strwUsername, strwAltUsername, strwPassword;
 	std::set<std::string> setFolderIgnore;
 	memory_ptr<SPropValue> lpAddRenProp;
 	ULONG cbEntryIDSrc = 0;
 
-	hr = mapiinit.Initialize();
+	auto hr = mapiinit.Initialize();
 	if (hr != hrSuccess) {
 		cout << "Unable to initialize session" << endl;
 		return hr;
@@ -337,13 +323,12 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 
 	// input from commandline is current locale
 	if (strUser)
-		strwUsername = convert_to<wstring>(strUser);
+		strwUsername = convert_to<std::wstring>(strUser);
 	if (strPass)
-		strwPassword = convert_to<wstring>(strPass);
+		strwPassword = convert_to<std::wstring>(strPass);
 	if (strAltUser)
-		strwAltUsername = convert_to<wstring>(strAltUser);
-
-	hr = HrOpenECSession(&~lpSession, "kopano-fsck", PROJECT_SVN_REV_STR,
+		strwAltUsername = convert_to<std::wstring>(strAltUser);
+	hr = HrOpenECSession(&~lpSession, "fsck", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), strHost, 0, NULL, NULL);
 	if(hr != hrSuccess) {
 		cout << "Wrong username or password." << endl;
@@ -371,10 +356,10 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 		return hr;
         }
 
-        hr = lpIEMS->CreateStoreEntryID(const_cast<wchar_t *>(L""),
-             (LPTSTR)strwAltUsername.c_str(),
-             MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID,
-	     &~lpUserStoreEntryID);
+		hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(L""),
+		     reinterpret_cast<const TCHAR *>(strwAltUsername.c_str()),
+		     MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID,
+		     &~lpUserStoreEntryID);
         if (hr != hrSuccess) {
             cout << "Cannot get user store id for user" << endl;
 		return hr;
@@ -398,7 +383,7 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 
 	if (HrGetOneProp(lpRootFolder, PR_IPM_OL2007_ENTRYIDS /*PR_ADDITIONAL_REN_ENTRYIDS_EX*/, &~lpAddRenProp) == hrSuccess &&
 	    Util::ExtractSuggestedContactsEntryID(lpAddRenProp, &cbEntryIDSrc, &~lpEntryIDSrc) == hrSuccess)
-		setFolderIgnore.insert(string(reinterpret_cast<const char *>(lpEntryIDSrc.get()), cbEntryIDSrc));
+		setFolderIgnore.emplace(reinterpret_cast<const char *>(lpEntryIDSrc.get()), cbEntryIDSrc);
 
 	hr = lpRootFolder->GetHierarchyTable(CONVENIENT_DEPTH, &~lpHierarchyTable);
 	if (hr != hrSuccess) {
@@ -430,16 +415,14 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 			break;
 
 		for (ULONG i = 0; i < lpRows->cRows; ++i)
-			RunFolderValidation(setFolderIgnore, lpRootFolder, &lpRows->aRow[i], checkmap);
+			RunFolderValidation(setFolderIgnore, lpRootFolder, &lpRows[i], checkmap);
 	}
 	return hrSuccess;
 }
 
 int main(int argc, char *argv[])
 {
-	HRESULT hr = hrSuccess;
 	CHECKMAP checkmap;
-	const char *strHost = NULL;
 	char* strUser = NULL;
 	const char *strPass = "";
 	char* strAltUser = NULL;
@@ -453,7 +436,7 @@ int main(int argc, char *argv[])
 	if (!forceUTF8Locale(true))
 		return -1;
 
-	strHost = GetServerUnixSocket();
+	auto strHost = GetServerUnixSocket();
 
 	/*
 	 * Read arguments.
@@ -490,22 +473,28 @@ int main(int argc, char *argv[])
 			print_help(argv[0]);
 			return 0;
 		case OPT_CALENDAR:
-			checkmap.insert(CHECKMAP_P("IPF.Appointment", new FsckCalendar()));
+			/*
+			 * g++ 4.9 is not smart enough to derive that "new
+			 * FsckCalendar" should be converted to
+			 * std::unique_ptr, so it needs to be spelled out.
+			 * (Fixed in modern g++s.)
+			 */
+			checkmap.emplace("IPF.Appointment", std::unique_ptr<Fsck>(new FsckCalendar));
 			break;
 		//case OPT_STICKY:
-		//	checkmap.insert(CHECKMAP_P("IPF.StickyNote", new FsckStickyNote()));
+		//	checkmap.emplace("IPF.StickyNote", std::unique_ptr<Fsck>(new FsckStickyNote));
 		//	break;
 		//case OPT_EMAIL:
-		//	checkmap.insert(CHECKMAP_P("IPF.Note", new FsckNote()));
+		//	checkmap.emplace("IPF.Note", std::unique_ptr<Fsck>(new FsckNote));
 		//	break;
 		case OPT_CONTACT:
-			checkmap.insert(CHECKMAP_P("IPF.Contact", new FsckContact()));
+			checkmap.emplace("IPF.Contact", std::unique_ptr<Fsck>(new FsckContact));
 			break;
 		case OPT_TASK:
-			checkmap.insert(CHECKMAP_P("IPF.Task", new FsckTask()));
+			checkmap.emplace("IPF.Task", std::unique_ptr<Fsck>(new FsckTask));
 			break;
 		//case OPT_JOURNAL:
-		//	checkmap.insert(CHECKMAP_P("IPF.Journal", new FsckJournal()));
+		//	checkmap.emplace("IPF.Journal", std::unique_ptr<Fsck>(new FsckJournal));
 		//	break;
 		case OPT_ALL:
 			bAll = true;
@@ -552,32 +541,25 @@ int main(int argc, char *argv[])
 	if (checkmap.empty()) {
 		if (!bAll)
 			cout << "Filter arguments missing, defaulting to --all" << endl;
-		checkmap.insert(CHECKMAP_P("IPF.Appointment", new FsckCalendar()));
-		//checkmap.insert(CHECKMAP_P("IPF.StickyNote", new FsckStickyNote()));
-		//checkmap.insert(CHECKMAP_P("IPF.Note", new FsckNote()));
-		checkmap.insert(CHECKMAP_P("IPF.Contact", new FsckContact()));
-		checkmap.insert(CHECKMAP_P("IPF.Task", new FsckTask()));
-		//checkmap.insert(CHECKMAP_P("IPF.Journal", new FsckJournal()));
+		checkmap.emplace("IPF.Appointment", std::unique_ptr<Fsck>(new FsckCalendar));
+		//checkmap.emplace("IPF.StickyNote", std::unique_ptr<Fsck>(new FsckStickyNote));
+		//checkmap.emplace("IPF.Note", std::unique_ptr<Fsck>(new FsckNote));
+		checkmap.emplace("IPF.Contact", std::unique_ptr<Fsck>(new FsckContact));
+		checkmap.emplace("IPF.Task", std::unique_ptr<Fsck>(new FsckTask));
+		//checkmap.emplace("IPF.Journal", std::unique_ptr<Fsck>(new FsckJournal));
 	}
 
-	hr = RunStoreValidation(strHost, strUser, strPass, strAltUser, bPublic, checkmap);
-
+	auto hr = RunStoreValidation(strHost, strUser, strPass, strAltUser, bPublic, checkmap);
 	/*
 	 * Cleanup
 	 */
-	if (hr == hrSuccess)
+	if (hr == hrSuccess) {
 		cout << endl << "Statistics:" << endl;
-
-	for (auto i = checkmap.begin(); i != checkmap.end();
-	     i = checkmap.begin()) {
-		Fsck *lpFsck = i->second;
-		
-		if (hr == hrSuccess)
-			lpFsck->PrintStatistics(i->first);
-		
-		checkmap.erase(i);
-		delete lpFsck;
+		for (auto i = checkmap.begin(); i != checkmap.end(); ++i) {
+			i->second->PrintStatistics(i->first);
+		}
+		return 0;
+	} else {
+		return 1;
 	}
-
-	return (hr == hrSuccess);
 }

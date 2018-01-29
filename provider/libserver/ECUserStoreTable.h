@@ -19,6 +19,7 @@
 #define EC_USERSTORE_TABLE_H
 
 #include <kopano/zcdefs.h>
+#include <kopano/Util.h>
 /* #include "ECStoreObjectTable.h" */
 #include "ECGenericObjectTable.h"
 #include <kopano/pcuser.hpp>
@@ -51,11 +52,12 @@ class _kc_export_dycast ECUserStoreTable _kc_final :
 
 public:
 	_kc_hidden static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECUserStoreTable **ret);
-	_kc_hidden static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *rowlist, struct propTagArray *, void *obj_data, struct rowSet **rowset, bool cache_table_data, bool table_limit);
+	_kc_hidden static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *rowlist, struct propTagArray *, const void *priv, struct rowSet **rowset, bool cache_table_data, bool table_limit);
 	_kc_hidden virtual ECRESULT Load(void);
 
 private:
 	std::map<unsigned int, ECUserStore> m_mapUserStoreData;
+	ALLOC_WRAP_FRIEND;
 };
 
 } /* namespace */

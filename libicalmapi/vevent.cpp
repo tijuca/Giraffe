@@ -82,15 +82,12 @@ HRESULT VEventConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *
  */
 HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalcomponent *lpicEvent, void *base, bool bisException, std::list<SPropValue> *lstMsgProps)
 {
-	icalproperty *icProp = NULL;
-	icalparameter *icParam = NULL;
 	SPropValue sPropVal;
 	bool bMeeting = false;
 	bool bMeetingOrganised = false;
 	std::wstring strEmail;
-	time_t tNow = 0;
 
-	icProp = icalcomponent_get_first_property(lpicEvent, ICAL_ORGANIZER_PROPERTY);
+	auto icProp = icalcomponent_get_first_property(lpicEvent, ICAL_ORGANIZER_PROPERTY);
 	if (icProp) 
 	{
 		const char *lpszProp = icalproperty_get_organizer(icProp);
@@ -109,11 +106,11 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 
 		sPropVal.ulPropTag = PR_RESPONSE_REQUESTED;
 		sPropVal.Value.b = true;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RESPONSESTATUS], PT_LONG);
 		sPropVal.Value.ul = respNotResponded;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 
 		HrCopyString(base, L"IPM.Schedule.Meeting.Request", &sPropVal.Value.lpszW);
 		break;
@@ -121,14 +118,14 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 	case ICAL_METHOD_COUNTER:
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COUNTERPROPOSAL], PT_BOOLEAN);
 		sPropVal.Value.b = true;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 
 		// Fall through to REPLY
-	case ICAL_METHOD_REPLY:
+	case ICAL_METHOD_REPLY: {
 		// This value with respAccepted/respDeclined/respTentative is only for imported items through the PUBLISH method, which we do not support.
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RESPONSESTATUS], PT_LONG);
 		sPropVal.Value.ul = respNone;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 		
 		// skip the meetingstatus property
 		bMeeting = false;
@@ -139,7 +136,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 		icProp = icalcomponent_get_first_property(lpicEvent, ICAL_ATTENDEE_PROPERTY);
 		if (icProp == NULL)
 			return MAPI_E_CALL_FAILED;
-		icParam = icalproperty_get_first_parameter(icProp, ICAL_PARTSTAT_PARAMETER);
+		auto icParam = icalproperty_get_first_parameter(icProp, ICAL_PARTSTAT_PARAMETER);
 		if (icParam == NULL)
 			return MAPI_E_CALL_FAILED;
 
@@ -160,11 +157,11 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 			return MAPI_E_TYPE_NO_SUPPORT;
 		}
 		break;
-
+	}
 	case ICAL_METHOD_CANCEL:
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RESPONSESTATUS], PT_LONG);
 		sPropVal.Value.ul = respNotResponded;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 
 		// make sure the cancel flag gets set
 		bMeeting = true;
@@ -173,8 +170,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 		break;
 
 	case ICAL_METHOD_PUBLISH:
-	default:
-		
+	default: {
 		// set ResponseStatus to 0 fix for BlackBerry.
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RESPONSESTATUS], PT_LONG);
 		if (m_ulUserStatus != 0)
@@ -183,13 +179,13 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 			sPropVal.Value.ul = 1;
 		else
 			sPropVal.Value.ul = 0;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 		
 		// time(NULL) returns UTC time as libical sets application to UTC time.
-		tNow = time(NULL);
-		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTREPLYTIME], PT_SYSTIME);		
+		auto tNow = time(nullptr);
+		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTREPLYTIME], PT_SYSTIME);
 		UnixTimeToFileTime(tNow, &sPropVal.Value.ft);
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 
 		// Publish is used when mixed events are in the vcalendar
 		// we should determine on other properties if this is a meeting request related item
@@ -203,28 +199,29 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 
 		break;
 	}
+	}
 
 	if (!bisException) {
 		sPropVal.ulPropTag = PR_MESSAGE_CLASS_W;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 	}
 
 	if (icMethod == ICAL_METHOD_CANCEL || icMethod == ICAL_METHOD_REQUEST)
 	{
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REQUESTSENT], PT_BOOLEAN); 
 		sPropVal.Value.b = true;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 	} else if (icMethod == ICAL_METHOD_REPLY || icMethod == ICAL_METHOD_COUNTER) {
 		// This is only because outlook and the examples say so in [MS-OXCICAL].pdf
 		// Otherwise, it's completely contradictionary to what the documentation describes.
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REQUESTSENT], PT_BOOLEAN); 
 		sPropVal.Value.b = false;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 	} else {
 		// PUBLISH method, depends on if we're the owner of the object
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REQUESTSENT], PT_BOOLEAN); 
 		sPropVal.Value.b = bMeetingOrganised;
-		lstMsgProps->push_back(sPropVal);
+		lstMsgProps->emplace_back(sPropVal);
 	}
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MEETINGSTATUS], PT_LONG);
@@ -238,7 +235,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 	} else {
 		sPropVal.Value.ul = 0; // this-is-a-meeting-object flag off
 	}
-	lstMsgProps->push_back(sPropVal);
+	lstMsgProps->emplace_back(sPropVal);
 
 	sPropVal.ulPropTag = PR_ICON_INDEX;
 	if (!bMeeting)
@@ -252,7 +249,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 	// 1025: recurring item
 	// 1026: meeting request
 	// 1027: recurring meeting request
-	lstMsgProps->push_back(sPropVal);
+	lstMsgProps->emplace_back(sPropVal);
 	return hrSuccess;
 }
 
@@ -268,10 +265,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
  */
 HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *lpicEventRoot, icalcomponent *lpicEvent, bool bIsAllday, icalitem *lpIcalItem)
 {
-	HRESULT hr = hrSuccess;
 	SPropValue sPropVal;
-	icalproperty* lpicDTStartProp = NULL;
-	icalproperty* lpicDTEndProp = NULL;
 	icalproperty* lpicOrigDTStartProp = NULL;
 	icalproperty* lpicOrigDTEndProp = NULL;
 	std::unique_ptr<icalproperty, icalmapi_delete> lpicFreeDTStartProp, lpicFreeDTEndProp;
@@ -279,28 +273,25 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 	time_t timeDTStartLocal = 0, timeDTEndLocal = 0;
 	time_t timeEndOffset = 0, timeStartOffset = 0;
 	icalproperty* lpicDurationProp = NULL;
-	icalproperty* lpicProp = NULL;
 
-	lpicDTStartProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
-	lpicDTEndProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTEND_PROPERTY);
+	auto lpicDTStartProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
+	auto lpicDTEndProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTEND_PROPERTY);
 	// DTSTART must be available
 	if (lpicDTStartProp == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = HrAddTimeZone(lpicDTStartProp, lpIcalItem);
+	auto hr = HrAddTimeZone(lpicDTStartProp, lpIcalItem);
 	if (hr != hrSuccess)
 		return hr;
 
 	if (icMethod == ICAL_METHOD_COUNTER) {
 		// dtstart contains proposal, X-MS-OLK-ORIGINALSTART optionally contains previous DTSTART
-		lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_X_PROPERTY);
-		while (lpicProp) {
-			if (strcmp(icalproperty_get_x_name(lpicProp), "X-MS-OLK-ORIGINALSTART") == 0) {
+		for (auto lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_X_PROPERTY);
+		     lpicProp != nullptr;
+		     lpicProp = icalcomponent_get_next_property(lpicEvent, ICAL_X_PROPERTY))
+			if (strcmp(icalproperty_get_x_name(lpicProp), "X-MS-OLK-ORIGINALSTART") == 0)
 				lpicOrigDTStartProp = lpicProp;
-			} else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MS-OLK-ORIGINALEND") == 0) {
+			else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MS-OLK-ORIGINALEND") == 0)
 				lpicOrigDTEndProp = lpicProp;
-			}
-			lpicProp = icalcomponent_get_next_property(lpicEvent, ICAL_X_PROPERTY);
-		}
 
 		if (lpicOrigDTStartProp && lpicOrigDTEndProp) {
 			// No support for DTSTART +DURATION and X-MS-OLK properties. Exchange will not send that either.
@@ -311,13 +302,13 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 			timeDTStartUTC = ICalTimeTypeToUTC(lpicEventRoot, lpicDTStartProp);
 			UnixTimeToFileTime(timeDTStartUTC, &sPropVal.Value.ft);
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PROPOSEDSTART], PT_SYSTIME);
-			lpIcalItem->lstMsgProps.push_back(sPropVal);
+			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 			// set new proposal end
 			timeDTEndUTC = ICalTimeTypeToUTC(lpicEventRoot, lpicDTEndProp);
 			UnixTimeToFileTime(timeDTEndUTC, &sPropVal.Value.ft);
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PROPOSEDEND], PT_SYSTIME);
-			lpIcalItem->lstMsgProps.push_back(sPropVal);
+			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 			// rebuild properties, so libical has the right value type in the property.
 			std::string strTmp;
@@ -347,20 +338,20 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 
 	// Set 0x820D / ApptStartWhole
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTSTARTWHOLE], PT_SYSTIME);
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set 0x8516 / CommonStart
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME);
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set PR_START_DATE
 	sPropVal.ulPropTag = PR_START_DATE;
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set 0x8215 / AllDayEvent
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ALLDAYEVENT], PT_BOOLEAN);
 	sPropVal.Value.b = bIsAllday;
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set endtime / DTEND
 	if (lpicDTEndProp) {
@@ -389,15 +380,15 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 		UnixTimeToFileTime(timeDTEndUTC, &sPropVal.Value.ft);
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTENDWHOLE], PT_SYSTIME);
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	
 	// Set 0x8517 / CommonEnd
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME);
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set PR_END_DATE
 	sPropVal.ulPropTag = PR_END_DATE;
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	// Set duration
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTDURATION], PT_LONG);
@@ -414,7 +405,7 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 
 	// Convert from seconds to minutes.
 	sPropVal.Value.ul /= 60;
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
+	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	// @todo add flags not to add these props ?? or maybe use a exclude filter in ICalToMAPI::GetItem()
 	// Set submit time / DTSTAMP
 	return hrSuccess;
@@ -498,10 +489,9 @@ HRESULT VEventConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMs
 
 	// Set end time / DTEND
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[ulEndIndex], PT_SYSTIME));
-	if (lpPropVal == NULL) {
+	if (lpPropVal == nullptr)
 		// do not create calendar items without start/end date, which is invalid.
 		return MAPI_E_CORRUPT_DATA;
-	}
 
 	ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 	hr = HrSetTimeProperty(ttTime, bIsAllDay, lpicTZinfo, strTZid, ICAL_DTEND_PROPERTY, lpEvent);
@@ -517,10 +507,9 @@ HRESULT VEventConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMs
 
 	// Set original start time / DTSTART
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTSTARTWHOLE], PT_SYSTIME));
-	if (lpPropVal == NULL) {
+	if (lpPropVal == nullptr)
 		// do not create calendar items without start/end date, which is invalid.
 		return MAPI_E_CORRUPT_DATA;
-	}
 
 	ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 	lpProp = icalproperty_new_x("overwrite-me");
@@ -532,10 +521,9 @@ HRESULT VEventConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMs
 
 	// Set original end time / DTEND
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTENDWHOLE], PT_SYSTIME));
-	if (lpPropVal == NULL) {
+	if (lpPropVal == nullptr)
 		// do not create calendar items without start/end date, which is invalid.
 		return MAPI_E_CORRUPT_DATA;
-	}
 
 	ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 	lpProp = icalproperty_new_x("overwrite-me");

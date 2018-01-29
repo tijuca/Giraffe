@@ -14,7 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
+#include <string>
+#include <utility>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include <mapidefs.h>
@@ -29,7 +31,6 @@
 #include "ECUserStoreTable.h"
 #include "ECABObjectTable.h"
 #include "ECStatsTables.h"
-#include "ECConvenientDepthABObjectTable.h"
 #include "ECTableManager.h"
 #include "ECSessionManager.h"
 #include "ECSession.h"
@@ -39,7 +40,6 @@
 #include <kopano/ECDefs.h>
 #include "SOAPUtils.h"
 #include <kopano/stringutil.h>
-#include <kopano/Trace.h>
 #include "ECServerEntrypoint.h"
 #include "ECMailBoxTable.h"
 
@@ -148,9 +148,9 @@ ECTableManager::~ECTableManager()
 {
 	scoped_rlock lock(hListMutex);
 
-	auto iterTables = mapTable.cbegin();
 	// Clean up tables, if CloseTable(..) isn't called 
-	while (iterTables != mapTable.cend()) {
+	for (auto iterTables = mapTable.cbegin();
+	     iterTables != mapTable.cend(); ) {
 		auto iterNext = iterTables;
 		++iterNext;
 		CloseTable(iterTables->first);
@@ -159,12 +159,12 @@ ECTableManager::~ECTableManager()
 	mapTable.clear();
 }
 
-void ECTableManager::AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTableId)
+void ECTableManager::AddTableEntry(std::unique_ptr<TABLE_ENTRY> &&arg,
+    unsigned int *lpulTableId)
 {
 	scoped_rlock lock(hListMutex);
-
-	mapTable[ulNextTableId] = lpEntry;
-
+	mapTable[ulNextTableId] = std::move(arg);
+	auto &lpEntry = mapTable[ulNextTableId];
 	lpEntry->lpTable->AddRef();
 
 	*lpulTableId = ulNextTableId;
@@ -192,7 +192,6 @@ void ECTableManager::AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTable
 
 ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned int *lpulTableId)
 {
-	ECRESULT er = erSuccess;
 	object_ptr<ECStoreObjectTable> lpTable;
 	std::unique_ptr<TABLE_ENTRY> lpEntry;
 	DB_RESULT lpDBResult;
@@ -204,9 +203,9 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	const ECLocale locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
 	ECDatabase *lpDatabase = NULL;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if(ulStoreId) {
 		er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulStoreId, &ulStoreId, &sGuid);
@@ -220,11 +219,10 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 		er = ECStoreObjectTable::Create(lpSession, 0, NULL, 0, MAPI_MESSAGE, 0, 0, locale, &~lpTable);
 	}
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	// Select outgoingqueue
-	strQuery = "SELECT o.hierarchy_id, i.hierarchyid FROM outgoingqueue AS o LEFT JOIN indexedproperties AS i ON i.hierarchyid=o.hierarchy_id and i.tag=0xFFF";
-	
+	strQuery = "SELECT o.hierarchy_id, i.hierarchyid FROM outgoingqueue AS o LEFT JOIN indexedproperties AS i ON i.hierarchyid=o.hierarchy_id and i.tag=4095";
 	if(ulStoreId)
 		strQuery += " WHERE o.flags & 1 =" + stringify(EC_SUBMIT_LOCAL) + " AND o.store_id=" + stringify(ulStoreId);
 	else
@@ -232,17 +230,16 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
-	while( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		if(lpDBRow[0] == NULL)
 			continue;
 
 		// Item found without entryid, item already deleted, so delete the item from the queue
 		if (lpDBRow[1] == NULL) {
 			ec_log_err("Removing stray object \"%s\" from outgoing table", lpDBRow[0]);
-			strQuery = "DELETE FROM outgoingqueue WHERE hierarchy_id=" + string(lpDBRow[0]);
-			
+			strQuery = "DELETE FROM outgoingqueue WHERE hierarchy_id=" + std::string(lpDBRow[0]);
 			lpDatabase->DoDelete(strQuery); //ignore errors
 			continue;
 		}
@@ -256,7 +253,7 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE;
 	lpEntry->sTable.sOutgoingQueue.ulStoreId = ulStoreId;
 	lpEntry->sTable.sOutgoingQueue.ulFlags = ulStoreId ? EC_SUBMIT_LOCAL : EC_SUBMIT_MASTER;
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	if (lpTable->GetColumns(NULL, TBL_ALL_COLUMNS, &lpsPropTags) == erSuccess)
 		lpTable->SetColumns(lpsPropTags, false);
 	lpTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
@@ -270,68 +267,68 @@ exit:
 
 ECRESULT ECTableManager::OpenUserStoresTable(unsigned int ulFlags, unsigned int *lpulTableId)
 {
-	ECRESULT er = erSuccess;
 	object_ptr<ECUserStoreTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
-	er = ECUserStoreTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
+	auto er = ECUserStoreTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
 		return er;
 
-	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new(std::nothrow) TABLE_ENTRY);
+	if (lpEntry == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_USERSTORES;
-	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
-
+	memset(&lpEntry->sTable, 0, sizeof(lpEntry->sTable));
 	er = lpTable->SetColumns(&sPropTagArrayUserStores, true);
 	if (er != erSuccess)
 		return er;
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	return erSuccess;
 }
 
 ECRESULT ECTableManager::OpenMultiStoreTable(unsigned int ulObjType, unsigned int ulFlags, unsigned int *lpulTableId)
 {
-	ECRESULT er = erSuccess;
 	object_ptr<ECMultiStoreTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
 	// Open an empty table. Contents will be provided by client in a later call.
-	er = ECMultiStoreTable::Create(lpSession, ulObjType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
+	auto er = ECMultiStoreTable::Create(lpSession, ulObjType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
 		return er;
 
-	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new(std::nothrow) TABLE_ENTRY);
+	if (lpEntry == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_MULTISTORE;
-	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	memset(&lpEntry->sTable, 0, sizeof(lpEntry->sTable));
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	return er;
 }
 
 ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ulObjType, unsigned int ulFlags, unsigned int *lpulTableId, bool fLoad)
 {
-	ECRESULT		er = erSuccess;
 	std::string		strQuery;
 	object_ptr<ECStoreObjectTable> lpTable;
 	std::unique_ptr<TABLE_ENTRY> lpEntry;
 	unsigned int	ulStoreId = 0;
 	GUID			sGuid;
-	ECLocale			locale;
 	ECDatabase *lpDatabase = NULL;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
-	er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulParent, &ulStoreId, &sGuid);
+	auto sesmgr = lpSession->GetSessionManager();
+	er = sesmgr->GetCacheManager()->GetStore(ulParent, &ulStoreId, &sGuid);
 	if(er != erSuccess)
 		return er;
 
-	locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
-	if(lpSession->GetSessionManager()->GetSearchFolders()->IsSearchFolder(ulStoreId, ulParent) == erSuccess) {
-		if (ulFlags & (MSGFLAG_DELETED | MAPI_ASSOCIATED))
+	auto locale = sesmgr->GetSortLocale(ulStoreId);
+	if (sesmgr->GetSearchFolders()->IsSearchFolder(ulParent) == erSuccess) {
+		if (ulObjType == MAPI_FOLDER || ulFlags & (MSGFLAG_DELETED | MAPI_ASSOCIATED))
 			return KCERR_NO_SUPPORT;
 		er = lpSession->GetSecurity()->CheckPermission(ulParent, ecSecurityFolderVisible);
 		if(er != erSuccess)
@@ -347,7 +344,9 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 	if (er != erSuccess)
 		return er;
 
-	lpEntry.reset(new TABLE_ENTRY);
+	lpEntry.reset(new(std::nothrow) TABLE_ENTRY);
+	if (lpEntry == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_GENERIC;
@@ -357,7 +356,7 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 
 	// First, add table to internal list of tables. This means we can already start
 	// receiving notifications on this table
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 
 	// Load a default column set
 	if (ulObjType == MAPI_MESSAGE)
@@ -373,12 +372,13 @@ static void AuditStatsAccess(ECSession *lpSession, const char *access, const cha
 		return;
 	std::string strUsername;
 	std::string strImpersonator;
-	
-	lpSession->GetSecurity()->GetUsername(&strUsername);
-	if (lpSession->GetSecurity()->GetImpersonator(&strImpersonator) == erSuccess)
-		ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
+	auto sec = lpSession->GetSecurity();
+	sec->GetUsername(&strUsername);
+	auto audit = lpSession->GetSessionManager()->GetAudit();
+	if (sec->GetImpersonator(&strImpersonator) == erSuccess)
+		ZLOG_AUDIT(audit, "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
 	else
-		ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
+		ZLOG_AUDIT(audit, "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
 }
 
 ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int ulFlags, unsigned int *lpulTableId)
@@ -394,7 +394,9 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	// TABLETYPE_STATS_SESSIONS: only for (sys)admins
 	// TABLETYPE_STATS_USERS: full list: only for (sys)admins, company list: only for admins
 
-	lpEntry.reset(new TABLE_ENTRY);
+	lpEntry.reset(new(std::nothrow) TABLE_ENTRY);
+	if (lpEntry == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	switch (ulTableType) {
 	case TABLETYPE_STATS_SYSTEM:
 		if ((hosted && adminlevel < ADMIN_LEVEL_SYSADMIN) || (!hosted && adminlevel < ADMIN_LEVEL_ADMIN)) {
@@ -462,32 +464,33 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
-	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	memset(&lpEntry->sTable, 0, sizeof(lpEntry->sTable));
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	return erSuccess;
 }
 
 ECRESULT ECTableManager::OpenMailBoxTable(unsigned int ulflags, unsigned int *lpulTableId)
 {
-	ECRESULT er = erSuccess;
 	object_ptr<ECMailBoxTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
-	er = ECMailBoxTable::Create(lpSession, ulflags, createLocaleFromName(lpszLocaleId), &~lpTable);
+	auto er = ECMailBoxTable::Create(lpSession, ulflags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
 		return er;
 
-	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new(std::nothrow) TABLE_ENTRY);
+	if (lpEntry == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_MAILBOX;
-	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
+	memset(&lpEntry->sTable, 0, sizeof(lpEntry->sTable));
 
 	//@todo check this list!!!
 	er = lpTable->SetColumns(&sPropTagArrayUserStores, true);
 	if (er != erSuccess)
 		return er;
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	return erSuccess;
 }
 
@@ -517,7 +520,7 @@ ECRESULT ECTableManager::OpenABTable(unsigned int ulParent, unsigned int ulParen
 	lpEntry->sTable.sGeneric.ulObjectFlags = ulFlags & (MAPI_ASSOCIATED | MSGFLAG_DELETED); // MSGFLAG_DELETED because of conversion in ns__tableOpen
 	lpEntry->sTable.sGeneric.ulObjectType = ulObjType;
 	lpEntry->sTable.sGeneric.ulParentId = ulParent;
-	AddTableEntry(lpEntry.release(), lpulTableId);
+	AddTableEntry(std::move(lpEntry), lpulTableId);
 	if (ulObjType == MAPI_ABCONT || ulObjType == MAPI_DISTLIST)
 		lpTable->SetColumns(&sPropTagArrayABHierarchy, true);
 	else
@@ -543,41 +546,39 @@ ECRESULT ECTableManager::GetTable(unsigned int ulTableId, ECGenericObjectTable *
 ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 {
 	ECRESULT er = erSuccess;
-	TABLE_ENTRY *lpEntry = NULL;
 	ulock_rec lk(hListMutex);
 	auto iterTables = mapTable.find(ulTableId);
-	if (iterTables != mapTable.cend()) {
-		// Remember the table entry struct
-		lpEntry = iterTables->second;
-		
-        // Unsubscribe if needed		
-        switch(lpEntry->ulTableType) {
-            case TABLE_ENTRY::TABLE_TYPE_GENERIC:
-                lpSession->GetSessionManager()->UnsubscribeTableEvents(lpEntry->ulTableType,
-																	   lpEntry->sTable.sGeneric.ulParentId, lpEntry->sTable.sGeneric.ulObjectType,
-																	   lpEntry->sTable.sGeneric.ulObjectFlags, lpSession->GetSessionId());
-                break;
-            case TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE:
-                lpSession->GetSessionManager()->UnsubscribeTableEvents(lpEntry->ulTableType,
-																	   lpEntry->sTable.sOutgoingQueue.ulFlags & EC_SUBMIT_MASTER ? 0 : lpEntry->sTable.sOutgoingQueue.ulStoreId, 
-																	   MAPI_MESSAGE, lpEntry->sTable.sOutgoingQueue.ulFlags, lpSession->GetSessionId());
-                break;
-            default:
-                break;
-        }
-		
-		// Now, remove the table from the open table list
-		mapTable.erase(ulTableId);
-    
-		// Unlock the table now as the search thread may not be able to exit without a hListMutex lock
-		lk.unlock();
+	if (iterTables == mapTable.cend())
+		return er;
 
-		// Free table data and threads running
-		lpEntry->lpTable->Release();
-		delete lpEntry;
-	} else {
-		lk.unlock();
+	auto &lpEntry = iterTables->second;
+
+	// Unsubscribe if needed
+	switch (lpEntry->ulTableType) {
+	case TABLE_ENTRY::TABLE_TYPE_GENERIC:
+		lpSession->GetSessionManager()->UnsubscribeTableEvents(lpEntry->ulTableType,
+			lpEntry->sTable.sGeneric.ulParentId, lpEntry->sTable.sGeneric.ulObjectType,
+			lpEntry->sTable.sGeneric.ulObjectFlags, lpSession->GetSessionId());
+		break;
+	case TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE:
+		lpSession->GetSessionManager()->UnsubscribeTableEvents(lpEntry->ulTableType,
+			lpEntry->sTable.sOutgoingQueue.ulFlags & EC_SUBMIT_MASTER ? 0 : lpEntry->sTable.sOutgoingQueue.ulStoreId,
+			MAPI_MESSAGE, lpEntry->sTable.sOutgoingQueue.ulFlags, lpSession->GetSessionId());
+		break;
+	default:
+		break;
 	}
+
+	// Remember the table entry struct
+	auto lpEntry2 = std::move(lpEntry);
+	// Now, remove the table from the open table list
+	mapTable.erase(ulTableId);
+
+	// Unlock the table now as the search thread may not be able to exit without a hListMutex lock
+	lk.unlock();
+
+	// Free table data and threads running
+	lpEntry2->lpTable->Release();
 	return er;
 }
 
@@ -640,17 +641,15 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if(er != erSuccess)
 			return er;
-
-		while ( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) ) {
+		while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 			if(lpDBRow == NULL || lpDBRow[0] == NULL)
 				continue;
-			setObjIdPrivate.insert(atoui(lpDBRow[0]));
+			setObjIdPrivate.emplace(atoui(lpDBRow[0]));
 		}
 
 		for(auto it = lstChildId.begin(); it != lstChildId.end(); ++it)
 			if (setObjIdPrivate.find(*it) == setObjIdPrivate.end())
-				lstChildId2.push_back(*it);
-
+				lstChildId2.emplace_back(*it);
 		filter_private = true;
 	}
 
@@ -681,13 +680,10 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
  */
 ECRESULT ECTableManager::GetStats(unsigned int *lpulTables, unsigned int *lpulObjectSize)
 {
-	unsigned int ulSize = 0;
-	unsigned int ulTables = 0; 
 	scoped_rlock lock(hListMutex);
 
-	ulTables = mapTable.size();
-	ulSize = MEMORY_USAGE_MAP(ulTables, TABLEENTRYMAP);
-
+	unsigned int ulTables = mapTable.size();
+	unsigned int ulSize = MEMORY_USAGE_MAP(ulTables, TABLEENTRYMAP);
 	for (const auto &e : mapTable)
 		if (e.second->ulTableType != TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS)
 			/* Skip system stats since it would recursively include itself */

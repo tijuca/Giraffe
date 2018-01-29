@@ -2,6 +2,8 @@
 #ifdef HAVE_LIBS3_H
 #include <kopano/platform.h>
 #include <algorithm>
+#include <chrono>
+#include <map>
 #include <mutex>
 #include <stdexcept>
 #include <cerrno>
@@ -9,12 +11,15 @@
 #include <zlib.h>
 #include <mapidefs.h>
 #include <mapitags.h>
+#include <kopano/MAPIErrors.h>
 #include <kopano/stringutil.h>
 #include "../../common/ECSerializer.h"
 #include "../common/SOAPUtils.h"
 #include "ECAttachmentStorage.h"
 #include "ECS3Attachment.h"
 #include "StreamUtil.h"
+
+using steady_clock = std::chrono::steady_clock;
 
 namespace KC {
 
@@ -24,16 +29,18 @@ namespace KC {
 /* Number of seconds to sleep before trying again */
 #define S3_SLEEP_DELAY 1
 
+#define now_positive() (std::chrono::steady_clock::now() + std::chrono::seconds(600))
+#define now_negative() (std::chrono::steady_clock::now() + std::chrono::seconds(60))
+
 /* callback data */
 struct s3_cd {
-	struct soap *soap;
-	unsigned char *data;
-	ECSerializer *sink;
-	bool alloc_data;
-	int size;
-	int processed;
-	int retries;
-	S3Status status;
+	struct soap *soap = nullptr;
+	unsigned char *data = nullptr;
+	ECSerializer *sink = nullptr;
+	bool alloc_data = false;
+	size_t size = 0, processed = 0;
+	int retries = 0;
+	S3Status status = S3StatusOK;
 };
 
 /* callback data wrapper */
@@ -42,17 +49,92 @@ struct s3_cdw {
 	void *cbdata;
 };
 
-static void *ec_libs3_handle;
-#define W(n) static decltype(S3_ ## n) *DY_ ## n;
-W(put_object)
-W(initialize)
-W(status_is_retryable)
-W(deinitialize)
-W(get_status_name)
-W(head_object)
-W(delete_object)
-W(get_object)
+#define S3_NEGATIVE_ENTRY SIZE_MAX
+
+/* This ought to be moved into ECS3Attachment, if and when that becomes a singleton. */
+
+ECRESULT ECS3Config::init(ECConfig *cfg)
+{
+	ec_log_info("S3: initializing attachment storage");
+	/* Copy strings, in case ECConfig gets reloaded and changes pointers */
+	m_akid   = cfg->GetSetting("attachment_s3_accesskeyid");
+	m_sakey  = cfg->GetSetting("attachment_s3_secretaccesskey");
+	m_bkname = cfg->GetSetting("attachment_s3_bucketname");
+	m_region = cfg->GetSetting("attachment_s3_region");
+	m_path   = cfg->GetSetting("attachment_path");
+	m_comp   = strtol(cfg->GetSetting("attachment_compression"), nullptr, 0);
+
+	auto protocol = cfg->GetSetting("attachment_s3_protocol");
+	auto uri_style = cfg->GetSetting("attachment_s3_uristyle");
+	m_bkctx.bucketName = m_bkname.c_str();
+	m_bkctx.protocol = strncmp(protocol, "https", 5) == 0 ? S3ProtocolHTTPS : S3ProtocolHTTP;
+	m_bkctx.uriStyle = strncmp(uri_style, "path", 4) == 0 ? S3UriStylePath : S3UriStyleVirtualHost;
+	m_bkctx.accessKeyId = m_akid.c_str();
+	m_bkctx.secretAccessKey = m_sakey.c_str();
+	m_bkctx.authRegion = m_region.c_str();
+
+	m_response_handler.propertiesCallback = &ECS3Attachment::response_prop_cb;
+	m_response_handler.completeCallback = &ECS3Attachment::response_complete_cb;
+	m_put_obj_handler.responseHandler = m_response_handler;
+	m_put_obj_handler.putObjectDataCallback = &ECS3Attachment::put_obj_cb;
+	m_get_obj_handler.responseHandler = m_response_handler;
+	m_get_obj_handler.getObjectDataCallback = &ECS3Attachment::get_obj_cb;
+	m_get_conditions.ifModifiedSince = -1;
+	m_get_conditions.ifNotModifiedSince = -1;
+	m_get_conditions.ifMatchETag = nullptr;
+	m_get_conditions.ifNotMatchETag = nullptr;
+	/*
+	 * Do a dlopen of libs3.so.4 so that the implicit pull-in of
+	 * libldap-2.4.so.2 symbols does not pollute our namespace of
+	 * libldap_r-2.4.so.2 symbols.
+	 */
+	m_handle = dlopen("libs3.so.4", RTLD_LAZY | RTLD_LOCAL);
+	const char *err;
+	if (m_handle == nullptr) {
+		ec_log_warn("dlopen libs3.so.4: %s", (err = dlerror()) ? err : "<none>");
+		return KCERR_DATABASE_ERROR;
+	}
+#define W(n) do { \
+		DY_ ## n = reinterpret_cast<decltype(DY_ ## n)>(dlsym(m_handle, "S3_" #n)); \
+		if (DY_ ## n == nullptr) { \
+			ec_log_warn("dlsym S3_" #n ": %s", (err = dlerror()) ? err : "<none>"); \
+			return KCERR_DATABASE_ERROR; \
+		} \
+	} while (false)
+
+	W(put_object);
+	W(initialize);
+	W(status_is_retryable);
+	W(deinitialize);
+	W(get_status_name);
+	W(head_object);
+	W(delete_object);
+	W(get_object);
 #undef W
+	auto status = DY_initialize("Kopano Mail", S3_INIT_ALL,
+	              cfg->GetSetting("attachment_s3_hostname"));
+	if (status != S3StatusOK) {
+		ec_log_err("S3: error while initializing attachment storage: %s",
+			DY_get_status_name(status));
+		return KCERR_NETWORK_ERROR;
+	}
+	return erSuccess;
+}
+
+ECS3Config::~ECS3Config()
+{
+	ec_log_info("S3: deinitializing attachment storage");
+	/* Deinitialize the S3 storage environment */
+	if (m_handle != nullptr) {
+		DY_deinitialize();
+		dlclose(m_handle);
+	}
+}
+
+ECAttachmentStorage *ECS3Config::new_handle(ECDatabase *db)
+{
+	return new(std::nothrow) ECS3Attachment(*this, db);
+}
 
 /**
  * Static function used to forward the response properties callback to the
@@ -65,7 +147,7 @@ W(get_object)
  */
 S3Status ECS3Attachment::response_prop_cb(const S3ResponseProperties *properties, void *cbdata)
 {
-	struct s3_cdw *data = reinterpret_cast<struct s3_cdw *>(cbdata);
+	auto data = static_cast<struct s3_cdw *>(cbdata);
 	return data->caller->response_prop(properties, data->cbdata);
 }
 
@@ -79,7 +161,7 @@ S3Status ECS3Attachment::response_prop_cb(const S3ResponseProperties *properties
 void ECS3Attachment::response_complete_cb(S3Status status,
     const S3ErrorDetails *error, void *cbdata)
 {
-	struct s3_cdw *data = reinterpret_cast<struct s3_cdw *>(cbdata);
+	auto data = static_cast<struct s3_cdw *>(cbdata);
 	return data->caller->response_complete(status, error, data->cbdata);
 }
 
@@ -94,7 +176,7 @@ void ECS3Attachment::response_complete_cb(S3Status status,
  */
 S3Status ECS3Attachment::get_obj_cb(int bufferSize, const char *buffer, void *cbdata)
 {
-	struct s3_cdw *data = reinterpret_cast<struct s3_cdw *>(cbdata);
+	auto data = static_cast<struct s3_cdw *>(cbdata);
 	return data->caller->get_obj(bufferSize, buffer, data->cbdata);
 }
 
@@ -109,63 +191,8 @@ S3Status ECS3Attachment::get_obj_cb(int bufferSize, const char *buffer, void *cb
  */
 int ECS3Attachment::put_obj_cb(int bufferSize, char *buffer, void *cbdata)
 {
-	struct s3_cdw *data = reinterpret_cast<struct s3_cdw *>(cbdata);
+	auto data = static_cast<struct s3_cdw *>(cbdata);
 	return data->caller->put_obj(bufferSize, buffer, data->cbdata);
-}
-
-ECRESULT ECS3Attachment::StaticInit(ECConfig *cf)
-{
-	ec_log_info("Initializing S3 Attachment Storage");
-
-	/*
-	 * Do a dlopen of libs3.so.4 so that the implicit pull-in of
-	 * libldap-2.4.so.2 symbols does not pollute our namespace of
-	 * libldap_r-2.4.so.2 symbols.
-	 */
-	void *h = ec_libs3_handle = dlopen("libs3.so.4", RTLD_LAZY | RTLD_LOCAL);
-	const char *err;
-	if (ec_libs3_handle == NULL) {
-		ec_log_warn("dlopen libs3.so.4: %s", (err = dlerror()) ? err : "<none>");
-		return KCERR_DATABASE_ERROR;
-	}
-#define W(n) do { \
-		DY_ ## n = reinterpret_cast<decltype(DY_ ## n)>(dlsym(h, "S3_" #n)); \
-		if (DY_ ## n == NULL) { \
-			ec_log_warn("dlsym S3_" #n ": %s", (err = dlerror()) ? err : "<none>"); \
-			dlclose(h); \
-			ec_libs3_handle = NULL; \
-			return KCERR_DATABASE_ERROR; \
-		} \
-	} while (false)
-
-	W(put_object);
-	W(initialize);
-	W(status_is_retryable);
-	W(deinitialize);
-	W(get_status_name);
-	W(head_object);
-	W(delete_object);
-	W(get_object);
-#undef W
-
-	S3Status status = DY_initialize("Kopano Mail", S3_INIT_ALL, cf->GetSetting("attachment_s3_hostname"));
-	if (status != S3StatusOK) {
-		ec_log_err("Error while initializing S3 Attachment Storage, error type: %s",
-			DY_get_status_name(status));
-		return KCERR_NETWORK_ERROR;
-	}
-	return erSuccess;
-}
-
-ECRESULT ECS3Attachment::StaticDeinit(void)
-{
-	ec_log_info("Deinitializing S3 Attachment Storage");
-	/* Deinitialize the S3 storage environment */
-	if (ec_libs3_handle != NULL) {
-		DY_deinitialize();
-		dlclose(ec_libs3_handle);
-	}
-	return erSuccess;
 }
 
 /*
@@ -209,32 +236,9 @@ ECRESULT ECS3Attachment::StaticDeinit(void)
  *		   a single server cluster.
  * @param ulCompressionLevel the compression level used to gzip the attachment data.
  */
-ECS3Attachment::ECS3Attachment(ECDatabase *database, const char *protocol,
-    const char *uri_style, const char *access_key_id,
-    const char *secret_access_key, const char *bucket_name, const char *region,
-    const char *basepath, unsigned int complvl) :
-	ECAttachmentStorage(database, complvl), m_basepath(basepath)
-{
-	memset(&m_bucket_ctx, 0, sizeof(m_bucket_ctx));
-	m_bucket_ctx.bucketName = bucket_name;
-	m_bucket_ctx.protocol = strncmp(protocol, "https", 5) == 0 ? S3ProtocolHTTPS : S3ProtocolHTTP;
-	m_bucket_ctx.uriStyle = strncmp(uri_style, "path", 4) == 0 ? S3UriStylePath : S3UriStyleVirtualHost;
-	m_bucket_ctx.accessKeyId = access_key_id;
-	m_bucket_ctx.secretAccessKey = secret_access_key;
-	m_bucket_ctx.authRegion = region;
-
-	/* Set the handlers */
-	m_response_handler.propertiesCallback = &ECS3Attachment::response_prop_cb;
-	m_response_handler.completeCallback = &ECS3Attachment::response_complete_cb;
-	m_put_obj_handler.responseHandler = m_response_handler;
-	m_put_obj_handler.putObjectDataCallback = &ECS3Attachment::put_obj_cb;
-	m_get_obj_handler.responseHandler = m_response_handler;
-	m_get_obj_handler.getObjectDataCallback = &ECS3Attachment::get_obj_cb;
-	m_get_conditions.ifModifiedSince = -1;
-	m_get_conditions.ifNotModifiedSince = -1;
-	m_get_conditions.ifMatchETag = NULL;
-	m_get_conditions.ifNotMatchETag = NULL;
-}
+ECS3Attachment::ECS3Attachment(ECS3Config &config, ECDatabase *db) :
+	ECAttachmentStorage(db, config.m_comp), m_config(config)
+{}
 
 ECS3Attachment::~ECS3Attachment(void)
 {
@@ -254,24 +258,24 @@ ECS3Attachment::~ECS3Attachment(void)
  */
 S3Status ECS3Attachment::response_prop(const S3ResponseProperties *properties, void *cbdata)
 {
-	struct s3_cd *data = reinterpret_cast<struct s3_cd *>(cbdata);
+	auto data = static_cast<struct s3_cd *>(cbdata);
 
 	if (properties->contentLength != 0) {
 		data->size = properties->contentLength;
-		ec_log_debug("Received the response properties, content length: %d", data->size);
+		ec_log_debug("S3: received the response properties, content length: %zu", data->size);
 	} else {
-		ec_log_debug("Received the response properties");
+		ec_log_debug("S3: received the response properties");
 	}
 	/*
 	 * Only allocate memory if we are not able to use a serializer sink, we
 	 * are instructed to alloc data->data and have not allocated it yet.
 	 */
-	if (data->sink == NULL && data->alloc_data && data->data == NULL) {
-		data->data = s_alloc_nothrow<unsigned char>(data->soap, data->size);
-		if (data->data == NULL) {
-			ec_log_err("Unable to claim memory of size: %d bytes.", data->size);
-			return S3StatusAbortedByCallback;
-		}
+	if (data->sink != nullptr || !data->alloc_data || data->data != nullptr)
+		return S3StatusOK;
+	data->data = s_alloc_nothrow<unsigned char>(data->soap, data->size);
+	if (data->data == NULL) {
+		ec_log_err("S3: cannot allocate %zu bytes", data->size);
+		return S3StatusAbortedByCallback;
 	}
 	return S3StatusOK;
 }
@@ -289,24 +293,24 @@ S3Status ECS3Attachment::response_prop(const S3ResponseProperties *properties, v
 void ECS3Attachment::response_complete(S3Status status,
     const S3ErrorDetails *error, void *cbdata)
 {
-	struct s3_cd *data = reinterpret_cast<struct s3_cd *>(cbdata);
+	auto data = static_cast<struct s3_cd *>(cbdata);
 	data->status = status;
 
-	ec_log_debug("Response completed: %s.", DY_get_status_name(status));
+	ec_log_debug("S3: response completed: %s.", m_config.DY_get_status_name(status));
 	if (status == S3StatusOK)
 		return;
 	if (error == 0) {
-		ec_log_err("Amazon S3 return status %s", DY_get_status_name(status));
+		ec_log_err("S3: Amazon return status %s", m_config.DY_get_status_name(status));
 		return;
 	}
-	ec_log_err("Amazon S3 return status %s, error: %s, resource: \"%s\"",
-		DY_get_status_name(status),
+	ec_log_err("S3: Amazon return status %s, error: %s, resource: \"%s\"",
+		m_config.DY_get_status_name(status),
 		error->message ? error->message : "<unknown>",
 		error->resource ? error->resource : "<none>");
 	if (error->furtherDetails != NULL)
-		ec_log_err("Amazon S3 error details: %s", error->furtherDetails);
+		ec_log_err("S3: Amazon error details: %s", error->furtherDetails);
 	for (ssize_t i = 0; i < error->extraDetailsCount; ++i)
-		ec_log_err("Amazon S3 error details: %s: %s",
+		ec_log_err("S3: Amazon error details: %s: %s",
 			error->extraDetails[i].name, error->extraDetails[i].value);
 }
 
@@ -322,7 +326,7 @@ void ECS3Attachment::response_complete(S3Status status,
  */
 S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdata)
 {
-	struct s3_cd *data = reinterpret_cast<struct s3_cd *>(cbdata);
+	auto data = static_cast<struct s3_cd *>(cbdata);
 	ECRESULT er;
 	/*
 	 * Check if we were able to acquire the memory. There are two cases
@@ -340,12 +344,13 @@ S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdat
 	if (data->processed + bufferSize > data->size)
 		return S3StatusAbortedByCallback;
 
-	ec_log_debug("Getting bytes from S3 callback: Remaining bytes to get: %d. Reading %d bytes",
+	ec_log_debug("S3: Getting bytes from callback: Remaining bytes to get: %zu. Reading %d bytes",
 		data->size - data->processed, bufferSize);
 	if (data->sink != NULL) {
 		er = data->sink->Write(buffer, 1, bufferSize);
 		if (er != erSuccess) {
-			ec_log_err("Unable to write to serializer sink");
+			ec_log_err("S3: unable to write to serializer sink: %s (0x%x)",
+				GetMAPIErrorMessage(kcerr_to_mapierr(er)), er);
 			return S3StatusAbortedByCallback;
 		}
 	} else {
@@ -367,7 +372,7 @@ S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdat
  */
 int ECS3Attachment::put_obj(int bufferSize, char *buffer, void *cbdata)
 {
-	struct s3_cd *data = reinterpret_cast<struct s3_cd *>(cbdata);
+	auto data = static_cast<struct s3_cd *>(cbdata);
 	ECRESULT ret;
 	int toRead = 0, remaining = 0;
 
@@ -382,61 +387,25 @@ int ECS3Attachment::put_obj(int bufferSize, char *buffer, void *cbdata)
 		return -1;
 
 	remaining = data->size - data->processed;
-	if (remaining > 0) {
-		toRead = remaining > bufferSize ? bufferSize : remaining;
-		ec_log_debug("Putting data using callback: "
-			"Remaining bytes to put: %d - Writing %d bytes in %d buffer",
-			remaining, toRead, bufferSize);
-
-		if (data->sink != NULL) {
-			ret = data->sink->Read(buffer, 1, toRead);
-			if (ret != erSuccess) {
-				ec_log_err("Unable to read from the serializer sink");
-				return -1;
-			}
-		} else {
-			memcpy(buffer, data->data + data->processed, toRead);
-		}
-		data->processed += toRead;
-	} else {
-		ec_log_debug("Putting data using callback: Remaining bytes to put: %d - We processed all the data, but S3 expects more", remaining);
+	if (remaining <= 0) {
+		ec_log_debug("S3: putting data using callback: Remaining bytes to put: %d - We processed all the data, but S3 expects more", remaining);
+		return toRead;
 	}
+	toRead = remaining > bufferSize ? bufferSize : remaining;
+	ec_log_debug("S3: Putting data using callback: "
+		"Remaining bytes to put: %d - Writing %d bytes in %d buffer",
+		remaining, toRead, bufferSize);
+	if (data->sink != NULL) {
+		ret = data->sink->Read(buffer, 1, toRead);
+		if (ret != erSuccess) {
+			ec_log_err("S3: Unable to read from the serializer sink");
+			return -1;
+		}
+	} else {
+		memcpy(buffer, data->data + data->processed, toRead);
+	}
+	data->processed += toRead;
 	return toRead;
-}
-
-/**
- * For a given instance id, check if this has valid attachment data present.
- *
- * @param[in] ins_id instance id to check validity
- *
- * @return instance present
- */
-bool ECS3Attachment::ExistAttachmentInstance(ULONG ins_id)
-{
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
-	struct s3_cdw cwdata;
-	cwdata.caller = this;
-	cwdata.cbdata = cdp;
-
-	std::string filename = make_att_filename(ins_id, false);
-	ec_log_debug("Checking whether the attachment exists: %s", filename.c_str());
-	/*
-	 * Loop at most S3_RETRIES times, to make sure that if the servers of S3
-	 * reply with a redirect, we actually try again and process it.
-	 */
-	cdp->retries = S3_RETRIES;
-	do {
-		DY_head_object(&m_bucket_ctx, filename.c_str(), nullptr, 0,
-			&m_response_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Existence check result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
-
-	ec_log_debug("Result of the existence check: %s",
-		DY_get_status_name(cdp->status));
-	return cdp->status == S3StatusOK;
 }
 
 /**
@@ -454,66 +423,58 @@ bool ECS3Attachment::ExistAttachmentInstance(ULONG ins_id)
  * @return Kopano error code
  */
 ECRESULT ECS3Attachment::LoadAttachmentInstance(struct soap *soap,
-    ULONG ins_id, size_t *size_p, unsigned char **data_p)
+    const ext_siid &ins_id, size_t *size_p, unsigned char **data_p)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
-	cdp->sink = NULL;
-	cdp->data = NULL;
-	cdp->alloc_data = true;
-	cdp->size = 0;
-	cdp->processed = 0;
-	cdp->soap = soap;
+	struct s3_cd cd;
+	cd.alloc_data = true;
+	cd.soap = soap;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, false);
-	ec_log_debug("Load attachment instance: %s", filename.c_str());
+	auto filename = make_att_filename(ins_id, false);
+	auto fn = filename.c_str();
+	ec_log_debug("S3: loading %s into buffer", fn);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of S3
 	 * reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_get_object(&m_bucket_ctx, filename.c_str(), &m_get_conditions, 0, 0,
-			nullptr, 0, &m_get_obj_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Load instance result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_get_object(&m_config.m_bkctx, fn, &m_config.m_get_conditions,
+			0, 0, nullptr, 0, &m_config.m_get_obj_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: load %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Result of the load instance: %s",
-		DY_get_status_name(cdp->status));
-
-	if (cdp->size != cdp->processed) {
-		ec_log_err("Short read while reading attachment data, key: %s", filename.c_str());
+	ec_log_debug("S3: load %s: %s", fn, m_config.DY_get_status_name(cd.status));
+	if (cd.size != cd.processed) {
+		ec_log_err("S3: load %s: short read %zu/%zu bytes",
+			fn, cd.processed, cd.size);
 		ret = KCERR_DATABASE_ERROR;
-		goto exit;
-	} else if (cdp->data == NULL) {
+	} else if (cd.data == nullptr) {
 		ret = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
-	} else if (cdp->status != S3StatusOK) {
+	} else if (cd.status != S3StatusOK) {
 		ret = KCERR_NETWORK_ERROR;
-		goto exit;
+	} else {
+		/*
+		 * We allocated the data in cd.data, which is referred to by
+		 * data_p. The caller of this function is responsible for freeing the
+		 * memory after its use.
+		 */
+		*size_p = cd.size;
+		*data_p = cd.data;
+		ret = erSuccess;
 	}
+	if (ret != erSuccess && cd.data != nullptr && soap == nullptr)
+		delete cd.data;
 	/*
-	 * We allocated the data in cdp->data, which is referred to by
-	 * data_p. The caller of this function is responsible for freeing the
-	 * memory after its use.
-	 */
-	*size_p = cdp->size;
-	*data_p = cdp->data;
-	ret = erSuccess;
- exit:
-	if (ret != erSuccess && cdp->data != NULL && soap == NULL)
-		delete cdp->data;
-	/*
-	 * Make sure we clear the cdp->data variable so we cannot write
+	 * Make sure we clear the cd.data variable so we cannot write
 	 * to it after it is freed externally.
 	 */
-	cdp->data = NULL;
+	cd.data = nullptr;
 	return ret;
 }
 
@@ -527,55 +488,51 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(struct soap *soap,
  * @return erSuccess if we were able to load the instance, or the error code
  * if we could not.
  */
-ECRESULT ECS3Attachment::LoadAttachmentInstance(ULONG ins_id, size_t *size_p, ECSerializer *sink)
+ECRESULT ECS3Attachment::LoadAttachmentInstance(const ext_siid &ins_id,
+    size_t *size_p, ECSerializer *sink)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
-	cdp->sink = sink;
-	cdp->data = NULL;
-	cdp->alloc_data = false;
-	cdp->size = 0;
-	cdp->processed = 0;
+	struct s3_cd cd;
+	cd.sink = sink;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, false);
-	ec_log_debug("Load attachment instance: %s", filename.c_str());
+	auto filename = make_att_filename(ins_id, false);
+	auto fn = filename.c_str();
+	ec_log_debug("S3: loading %s into serializer", fn);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of S3
 	 * reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_get_object(&m_bucket_ctx, filename.c_str(), &m_get_conditions, 0, 0,
-			nullptr, 0, &m_get_obj_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Load instance result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_get_object(&m_config.m_bkctx, fn, &m_config.m_get_conditions,
+			0, 0, nullptr, 0, &m_config.m_get_obj_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: load %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Result of the load instance: %s",
-		DY_get_status_name(cdp->status));
-	if (cdp->size != cdp->processed) {
-		ec_log_err("Short read while reading attachment data from S3, key: %s", filename.c_str());
+	ec_log_debug("S3: load %s: %s", fn, m_config.DY_get_status_name(cd.status));
+	if (cd.size != cd.processed) {
+		ec_log_err("S3: load %s: short read %zu/%zu bytes",
+			fn, cd.processed, cd.size);
 		ret = KCERR_DATABASE_ERROR;
-		goto exit;
-	} else if (cdp->status == S3StatusOK) {
-		ret = erSuccess;
-		goto exit;
-	} else if (cdp->data == NULL) {
+	} else if (cd.data == nullptr) {
 		ret = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
+	} else if (cd.status != S3StatusOK) {
+		ret = erSuccess;
+	} else {
+		scoped_lock locker(m_config.m_cachelock);
+		m_config.m_cache[ins_id.siid] = {now_positive(), cd.size};
+		*size_p = cd.size;
 	}
-	*size_p = cdp->size;
- exit:
 	/*
 	 * Make sure we do not write to the sink accidentally, therefore reset
 	 * it to NULL.
 	 */
-	cdp->sink = NULL;
+	cd.sink = nullptr;
 	return ret;
 }
 
@@ -589,52 +546,49 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(ULONG ins_id, size_t *size_p, EC
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
-    size_t size, unsigned char *data)
+ECRESULT ECS3Attachment::SaveAttachmentInstance(const ext_siid &ins_id,
+    ULONG propid, size_t size, unsigned char *data)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
-	cdp->sink = NULL;
-	cdp->data = data;
-	cdp->size = size;
-	cdp->alloc_data = false;
+	struct s3_cd cd;
+	cd.data = data;
+	cd.size = size;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, comp && size != 0);
-	ec_log_debug("Save attachment instance data: %s: %d of %ld", filename.c_str(), cdp->data != NULL, size);
+	auto filename = make_att_filename(ins_id, comp && size != 0);
+	auto fn = filename.c_str();
+	ec_log_debug("S3: saving %s (buffer of %zu bytes)", fn, size);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of S3
 	 * reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_put_object(&m_bucket_ctx, filename.c_str(), size, nullptr, nullptr, 0,
-			&m_put_obj_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Save attachment result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_put_object(&m_config.m_bkctx, fn, size, nullptr,
+			nullptr, 0, &m_config.m_put_obj_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: save %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Result of the save attachment: %s",
-		DY_get_status_name(cdp->status));
+	ec_log_debug("S3: save %s: %s", fn, m_config.DY_get_status_name(cd.status));
 	/* set in transaction before disk full check to remove empty file */
 	if (m_transact)
-		m_new_att.insert(ins_id);
+		m_new_att.emplace(ins_id);
 
-	if (cdp->size != cdp->processed) {
-		ec_log_err("Unable to write attachment data to S3, key: %s", filename.c_str());
+	if (cd.size != cd.processed) {
+		ec_log_err("S3: save %s: processed only %zu/%zu bytes",
+			fn, cd.processed, cd.size);
 		ret = KCERR_DATABASE_ERROR;
-		goto exit;
-	} else if (cdp->status == S3StatusOK) {
+	} else if (cd.status == S3StatusOK) {
+		scoped_lock locker(m_config.m_cachelock);
+		m_config.m_cache[ins_id.siid] = {now_positive(), cd.size};
 		ret = erSuccess;
-		goto exit;
 	}
- exit:
-	cdp->data = NULL;
+	cd.data = NULL;
 	return ret;
 }
 
@@ -648,53 +602,49 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
-    size_t size, ECSerializer *source)
+ECRESULT ECS3Attachment::SaveAttachmentInstance(const ext_siid &ins_id,
+    ULONG propid, size_t size, ECSerializer *source)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
-	cdp->sink = source;
-	cdp->data = NULL;
-	cdp->alloc_data = false;
-	cdp->size = size;
+	struct s3_cd cd;
+	cd.sink = source;
+	cd.size = size;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, comp && size != 0);
-	ec_log_debug("Save attachment instance source: %s: %d of %ld", filename.c_str(), cdp->sink != NULL, size);
+	auto filename = make_att_filename(ins_id, comp && size != 0);
+	auto fn = filename.c_str();
+	ec_log_debug("S3: saving %s (serializer with %zu bytes)", fn, size);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of S3
 	 * reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_put_object(&m_bucket_ctx, filename.c_str(), size, nullptr, nullptr, 0,
-			&m_put_obj_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Save attachment result in while: %s",
-				DY_get_status_name(cdp->status));
-	}
-	while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_put_object(&m_config.m_bkctx, fn, size, nullptr,
+			nullptr, 0, &m_config.m_put_obj_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: save %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Result of the save attachment: %s",
-		DY_get_status_name(cdp->status));
+	ec_log_debug("S3: save %s: %s", fn, m_config.DY_get_status_name(cd.status));
 	/* set in transaction before disk full check to remove empty file */
 	if (m_transact)
-		m_new_att.insert(ins_id);
+		m_new_att.emplace(ins_id);
 
-	if (cdp->size != cdp->processed) {
-		ec_log_err("Unable to write attachment data to S3, key: %s", filename.c_str());
+	if (cd.size != cd.processed) {
+		ec_log_err("S3: save %s: processed only %zu/%zu bytes",
+			fn, cd.processed, cd.size);
 		ret = KCERR_DATABASE_ERROR;
-		goto exit;
-	} else if (cdp->status == S3StatusOK) {
+	} else if (cd.status == S3StatusOK) {
+		scoped_lock locker(m_config.m_cachelock);
+		m_config.m_cache[ins_id.siid] = {now_positive(), cd.size};
 		ret = erSuccess;
-		goto exit;
 	}
- exit:
-	cdp->sink = NULL;
+	cd.sink = NULL;
 	return ret;
 }
 
@@ -706,44 +656,16 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ULONG> &lstDeleteInstances, bool bReplace)
+ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ext_siid> &lstDeleteInstances, bool bReplace)
 {
 	ECRESULT ret = erSuccess;
 	int errors = 0;
-	for (auto del_id : lstDeleteInstances) {
+	for (const auto &del_id : lstDeleteInstances) {
 		ret = this->DeleteAttachmentInstance(del_id, bReplace);
 		if (ret != erSuccess)
 			++errors;
 	}
 	return errors == 0 ? erSuccess : KCERR_DATABASE_ERROR;
-}
-
-/**
- * Mark a file deleted by renaming it
- *
- * @param[in] ins_id instance id to mark
- *
- * @return Kopano error code
- */
-ECRESULT ECS3Attachment::mark_att_for_del(ULONG ins_id)
-{
-	ec_log_debug("Mark attachment for deletion");
-	m_marked_att.insert(ins_id);
-	return erSuccess;
-}
-
-/**
- * Revert a delete marked instance
- *
- * @param[in] ins_id instance id to restore
- *
- * @return Kopano error code
- */
-ECRESULT ECS3Attachment::restore_marked_att(ULONG ins_id)
-{
-	ec_log_debug("Restored attachment, unmark for deletion");
-	m_marked_att.erase(ins_id);
-	return erSuccess;
 }
 
 /**
@@ -753,34 +675,38 @@ ECRESULT ECS3Attachment::restore_marked_att(ULONG ins_id)
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::del_marked_att(ULONG ins_id)
+ECRESULT ECS3Attachment::del_marked_att(const ext_siid &ins_id)
 {
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
+	struct s3_cd cd;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, false);
-	ec_log_debug("Delete marked attachment: %s", filename.c_str());
+	auto filename = make_att_filename(ins_id, false);
+	auto fn = filename.c_str();
+	ec_log_debug("S3: delete marked attachment: %s", fn);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of
 	 * S3 reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_delete_object(&m_bucket_ctx, filename.c_str(), nullptr, 0,
-			&m_response_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Delete marked attachment result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_delete_object(&m_config.m_bkctx, fn, nullptr, 0,
+			&m_config.m_response_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: delete %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Result of the delete marked attachment: %s",
-		DY_get_status_name(cdp->status));
-	if (cdp->status == S3StatusOK)
-		return erSuccess;
-	return KCERR_NOT_FOUND;
+	ec_log_debug("S3: delete %s: %s", fn, m_config.DY_get_status_name(cd.status));
+	if (cd.status == S3StatusOK || cd.status == S3StatusHttpErrorNotFound) {
+		/* Delete successful, or did not exist before */
+		scoped_lock locker(m_config.m_cachelock);
+		m_config.m_cache[ins_id.siid] = {now_negative(), S3_NEGATIVE_ENTRY};
+	}
+	/* else { do not touch cache for network errors, etc. } */
+
+	return cd.status == S3StatusOK ? erSuccess : KCERR_NOT_FOUND;
 }
 
 /**
@@ -791,20 +717,14 @@ ECRESULT ECS3Attachment::del_marked_att(ULONG ins_id)
  *
  * @return
  */
-ECRESULT ECS3Attachment::DeleteAttachmentInstance(ULONG ins_id,
+ECRESULT ECS3Attachment::DeleteAttachmentInstance(const ext_siid &ins_id,
     bool bReplace)
 {
-	ECRESULT ret = erSuccess;
-	std::string filename = make_att_filename(ins_id, m_bFileCompression);
-
+	auto filename = make_att_filename(ins_id, m_bFileCompression);
 	if (!m_transact)
 		return del_marked_att(ins_id);
-
-	ret = mark_att_for_del(ins_id);
-	if (ret != erSuccess && ret != KCERR_NOT_FOUND) {
-		assert(false);
-		return ret;
-	}
+	ec_log_debug("S3: set delete mark for %u", ins_id.siid);
+	m_marked_att.emplace(ins_id);
 	return erSuccess;
 }
 
@@ -816,9 +736,9 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstance(ULONG ins_id,
  *
  * @return Kopano error code
  */
-std::string ECS3Attachment::make_att_filename(ULONG ins_id, bool comp)
+std::string ECS3Attachment::make_att_filename(const ext_siid &esid, bool comp)
 {
-	std::string filename = m_basepath + PATH_SEPARATOR + stringify(ins_id);
+	auto filename = m_config.m_path + PATH_SEPARATOR + stringify(esid.siid);
 	if (comp)
 		filename += ".gz";
 	return filename;
@@ -829,33 +749,13 @@ std::string ECS3Attachment::make_att_filename(ULONG ins_id, bool comp)
  *
  * @return whether we should retry
  */
-bool ECS3Attachment::should_retry(struct s3_cd *cdp)
+bool ECS3Attachment::should_retry(struct s3_cd &cd)
 {
-	if (cdp->retries <= 0)
+	if (cd.retries <= 0)
 		return false;
-	--cdp->retries;
+	--cd.retries;
 	sleep(S3_SLEEP_DELAY);
 	return true;
-}
-
-/**
- * This function creates a nrew S3Attachment Callback Data struct instance,
- * this will make sure that all the variables are initialized to default
- * values.
- *
- * @return a new s3_cd struct instance
- */
-struct s3_cd ECS3Attachment::create_cd(void)
-{
-	struct s3_cd c;
-	c.soap = NULL;
-	c.data = NULL;
-	c.sink = NULL;
-	c.alloc_data = false;
-	c.size = 0;
-	c.processed = 0;
-	c.status = S3StatusOK;
-	return c;
 }
 
 /**
@@ -867,64 +767,81 @@ struct s3_cd ECS3Attachment::create_cd(void)
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::GetSizeInstance(ULONG ins_id, size_t *size_p,
-    bool *compr_p)
+ECRESULT ECS3Attachment::GetSizeInstance(const ext_siid &ins_id,
+    size_t *size_p, bool *compr_p)
 {
-	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
-	struct s3_cd cdata = create_cd();
-	struct s3_cd *cdp = &cdata;
+	auto filename = make_att_filename(ins_id, comp);
+	auto fn = filename.c_str();
+
+	ulock_normal locker(m_config.m_cachelock);
+	auto cache_item = m_config.m_cache.find(ins_id.siid);
+	if (cache_item != m_config.m_cache.cend() &&
+	    steady_clock::now() < cache_item->second.valid_until) {
+		if (cache_item->second.size == S3_NEGATIVE_ENTRY)
+			return KCERR_NOT_FOUND;
+		*size_p = cache_item->second.size;
+		if (compr_p != nullptr)
+			*compr_p = comp;
+		return erSuccess;
+	}
+	locker.unlock();
+
+	struct s3_cd cd;
 	struct s3_cdw cwdata;
 	cwdata.caller = this;
-	cwdata.cbdata = cdp;
+	cwdata.cbdata = &cd;
 
-	std::string filename = make_att_filename(ins_id, comp);
-	ec_log_debug("Get size attachment instance: %s", filename.c_str());
+	ec_log_debug("S3: getsize %s", fn);
 	/*
 	 * Loop at most S3_RETRIES times, to make sure that if the servers of
 	 * S3 reply with a redirect, we actually try again and process it.
 	 */
-	cdp->retries = S3_RETRIES;
+	cd.retries = S3_RETRIES;
 	do {
-		DY_head_object(&m_bucket_ctx, filename.c_str(), nullptr, 0,
-			&m_response_handler, &cwdata);
-		if (DY_status_is_retryable(cdp->status))
-			ec_log_debug("Get size attachment result in while: %s",
-				DY_get_status_name(cdp->status));
-	} while (DY_status_is_retryable(cdp->status) && should_retry(cdp));
+		m_config.DY_head_object(&m_config.m_bkctx, fn, nullptr, 0,
+			&m_config.m_response_handler, &cwdata);
+		if (m_config.DY_status_is_retryable(cd.status))
+			ec_log_debug("S3: getsize %s: retryable status: %s",
+				fn, m_config.DY_get_status_name(cd.status));
+	} while (m_config.DY_status_is_retryable(cd.status) && should_retry(cd));
 
-	ec_log_debug("Get size of attachment: %s -> %d",
-		DY_get_status_name(cdp->status), cdp->size);
-
-	if (cdp->status == S3StatusOK) {
-		*size_p = cdp->size;
-		if (compr_p != NULL)
-			*compr_p = comp;
-		ret = erSuccess;
+	ec_log_debug("S3: getsize %s: %s, %zu bytes",
+		fn, m_config.DY_get_status_name(cd.status), cd.size);
+	if (cd.status == S3StatusHttpErrorNotFound) {
+		locker.lock();
+		m_config.m_cache[ins_id.siid] = {now_negative(), S3_NEGATIVE_ENTRY};
+		return KCERR_NOT_FOUND;
 	}
-	return ret;
+	if (cd.status != S3StatusOK)
+		return KCERR_NOT_FOUND;
+	locker.lock();
+	m_config.m_cache[ins_id.siid] = {now_positive(), cd.size};
+	*size_p = cd.size;
+	if (compr_p != NULL)
+		*compr_p = comp;
+	return erSuccess;
 }
 
-ECRESULT ECS3Attachment::Begin(void)
+kd_trans ECS3Attachment::Begin(ECRESULT &trigger)
 {
-	ec_log_debug("Begin transaction");
+	ec_log_debug("S3: begin transaction");
 	if (m_transact) {
 		/* Possible a duplicate begin call, don't destroy the data in production */
 		assert(false);
-		return erSuccess;
+		return kd_trans();
 	}
 	m_new_att.clear();
-	m_deleted_att.clear();
 	m_marked_att.clear();
 	m_transact = true;
-	return erSuccess;
+	return kd_trans(*this, trigger);
 }
 
 ECRESULT ECS3Attachment::Commit(void)
 {
 	bool error = false;
 
-	ec_log_debug("Commit transaction");
+	ec_log_debug("S3: commit transaction");
 	if (!m_transact) {
 		assert(false);
 		return erSuccess;
@@ -932,17 +849,12 @@ ECRESULT ECS3Attachment::Commit(void)
 
 	/* Disable the transaction */
 	m_transact = false;
-	/* Delete the attachments */
-	for (auto att_id : m_deleted_att)
-		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
-			error = true;
 	/* Delete marked attachments */
-	for (auto att_id : m_marked_att)
+	for (const auto &att_id : m_marked_att)
 		if (del_marked_att(att_id) != erSuccess)
 			error = true;
 
 	m_new_att.clear();
-	m_deleted_att.clear();
 	m_marked_att.clear();
 	return error ? KCERR_DATABASE_ERROR : erSuccess;
 }
@@ -951,7 +863,7 @@ ECRESULT ECS3Attachment::Rollback(void)
 {
 	bool error = false;
 
-	ec_log_debug("Rollback transaction");
+	ec_log_debug("S3: rollback transaction");
 	if (!m_transact) {
 		assert(false);
 		return erSuccess;
@@ -959,17 +871,15 @@ ECRESULT ECS3Attachment::Rollback(void)
 
 	/* Disable the transaction */
 	m_transact = false;
-	/* Do not delete the attachments */
-	m_deleted_att.clear();
 	/* Remove the created attachments */
-	for (auto att_id : m_new_att)
+	for (const auto &att_id : m_new_att)
 		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
 			error = true;
 	/* Restore marked attachment */
-	for (auto att_id : m_marked_att)
-		if (restore_marked_att(att_id) != erSuccess)
-			error = true;
-
+	for (const auto &att_id : m_marked_att) {
+		ec_log_debug("S3: removed delete mark for %u", att_id.siid);
+		m_marked_att.erase(att_id);
+	}
 	m_new_att.clear();
 	m_marked_att.clear();
 	return error ? KCERR_DATABASE_ERROR : erSuccess;

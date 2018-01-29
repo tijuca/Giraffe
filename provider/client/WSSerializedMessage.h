@@ -30,8 +30,7 @@
  */
 class WSSerializedMessage _kc_final : public ECUnknown {
 public:
-	WSSerializedMessage(soap *lpSoap, const std::string strStreamId, ULONG cbProps, LPSPropValue lpProps);
-
+	WSSerializedMessage(soap *, const std::string &stream_id, ULONG nprops, SPropValue *props);
 	HRESULT GetProps(ULONG *lpcbProps, LPSPropValue *lppProps);
 	HRESULT CopyData(LPSTREAM lpDestStream);
 	HRESULT DiscardData();
@@ -56,7 +55,5 @@ private:
 	StreamPtr			m_ptrDestStream;
 	HRESULT m_hr = hrSuccess;
 };
-
-typedef KCHL::object_ptr<WSSerializedMessage> WSSerializedMessagePtr;
 
 #endif // ndef WSSerializedMessage_INCLUDED

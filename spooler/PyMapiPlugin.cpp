@@ -14,20 +14,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <Python.h>
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
-#include <Python.h>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapiutil.h>
 #include <mapidefs.h>
 #include <kopano/mapiext.h>
 #include <mapiguid.h>
+#include "PythonSWIGRuntime.h"
 #include "PyMapiPlugin.h"
 #include <kopano/stringutil.h>
 #include "frameobject.h"
+#include "pymem.hpp"
 
 #define NEW_SWIG_INTERFACE_POINTER_OBJ(pyswigobj, objpointer, typeobj) {\
 	if (objpointer) {\
@@ -49,6 +50,37 @@
 	}\
 }
 
+typedef KCHL::pyobj_ptr PyObjectAPtr;
+
+class PyMapiPlugin _kc_final : public pym_plugin_intf {
+	public:
+	PyMapiPlugin(void) = default;
+
+	HRESULT Init(ECLogger *lpLogger, PyObject *lpModMapiPlugin, const char* lpPluginManagerClassName, const char *lpPluginPath);
+	virtual HRESULT MessageProcessing(const char *func, IMAPISession *, IAddrBook *, IMsgStore *, IMAPIFolder *, IMessage *, ULONG *result);
+	virtual HRESULT RulesProcessing(const char *func, IMAPISession *, IAddrBook *, IMsgStore *, IExchangeModifyTable *emt_rules, ULONG *result);
+	virtual HRESULT RequestCallExecution(const char *func, IMAPISession *, IAddrBook *, IMsgStore *, IMAPIFolder *, IMessage *, ULONG *do_callexe, ULONG *result);
+
+	swig_type_info *type_p_ECLogger = nullptr, *type_p_IAddrBook = nullptr;
+	swig_type_info *type_p_IMAPIFolder = nullptr;
+	swig_type_info *type_p_IMAPISession = nullptr;
+	swig_type_info *type_p_IMsgStore = nullptr;
+	swig_type_info *type_p_IMessage = nullptr;
+	swig_type_info *type_p_IExchangeModifyTable = nullptr;
+
+	private:
+	PyObjectAPtr m_ptrMapiPluginManager{nullptr};
+	KCHL::object_ptr<ECLogger> m_lpLogger;
+
+	/* Inhibit (accidental) copying */
+	PyMapiPlugin(const PyMapiPlugin &) = delete;
+	PyMapiPlugin &operator=(const PyMapiPlugin &) = delete;
+};
+
+struct pym_factory_priv {
+	PyObjectAPtr m_ptrModMapiPlugin{nullptr};
+};
+
 /**
  * Handle the python errors
  * 
@@ -56,51 +88,45 @@
  */
 static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 {
-	HRESULT hr = hrSuccess;
-
-	if (!pyobj) 
-	{ 
-		PyObject *lpErr = PyErr_Occurred();
-		if(lpErr) {
-			PyObjectAPtr ptype, pvalue, ptraceback;
-			PyErr_Fetch(&~ptype, &~pvalue, &~ptraceback);
-			auto traceback = reinterpret_cast<PyTracebackObject *>(ptraceback.get());
-			const char *pStrErrorMessage = "Unknown";
-			const char *pStrType = "Unknown";
-
-			if (pvalue != nullptr)
-				pStrErrorMessage = PyString_AsString(pvalue.get());
-			if (ptype != nullptr)
-				pStrType = PyString_AsString(ptype.get());
-
-			if (lpLogger)
-			{
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python type: %s", pStrType);
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python error: %s", pStrErrorMessage);
-				
-				while (traceback && traceback->tb_next != NULL) {
-					PyFrameObject *frame = (PyFrameObject *)traceback->tb_frame;
-					if (frame) {
-						int line = frame->f_lineno;
-						const char *filename = PyString_AsString(frame->f_code->co_filename); 
-						const char *funcname = PyString_AsString(frame->f_code->co_name); 
-						
-						lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python trace: %s(%d) %s", filename, line, funcname);
-					} else { 
-						lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python trace: Unknown");
-					}
-					
-					traceback = traceback->tb_next;
-				}
-			}
-
-			PyErr_Clear();
-		} 
-		assert(false); 
-		hr = S_FALSE; 
+	if (pyobj != nullptr)
+		return hrSuccess;
+	PyObject *lpErr = PyErr_Occurred();
+	if (lpErr == nullptr) {
+		assert(false);
+		return S_FALSE;
 	}
+	PyObjectAPtr ptype, pvalue, ptraceback;
+	PyErr_Fetch(&~ptype, &~pvalue, &~ptraceback);
+	auto traceback = reinterpret_cast<PyTracebackObject *>(ptraceback.get());
+	const char *pStrErrorMessage = "Unknown";
+	const char *pStrType = "Unknown";
 
-	return hr;
+	if (pvalue != nullptr)
+		pStrErrorMessage = PyString_AsString(pvalue.get());
+	if (ptype != nullptr)
+		pStrType = PyString_AsString(ptype.get());
+
+	if (lpLogger)
+	{
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python type: %s", pStrType);
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python error: %s", pStrErrorMessage);
+
+		for (; traceback != nullptr && traceback->tb_next != nullptr;
+		     traceback = traceback->tb_next) {
+			auto frame = traceback->tb_frame;
+			if (frame == nullptr) {
+				lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python trace: Unknown");
+				continue;
+			}
+			int line = frame->f_lineno;
+			const char *filename = PyString_AsString(frame->f_code->co_filename);
+			const char *funcname = PyString_AsString(frame->f_code->co_name);
+			lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python trace: %s(%d) %s", filename, line, funcname);
+		}
+	}
+	PyErr_Clear();
+	assert(false);
+	return S_FALSE;
 }
 
 #define PY_HANDLE_ERROR(logger, pyobj) { \
@@ -131,12 +157,6 @@ static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 	} \
 }
 
-PyMapiPlugin::~PyMapiPlugin(void)
-{ 
-	if (m_lpLogger != nullptr)
-		m_lpLogger->Release();
-}
-
 /**
  * Initialize the PyMapiPlugin.
  *
@@ -152,13 +172,10 @@ HRESULT PyMapiPlugin::Init(ECLogger *lpLogger, PyObject *lpModMapiPlugin, const 
 	PyObjectAPtr	ptrPyLogger;
 	PyObjectAPtr	ptrClass;
 	PyObjectAPtr	ptrArgs;
-	std::string		strEnvPython;
 
 	if (!lpModMapiPlugin)
 		return S_OK;
-	m_lpLogger = lpLogger;
-	if (m_lpLogger)
-		m_lpLogger->AddRef();
+	m_lpLogger.reset(lpLogger);
 
 	// Init MAPI-swig types
 	BUILD_SWIG_TYPE(type_p_IMessage, "_p_IMessage");
@@ -279,17 +296,23 @@ HRESULT PyMapiPlugin::RequestCallExecution(const char *lpFunctionName, IMAPISess
 	return hr;
 }
 
-PyMapiPluginFactory::~PyMapiPluginFactory()
+PyMapiPluginFactory::PyMapiPluginFactory() :
+	m_priv(new struct pym_factory_priv)
 {
-	if (m_ptrModMapiPlugin != NULL) {
-		m_ptrModMapiPlugin = NULL;
-		Py_Finalize();
-	}
-	if (m_lpLogger != nullptr)
-		m_lpLogger->Release();
 }
 
-HRESULT PyMapiPluginFactory::Init(ECConfig* lpConfig, ECLogger *lpLogger)
+PyMapiPluginFactory::~PyMapiPluginFactory()
+{
+	if (m_priv != nullptr && m_priv->m_ptrModMapiPlugin != nullptr) {
+		m_priv->m_ptrModMapiPlugin = nullptr;
+		Py_Finalize();
+	}
+	delete m_priv;
+}
+
+HRESULT PyMapiPluginFactory::create_plugin(ECConfig *lpConfig,
+    ECLogger *lpLogger, const char *lpPluginManagerClassName,
+    pym_plugin_intf **lppPlugin)
 {
 	HRESULT			hr = S_OK;
 	std::string		strEnvPython;
@@ -297,45 +320,30 @@ HRESULT PyMapiPluginFactory::Init(ECConfig* lpConfig, ECLogger *lpLogger)
 	PyObjectAPtr	ptrName;
 	PyObjectAPtr	ptrModule;
 
-	m_lpLogger = lpLogger;
-	if (m_lpLogger)
-		m_lpLogger->AddRef();
-
+	m_lpLogger.reset(lpLogger);
 	m_bEnablePlugin = parseBool(lpConfig->GetSetting("plugin_enabled", NULL, "no"));
-	if (!m_bEnablePlugin)
-		return S_OK;
+	if (m_bEnablePlugin) {
+		m_strPluginPath = lpConfig->GetSetting("plugin_path");
+		strEnvPython = lpConfig->GetSetting("plugin_manager_path");
+		lpEnvPython = getenv("PYTHONPATH");
+		if (lpEnvPython)
+			strEnvPython += std::string(":") + lpEnvPython;
+		setenv("PYTHONPATH", strEnvPython.c_str(), 1);
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "PYTHONPATH = %s", strEnvPython.c_str());
+		Py_Initialize();
+		ptrModule.reset(PyImport_ImportModule("MAPI"));
+		PY_HANDLE_ERROR(m_lpLogger, ptrModule);
+		// Import python plugin framework
+		// @todo error unable to find file xxx
+		ptrName.reset(PyString_FromString("mapiplugin"));
+		m_priv->m_ptrModMapiPlugin.reset(PyImport_Import(ptrName));
+		PY_HANDLE_ERROR(m_lpLogger, m_priv->m_ptrModMapiPlugin);
+	}
 
-	m_strPluginPath = lpConfig->GetSetting("plugin_path");
-
-	strEnvPython = lpConfig->GetSetting("plugin_manager_path");
-
-	lpEnvPython = getenv("PYTHONPATH");
-	if (lpEnvPython) 
-		strEnvPython += std::string(":") + lpEnvPython;
-
-	setenv("PYTHONPATH", strEnvPython.c_str(), 1);
-
-	lpLogger->Log(EC_LOGLEVEL_DEBUG, "PYTHONPATH = %s", strEnvPython.c_str());
-
-	Py_Initialize();
-	ptrModule.reset(PyImport_ImportModule("MAPI"));
-	PY_HANDLE_ERROR(m_lpLogger, ptrModule);
-
-	// Import python plugin framework
-	// @todo error unable to find file xxx
-	ptrName.reset(PyString_FromString("mapiplugin"));
-	m_ptrModMapiPlugin.reset(PyImport_Import(ptrName));
-	PY_HANDLE_ERROR(m_lpLogger, m_ptrModMapiPlugin);
-	return hr;
-}
-
-HRESULT PyMapiPluginFactory::CreatePlugin(const char* lpPluginManagerClassName, PyMapiPlugin **lppPlugin)
-{
-	HRESULT hr = S_OK;
 	std::unique_ptr<PyMapiPlugin> lpPlugin(new(std::nothrow) PyMapiPlugin);
 	if (lpPlugin == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	hr = lpPlugin->Init(m_lpLogger, m_ptrModMapiPlugin, lpPluginManagerClassName, m_strPluginPath.c_str());
+	hr = lpPlugin->Init(m_lpLogger, m_priv->m_ptrModMapiPlugin, lpPluginManagerClassName, m_strPluginPath.c_str());
 	if (hr != S_OK)
 		return hr;
 	*lppPlugin = lpPlugin.release();

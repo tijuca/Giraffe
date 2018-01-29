@@ -20,8 +20,6 @@
 #include <kopano/ECScheduler.h>
 #include <kopano/lockhelper.hpp>
 #include <cerrno>
-#include <sys/time.h> /* gettimeofday */
-
 #define SCHEDULER_POLL_FREQUENCY	5
 
 namespace KC {
@@ -29,7 +27,6 @@ namespace KC {
 ECScheduler::ECScheduler(ECLogger *lpLogger) :
 	m_lpLogger(lpLogger)
 {
-	m_lpLogger->AddRef();
 	//Create Scheduler thread
 	pthread_create(&m_hMainThread, NULL, ScheduleThread, (void*)this);
 	set_thread_name(m_hMainThread, "ECScheduler:main");
@@ -42,9 +39,6 @@ ECScheduler::~ECScheduler(void)
 	m_hExitSignal.notify_one();
 	l_exit.unlock();
 	pthread_join(m_hMainThread, NULL);
-
-	//Clean up something
-	m_lpLogger->Release();
 }
 
 HRESULT ECScheduler::AddSchedule(eSchedulerType eType, unsigned int ulBeginCycle, void* (*lpFunction)(void*), void* lpData)
@@ -60,7 +54,7 @@ HRESULT ECScheduler::AddSchedule(eSchedulerType eType, unsigned int ulBeginCycle
 	sECSchedule.lpFunction = lpFunction;
 	sECSchedule.lpData = lpData;
 	sECSchedule.tLastRunTime = 0;
-	m_listScheduler.push_back(std::move(sECSchedule));
+	m_listScheduler.emplace_back(std::move(sECSchedule));
 	return S_OK;
 }
 
@@ -115,9 +109,9 @@ bool ECScheduler::hasExpired(time_t ttime, ECSCHEDULE *lpSchedule)
 
 void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 {
+	kcsrv_blocksigs();
 	ECScheduleList::iterator	iterScheduleList;
-
-	ECScheduler*		lpScheduler = (ECScheduler*)lpTmpScheduler;
+	auto lpScheduler = static_cast<ECScheduler *>(lpTmpScheduler);
 	HRESULT*			lperThread = NULL;
 	pthread_t			hThread;
 

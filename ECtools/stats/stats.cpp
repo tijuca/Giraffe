@@ -17,8 +17,9 @@
 
 #include <kopano/platform.h>
 #include "config.h"
-
+#include <chrono>
 #include <iostream>
+#include <string>
 #include <mapi.h>
 #include <mapiutil.h>
 #include <edkmdb.h>
@@ -38,11 +39,14 @@
 #include <kopano/ecversion.h>
 #include <kopano/memory.hpp>
 #include <kopano/charset/convert.h>
-#include "MAPIConsoleTable.h"
 #include <kopano/ECLogger.h>
+#include <kopano/mapi_ptr.h>
+#include "ConsoleTable.h"
 
-using namespace std;
 using namespace KCHL;
+using std::cerr;
+using std::cout;
+using std::endl;
 
 enum eTableType { INVALID_STATS = -1, SYSTEM_STATS, SESSION_STATS, USER_STATS, COMPANY_STATS, SERVER_STATS, SESSION_TOP, OPTION_HOST, OPTION_USER, OPTION_DUMP };
 
@@ -107,30 +111,20 @@ static const ULONG ulTableProps[] = {
 };
 
 struct TIMES {
-    double dblUser;
-    double dblSystem;
-    double dblReal;
+	double dblUser, dblSystem, dblReal;
     unsigned int ulRequests;
 };
 
 struct SESSION {
-    unsigned long long ullSessionId;
-    unsigned long long ullSessionGroupId;
-    TIMES times;
-    TIMES dtimes;
+	unsigned long long ullSessionId, ullSessionGroupId;
+	TIMES times, dtimes;
 
     unsigned int ulIdle;
     int ulPeerPid;
     bool bLocked;
-    
-    std::string strUser;
-    std::string strIP;
-    std::string strBusy;
-    std::string strState;
-    std::string strPeer;
-    std::string strClientVersion;
-    std::string strClientApp;
-    std::string strClientAppVersion, strClientAppMisc;
+	std::string strUser, strIP, strBusy, strState, strPeer;
+	std::string strClientVersion, strClientApp, strClientAppVersion;
+	std::string strClientAppMisc;
     
     bool operator <(const SESSION &b) const
     {
@@ -147,10 +141,9 @@ static bool sort_app(const SESSION &a, const SESSION &b) { return a.strClientApp
 typedef bool(*SortFuncPtr)(const SESSION&, const SESSION&);
 static SortFuncPtr sortfunc;
 
-static std::string GetString(LPSPropValue lpProps, ULONG cValues,
-    ULONG ulPropTag)
+static std::string GetString(const SRow &row, ULONG ulPropTag)
 {
-	auto lpProp = PCpropFindProp(lpProps, cValues, ulPropTag);
+	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return "";
         
@@ -174,10 +167,9 @@ static std::string GetString(LPSPropValue lpProps, ULONG cValues,
     return "";
 }
 
-static unsigned long long GetLongLong(LPSPropValue lpProps, ULONG cValues,
-    ULONG ulPropTag)
+static unsigned long long GetLongLong(const SRow &row, ULONG ulPropTag)
 {
-	auto lpProp = PCpropFindProp(lpProps, cValues, ulPropTag);
+	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return -1;
         
@@ -189,9 +181,9 @@ static unsigned long long GetLongLong(LPSPropValue lpProps, ULONG cValues,
     return 0;
 }
 
-static double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
+static double GetDouble(const SRow &row, ULONG ulPropTag)
 {
-	auto lpProp = PCpropFindProp(lpProps, cValues, ulPropTag);
+	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return 0;
         
@@ -205,23 +197,14 @@ static double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
 static void showtop(LPMDB lpStore)
 {
 #ifdef HAVE_CURSES_H
-    HRESULT hr = hrSuccess;
 	object_ptr<IMAPITable> lpTable;
-    WINDOW *win = NULL;
     std::map<unsigned long long, TIMES> mapLastTimes;
     std::map<std::string, std::string> mapStats;
     std::map<std::string, double> mapDiffStats;
-    std::list<SESSION> lstSessions;
-    std::set<std::string> setUsers;
-    std::set<std::string> setHosts;
-    std::map<unsigned long long, unsigned int> mapSessionGroups;
+	std::set<std::string> setHosts;
 	char date[64];
-	time_t now;
-    unsigned int ulSessGrp = 1;
-    double dblUser, dblSystem;
-    int wx,wy;
-    int key;
-    double dblLast = 0, dblTime = 0;
+	int wx, wy, key;
+	KC::time_point dblLast;
 
 	// columns in sizes, not literal offsets
 	static const unsigned int cols[] = {0, 4, 21, 8, 25, 16, 20, 8, 8, 7, 7, 5};
@@ -233,7 +216,7 @@ static void showtop(LPMDB lpStore)
 		{2, {PR_DISPLAY_NAME_A, PR_EC_STATS_SYSTEM_VALUE}};
 
     // Init ncurses
-    win = initscr(); 
+	auto win = initscr();
     if(win == NULL) {
         cerr << "ncurses error\n";
         return;
@@ -249,7 +232,7 @@ static void showtop(LPMDB lpStore)
     while(1) {
         int line = 0;
 		werase(win);
-		hr = lpStore->OpenProperty(PR_EC_STATSTABLE_SYSTEM, &IID_IMAPITable, 0, 0, &~lpTable);
+		auto hr = lpStore->OpenProperty(PR_EC_STATSTABLE_SYSTEM, &IID_IMAPITable, 0, 0, &~lpTable);
 		if(hr != hrSuccess)
 		    goto exit;
 		hr = lpTable->SetColumns(sptaSystem, 0);
@@ -260,13 +243,13 @@ static void showtop(LPMDB lpStore)
 		hr = lpTable->QueryRows(-1, 0, &~lpsRowSet);
         if(hr != hrSuccess)
             goto exit;
-            
-        dblTime = GetTimeOfDay() - dblLast;
-        dblLast = GetTimeOfDay();
+		auto cr_now = std::chrono::steady_clock::now();
+		auto dblTime = dur2dbl(cr_now - dblLast);
+		dblLast = std::move(cr_now);
             
         for (ULONG i = 0; i < lpsRowSet->cRows; ++i) {
-		auto lpName = PCpropFindProp(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_DISPLAY_NAME_A);
-		auto lpValue = PCpropFindProp(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SYSTEM_VALUE);
+		auto lpName  = lpsRowSet[i].cfind(PR_DISPLAY_NAME_A);
+		auto lpValue = lpsRowSet[i].cfind(PR_EC_STATS_SYSTEM_VALUE);
             if(lpName && lpValue) {
                 mapDiffStats[lpName->Value.lpszA] = atof(lpValue->Value.lpszA) - atof(mapStats[lpName->Value.lpszA].c_str());
                 mapStats[lpName->Value.lpszA] = lpValue->Value.lpszA;
@@ -280,35 +263,33 @@ static void showtop(LPMDB lpStore)
         if(hr != hrSuccess)
             break;
             
-        lstSessions.clear();
-        mapSessionGroups.clear();
-        setUsers.clear();
-        dblUser = dblSystem = 0;
-        ulSessGrp = 1;
+		std::list<SESSION> lstSessions;
+		std::map<unsigned long long, unsigned int> mapSessionGroups;
+		std::set<std::string> setUsers;
+		double dblUser = 0, dblSystem = 0;
+		unsigned int ulSessGrp = 1;
         
         for (ULONG i = 0; i < lpsRowSet->cRows; ++i) {
             SESSION session;
 
-            session.strUser = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_USERNAME_A);
-            session.strIP = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_IPADDRESS);
-            session.strBusy = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_BUSYSTATES);
-            session.strState = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_PROCSTATES);
-            session.strClientVersion = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CLIENT_VERSION);
-            session.strClientApp = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION);
-            session.strClientAppVersion = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION);
-            session.strClientAppMisc = GetString(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC);
-
-            session.ulPeerPid = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_PEER_PID);
-            session.times.ulRequests = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_REQUESTS);
-            session.ullSessionId = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_ID);
-            session.ullSessionGroupId = GetLongLong(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_GROUP_ID);
-            if(session.ulPeerPid) {
+            session.strUser = GetString(lpsRowSet[i], PR_EC_USERNAME_A);
+            session.strIP = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_IPADDRESS);
+            session.strBusy = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_BUSYSTATES);
+            session.strState = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_PROCSTATES);
+            session.strClientVersion = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_CLIENT_VERSION);
+            session.strClientApp = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_CLIENT_APPLICATION);
+            session.strClientAppVersion = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION);
+            session.strClientAppMisc = GetString(lpsRowSet[i], PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC);
+            session.ulPeerPid = GetLongLong(lpsRowSet[i], PR_EC_STATS_SESSION_PEER_PID);
+            session.times.ulRequests = GetLongLong(lpsRowSet[i], PR_EC_STATS_SESSION_REQUESTS);
+            session.ullSessionId = GetLongLong(lpsRowSet[i], PR_EC_STATS_SESSION_ID);
+            session.ullSessionGroupId = GetLongLong(lpsRowSet[i], PR_EC_STATS_SESSION_GROUP_ID);
+			if (session.ulPeerPid != 0)
 				session.strPeer = stringify(session.ulPeerPid);
-			}
 
-            session.times.dblUser = GetDouble(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CPU_USER);
-            session.times.dblSystem = GetDouble(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CPU_SYSTEM);
-            session.times.dblReal = GetDouble(lpsRowSet->aRow[i].lpProps, lpsRowSet->aRow[i].cValues, PR_EC_STATS_SESSION_CPU_REAL);
+            session.times.dblUser = GetDouble(lpsRowSet[i], PR_EC_STATS_SESSION_CPU_USER);
+            session.times.dblSystem = GetDouble(lpsRowSet[i], PR_EC_STATS_SESSION_CPU_SYSTEM);
+            session.times.dblReal = GetDouble(lpsRowSet[i], PR_EC_STATS_SESSION_CPU_REAL);
 
             auto iterTimes = mapLastTimes.find(session.ullSessionId);
             if (iterTimes != mapLastTimes.cend()) {
@@ -324,11 +305,9 @@ static void showtop(LPMDB lpStore)
                 session.dtimes.dblUser = session.dtimes.dblSystem = session.dtimes.dblReal = 0;
             }
             mapLastTimes[session.ullSessionId] = session.times;
-            
-            lstSessions.push_back(session);
-            setUsers.insert(session.strUser);
-            setHosts.insert(session.strIP);
-            
+			lstSessions.emplace_back(session);
+			setUsers.emplace(session.strUser);
+			setHosts.emplace(session.strIP);
             if(session.ullSessionGroupId != 0) {
                 auto iterSessionGroups = mapSessionGroups.find(session.ullSessionGroupId);
                 if (iterSessionGroups == mapSessionGroups.cend())
@@ -344,9 +323,9 @@ static void showtop(LPMDB lpStore)
 			lstSessions.reverse();
 
         wmove(win, 0,0);
-		memset(date, 0, 64);
-		now = time(NULL);
-		strftime(date, 64, "%c", localtime(&now) );
+		memset(date, 0, sizeof(date));
+		auto now = time(nullptr);
+		strftime(date, sizeof(date), "%c", localtime(&now) );
         wprintw(win, "Last update: %s (%.1fs since last)", date, dblTime);
 		
         wmove(win, 1,0);
@@ -503,6 +482,61 @@ exit:
 #endif
 }
  
+static std::string mapitable_ToString(const SPropValue *lpProp)
+{
+	switch (PROP_TYPE(lpProp->ulPropTag)) {
+	case PT_STRING8:
+		return std::string(lpProp->Value.lpszA);
+	case PT_LONG:
+		return stringify(lpProp->Value.ul);
+	case PT_DOUBLE:
+		return stringify(lpProp->Value.dbl);
+	case PT_FLOAT:
+		return stringify(lpProp->Value.flt);
+	case PT_I8:
+		return stringify_int64(lpProp->Value.li.QuadPart);
+	case PT_SYSTIME: {
+		time_t t;
+		char buf[32]; // must be at least 26 bytes
+		FileTimeToUnixTime(lpProp->Value.ft, &t);
+		ctime_r(&t, buf);
+		return trim(buf, " \t\n\r\v\f");
+	}
+	case PT_MV_STRING8: {
+		std::string s;
+		for (unsigned int i = 0; i < lpProp->Value.MVszA.cValues; ++i) {
+			if (!s.empty())
+				s += ",";
+			s += lpProp->Value.MVszA.lppszA[i];
+		}
+		return s;
+	}
+	}
+	return std::string();
+}
+
+static HRESULT MAPITablePrint(IMAPITable *lpTable, bool humanreadable /* = true */)
+{
+	SPropTagArrayPtr ptrColumns;
+	SRowSetPtr ptrRows;
+	ConsoleTable ct(0, 0);
+
+	HRESULT hr = lpTable->QueryColumns(0, &~ptrColumns);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpTable->QueryRows(-1, 0, &~ptrRows);
+	if (hr != hrSuccess)
+		return hr;
+	ct.Resize(ptrRows.size(), ptrColumns->cValues);
+	for (unsigned int i = 0; i < ptrColumns->cValues; ++i)
+		ct.SetHeader(i, stringify(ptrColumns->aulPropTag[i], true));
+	for (unsigned int i = 0; i < ptrRows.size(); ++i)
+		for (unsigned int j = 0; j < ptrRows[i].cValues; ++j)
+			ct.SetColumn(i, j, mapitable_ToString(&ptrRows[i].lpProps[j]));
+	humanreadable ? ct.PrintTable() : ct.DumpTable();
+	return hrSuccess;
+}
+
 static void dumptable(eTableType eTable, LPMDB lpStore, bool humanreadable)
 {
 	HRESULT hr = hrSuccess;
@@ -544,7 +578,7 @@ static void print_help(const char *name)
 int main(int argc, char *argv[])
 {
 	HRESULT hr = hrSuccess;
-	object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false));
+	object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
 	AutoMAPI mapiinit;
 	object_ptr<IMAPISession> lpSession;
 	object_ptr<IMsgStore> lpStore;
@@ -552,8 +586,6 @@ int main(int argc, char *argv[])
 	const char *user = NULL;
 	const char *pass = NULL;
 	const char *host = NULL;
-	wstring strwUsername;
-	wstring strwPassword;
 	bool humanreadable(true);
 
 	setlocale(LC_MESSAGES, "");
@@ -613,10 +645,9 @@ int main(int argc, char *argv[])
 	    }
 	}
 
-	strwUsername = convert_to<wstring>(user ? user : "SYSTEM");
-	strwPassword = convert_to<wstring>(pass ? pass : "");
-
-	hr = HrOpenECSession(&~lpSession, "kopano-stats", PROJECT_SVN_REV_STR,
+	auto strwUsername = convert_to<std::wstring>(user ? user : "SYSTEM");
+	auto strwPassword = convert_to<std::wstring>(pass ? pass : "");
+	hr = HrOpenECSession(&~lpSession, "stats", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), host,
 	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE);
 	if (hr != hrSuccess) {

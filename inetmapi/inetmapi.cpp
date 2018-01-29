@@ -49,52 +49,18 @@
 #include <kopano/ECLogger.h>
 #include <kopano/mapi_ptr.h>
 
-using namespace std;
 using namespace KCHL;
+using std::string;
+using std::wstring;
 
 namespace KC {
 
-bool ValidateCharset(const char *charset)
-{
-	/*
-	 * iconv does not like to convert wchar_t to wchar_t, so filter that
-	 * one. https://sourceware.org/bugzilla/show_bug.cgi?id=20804
-	 */
-	if (strcmp(charset, CHARSET_WCHAR) == 0)
-		return true;
-	iconv_t cd = iconv_open(CHARSET_WCHAR, charset);
-	if (cd == (iconv_t)(-1))
-		return false;
-		
-	iconv_close(cd);
-	return true;
-}
-
-ECSender::ECSender(const std::string &strSMTPHost, int port)
-{
-	smtpresult = 0;
-	smtphost = strSMTPHost;
-	smtpport = port;
-}
-
-int ECSender::getSMTPResult() {
-	return smtpresult;
-}
-
-const WCHAR* ECSender::getErrorString() {
-	return error.c_str();
-}
-
-void ECSender::setError(const std::wstring &newError) {
-	error = newError;
-}
+ECSender::ECSender(const std::string &strSMTPHost, int port) :
+	smtphost(strSMTPHost), smtpport(port)
+{}
 
 void ECSender::setError(const std::string &newError) {
 	error = convert_to<wstring>(newError);
-}
-
-bool ECSender::haveError() {
-	return ! error.empty();
 }
 
 static std::mutex vmInitLock;
@@ -156,7 +122,7 @@ static bool vtm_ascii_compatible(const char *s)
 	iconv_t cd = iconv_open(s, "us-ascii");
 	if (cd == reinterpret_cast<iconv_t>(-1))
 		return false;
-	char *inbuf = const_cast<char *>(in), *outbuf = out;
+	auto inbuf = const_cast<char *>(in), outbuf = out;
 	size_t insize = sizeof(in), outsize = sizeof(out);
 	bool mappable = iconv(cd, &inbuf, &insize, &outbuf, &outsize) != static_cast<size_t>(-1);
 	iconv_close(cd);
@@ -187,12 +153,10 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
     IMessage *lpMessage, char **lppbuf, sending_options sopt)
 {
 	std::ostringstream oss;
-	char *lpszData = NULL;
 	HRESULT hr = IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt);
 	if (hr != hrSuccess)
 		return hr;
-        
-	lpszData = new char[oss.str().size()+1];
+	auto lpszData = new char[oss.str().size()+1];
 	strcpy(lpszData, oss.str().c_str());
 
 	*lppbuf = lpszData;
@@ -202,14 +166,13 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
     IMessage *lpMessage, std::ostream &os, sending_options sopt)
 {
-	HRESULT			hr			= hrSuccess;
 	memory_ptr<SPropValue> lpTime, lpMessageId;
 	MAPIToVMIME mToVM(lpSession, lpAddrBook, sopt);
 	vmime::shared_ptr<vmime::message> lpVMMessage;
 	vmime::utility::outputStreamAdapter adapter(os);
 
 	InitializeVMime();
-	hr = mToVM.convertMAPIToVMIME(lpMessage, &lpVMMessage);
+	auto hr = mToVM.convertMAPIToVMIME(lpMessage, &lpVMMessage);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -236,11 +199,9 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
     IMessage *lpMessage, ECSender *mailer_base, sending_options sopt)
 {
-	HRESULT			hr	= hrSuccess;
 	MAPIToVMIME mToVM(lpSession, lpAddrBook, sopt);
 	vmime::shared_ptr<vmime::message> vmMessage;
-	ECVMIMESender		*mailer	= dynamic_cast<ECVMIMESender*>(mailer_base);
-	wstring			wstrError;
+	auto mailer = dynamic_cast<ECVMIMESender *>(mailer_base);
 	SPropArrayPtr	ptrProps;
 	static constexpr const SizedSPropTagArray(2, sptaForwardProps) =
 		{2, {PR_AUTO_FORWARDED, PR_INTERNET_MESSAGE_ID_A}};
@@ -250,9 +211,9 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 		return MAPI_E_INVALID_PARAMETER;
 
 	InitializeVMime();
-	hr = mToVM.convertMAPIToVMIME(lpMessage, &vmMessage, MTV_SPOOL);
+	auto hr = mToVM.convertMAPIToVMIME(lpMessage, &vmMessage, MTV_SPOOL);
 	if (hr != hrSuccess) {
-		wstrError = mToVM.getConversionError();
+		std::wstring wstrError = mToVM.getConversionError();
 		if (wstrError.empty())
 			wstrError = L"No error details specified";
 
@@ -300,10 +261,21 @@ HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope,
     std::string *lpBody, std::string *lpBodyStructure)
 {
 	InitializeVMime();
+	return VMIMEToMAPI().createIMAPProperties(input, lpEnvelope, lpBody, lpBodyStructure);
+}
 
-	VMIMEToMAPI VMToM;
+HRESULT createIMAPBody(const std::string &input, IMessage *lpMessage, bool envelope)
+{
+	InitializeVMime();
 
-	return VMToM.createIMAPProperties(input, lpEnvelope, lpBody, lpBodyStructure);
+	auto vmMessage = vmime::make_shared<vmime::message>();
+	vmMessage->parse(input);
+
+	auto hr = VMIMEToMAPI().createIMAPBody(input, vmMessage, lpMessage);
+	if (hr != hrSuccess || !envelope)
+		return hr;
+
+	return VMIMEToMAPI().createIMAPEnvelope(vmMessage, lpMessage);
 }
 
 } /* namespace */

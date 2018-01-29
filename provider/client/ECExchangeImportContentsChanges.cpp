@@ -14,10 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include "ECExchangeImportContentsChanges.h"
 #include "WSMessageStreamImporter.h"
@@ -47,39 +46,24 @@
 
 using namespace KCHL;
 
-ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder)
-: m_lpFolder(lpFolder), m_iidMessage(IID_IMessage)
+ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder) :
+	m_lpFolder(lpFolder)
 {
-	ECSyncLog::GetLogger(&m_lpLogger);
-	m_lpFolder->AddRef();
-}
-
-ECExchangeImportContentsChanges::~ECExchangeImportContentsChanges(){
-	m_lpFolder->Release();
-	m_lpLogger->Release();
-	MAPIFreeBuffer(m_lpSourceKey);
+	ECSyncLog::GetLogger(&~m_lpLogger);
 }
 
 HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges){
 	HRESULT hr;
-	ECExchangeImportContentsChanges *lpEICC = NULL;
-
 	if(!lpFolder)
 		return MAPI_E_INVALID_PARAMETER;
-
-	lpEICC = new ECExchangeImportContentsChanges(lpFolder);
-
-	hr = HrGetOneProp(&lpFolder->m_xMAPIProp, PR_SOURCE_KEY, &lpEICC->m_lpSourceKey);
-	if (hr == hrSuccess)
-		/*
-		 * This essentially returns lpEICC (in the second argument's
-		 * location), so whatever Coverity is saying about it not
-		 * being freed, don't believe it.
-		 */
-		hr = lpEICC->QueryInterface(IID_IExchangeImportContentsChanges, reinterpret_cast<void **>(lppExchangeImportContentsChanges));
-	else
-		delete lpEICC;
-	return hr;
+	object_ptr<ECExchangeImportContentsChanges> lpEICC(new(std::nothrow) ECExchangeImportContentsChanges(lpFolder));
+	if (lpEICC == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpEICC->m_lpSourceKey);
+	if (hr != hrSuccess)
+		return hr;
+	return lpEICC->QueryInterface(IID_IExchangeImportContentsChanges,
+	       reinterpret_cast<void **>(lppExchangeImportContentsChanges));
 }
 
 HRESULT	ECExchangeImportContentsChanges::QueryInterface(REFIID refiid, void **lppInterface)
@@ -93,23 +77,24 @@ HRESULT	ECExchangeImportContentsChanges::QueryInterface(REFIID refiid, void **lp
 		m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 		if (bCanStream == FALSE)
 			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-		REGISTER_INTERFACE2(IECImportContentsChanges, &this->m_xECImportContentsChanges);
+		REGISTER_INTERFACE2(IECImportContentsChanges, this);
 	}
-	REGISTER_INTERFACE2(IExchangeImportContentsChanges, &this->m_xECImportContentsChanges);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xECImportContentsChanges);
+	REGISTER_INTERFACE2(IExchangeImportContentsChanges, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError){
 	HRESULT		hr = hrSuccess;
-	LPMAPIERROR	lpMapiError = NULL;
+	memory_ptr<MAPIERROR> lpMapiError;
 	memory_ptr<TCHAR> lpszErrorMsg;
 	
 	//FIXME: give synchronization errors messages
 	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
 		return hr;
-	if ((hr = MAPIAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError)) != hrSuccess)
+	hr = MAPIAllocateBuffer(sizeof(MAPIERROR), &~lpMapiError);
+	if (hr != hrSuccess)
 		return hr;
 	
 	if (ulFlags & MAPI_UNICODE) {
@@ -140,8 +125,7 @@ HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulF
 	lpMapiError->ulContext		= 0;
 	lpMapiError->ulLowLevelError= 0;
 	lpMapiError->ulVersion		= 0;
-
-	*lppMAPIError = lpMapiError;
+	*lppMAPIError = lpMapiError.release();
 	return hrSuccess;
 }
 
@@ -209,12 +193,7 @@ HRESULT ECExchangeImportContentsChanges::UpdateState(LPSTREAM lpStream){
 	hr = lpStream->Write(&m_ulSyncId, 4, &ulLen);
 	if(hr != hrSuccess)
 		return hr;
-
-	hr = lpStream->Write(&m_ulChangeId, 4, &ulLen);
-	if(hr != hrSuccess)
-		return hr;
-
-	return hrSuccess;
+	return lpStream->Write(&m_ulChangeId, 4, &ulLen);
 }
 
 HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage){
@@ -230,7 +209,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 
 	ULONG ulObjType = 0;
 	bool bAssociatedMessage = false;
-	IMessage *lpMessage = NULL;
+	object_ptr<IMessage> lpMessage;
 	object_ptr<ECMessage> lpECMessage;
 	ULONG ulNewFlags = 0;
 
@@ -265,19 +244,20 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 		auto lpPassedEntryId = PCpropFindProp(lpPropArray, cValue, PR_ENTRYID);
 		// Create the message with the passed entry ID
 		if(lpPassedEntryId)
-			hr = m_lpFolder->CreateMessageWithEntryID(&IID_IMessage, ulNewFlags, lpPassedEntryId->Value.bin.cb, (LPENTRYID)lpPassedEntryId->Value.bin.lpb, &lpMessage);
+			hr = m_lpFolder->CreateMessageWithEntryID(&IID_IMessage, ulNewFlags, lpPassedEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPassedEntryId->Value.bin.lpb), &~lpMessage);
 		else
-			hr = m_lpFolder->CreateMessage(&IID_IMessage, ulNewFlags, &lpMessage);
+			hr = m_lpFolder->CreateMessage(&IID_IMessage, ulNewFlags, &~lpMessage);
 
 		if(hr != hrSuccess)
 			return hr;
 	}else{
-		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &m_iidMessage, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpMessage);
+		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpMessage);
 		if (hr == MAPI_E_NOT_FOUND)
 			// The item was soft-deleted; sourcekey is known, but we cannot open the item. It has therefore been deleted.
 			return SYNC_E_OBJECT_DELETED;
 		if(hr != hrSuccess)
 			return hr;
+
 		if (IsProcessed(lpRemoteCK, lpPropPCL))
 			//we already have this change
 			return SYNC_E_IGNORE;
@@ -306,7 +286,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 	hr = lpMessage->SetProps(cValue, lpPropArray, NULL);
 	if(hr != hrSuccess)
 		return hr;
-	*lppMessage = lpMessage;
+	*lppMessage = lpMessage.release();
 	return hrSuccess;
 }
 
@@ -589,7 +569,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		ZLOG_DEBUG(m_lpLogger, "Failed to open root folder, hr = 0x%08x", hr);
 		return hr;
 	}
-	hr = m_lpFolder->GetMsgStore()->GetReceiveFolder((TCHAR*)"IPM", 0, &cbEntryId, &~lpEntryId, NULL);
+	hr = m_lpFolder->GetMsgStore()->GetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0, &cbEntryId, &~lpEntryId, nullptr);
 	if(hr != hrSuccess) {
 		ZLOG_DEBUG(m_lpLogger, "Failed to get 'IPM' receive folder id, hr = 0x%08x", hr);
 		return hr;
@@ -599,7 +579,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		ZLOG_DEBUG(m_lpLogger, "Failed to open 'IPM' receive folder, hr = 0x%08x", hr);
 		return hr;
 	}
-	hr = HrGetOneProp(&m_lpFolder->GetMsgStore()->m_xMsgStore, PR_IPM_SUBTREE_ENTRYID, &~lpIPMSubTree);
+	hr = HrGetOneProp(m_lpFolder->GetMsgStore(), PR_IPM_SUBTREE_ENTRYID, &~lpIPMSubTree);
 	if(hr != hrSuccess) {
 		ZLOG_DEBUG(m_lpLogger, "Failed to get ipm subtree id, hr = 0x%08x", hr);
 		return hr;
@@ -610,15 +590,18 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		return hr;
 	}
 
-	HrGetOneProp(lpRootFolder, PR_ADDITIONAL_REN_ENTRYIDS, &~lpAdditionalREN);
 
 	//make new PR_ADDITIONAL_REN_ENTRYIDS
 	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpNewAdditionalREN);
 	if(hr != hrSuccess)
 		return hr;
-
 	lpNewAdditionalREN->ulPropTag = PR_ADDITIONAL_REN_ENTRYIDS;
-	lpNewAdditionalREN->Value.MVbin.cValues = (lpAdditionalREN == nullptr || lpAdditionalREN->Value.MVbin.cValues < 4) ? 4 : lpAdditionalREN->Value.MVbin.cValues;
+	if (HrGetOneProp(lpRootFolder, PR_ADDITIONAL_REN_ENTRYIDS, &~lpAdditionalREN) != hrSuccess ||
+	    lpAdditionalREN->Value.MVbin.cValues < 4)
+		lpNewAdditionalREN->Value.MVbin.cValues = 4;
+	else
+		lpNewAdditionalREN->Value.MVbin.cValues = lpAdditionalREN->Value.MVbin.cValues;
+
 	hr = MAPIAllocateMore(sizeof(SBinary)*lpNewAdditionalREN->Value.MVbin.cValues, lpNewAdditionalREN, (LPVOID*)&lpNewAdditionalREN->Value.MVbin.lpbin);
 	if(hr != hrSuccess)
 		return hr;
@@ -853,7 +836,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEnt
 		ULONG ulType = 0;
 
 		ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The item seems to be in conflict");
-		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &ptrMessage.iid(), MAPI_MODIFY, &ulType, &~ptrMessage);
+		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &iid_of(ptrMessage), MAPI_MODIFY, &ulType, &~ptrMessage);
 		if (hr == MAPI_E_NOT_FOUND) {
 			// This shouldn't happen as we just got a conflict.
 			ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The destination item seems to have disappeared");
@@ -875,12 +858,6 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEnt
 	}
 
 	*lppMessageImporter = ptrMessageImporter.release();
-	return hrSuccess;
-}
-
-HRESULT ECExchangeImportContentsChanges::SetMessageInterface(REFIID refiid)
-{
-	m_iidMessage = refiid;
 	return hrSuccess;
 }
 
@@ -954,11 +931,9 @@ HrVerifyRemindersRestriction(const SRestriction *lpRestriction,
 
 	if (lpAdditionalREN->Value.MVbin.lpbin[0].cb == 0 || lpAdditionalREN->Value.MVbin.lpbin[2].cb == 0 || lpAdditionalREN->Value.MVbin.lpbin[3].cb == 0)
 		return hrSuccess;
-
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[0]);
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[2]);
-	lstEntryIds.push_back(lpAdditionalREN->Value.MVbin.lpbin[3]);
-
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[0]);
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[2]);
+	lstEntryIds.emplace_back(lpAdditionalREN->Value.MVbin.lpbin[3]);
 	return HrRestrictionContains(lpRestriction, lstEntryIds);
 }
 
@@ -994,7 +969,7 @@ HRESULT ECExchangeImportContentsChanges::HrUpdateSearchReminders(LPMAPIFOLDER lp
 	else
 		return MAPI_E_NOT_FOUND;
 
-	hr = lpRootFolder->OpenEntry(lpREMEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpREMEntryID->Value.bin.lpb), &ptrRemindersFolder.iid(), MAPI_BEST_ACCESS, &ulType, &~ptrRemindersFolder);
+	hr = lpRootFolder->OpenEntry(lpREMEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpREMEntryID->Value.bin.lpb), &iid_of(ptrRemindersFolder), MAPI_BEST_ACCESS, &ulType, &~ptrRemindersFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrRemindersFolder->GetSearchCriteria(0, &~ptrOrigRestriction, &~ptrOrigContainerList, &ulOrigSearchState);
@@ -1023,17 +998,3 @@ HRESULT ECExchangeImportContentsChanges::HrUpdateSearchReminders(LPMAPIFOLDER lp
 
 	return ptrRemindersFolder->SetSearchCriteria(ptrPreRestriction, ptrOrigContainerList, RESTART_SEARCH | (ulOrigSearchState & (SEARCH_FOREGROUND | SEARCH_RECURSIVE)));
 }
-
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, Config, (LPSTREAM, lpStream), (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, UpdateState, (LPSTREAM, lpStream))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ImportMessageChange, (ULONG, cValue), (LPSPropValue, lpPropArray), (ULONG, ulFlags), (LPMESSAGE *, lppMessage))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ImportMessageDeletion, (ULONG, ulFlags), (LPENTRYLIST, lpSourceEntryList))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ImportPerUserReadStateChange, (ULONG, cElements), (LPREADSTATE, lpReadState))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ImportMessageMove, (ULONG, cbSourceKeySrcFolder), (BYTE *, pbSourceKeySrcFolder), (ULONG, cbSourceKeySrcMessage), (BYTE *, pbSourceKeySrcMessage), (ULONG, cbPCLMessage), (BYTE *, pbPCLMessage), (ULONG, cbSourceKeyDestMessage), (BYTE *, pbSourceKeyDestMessage), (ULONG, cbChangeNumDestMessage), (BYTE *, pbChangeNumDestMessage))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ConfigForConversionStream, (LPSTREAM, lpStream), (ULONG, ulFlags), (ULONG, cValuesConversion), (LPSPropValue, lpPropArrayConversion))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, ImportMessageChangeAsAStream, (ULONG, cpvalChanges), (LPSPropValue, ppvalChanges), (ULONG, ulFlags), (LPSTREAM *, lppstream))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportContentsChanges, ECImportContentsChanges, SetMessageInterface, (REFIID, refiid))

@@ -32,7 +32,7 @@ public:
 				   const vmime::encoding& enc,
 				   const vmime::mediaType& type,
 				   const std::string& contentid,
-				   const vmime::word filename,
+				   const vmime::word &filename,
 				   const vmime::text& desc = vmime::NULL_TEXT,
 				   const vmime::word& name = vmime::NULL_WORD);
 
@@ -42,11 +42,10 @@ private:
 
 	vmime::word m_filename;
 	std::string m_contentid;
-
-	bool m_hasCharset;
+	bool m_hasCharset = false;
 	vmime::charset m_charset;
 
-	void generatePart(vmime::shared_ptr<vmime::bodyPart> part) const;
+	void generatePart(vmime::shared_ptr<vmime::bodyPart> part) const _kc_override;
 };
 
 } /* namespace */

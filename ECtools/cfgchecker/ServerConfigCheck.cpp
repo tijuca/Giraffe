@@ -16,14 +16,12 @@
  */
 
 #include <kopano/platform.h>
-#include "ServerConfigCheck.h"
+#include "ECConfigCheck.h"
 #include <kopano/stringutil.h>
 
 ServerConfigCheck::ServerConfigCheck(const char *lpszConfigFile) : ECConfigCheck("Server Configuration file", lpszConfigFile)
 {
-	std::string setting;
-
-	setting = getSetting("enable_hosted_kopano");
+	std::string setting = getSetting("enable_hosted_kopano");
 	if (!setting.empty())
 		setHosted(parseBool(setting.c_str()));
 	setting = getSetting("enable_distributed_kopano");
@@ -53,14 +51,10 @@ void ServerConfigCheck::loadChecks()
 
 	addCheck("enable_distributed_kopano", 0, &testBoolean);
 	addCheck("server_name", CONFIG_MULTI_USED);
-// 	addCheck("thread_stacksize", 0, &testMinInt, 25);
-
 	addCheck("enable_gab", 0, &testBoolean);
 	addCheck("enable_sso_ntlmauth", 0, &testBoolean);
-	addCheck("sync_log_all_changes", 0, &testBoolean);
 	addCheck("client_update_enabled", 0, &testBoolean);
 	addCheck("hide_everyone", 0, &testBoolean);
-	addCheck("index_services_enabled", 0, &testBoolean);
 	addCheck("enable_enhanced_ics", 0, &testBoolean);
 
 	addCheck("softdelete_lifetime", 0, &testNonZero);
@@ -105,12 +99,6 @@ int ServerConfigCheck::testPlugin(const config_check_t *check)
 		printError(check->option1, "Unix plugin does not support multi-tenancy");
 		return CHECK_ERROR;
 	}
-
-	if (check->multi && check->value1 != "ldapms") {
-		printError(check->option1, check->value1 + " plugin does not support multiserver");
-		return CHECK_ERROR;
-	}
-
 	if (check->multi && check->value1 == "ldap") {
 		printError(check->option1, "Unix plugin does not support multiserver");
 		return CHECK_ERROR;
@@ -151,13 +139,12 @@ int ServerConfigCheck::testPluginPath(const config_check_t *check)
 
 int ServerConfigCheck::testStorename(const config_check_t *check)
 {
-	if (!check->hosted) {
-		if (check->value1.find("%c") != std::string::npos) {
-			printError(check->option1, "multi-tenancy disabled, but value contains %c: " + check->value1);
-			return CHECK_ERROR;
-		}
+	if (check->hosted)
+		return CHECK_OK;
+	if (check->value1.find("%c") != std::string::npos) {
+		printError(check->option1, "multi-tenancy disabled, but value contains %c: " + check->value1);
+		return CHECK_ERROR;
 	}
-
 	return CHECK_OK;
 }
 

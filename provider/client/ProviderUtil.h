@@ -18,6 +18,7 @@
 #ifndef PROVIDERUTIL_H
 #define PROVIDERUTIL_H
 
+#include <kopano/memory.hpp>
 #include "WSTransport.h"
 
 #define CT_UNSPECIFIED		0x00
@@ -25,8 +26,8 @@
 #define CT_OFFLINE			0x02
 
 struct PROVIDER_INFO {
-	IMSProvider *lpMSProviderOnline;
-	IABProvider *lpABProviderOnline;
+	KCHL::object_ptr<IMSProvider> lpMSProviderOnline;
+	KCHL::object_ptr<IABProvider> lpABProviderOnline;
 	ULONG		ulProfileFlags;	//  Profile flags when you start the first time
 	ULONG		ulConnectType; // CT_* values, The type of connection when you start the first time
 };
@@ -34,11 +35,7 @@ struct PROVIDER_INFO {
 typedef std::map<std::string, PROVIDER_INFO> ECMapProvider;
 
 HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult);
-
-HRESULT CreateMsgStoreObject(char *lpszProfname, LPMAPISUP lpMAPISup, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags, WSTransport* lpTransport,
-							MAPIUID* lpguidMDBProvider, BOOL bSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore,
-							ECMsgStore** lppMsgStore);
-
+extern HRESULT CreateMsgStoreObject(const char *profile, IMAPISupport *, ULONG eid_size, ENTRYID *eid, ULONG msg_flags, ULONG profile_flags, WSTransport *, const MAPIUID *mdb_prov, BOOL spooler, BOOL deflt_store, BOOL offline_store, ECMsgStore **);
 HRESULT SetProviderMode(IMAPISupport *lpMAPISup, ECMapProvider *lpmapProvider, LPCSTR lpszProfileName, ULONG ulConnectType);
 HRESULT GetProviders(ECMapProvider *lpmapProvider, IMAPISupport *lpMAPISup, LPCSTR lpszProfileName, ULONG ulFlags, PROVIDER_INFO *lpsProviderInfo);
 

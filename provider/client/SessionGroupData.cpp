@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
 #include <mapicode.h>
@@ -36,23 +36,10 @@ SessionGroupData::SessionGroupData(ECSESSIONGROUPID ecSessionGroupId,
 	m_ecSessionGroupInfo.strProfile = lpInfo->strProfile;
 }
 
-SessionGroupData::~SessionGroupData(void)
-{
-	if (m_lpNotifyMaster)
-		m_lpNotifyMaster->Release();
-}
-
 HRESULT SessionGroupData::Create(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps, SessionGroupData **lppData)
 {
-	HRESULT hr = hrSuccess;
-	SessionGroupData *lpData = NULL;
-
-	lpData = new SessionGroupData(ecSessionGroupId, lpInfo, sProfileProps);
-	lpData->AddRef();
-
-	*lppData = lpData;
-
-	return hr;
+	return alloc_wrap<SessionGroupData>(ecSessionGroupId, lpInfo,
+	       sProfileProps).put(lppData);
 }
 
 HRESULT SessionGroupData::GetOrCreateNotifyMaster(ECNotifyMaster **lppMaster)
@@ -61,8 +48,8 @@ HRESULT SessionGroupData::GetOrCreateNotifyMaster(ECNotifyMaster **lppMaster)
 	scoped_rlock lock(m_hMutex);
 
 	if (!m_lpNotifyMaster)
-		hr = ECNotifyMaster::Create(this, &m_lpNotifyMaster);
-	*lppMaster = m_lpNotifyMaster;
+		hr = ECNotifyMaster::Create(this, &~m_lpNotifyMaster);
+	*lppMaster = m_lpNotifyMaster.get();
 	return hr;
 }
 
@@ -93,13 +80,11 @@ ECSESSIONGROUPID SessionGroupData::GetSessionGroupId()
 
 ULONG SessionGroupData::AddRef()
 {
-	scoped_rlock lock(m_hRefMutex);
 	return ++m_cRef;
 }
 
 ULONG SessionGroupData::Release()
 {
-	scoped_rlock lock(m_hRefMutex);
 	return --m_cRef;
 }
 

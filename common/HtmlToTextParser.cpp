@@ -155,7 +155,6 @@ void CHtmlToTextParser::addNewLine(bool forceLine) {
 void CHtmlToTextParser::addChar(WCHAR c) {
 	if (fScriptMode || fHeadMode || fStyleMode)
 		return;
-
 	strText.push_back(c);
 	cNewlines = 0;
 	fTDTHMode = false;
@@ -163,7 +162,7 @@ void CHtmlToTextParser::addChar(WCHAR c) {
 
 void CHtmlToTextParser::addSpace(bool force) {
 	
-	if(force || (!strText.empty() && *strText.rbegin() != ' ') )
+	if (force || (!strText.empty() && strText.back() != ' '))
 		addChar(' ');
 }
 
@@ -192,8 +191,7 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 			entity += *lpwHTML;
 			++lpwHTML;
 		}
-
-		strText.push_back(wcstoul(entity.c_str(), NULL, base));
+		strText.push_back(wcstoul(entity.c_str(), nullptr, base));
 	} else {
 		for (int i = 0; *lpwHTML != ';' && *lpwHTML != 0 && i < 10; ++i) {
 			entity += *lpwHTML;
@@ -202,7 +200,7 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 
 		WCHAR code = CHtmlEntity::toChar(entity.c_str());
 		if (code > 0)
-			strText.push_back( code );
+			strText.push_back(code);
 	}
 
 	if(*lpwHTML == ';')
@@ -216,8 +214,7 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 	bool bTagName = true;
 	bool bTagEnd = false;
 	bool bParseAttrs = false;
-	MapParser::const_iterator iterTag;
-
+	decltype(tagMap)::const_iterator iterTag;
 	std::wstring tagName;
 
 	while (*lpwHTML != 0 && !bTagEnd) 
@@ -238,13 +235,12 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 					++lpwHTML;
 					continue;
 				}
-				if (fCommentMode) {
-					if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
-						++lpwHTML; // comment ends with -->
-						return;
-					}
-				} else {
+				if (!fCommentMode) {
 					++lpwHTML; // all others end on the first >
+					return;
+				}
+				if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
+					++lpwHTML; // comment ends with -->
 					return;
 				}
 				++lpwHTML;
@@ -409,30 +405,21 @@ void CHtmlToTextParser::parseTagBA()
 }
 
 bool CHtmlToTextParser::addURLAttribute(const WCHAR *lpattr, bool bSpaces) {
-
-	MapAttrs::const_iterator iter;
-
 	if (stackAttrs.empty())
 		return false;
-
-	iter = stackAttrs.top().find(lpattr);
-	if (iter != stackAttrs.top().end()) {
-		if(wcsncasecmp(iter->second.c_str(), L"http:", 5) == 0 ||
-			wcsncasecmp(iter->second.c_str(), L"ftp:", 4) == 0 ||
-			wcsncasecmp(iter->second.c_str(), L"mailto:", 7) == 0)
-		{
-			addSpace(false);
-
-			strText.append(L"<");
-			strText.append(iter->second);
-			strText.append(L">");
-
-			addSpace(false);
-			return true;
-		}
-	}
-
-	return false;
+	auto iter = stackAttrs.top().find(lpattr);
+	if (iter == stackAttrs.top().cend())
+		return false;
+	if (wcsncasecmp(iter->second.c_str(), L"http:", 5) != 0 &&
+	    wcsncasecmp(iter->second.c_str(), L"ftp:", 4) != 0 &&
+	    wcsncasecmp(iter->second.c_str(), L"mailto:", 7) != 0)
+		return false;
+	addSpace(false);
+	strText.append(L"<");
+	strText.append(iter->second);
+	strText.append(L">");
+	addSpace(false);
+	return true;
 }
 
 void CHtmlToTextParser::parseTagSCRIPT() {
@@ -499,38 +486,33 @@ static std::wstring inttostring(unsigned int x) {
 
 void CHtmlToTextParser::parseTagLI() {
 	addNewLine( false );
-
-	if (!listInfoStack.empty()) {
-		for (size_t i = 0; i < listInfoStack.size() - 1; ++i)
-			strText.append(L"\t");
-
-		if (listInfoStack.top().mode == lmOrdered) {
-			strText += inttostring(listInfoStack.top().count++) + L".";
-		} else 
-			strText.append(L"*");
-		
+	if (listInfoStack.empty())
+		return;
+	for (size_t i = 0; i < listInfoStack.size() - 1; ++i)
 		strText.append(L"\t");
-		cNewlines = 0;
-		fTDTHMode = false;
-	}
+	if (listInfoStack.top().mode == lmOrdered)
+		strText += inttostring(listInfoStack.top().count++) + L".";
+	else
+		strText.append(L"*");
+	strText.append(L"\t");
+	cNewlines = 0;
+	fTDTHMode = false;
 }
 
 void CHtmlToTextParser::parseTagDT() {
 	addNewLine( false );
-
-	if (!listInfoStack.empty()) {
-		for (size_t i = 0; i < listInfoStack.size() - 1; ++i)
-			strText.append(L"\t");
-	}
+	if (listInfoStack.empty())
+		return;
+	for (size_t i = 0; i < listInfoStack.size() - 1; ++i)
+		strText.append(L"\t");
 }
 
 void CHtmlToTextParser::parseTagDD() {
 	addNewLine( false );
-
-	if (!listInfoStack.empty()) {
-		for (size_t i = 0; i < listInfoStack.size(); ++i)
-			strText.append(L"\t");
-	}
+	if (listInfoStack.empty())
+		return;
+	for (size_t i = 0; i < listInfoStack.size(); ++i)
+		strText.append(L"\t");
 }
 
 void CHtmlToTextParser::parseTagDL() {

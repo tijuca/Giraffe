@@ -43,24 +43,22 @@ protected:
 	std::string smtphost;
 	int smtpport;
 	std::wstring error;
-	int smtpresult;
+	int smtpresult = 0;
 
 	std::vector<sFailedRecip> mTemporaryFailedRecipients;
 	std::vector<sFailedRecip> mPermanentFailedRecipients;
 
 public:
 	_kc_hidden ECSender(const std::string &smtphost, int port);
-	_kc_hidden virtual ~ECSender(void) _kc_impdtor;
-	_kc_hidden virtual int getSMTPResult(void);
-	_kc_hidden virtual const wchar_t *getErrorString(void);
-	_kc_hidden virtual void setError(const std::wstring &);
+	_kc_hidden virtual ~ECSender(void) = default;
+	_kc_hidden virtual int getSMTPResult() const { return smtpresult; }
+	_kc_hidden virtual const wchar_t *getErrorString() const { return error.c_str(); }
+	_kc_hidden virtual void setError(const std::wstring &e) { error = e; }
 	_kc_hidden virtual void setError(const std::string &);
-	_kc_hidden virtual bool haveError(void);
+	_kc_hidden virtual bool haveError() const { return !error.empty(); }
 	_kc_hidden virtual const std::vector<sFailedRecip> &getPermanentFailedRecipients(void) const { return mPermanentFailedRecipients; }
 	_kc_hidden virtual const std::vector<sFailedRecip> &getTemporaryFailedRecipients(void) const { return mTemporaryFailedRecipients; }
 };
-
-bool ValidateCharset(const char *charset);
 
 /* c wrapper to create object */
 extern _kc_export ECSender *CreateSender(const std::string &smtphost, int port);
@@ -83,7 +81,7 @@ extern _kc_export HRESULT IMToINet(IMAPISession *, IAddrBook *, IMessage *, ECSe
 
 // Parse the RFC822 input and create IMAP Envelope, Body and Bodystructure property values
 extern _kc_export HRESULT createIMAPProperties(const std::string &input, std::string *envelope, std::string *body, std::string *bodystruct);
-
+extern _kc_export HRESULT createIMAPBody(const std::string &input, IMessage *lpMessage, bool envelope = false);
 } /* namespace */
 
 #endif // INETMAPI_H

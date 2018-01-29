@@ -16,15 +16,13 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include <utility>
-#include <kopano/Trace.h>
 #include "ZCABLogon.h"
 #include "ZCABContainer.h"
 #include <kopano/ECTags.h>
 #include <kopano/ECDebug.h>
-#include <kopano/ECDebugPrint.h>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include "kcore.hpp"
 #include <mapix.h>
@@ -32,7 +30,8 @@
 
 using namespace KCHL;
 
-ZCABLogon::ZCABLogon(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGUID) :
+ZCABLogon::ZCABLogon(IMAPISupport *lpMAPISup, ULONG ulProfileFlags,
+    const GUID *lpGUID) :
 	ECUnknown("IABLogon"), m_lpMAPISup(lpMAPISup)
 {
 	// The specific GUID for *this* addressbook provider, if available
@@ -48,26 +47,18 @@ ZCABLogon::~ZCABLogon()
 		m_lpMAPISup->Release();
 }
 
-HRESULT ZCABLogon::Create(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGuid, ZCABLogon **lppZCABLogon)
+HRESULT ZCABLogon::Create(IMAPISupport *lpMAPISup, ULONG ulProfileFlags,
+    const GUID *lpGuid, ZCABLogon **lppZCABLogon)
 {
-	HRESULT hr = hrSuccess;
-
-	ZCABLogon *lpABLogon = new ZCABLogon(lpMAPISup, ulProfileFlags, lpGuid);
-
-	hr = lpABLogon->QueryInterface(IID_ZCABLogon, (void **)lppZCABLogon);
-
-	if(hr != hrSuccess)
-		delete lpABLogon;
-
-	return hr;
+	return alloc_wrap<ZCABLogon>(lpMAPISup, ulProfileFlags, lpGuid).put(lppZCABLogon);
 }
 
 HRESULT ZCABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ZCABLogon, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IABLogon, &this->m_xABLogon);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xABLogon);
+	REGISTER_INTERFACE2(IABLogon, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -125,7 +116,7 @@ HRESULT ZCABLogon::AddFolder(const WCHAR* lpwDisplayName, ULONG cbStore, LPBYTE 
 	if (hr != hrSuccess)
 		return hr;
 	memcpy(entry.lpFolder, lpFolder, cbFolder);
-	m_lFolders.push_back(std::move(entry));
+	m_lFolders.emplace_back(std::move(entry));
 	return hrSuccess;
 }
 
@@ -158,11 +149,13 @@ HRESULT ZCABLogon::ClearFolderList()
  * 
  * @return 
  */
-HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
+HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    const IID *lpInterface, ULONG ulFlags, ULONG *lpulObjType,
+    IUnknown **lppUnk)
 {
 	HRESULT			hr = hrSuccess;
 	object_ptr<ZCABContainer> lpRootContainer;
-	object_ptr<ZCMAPIProp> lpContact;
+	object_ptr<IUnknown> lpContact;
 	object_ptr<IProfSect> lpProfileSection;
 	memory_ptr<SPropValue> lpFolderProps;
 	ULONG cValues = 0;
@@ -186,7 +179,7 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 		// you can only open the top level container
 		if (memcmp((LPBYTE)lpEntryID +4, &MUIDZCSAB, sizeof(GUID)) != 0)
 			return MAPI_E_UNKNOWN_ENTRYID;
-		hr = m_lpMAPISup->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, 0, &~lpProfileSection);
+		hr = m_lpMAPISup->OpenProfileSection(reinterpret_cast<const MAPIUID *>(&pbGlobalProfileSectionGuid), 0, &~lpProfileSection);
 		if (hr != hrSuccess)
 			return hr;
 		hr = lpProfileSection->GetProps(sptaFolderProps, 0, &cValues, &~lpFolderProps);
@@ -213,7 +206,7 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 
 		if (cbEntryID > 4+sizeof(GUID)) {
 			// we're actually opening a contact .. so pass-through to the just opened rootcontainer
-			hr = lpRootContainer->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, &~lpContact);
+			hr = lpRootContainer->OpenEntry(cbEntryID, lpEntryID, &IID_IUnknown, ulFlags, lpulObjType, &~lpContact);
 			if (hr != hrSuccess)
 				return hr;
 		}
@@ -223,7 +216,7 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 		if(lpInterface)
 			hr = lpContact->QueryInterface(*lpInterface, (void **)lppUnk);
 		else
-			hr = lpContact->QueryInterface(IID_IMAPIProp, (void **)lppUnk);
+			hr = lpContact->QueryInterface(IID_IDistList, reinterpret_cast<void **>(lppUnk));
 	} else {
 		*lpulObjType = MAPI_ABCONT;
 
@@ -240,7 +233,9 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	return hrSuccess;
 }
 
-HRESULT ZCABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
+HRESULT ZCABLogon::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
+    ULONG cbEntryID2, const ENTRYID *lpEntryID2, ULONG ulFlags,
+    ULONG *lpulResult)
 {
 	// we don't implement this .. a real ab provider should do this action.
 	return MAPI_E_NO_SUPPORT;
@@ -283,17 +278,3 @@ HRESULT ZCABLogon::PrepareRecips(ULONG ulFlags,
 		return hrSuccess;
 	return MAPI_E_NO_SUPPORT;
 }
-
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Logoff, (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, CompareEntryIDs, (ULONG, cbEntryID1), (LPENTRYID, lpEntryID1), (ULONG, cbEntryID2), (LPENTRYID, lpEntryID2), (ULONG, ulFlags), (ULONG *, lpulResult))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Advise, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Unadvise, (ULONG, ulConnection))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenStatusEntry, (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPMAPISTATUS *, lppMAPIStatus))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenTemplateID, (ULONG, cbTemplateID), (LPENTRYID, lpTemplateID), (ULONG, ulTemplateFlags), (LPMAPIPROP, lpMAPIPropData), (LPCIID, lpInterface), (LPMAPIPROP *, lppMAPIPropNew), (LPMAPIPROP, lpMAPIPropSibling))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, GetOneOffTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
-DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, PrepareRecips, (ULONG, ulFlags), (const SPropTagArray *, lpPropTagArray), (LPADRLIST, lpRecipList))

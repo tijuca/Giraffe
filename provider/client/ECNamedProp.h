@@ -21,55 +21,29 @@
 #include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <map>
+#include <kopano/memory.hpp>
 
 class WSTransport;
 
-// Sort function
-//
-// Doesn't really matter *how* it sorts, as long as it's reproduceable
 struct ltmap {
-	bool operator()(const MAPINAMEID *a, const MAPINAMEID *b) const
-	{
-	    int r = memcmp(a->lpguid, b->lpguid, sizeof(GUID));
-	    
-        if(r<0)
-            return false;
-        else if(r>0)
-            return true;
-        else {	    
-            if(a->ulKind != b->ulKind)
-                return a->ulKind > b->ulKind;
-
-            switch(a->ulKind) {
-            case MNID_ID:
-                return a->Kind.lID > b->Kind.lID;
-            case MNID_STRING:
-                return wcscmp(a->Kind.lpwstrName, b->Kind.lpwstrName) < 0;
-            default:
-                return false;
-            }
-        }
-	}
+	bool operator()(const MAPINAMEID *, const MAPINAMEID *) const noexcept;
 };
 
 class ECNamedProp _kc_final {
 public:
 	ECNamedProp(WSTransport *lpTransport);
 	virtual ~ECNamedProp();
-
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames);
+	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names);
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags);
 
 private:
+	KCHL::object_ptr<WSTransport> lpTransport;
 	std::map<MAPINAMEID *,ULONG,ltmap>		mapNames;
-	WSTransport	*							lpTransport;
 
 	HRESULT			ResolveLocal(MAPINAMEID *lpName, ULONG *ulId);
 	HRESULT			ResolveCache(MAPINAMEID *lpName, ULONG *ulId);
-
-	HRESULT			ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName);
-	HRESULT			ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName);
-
+	HRESULT ResolveReverseLocal(ULONG ulId, const GUID *, ULONG flags, void *base, MAPINAMEID **name);
+	HRESULT ResolveReverseCache(ULONG ulId, const GUID *, ULONG flags, void *base, MAPINAMEID **name);
 	HRESULT			UpdateCache(ULONG ulId, MAPINAMEID *lpName);
 	HRESULT			HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void *lpBase);
 

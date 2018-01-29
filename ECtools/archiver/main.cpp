@@ -17,6 +17,8 @@
 
 #include <kopano/platform.h>
 #include <iostream>
+#include <memory>
+#include <sstream>
 #include <climits>
 #include <getopt.h>
 #include <kopano/stringutil.h>
@@ -25,10 +27,14 @@
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ecversion.h>
+#include <kopano/UnixUtil.h>
 #include "Archiver.h"
-#include "UnixUtil.cpp"
 
 namespace KC {
+
+using std::cerr;
+using std::cout;
+using std::endl;
 
 enum modes {
     MODE_INVALID = 0,
@@ -44,39 +50,18 @@ enum modes {
 
 static const char *modename(modes mode)
 {
-    const char* retval = "";
     switch (mode) {
-    case MODE_INVALID:
-        retval = "Invalid mode";
-        break;
-    case MODE_ATTACH:
-        retval = "Attach";
-        break;
-    case MODE_DETACH:
-        retval = "Detach";
-        break;
-    case MODE_DETACH_IDX:
-        retval = "Detach by index";
-        break;
-    case MODE_LIST:
-        retval = "List";
-        break;
-    case MODE_LIST_ARCHUSER:
-        retval = "List archive users";
-        break;
-    case MODE_ARCHIVE:
-        retval = "Archive";
-        break;
-    case MODE_CLEANUP:
-        retval = "Clean-up";
-        break;
-    case MODE_AUTO_ATTACH:
-        retval = "Auto attach";
-        break;
-    default:
-        retval = "Undefined mode";
+	case MODE_INVALID: return "Invalid mode";
+	case MODE_ATTACH: return "Attach";
+	case MODE_DETACH: return "Detach";
+	case MODE_DETACH_IDX: return "Detach by index";
+	case MODE_LIST: return "List";
+	case MODE_LIST_ARCHUSER: return "List archive users";
+	case MODE_ARCHIVE: return "Archive";
+	case MODE_CLEANUP: return "Clean-up";
+	case MODE_AUTO_ATTACH: return "Auto attach";
+	default: return "Undefined mode";
     }
-    return retval;
 }
 
 /**
@@ -87,7 +72,7 @@ static const char *modename(modes mode)
  * @param[in]	lpszName
  *					The name of the application to use in the output.
  */
-static void print_help(ostream &ostr, const char *lpszName)
+static void print_help(std::ostream &ostr, const char *lpszName)
 {
     ostr << endl;
     ostr << "Usage:" << endl;
@@ -159,17 +144,17 @@ static void print_mode_error(modes modeSet, modes modeReq,
     print_help(cerr, lpszName);
 }
 
-static std::string args_to_cmdline(int argc, const char * const argv[])
+static std::string kc_join(int argc, const char *const *argv, const char *sep)
 {
-    if (argc <= 0)
-        return std::string();
-
-    std::string strCmdLine(argv[0]);
-
-    for (int i = 1; i < argc; ++i)
-        strCmdLine.append(" '").append(shell_escape(argv[i])).append(1, '\'');
-
-    return strCmdLine;
+	std::string s;
+	if (argc == 0)
+		return s;
+	for (int k = 0; k < argc; ++k) {
+		s += argv[0];
+		s += sep;
+	}
+	s.erase(s.size() - 2, 2);
+	return s;
 }
 
 enum cmdOptions {
@@ -223,8 +208,6 @@ static inline const char *yesno(bool bValue) { return bValue ? "yes" : "no"; }
  */
 int main(int argc, char *argv[])
 {
-    eResult	r = Success;
-
     modes mode = MODE_INVALID;
     tstring strUser;
     const char *lpszArchive = NULL;
@@ -235,11 +218,8 @@ int main(int argc, char *argv[])
     bool bAutoAttach = false;
     bool bForceCleanup = false;
     unsigned ulAttachFlags = 0;
-    ArchiverPtr ptrArchiver;
+	std::unique_ptr<Archiver> ptrArchiver;
     convert_context converter;
-    const std::string strCmdLine = args_to_cmdline(argc, argv);
-    std::list<configsetting_t> lSettings;
-
     ULONG ulFlags = 0;
 
     const char *lpszConfig = Archiver::GetConfigPath();
@@ -251,9 +231,8 @@ int main(int argc, char *argv[])
 
     setlocale(LC_CTYPE, "");
 
-    int c;
     while (1) {
-        c = getopt_long(argc, argv, "u:c:lLACwa:d:D:f:s:N", long_options, NULL);
+		auto c = getopt_long(argc, argv, "u:c:lLACwa:d:D:f:s:N", long_options, NULL);
         if (c == -1)
             break;
         switch (c) {
@@ -451,7 +430,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    r = Archiver::Create(&ptrArchiver);
+	auto r = Archiver::Create(&ptrArchiver);
     if (r != Success) {
         cerr << "Failed to instantiate archiver object" << endl;
         return 1;
@@ -467,11 +446,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    ec_log_crit("Startup command: %s", strCmdLine.c_str());
-    ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Version: %s", PROJECT_VERSION_ARCHIVER_STR);
-
-    lSettings = ptrArchiver->GetConfig()->GetAllSettings();
-
+	ec_log_crit("Startup command: %s", kc_join(argc, argv, "\" \"").c_str());
+	ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Version %s", PROJECT_VERSION);
+	auto lSettings = ptrArchiver->GetConfig()->GetAllSettings();
     ECLogger* filelogger = ptrArchiver->GetLogger(Archiver::LogOnly);
     ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Config settings:");
 	for (const auto &s : lSettings)
@@ -547,7 +524,7 @@ int main(int argc, char *argv[])
 
     case MODE_LIST_ARCHUSER: {
         ArchiveManagePtr ptr;
-        r = ptrArchiver->GetManage(_T("SYSTEM"), &ptr);
+        r = ptrArchiver->GetManage(KC_T("SYSTEM"), &ptr);
         if (r != Success)
             return 1;
 

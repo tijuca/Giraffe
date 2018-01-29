@@ -36,8 +36,6 @@
 #include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
 
-using namespace std;
-
 namespace KC {
 /**
  * @defgroup userplugin Server user plugin
@@ -82,7 +80,7 @@ public:
 	 *					will be ignored.
 	 * @return TRUE if the objects are equal
 	 */
-    bool operator==(const objectsignature_t &sig) const { return id == sig.id; };
+	bool operator==(const objectsignature_t &sig) const noexcept { return id == sig.id; };
 
 	/**
 	 * Object signature less-then comparison
@@ -93,7 +91,7 @@ public:
 	 *					the signature will be ignored.
 	 * @return TRUE if the current object is less then the sig object
 	 */
-    bool operator< (const objectsignature_t &sig) { return id.id < sig.id.id; };
+	bool operator<(const objectsignature_t &sig) const noexcept { return id.id < sig.id.id; };
 
 	/**
 	 * externid with objectclass
@@ -108,9 +106,8 @@ public:
     std::string signature;
 };
 
-typedef list<objectsignature_t> signatures_t;
-
-typedef list<unsigned int> abprops_t;
+typedef std::list<objectsignature_t> signatures_t;
+typedef std::list<unsigned int> abprops_t;
 
 class ECConfig;
 
@@ -137,7 +134,7 @@ public:
 		m_bDistributed(shareddata->IsDistributed())
 	{}
 
-	virtual ~UserPlugin(void) _kc_impdtor;
+	virtual ~UserPlugin(void) = default;
 
 	/**
 	 * Initialize plugin
@@ -160,7 +157,7 @@ public:
 	 * @return The object signature of the resolved object
 	 * @throw std::exception
 	 */
-	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company) = 0;
+	virtual objectsignature_t resolveName(objectclass_t objclass, const std::string &name, const objectid_t &company) = 0;
 
 	/**
 	 * Authenticate user with username and password
@@ -175,7 +172,7 @@ public:
 	 * @return The objectsignature of the authenticated user
 	 * @throw std::exception
 	 */
-	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company) = 0;
+	virtual objectsignature_t authenticateUser(const std::string &username, const std::string &password, const objectid_t &company) = 0;
 
 	/**
 	 * Request a list of objects for a particular company and specified objectclass.
@@ -189,7 +186,7 @@ public:
 	 * @return The list of object signatures of all objects which were found
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass) = 0;
+	virtual signatures_t getAllObjects(const objectid_t &company, objectclass_t) = 0;
 
 	/**
 	 * Obtain the object details for the given object
@@ -199,7 +196,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid) = 0;
+	virtual objectdetails_t getObjectDetails(const objectid_t &) = 0;
 
 	/**
 	 * Obtain the object details for the given objects
@@ -209,7 +206,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<std::map<objectid_t, objectdetails_t> > getObjectDetails(const std::list<objectid_t> &objectids) = 0;
+	virtual std::map<objectid_t, objectdetails_t> getObjectDetails(const std::list<objectid_t> &objectids) = 0;
 
 	/**
 	 * Get all children for a parent for a given relation type.
@@ -222,7 +219,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject) = 0;
+	virtual signatures_t getSubObjectsForObject(userobject_relation_t, const objectid_t &parentobject) = 0;
 
 	/**
 	 * Request all parents for a childobject for a given relation type.
@@ -235,7 +232,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject) = 0;
+	virtual signatures_t getParentObjectsForObject(userobject_relation_t, const objectid_t &childobject) = 0;
 
 	/**
 	 * Search for all objects which match the given string,
@@ -249,7 +246,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> searchObject(const std::string &match, unsigned int ulFlags) = 0;
+	virtual signatures_t searchObject(const std::string &match, unsigned int flags) = 0;
 
 	/**
 	 * Obtain details for the public store
@@ -259,7 +256,7 @@ public:
 	 * @return The public store details
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<objectdetails_t> getPublicStoreDetails(void) = 0;
+	virtual objectdetails_t getPublicStoreDetails() = 0;
 
 	/**
 	 * Obtain the objectdetails for a server
@@ -271,7 +268,7 @@ public:
 	 * @return The server details
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<serverdetails_t> getServerDetails(const std::string &server) = 0;
+	virtual serverdetails_t getServerDetails(const std::string &server) = 0;
 
 	/**
 	 * Obtain server list
@@ -279,7 +276,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual std::unique_ptr<serverlist_t> getServers(void) = 0;
+	virtual serverlist_t getServers() = 0;
 
 	/**
 	 * Update an object with new details
@@ -383,7 +380,7 @@ public:
 	 *					Boolean to indicate if the userdefault quota must be requested.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault) = 0;
+	virtual quotadetails_t getQuota(const objectid_t &, bool get_user_default) = 0;
 
 	/**
 	 * Set quota information on object
@@ -406,7 +403,7 @@ public:
 	 * @return	a list of properties
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<abprops_t> getExtraAddressbookProperties(void) = 0;
+	virtual abprops_t getExtraAddressbookProperties() = 0;
 
 	/**
 	 * Reset entire plugin - use with care - this deletes (almost) all entries in the user database
@@ -451,7 +448,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	objectnotfound(const string &arg) : runtime_error(arg) {
+	objectnotfound(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "objectnotfound exception: " << arg << endl;
 #endif
@@ -468,7 +466,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	toomanyobjects(const string &arg) : runtime_error(arg) {
+	toomanyobjects(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "toomanyobjects exception: " << arg << endl;
 #endif
@@ -485,7 +484,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	collision_error(const string &arg) : runtime_error(arg) {
+	collision_error(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "collision_error exception: " << arg << endl;
 #endif
@@ -502,7 +502,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	data_error(const string &arg) : runtime_error(arg) {
+	data_error(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "data_error exception: " << arg << endl;
 #endif
@@ -519,7 +520,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	notimplemented(const string &arg) : runtime_error(arg) {
+	notimplemented(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "notimplemented exception: " << arg << endl;
 #endif
@@ -538,7 +540,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	notsupported(const string &arg) : runtime_error(arg) {
+	notsupported(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "notsupported exception: " << arg << endl;
 #endif
@@ -554,7 +557,8 @@ public:
 	 * @param[in]	arg
 	 *					The description why the exception was thrown
 	 */
-	login_error(const string &arg) : runtime_error(arg) {
+	login_error(const std::string &arg) : runtime_error(arg)
+	{
 #ifdef EXCEPTION_DEBUG
 		cerr << "login_error exception: " << arg << endl;
 #endif
@@ -573,7 +577,9 @@ public:
 	 * @param[in]	ldaperror
 						The ldap error code why the exception was thrown
 	 */
-	ldap_error(const string &arg, int ldaperror=0) : runtime_error(arg) {
+	ldap_error(const std::string &arg, int ldaperror = 0) :
+		runtime_error(arg)
+	{
 		m_ldaperror = ldaperror;
 #ifdef EXCEPTION_DEBUG
 		cerr << "ldap_error exception: " << arg << endl;
@@ -593,7 +599,7 @@ public:
  */
 template <class Tin, class Tout>
 static inline Tout fromstring(const Tin &s) {
-	istringstream i(s);
+	std::istringstream i(s);
 	Tout res;
 	i >> res;
 	return res;
@@ -607,9 +613,9 @@ static inline Tout fromstring(const Tin &s) {
  *					The type depends on template Tin.
  * @return The string representation of i
  */
-template <class Tin>
-static inline string tostring(const Tin i) {
-	ostringstream o;
+template<class Tin> static inline std::string tostring(const Tin i)
+{
+	std::ostringstream o;
 	o << i;
 	return o.str();
 }

@@ -28,10 +28,10 @@
 #include "ECMsgStore.h"
 #include "ECMAPIProp.h"
 
-class ECMAPIContainer : public ECMAPIProp {
+class ECMAPIContainer : public ECMAPIProp, public virtual IMAPIContainer {
 public:
 	ECMAPIContainer(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, const char *szClassName);
-	virtual ~ECMAPIContainer(void) _kc_impdtor;
+	virtual ~ECMAPIContainer(void) = default;
 
 	// IUnknown
 	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
@@ -39,19 +39,13 @@ public:
 	// IMAPIContainer
 	virtual HRESULT GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable);
 	virtual HRESULT GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk);
+	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	virtual HRESULT SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags);
 	virtual HRESULT GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestriction, LPENTRYLIST *lppContainerList, ULONG *lpulSearchState);
 
 	// IMAPIProp
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-
-	class xMAPIContainer _kc_final : public IMAPIContainer {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIContainer.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xMAPIContainer;
 };
 
 #endif // #ifndef ECMAPICONTAINER

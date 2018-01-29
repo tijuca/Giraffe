@@ -18,6 +18,8 @@
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
+#include <string>
+#include <utility>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
 #include "instanceidmapper.h"
@@ -25,41 +27,31 @@
 #include <kopano/stringutil.h>
 #include "arc_mysql.hpp"
 
-using namespace std;
-
 namespace KC { namespace operations {
 
 HRESULT InstanceIdMapper::Create(ECLogger *lpLogger, ECConfig *lpConfig, InstanceIdMapperPtr *lpptrMapper)
 {
 	HRESULT hr = hrSuccess;
 	std::unique_ptr<InstanceIdMapper> lpMapper;
-	ECConfig *lpLocalConfig = lpConfig;
+	std::unique_ptr<ECConfig> lpLocalConfig;
 
 	// Get config if required.
-	if (lpLocalConfig == NULL) {
-		lpLocalConfig = ECConfig::Create(Archiver::GetConfigDefaults());
+	if (lpConfig == nullptr) {
+		lpLocalConfig.reset(ECConfig::Create(Archiver::GetConfigDefaults()));
 		if (!lpLocalConfig->LoadSettings(Archiver::GetConfigPath()))
 			// Just log warnings and errors and continue with default.
-			LogConfigErrors(lpLocalConfig);
+			LogConfigErrors(lpLocalConfig.get());
+		lpConfig = lpLocalConfig.get();
 	}
 	lpMapper.reset(new(std::nothrow) InstanceIdMapper(lpLogger));
-	if (lpMapper == nullptr) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
-	hr = lpMapper->Init(lpLocalConfig);
+	if (lpMapper == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	hr = lpMapper->Init(lpConfig);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	static_assert(sizeof(InstanceIdMapper) || true, "incomplete type must not be used");
-	lpptrMapper->reset(lpMapper.release());
-exit:
-	if (lpConfig == NULL) {
-		assert(lpLocalConfig != NULL);
-		delete lpLocalConfig;
-	}
-
-	return hr;
+	*lpptrMapper = std::move(lpMapper);
+	return hrSuccess;
 }
 
 InstanceIdMapper::InstanceIdMapper(ECLogger *lpLogger) :
@@ -86,7 +78,7 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 {
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
-	string strQuery;
+	std::string strQuery;
 	DB_RESULT lpResult;
 	DB_ROW lpDBRow = NULL;
 	DB_LENGTHS lpLengths = NULL;
@@ -96,15 +88,15 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 
 	strQuery =
 		"SELECT m_dst.val_binary FROM za_mappings AS m_dst "
-			"JOIN za_mappings AS m_src ON m_dst.instance_id = m_src.instance_id AND m_dst.tag = m_src.tag AND m_src.val_binary = " + m_ptrDatabase->EscapeBinary((LPBYTE)lpSourceInstanceID, cbSourceInstanceID) + " "
-			"JOIN za_servers AS s_dst ON m_dst.server_id = s_dst.id AND s_dst.guid = " + m_ptrDatabase->EscapeBinary(destServerUID.lpb, destServerUID.cb) + " "
-			"JOIN za_servers AS s_src ON m_src.server_id = s_src.id AND s_src.guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID.lpb, sourceServerUID.cb);
-
+		"JOIN za_mappings AS m_src ON m_dst.instance_id = m_src.instance_id AND m_dst.tag = m_src.tag AND m_src.val_binary = " + m_ptrDatabase->EscapeBinary(lpSourceInstanceID, cbSourceInstanceID) + " "
+		"JOIN za_servers AS s_dst ON m_dst.server_id = s_dst.id AND s_dst.guid = " + m_ptrDatabase->EscapeBinary(destServerUID) + " "
+		"JOIN za_servers AS s_src ON m_src.server_id = s_src.id AND s_src.guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID) +
+		" LIMIT 2";
 	er = m_ptrDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		return kcerr_to_mapierr(er);
 
-	switch (m_ptrDatabase->GetNumRows(lpResult)) {
+	switch (lpResult.get_num_rows()) {
 	case 0:
 		return MAPI_E_NOT_FOUND;
 	case 1:
@@ -114,13 +106,12 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 		return MAPI_E_DISK_ERROR; // MAPI version of KCERR_DATABASE_ERROR
 	}
 
-	lpDBRow = m_ptrDatabase->FetchRow(lpResult);
+	lpDBRow = lpResult.fetch_row();
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		ec_log_crit("InstanceIdMapper::GetMappedInstanceId(): FetchRow failed");
 		return MAPI_E_DISK_ERROR; // MAPI version of KCERR_DATABASE_ERROR
 	}
-
-	lpLengths = m_ptrDatabase->FetchRowLengths(lpResult);
+	lpLengths = lpResult.fetch_row_lengths();
 	if (lpLengths == NULL || lpLengths[0] == 0) {
 		ec_log_crit("InstanceIdMapper::GetMappedInstanceId(): FetchRowLengths failed");
 		return MAPI_E_DISK_ERROR; // MAPI version of KCERR_DATABASE_ERROR
@@ -138,7 +129,7 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 HRESULT InstanceIdMapper::SetMappedInstances(ULONG ulPropTag, const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID)
 {
 	ECRESULT er = erSuccess;
-	string strQuery;
+	std::string strQuery;
 	DB_RESULT lpResult;
 	DB_ROW lpDBRow = NULL;
 
@@ -152,19 +143,19 @@ HRESULT InstanceIdMapper::SetMappedInstances(ULONG ulPropTag, const SBinary &sou
 		goto exit;
 
 	// Make sure the server entries exist.
-	strQuery = "INSERT IGNORE INTO za_servers (guid) VALUES (" + m_ptrDatabase->EscapeBinary(sourceServerUID.lpb, sourceServerUID.cb) + "),(" +  m_ptrDatabase->EscapeBinary(destServerUID.lpb, destServerUID.cb) + ")";
+	strQuery = "INSERT IGNORE INTO za_servers (guid) VALUES (" + m_ptrDatabase->EscapeBinary(sourceServerUID) + "),(" +  m_ptrDatabase->EscapeBinary(destServerUID) + ")";
 	er = m_ptrDatabase->DoInsert(strQuery, NULL, NULL);
 	if (er != erSuccess)
 		goto exit;
 
 	// Now first see if the source instance is available.
-	strQuery = "SELECT instance_id FROM za_mappings AS m JOIN za_servers AS s ON m.server_id = s.id AND s.guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID.lpb, sourceServerUID.cb) + " "
-					"WHERE m.val_binary = " + m_ptrDatabase->EscapeBinary((LPBYTE)lpSourceInstanceID, cbSourceInstanceID) + " AND tag = " + stringify(PROP_ID(ulPropTag));
+	strQuery = "SELECT instance_id FROM za_mappings AS m JOIN za_servers AS s ON m.server_id = s.id AND s.guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID) + " "
+	           "WHERE m.val_binary = " + m_ptrDatabase->EscapeBinary(lpSourceInstanceID, cbSourceInstanceID) + " AND tag = " + stringify(PROP_ID(ulPropTag)) + " LIMIT 1";
 	er = m_ptrDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		goto exit;
 
-	lpDBRow = m_ptrDatabase->FetchRow(lpResult);
+	lpDBRow = lpResult.fetch_row();
 	if (lpDBRow == NULL) {
 		unsigned int ulNewId;
 
@@ -174,11 +165,11 @@ HRESULT InstanceIdMapper::SetMappedInstances(ULONG ulPropTag, const SBinary &sou
 			goto exit;
 
 		strQuery = "INSERT IGNORE INTO za_mappings (server_id, val_binary, tag, instance_id) VALUES "
-						"((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID.lpb, sourceServerUID.cb) + ")," + m_ptrDatabase->EscapeBinary((LPBYTE)lpSourceInstanceID, cbSourceInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + stringify(ulNewId) + "),"
-						"((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(destServerUID.lpb, destServerUID.cb) + ")," + m_ptrDatabase->EscapeBinary((LPBYTE)lpDestInstanceID, cbDestInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + stringify(ulNewId) + ")";
+		           "((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(sourceServerUID) + ")," + m_ptrDatabase->EscapeBinary(lpSourceInstanceID, cbSourceInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + stringify(ulNewId) + "),"
+		           "((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(destServerUID) + ")," + m_ptrDatabase->EscapeBinary(lpDestInstanceID, cbDestInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + stringify(ulNewId) + ")";
 	} else {	// Source instance id is known
 		strQuery = "REPLACE INTO za_mappings (server_id, val_binary, tag, instance_id) VALUES "
-						"((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(destServerUID.lpb, destServerUID.cb) + ")," + m_ptrDatabase->EscapeBinary((LPBYTE)lpDestInstanceID, cbDestInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + lpDBRow[0] + ")";
+		           "((SELECT id FROM za_servers WHERE guid = " + m_ptrDatabase->EscapeBinary(destServerUID) + ")," + m_ptrDatabase->EscapeBinary(lpDestInstanceID, cbDestInstanceID) + "," + stringify(PROP_ID(ulPropTag)) + "," + lpDBRow[0] + ")";
 	}
 	er = m_ptrDatabase->DoInsert(strQuery, NULL, NULL);
 	if (er != erSuccess)

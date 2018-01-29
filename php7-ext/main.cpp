@@ -15,10 +15,9 @@
  *
  */
 
-#include "phpconfig.h"
-
 #include <kopano/platform.h>
 #include <kopano/ecversion.h>
+#include <algorithm>
 #include <memory>
 #include <new>
 #include <cstdio>
@@ -32,13 +31,12 @@
 #include <kopano/memory.hpp>
 #include <kopano/tie.hpp>
 #include <kopano/MAPIErrors.h>
-#include "ECRulesTableProxy.h"
 #include <ICalToMAPI.h>
 #include <MAPIToICal.h>
 #include <libicalmapi/mapitovcf.hpp>
 #include <libicalmapi/vcftomapi.hpp>
-
-#define LOGFILE_PATH "/var/log/kopano"
+#include "php-ext/phpconfig.h"
+#include "php-ext/ECRulesTableProxy.h"
 
 /*
  * Things to notice when reading/editing this source:
@@ -54,7 +52,7 @@
  * - all internal functions need to pass TSRMLS_CC in the end, so win32 version compiles
  *
  * - when using "l" in zend_parse_parameters(), use 'long' (64-bit) as variable type, not ULONG (32-bit)
- * - when using "s" in zend_parse_parameters(), the string length is 32 bits, so use 'unsigned int' or 'ULONG'
+ * - when using "s" in zend_parse_parameters(), the string length is "int" in PHP5 and "size_t" in PHP7. Use our php_stringsize_t typedef.
  *
  */
 
@@ -110,8 +108,10 @@
 // we need to include this in c++ space because php.h also includes it in
 // 'extern "C"'-space which doesn't work in win32
 #include <cmath>
-
-using namespace std;
+#if __GNUC_PREREQ(5, 0) && !__GNUC_PREREQ(6, 0)
+using std::isfinite;
+using std::isnan;
+#endif
 
 extern "C" {
 	// Remove these defines to remove warnings
@@ -120,11 +120,6 @@ extern "C" {
 	#undef PACKAGE_NAME
 	#undef PACKAGE_STRING
 	#undef PACKAGE_BUGREPORT
-
-	#if !__GNUC_PREREQ(6,0)
-	#define zend_isnan(a) std::isnan(a)
-	#endif
-
 	#include "php.h"
    	#include "php_globals.h"
    	#include "php_ini.h"
@@ -134,13 +129,19 @@ extern "C" {
 	#include "ext/standard/php_string.h"
 }
 
+typedef size_t php_stringsize_t; /* cf. va_arg call in php/Zend/zend_API.c */
+
 // Destructor functions needed for the PHP resources. 
 static void _php_free_mapi_rowset(zend_resource *rsrc TSRMLS_DC);
 
 // Not defined anymore in PHP 5.3.0
-// we only use first and fourth versions, so just define those.
 #if ZEND_MODULE_API_NO >= 20071006
 ZEND_BEGIN_ARG_INFO(first_arg_force_ref, 0)
+        ZEND_ARG_PASS_INFO(1)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(second_arg_force_ref, 0)
+        ZEND_ARG_PASS_INFO(0)
         ZEND_ARG_PASS_INFO(1)
 ZEND_END_ARG_INFO()
 
@@ -152,26 +153,34 @@ ZEND_BEGIN_ARG_INFO(fourth_arg_force_ref, 0)
 ZEND_END_ARG_INFO()
 #endif
 
-#define LOG_BEGIN() { \
-    if (mapi_debug & 1) { \
-        php_error_docref(NULL TSRMLS_CC, E_NOTICE, "[IN] %s", __FUNCTION__); \
-    } \
-}
+#define LOG_BEGIN() do { \
+	if (mapi_debug & 1) \
+		php_error_docref(nullptr TSRMLS_CC, E_NOTICE, "[IN] %s", __FUNCTION__); \
+} while (false)
 
-#define LOG_END()   { \
-    if (mapi_debug & 2) { \
-        HRESULT hrx =  MAPI_G(hr); \
-        php_error_docref(NULL TSRMLS_CC, E_NOTICE, "[OUT] %s hr=0x%08x", __FUNCTION__, hrx); \
-    } \
-}
+#define LOG_END() do { \
+	if (mapi_debug & 2) { \
+		HRESULT hrx =  MAPI_G(hr); \
+		php_error_docref(nullptr TSRMLS_CC, E_NOTICE, "[OUT] %s hr=0x%08x", __FUNCTION__, hrx); \
+	} \
+} while (false)
 
+/*
+ * PHP fails to apply do{}while(0), so we have to do it extra in some places.
+ * Do not remove the do{} wrap.
+ */
 #define ZEND_FETCH_RESOURCE_C(rsrc, rsrc_type, passed_id, default_id, resource_type_name, resource_type) \
-        rsrc = (rsrc_type)zend_fetch_resource(Z_RES_P(*passed_id), resource_type_name, resource_type); \
-        if (!rsrc) \
-        	RETURN_FALSE;
+	do { \
+		rsrc = static_cast<rsrc_type>(zend_fetch_resource(Z_RES_P(*passed_id), resource_type_name, resource_type)); \
+		if (rsrc == nullptr) do { \
+			RETURN_FALSE; \
+		} while (false); \
+	} while (false)
 
 #define ZEND_REGISTER_RESOURCE(return_value, lpMAPISession, le_mapi_session) \
-	ZVAL_RES(return_value, zend_register_resource(lpMAPISession, le_mapi_session));
+	do { \
+		ZVAL_RES(return_value, zend_register_resource(lpMAPISession, le_mapi_session)); \
+	} while (false)
 
 // A very, very nice PHP #define that causes link errors in MAPI when you have multiple
 // files referencing MAPI....
@@ -187,14 +196,7 @@ ZEND_END_ARG_INFO()
 #include <mapispi.h>
 #include <mapitags.h>
 #include <mapidefs.h>
-
-#include <kopano/IECServiceAdmin.h>
-#include <kopano/IECSecurity.h>
-#include <kopano/IECUnknown.h>
-#include "IECExportChanges.h"
-#include "IECMultiStoreTable.h"
-#include <kopano/IECLicense.h>
-
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/ECTags.h>
 #include <kopano/ECDefs.h>
 
@@ -207,7 +209,7 @@ ZEND_END_ARG_INFO()
 
 #include <string>
 
-#include "util.h"
+#include "php-ext/util.h"
 #include "rtfutil.h"
 #include <kopano/CommonUtil.h>
 
@@ -224,8 +226,6 @@ ZEND_END_ARG_INFO()
 
 //Freebusy includes
 #include "ECFreeBusySupport.h"
-
-#include "favoritesutil.h"
 
 // at last, the php-plugin extension headers
 #include "main.h"
@@ -247,7 +247,7 @@ public:
 
 private:
 	std::string what;
-	unsigned long long start_ts = 0;
+	KC::time_point start_ts;
 };
 
 using namespace std;
@@ -264,28 +264,22 @@ pmeasure::pmeasure(const std::string &whatIn)
 	if (perf_measure_file == NULL || *perf_measure_file == '\0')
 		return;
 	what = whatIn;
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	start_ts = ts.tv_sec * 1000 * 1000 + ts.tv_nsec / 1000;
+	start_ts = decltype(start_ts)::clock::now();
 }
 
 pmeasure::~pmeasure(void)
 {
 	if (perf_measure_file == NULL || *perf_measure_file == '\0')
 		return;
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-
+	auto end_ts = decltype(start_ts)::clock::now();
 	FILE *fh = fopen(perf_measure_file, "a+");
 	if (fh == NULL) {
 		if (lpLogger != NULL)
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "~pmeasure: cannot open \"%s\": %s", perf_measure_file, strerror(errno));
 		return;
 	}
-
-	unsigned long long int now = ts.tv_sec * 1000 * 1000 + ts.tv_nsec / 1000;
-	unsigned long long int tdiff = now - start_ts;
-
+	using namespace std::chrono;
+	long long int tdiff = duration_cast<microseconds>(end_ts - start_ts).count();
 	fprintf(fh, "%lld %s\n", tdiff, what.c_str());
 	fclose(fh);
 }
@@ -301,7 +295,6 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_prop_tag, NULL)
 	ZEND_FE(mapi_createoneoff, NULL)
 	ZEND_FE(mapi_parseoneoff, NULL)
-	ZEND_FE(mapi_logon, NULL)
 	ZEND_FE(mapi_logon_zarafa, NULL)
 	ZEND_FE(mapi_getmsgstorestable, NULL)
 	ZEND_FE(mapi_openmsgstore, NULL)
@@ -322,6 +315,7 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_msgstore_openmultistoretable, NULL)
 	ZEND_FE(mapi_msgstore_advise, NULL)
 	ZEND_FE(mapi_msgstore_unadvise, NULL)
+	ZEND_FE(mapi_msgstore_abortsubmit, nullptr)
 	
 	ZEND_FE(mapi_sink_create, NULL)
 	ZEND_FE(mapi_sink_timedwait, NULL)
@@ -417,8 +411,6 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_zarafa_add_quota_recipient, NULL)
 	ZEND_FE(mapi_zarafa_del_quota_recipient, NULL)
 	ZEND_FE(mapi_zarafa_get_quota_recipientlist, NULL)
-	ZEND_FE(mapi_zarafa_check_license, NULL)
-	ZEND_FE(mapi_zarafa_getcapabilities, NULL)
 	ZEND_FE(mapi_zarafa_getpermissionrules, NULL)
 	ZEND_FE(mapi_zarafa_setpermissionrules, NULL)
 
@@ -439,8 +431,6 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_freebusyupdate_publish, NULL)
 	ZEND_FE(mapi_freebusyupdate_reset, NULL)
 	ZEND_FE(mapi_freebusyupdate_savechanges, NULL)
-
-	ZEND_FE(mapi_favorite_add, NULL)
 
 	ZEND_FE(mapi_exportchanges_config, NULL)
 	ZEND_FE(mapi_exportchanges_synchronize, NULL)
@@ -477,22 +467,16 @@ zend_function_entry mapi_functions[] =
 
 	ZEND_FALIAS(mapi_attach_openbin, mapi_openproperty, NULL)
 	ZEND_FALIAS(mapi_msgstore_getprops, mapi_getprops, NULL)
-	ZEND_FALIAS(mapi_msgstore_setprops, mapi_setprops, NULL)
 	ZEND_FALIAS(mapi_folder_getprops, mapi_getprops, NULL)
-	ZEND_FALIAS(mapi_folder_openproperty, mapi_openproperty, NULL)
-	ZEND_FALIAS(mapi_folder_setprops, mapi_setprops, NULL)
 	ZEND_FALIAS(mapi_message_getprops, mapi_getprops, NULL)
 	ZEND_FALIAS(mapi_message_setprops, mapi_setprops, NULL)
 	ZEND_FALIAS(mapi_message_openproperty, mapi_openproperty, NULL)
 	ZEND_FALIAS(mapi_attach_getprops, mapi_getprops, NULL)
-	ZEND_FALIAS(mapi_attach_setprops, mapi_setprops, NULL)
 	ZEND_FALIAS(mapi_attach_openproperty, mapi_openproperty, NULL)
 	ZEND_FALIAS(mapi_message_savechanges, mapi_savechanges, NULL)
 
-	// old versions
-	ZEND_FALIAS(mapi_zarafa_getuser, mapi_zarafa_getuser_by_name, NULL)
-	ZEND_FALIAS(mapi_zarafa_getgroup, mapi_zarafa_getgroup_by_name, NULL)
-
+	ZEND_FE(kc_session_save, second_arg_force_ref)
+	ZEND_FE(kc_session_restore, second_arg_force_ref)
 	{NULL, NULL, NULL}
 };
 
@@ -512,7 +496,7 @@ zend_module_entry mapi_module_entry =
 	PHP_RINIT(mapi),	/* Request init function */
 	PHP_RSHUTDOWN(mapi),/* Request shutdown function */
 	PHP_MINFO(mapi),	/* Info function */
-	PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR, /* version */
+	PROJECT_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 
@@ -530,8 +514,7 @@ PHP_MINFO_FUNCTION(mapi)
 {
 	php_info_print_table_start();
 	php_info_print_table_row(2, "MAPI Support", "enabled");
-	php_info_print_table_row(2, "Version", PROJECT_VERSION_EXT_STR);
-	php_info_print_table_row(2, "Git version", PROJECT_SVN_REV_STR);
+	php_info_print_table_row(2, "Version", PROJECT_VERSION);
 	php_info_print_table_end();
 }
 
@@ -544,9 +527,9 @@ static int LoadSettingsFile(void)
 	struct stat st;
 	if (stat(cfg_file, &st) == 0) {
 		static const configsetting_t settings[] = {
-			{ "log_method", "syslog" },
-			{ "log_file", LOGFILE_PATH "/php-mapi.log" },
-			{ "log_level", "3", CONFIGSETTING_RELOADABLE },
+			{"log_method", "syslog", CONFIGSETTING_NONEMPTY},
+			{"log_file", "/var/log/kopano/php-mapi.log", CONFIGSETTING_NONEMPTY},
+			{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 			{ "log_timestamp", "0" },
 			{ "log_buffer_size", "0" },
 			{ "log_buffer_size", "0" },
@@ -555,7 +538,7 @@ static int LoadSettingsFile(void)
 			{ NULL, NULL }
 		};
 
-                ECConfig *cfg = ECConfig::Create(settings);
+		auto cfg = ECConfig::Create(std::nothrow, settings);
                 if (!cfg)
 			return FAILURE;
 
@@ -579,9 +562,7 @@ static int LoadSettingsFile(void)
 		lpLogger = new(std::nothrow) ECLogger_Null();
 	if (lpLogger == NULL)
 		return FAILURE;
-
-	lpLogger->Log(EC_LOGLEVEL_INFO, "PHP-MAPI instantiated " PROJECT_VERSION_EXT_STR);
-
+	lpLogger->Log(EC_LOGLEVEL_INFO, "php7-mapi " PROJECT_VERSION " instantiated");
 	ec_log_set(lpLogger);
 	if (mapi_debug)
 		lpLogger->Log(EC_LOGLEVEL_INFO, "PHP-MAPI trace level set to %d", mapi_debug);
@@ -629,11 +610,11 @@ PHP_MINIT_FUNCTION(mapi) {
 	le_mapi_exportchanges = zend_register_list_destructors_ex(_php_free_mapi_object<IExchangeExportChanges>, nullptr, const_cast<char *>(name_mapi_exportchanges), module_number);
 	le_mapi_importhierarchychanges = zend_register_list_destructors_ex(_php_free_mapi_object<IExchangeImportHierarchyChanges>, nullptr, const_cast<char *>(name_mapi_importhierarchychanges), module_number);
 	le_mapi_importcontentschanges = zend_register_list_destructors_ex(_php_free_mapi_object<IExchangeImportContentsChanges>, nullptr, const_cast<char *>(name_mapi_importcontentschanges), module_number);
-
 	MAPIINIT_0 MAPIINIT = { 0, MAPI_MULTITHREAD_NOTIFICATIONS };
 
 	// There is also a MAPI_NT_SERVICE flag, see help page for MAPIInitialize
-	MAPIInitialize(&MAPIINIT);
+	if (MAPIInitialize(&MAPIINIT) != hrSuccess)
+		return FAILURE;
 
 	ZEND_INIT_MODULE_GLOBALS(mapi, php_mapi_init_globals, NULL);
 
@@ -700,21 +681,20 @@ PHP_RSHUTDOWN_FUNCTION(mapi) {
 ***************************************************************/
 
 // This is called when our proxy object goes out of scope
-
 static void _php_free_mapi_rowset(zend_resource *rsrc TSRMLS_DC)
 {
-	LPSRowSet pRowSet = (LPSRowSet)rsrc->ptr;
+	auto pRowSet = static_cast<SRowSet *>(rsrc->ptr);
 	if (pRowSet) FreeProws(pRowSet);
 }
 
 static HRESULT GetECObject(LPMAPIPROP lpMapiProp,
-    IECUnknown **lppIECUnknown TSRMLS_DC)
+    IUnknown **lppIECUnknown TSRMLS_DC)
 {
 	PMEASURE_FUNC;
 	memory_ptr<SPropValue> lpPropVal;
 	MAPI_G(hr) = HrGetOneProp(lpMapiProp, PR_EC_OBJECT, &~lpPropVal);
 	if (MAPI_G(hr) == hrSuccess)
-		*lppIECUnknown = (IECUnknown *)lpPropVal->Value.lpszA;
+		*lppIECUnknown = reinterpret_cast<IUnknown *>(lpPropVal->Value.lpszA);
 	return MAPI_G(hr);
 }
 
@@ -753,9 +733,7 @@ ZEND_FUNCTION(mapi_prop_id)
 }
 
 /**
- * Checks if the severity of a errorCode is set to Fail
- *
- *
+ * Checks if the severity of an errorCode is set to Fail
  */
 ZEND_FUNCTION(mapi_is_error)
 {
@@ -804,7 +782,7 @@ ZEND_FUNCTION(mapi_prop_tag)
 	// the compares within .php files can be correctly performed, so named props work.
 
 	// maybe we need to rewrite this system a bit, so proptags are always a string, and never interpreted
-	// eg. by prepending the assoc keys with 'PROPTAG' or something...
+	// e.g. by prepending the assoc keys with 'PROPTAG' or something...
 
 	RETURN_LONG((LONG)PROP_TAG(ulPropType, ulPropID));
 }
@@ -818,15 +796,13 @@ ZEND_FUNCTION(mapi_createoneoff)
 	char *szDisplayName = NULL;
 	char *szType = NULL;
 	char *szEmailAddress = NULL;
-	size_t ulDisplayNameLen = 0, ulTypeLen = 0, ulEmailAddressLen = 0;
+	php_stringsize_t ulDisplayNameLen = 0, ulTypeLen = 0, ulEmailAddressLen = 0;
 	long ulFlags = MAPI_SEND_NO_RICH_INFO;
 	// return value
 	memory_ptr<ENTRYID> lpEntryID;
 	ULONG cbEntryID = 0;
 	// local
-	wstring name;
-	wstring type;
-	wstring email;
+	std::wstring name, type, email;
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -874,7 +850,7 @@ ZEND_FUNCTION(mapi_parseoneoff)
 	LOG_BEGIN();
 	// params
 	LPENTRYID lpEntryID = NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	// return value
 	utf8string strDisplayName;
 	utf8string strType;
@@ -933,26 +909,22 @@ ZEND_FUNCTION(mapi_logon_zarafa)
 	LOG_BEGIN();
 	// params
 	char		*username = NULL;
-	size_t username_len = 0;
 	char		*password = NULL;
-	size_t password_len = 0;
 	const char *server = NULL;
-	size_t server_len = 0;
 	const char *sslcert = "";
-	size_t sslcert_len = 0;
 	const char *sslpass = "";
-	size_t sslpass_len = 0;
 	const char *wa_version = "";
-	size_t wa_version_len = 0;
 	const char *misc_version = "";
-	size_t misc_version_len = 0;
+	php_stringsize_t username_len = 0, password_len = 0, server_len = 0;
+	php_stringsize_t sslcert_len = 0, sslpass_len = 0, wa_version_len = 0;
+	php_stringsize_t misc_version_len = 0;
 	long		ulFlags = EC_PROFILE_FLAGS_NO_NOTIFICATIONS;
 	// return value
 	object_ptr<IMAPISession> lpMAPISession;
 	// local
 	ULONG		ulProfNum = rand_mt();
 	char		szProfName[MAX_PATH];
-	SPropValue	sPropZarafa[8];
+	SPropValue	sPropOur[8];
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -963,33 +935,33 @@ ZEND_FUNCTION(mapi_logon_zarafa)
 		&wa_version, &wa_version_len, &misc_version, &misc_version_len) == FAILURE) return;
 
 	if (!server) {
-		server = "http://localhost:236/zarafa";
+		server = "http://localhost:236/";
 		server_len = strlen(server);
 	}
 
 	snprintf(szProfName, MAX_PATH-1, "www-profile%010u", ulProfNum);
 
-	sPropZarafa[0].ulPropTag = PR_EC_PATH;
-	sPropZarafa[0].Value.lpszA = const_cast<char *>(server);
-	sPropZarafa[1].ulPropTag = PR_EC_USERNAME_A;
-	sPropZarafa[1].Value.lpszA = const_cast<char *>(username);
-	sPropZarafa[2].ulPropTag = PR_EC_USERPASSWORD_A;
-	sPropZarafa[2].Value.lpszA = const_cast<char *>(password);
-	sPropZarafa[3].ulPropTag = PR_EC_FLAGS;
-	sPropZarafa[3].Value.ul = ulFlags;
+	sPropOur[0].ulPropTag = PR_EC_PATH;
+	sPropOur[0].Value.lpszA = const_cast<char *>(server);
+	sPropOur[1].ulPropTag = PR_EC_USERNAME_A;
+	sPropOur[1].Value.lpszA = const_cast<char *>(username);
+	sPropOur[2].ulPropTag = PR_EC_USERPASSWORD_A;
+	sPropOur[2].Value.lpszA = const_cast<char *>(password);
+	sPropOur[3].ulPropTag = PR_EC_FLAGS;
+	sPropOur[3].Value.ul = ulFlags;
 
-	// unused by zarafa if PR_EC_PATH isn't https
-	sPropZarafa[4].ulPropTag = PR_EC_SSLKEY_FILE;
-	sPropZarafa[4].Value.lpszA = const_cast<char *>(sslcert);
-	sPropZarafa[5].ulPropTag = PR_EC_SSLKEY_PASS;
-	sPropZarafa[5].Value.lpszA = const_cast<char *>(sslpass);
+	// unused if PR_EC_PATH is not https
+	sPropOur[4].ulPropTag = PR_EC_SSLKEY_FILE;
+	sPropOur[4].Value.lpszA = const_cast<char *>(sslcert);
+	sPropOur[5].ulPropTag = PR_EC_SSLKEY_PASS;
+	sPropOur[5].Value.lpszA = const_cast<char *>(sslpass);
 
-	sPropZarafa[6].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION;
-	sPropZarafa[6].Value.lpszA = const_cast<char *>(wa_version);
-	sPropZarafa[7].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC;
-	sPropZarafa[7].Value.lpszA = const_cast<char *>(misc_version);
+	sPropOur[6].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION;
+	sPropOur[6].Value.lpszA = const_cast<char *>(wa_version);
+	sPropOur[7].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC;
+	sPropOur[7].Value.lpszA = const_cast<char *>(misc_version);
 
-	MAPI_G(hr) = mapi_util_createprof(szProfName, "ZARAFA6", 8, sPropZarafa);
+	MAPI_G(hr) = mapi_util_createprof(szProfName, "ZARAFA6", 8, sPropOur);
 	if (MAPI_G(hr) != hrSuccess) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", mapi_util_getlasterror().c_str());
 		goto exit; // error already displayed in mapi_util_createprof
@@ -1032,7 +1004,7 @@ ZEND_FUNCTION(mapi_openentry)
 	// params
 	zval		*res;
 	IMAPISession *lpSession = NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	LPENTRYID	lpEntryID	= NULL;
 	long		ulFlags = MAPI_BEST_ACCESS;
 	// return value
@@ -1045,60 +1017,30 @@ ZEND_FUNCTION(mapi_openentry)
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|sl", &res, &lpEntryID, &cbEntryID, &ulFlags) == FAILURE) return;
 
-        ZEND_FETCH_RESOURCE_C(lpSession, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
-
-	MAPI_G(hr) = lpSession->OpenEntry(cbEntryID, lpEntryID, nullptr,
-	             ulFlags, &ulObjType, &~lpUnknown);
+	ZEND_FETCH_RESOURCE_C(lpSession, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
+	MAPI_G(hr) = lpSession->OpenEntry(cbEntryID, lpEntryID,
+	             &iid_of(lpUnknown), ulFlags, &ulObjType, &~lpUnknown);
 	if (FAILED(MAPI_G(hr)))
 		goto exit;
 
 	if (ulObjType == MAPI_FOLDER) {
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_folder);
+		object_ptr<IMAPIFolder> fld;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(fld), &~fld);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, fld.release(), le_mapi_folder);
 	}
 	else if(ulObjType == MAPI_MESSAGE) {
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_message);
+		object_ptr<IMessage> msg;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(msg), &~msg);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, msg.release(), le_mapi_message);
 	} else {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "EntryID is not a folder or a message.");
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
-
-exit:
-	LOG_END();
-	THROW_ON_ERROR();
-}
-
-// This function cannot be used, since you currently can't create profiles directly in php
-ZEND_FUNCTION(mapi_logon)
-{
-	PMEASURE_FUNC;
-	LOG_BEGIN();
-	// params
-	const char *profilename = "";
-	const char *profilepassword = "";
-	size_t profilename_len = 0, profilepassword_len = 0;
-	// return value
-	LPMAPISESSION	lpMAPISession = NULL;
-	// local
-
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if (ZEND_NUM_ARGS() > 0 &&
-	    zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss",
-	    &profilename, &profilename_len, &profilepassword, &profilepassword_len) == FAILURE)
-		return;
-	/*
-	* MAPI_LOGON_UI will show a dialog when a profilename is not
-	* found or a password is not correct, without it the dialog will never appear => that's what we want
-	* MAPI_USE_DEFAULT |
-	*/
-	MAPI_G(hr) = MAPILogonEx(0, (LPTSTR)profilename, (LPTSTR)profilepassword, MAPI_USE_DEFAULT | MAPI_EXTENDED | MAPI_TIMEOUT_SHORT | MAPI_NEW_SESSION, &lpMAPISession);
-
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-
-	ZEND_REGISTER_RESOURCE(return_value, lpMAPISession, le_mapi_session);
 
 exit:
 	LOG_END();
@@ -1140,7 +1082,7 @@ ZEND_FUNCTION(mapi_ab_openentry) {
 	// params
 	zval		*res;
 	LPADRBOOK	lpAddrBook = NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	LPENTRYID	lpEntryID = NULL;
 	long		ulFlags = 0; //MAPI_BEST_ACCESS;
 	// return value
@@ -1160,22 +1102,30 @@ ZEND_FUNCTION(mapi_ab_openentry) {
 
 	ZEND_FETCH_RESOURCE_C(lpAddrBook, LPADRBOOK, &res, -1, name_mapi_addrbook, le_mapi_addrbook);
 
-	MAPI_G(hr) = lpAddrBook->OpenEntry(cbEntryID, lpEntryID, nullptr,
-	             ulFlags, &ulObjType, &~lpUnknown);
+	MAPI_G(hr) = lpAddrBook->OpenEntry(cbEntryID, lpEntryID,
+	             &iid_of(lpUnknown), ulFlags, &ulObjType, &~lpUnknown);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-	switch (ulObjType) {
-	case MAPI_MAILUSER:
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_mailuser);
-		break;
-	case MAPI_DISTLIST:
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_distlist);
-		break;
-	case MAPI_ABCONT:
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_abcont);
-		break;
-	default:
+	if (ulObjType == MAPI_MAILUSER) {
+		object_ptr<IMailUser> usr;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(usr), &~usr);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, usr.release(), le_mapi_mailuser);
+	} else if (ulObjType == MAPI_DISTLIST) {
+		object_ptr<IDistList> dl;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(dl), &~dl);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, dl.release(), le_mapi_distlist);
+	} else if (ulObjType == MAPI_ABCONT) {
+		object_ptr<IABContainer> ab;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(ab), &~ab);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, ab.release(), le_mapi_abcont);
+	} else {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "EntryID is not an AddressBook item");
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 		goto exit;
@@ -1303,7 +1253,7 @@ ZEND_FUNCTION(mapi_openmsgstore)
 	PMEASURE_FUNC;
 	LOG_BEGIN();
 	// params
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	LPENTRYID	lpEntryID	= NULL;
 	zval *res = NULL;
 	IMAPISession * lpSession = NULL;
@@ -1345,7 +1295,7 @@ ZEND_FUNCTION(mapi_openprofilesection)
 	// params
 	zval *res;
 	IMAPISession *lpSession = NULL;
-	size_t uidlen;
+	php_stringsize_t uidlen;
 	LPMAPIUID lpUID = NULL;
 	// return value
 	IMAPIProp *lpProfSectProp = NULL;
@@ -1642,7 +1592,7 @@ ZEND_FUNCTION(mapi_folder_createfolder) {
 	zval *srcFolder = NULL;
 	long folderType = FOLDER_GENERIC, ulFlags = 0;
 	const char *lpszFolderName = "", *lpszFolderComment = "";
-	size_t FolderNameLen = 0, FolderCommentLen = 0;
+	php_stringsize_t FolderNameLen = 0, FolderCommentLen = 0;
 	// return value
 	LPMAPIFOLDER lpNewFolder = NULL;
 
@@ -1656,10 +1606,8 @@ ZEND_FUNCTION(mapi_folder_createfolder) {
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
-
-	if (FolderCommentLen == 0) {
+	if (FolderCommentLen == 0)
 		lpszFolderComment = NULL;
-	}
 
 	ZEND_FETCH_RESOURCE_C(lpSrcFolder, LPMAPIFOLDER, &srcFolder, -1, name_mapi_folder, le_mapi_folder);
 
@@ -1678,7 +1626,7 @@ ZEND_FUNCTION(mapi_folder_deletefolder)
 	LOG_BEGIN();
 	// params
 	ENTRYID			*lpEntryID = NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	long			ulFlags = 0;
 	zval			*res = NULL;
 	LPMAPIFOLDER	lpFolder = NULL;
@@ -1741,10 +1689,9 @@ ZEND_FUNCTION(mapi_folder_copyfolder)
 	zval			*zvalSrcFolder, *zvalDestFolder;
 	LPMAPIFOLDER	lpSrcFolder = NULL, lpDestFolder = NULL;
 	ENTRYID			*lpEntryID = NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0, cbNewFolderNameLen = 0;
 	long			ulFlags = 0;
 	LPTSTR			lpszNewFolderName = NULL;
-	size_t cbNewFolderNameLen = 0;
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -1791,7 +1738,7 @@ ZEND_FUNCTION(mapi_msgstore_createentryid)
 	zval		*res;
 	LPMDB		pMDB		= NULL;
 	LPSTR		sMailboxDN = NULL;
-	size_t lMailboxDN = 0;
+	php_stringsize_t lMailboxDN = 0;
 	// return value
 	ULONG		cbEntryID	= 0;
 	memory_ptr<ENTRYID> lpEntryID;
@@ -1810,7 +1757,7 @@ ZEND_FUNCTION(mapi_msgstore_createentryid)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "IExchangeManageStore interface was not supported by given store.");
 		goto exit;
 	}
-	MAPI_G(hr) = lpEMS->CreateStoreEntryID((LPTSTR)"", (LPTSTR)sMailboxDN, 0, &cbEntryID, &~lpEntryID);
+	MAPI_G(hr) = lpEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(""), reinterpret_cast<const TCHAR *>(sMailboxDN), 0, &cbEntryID, &~lpEntryID);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -1838,9 +1785,8 @@ ZEND_FUNCTION(mapi_msgstore_getarchiveentryid)
 	zval		*res;
 	LPMDB		pMDB		= NULL;
 	LPSTR		sUser = NULL;
-	size_t lUser = 0;
 	LPSTR		sServer = NULL;
-	size_t lServer = 0;
+	php_stringsize_t lUser = 0, lServer = 0;
 	// return value
 	ULONG		cbEntryID	= 0;
 	EntryIdPtr	ptrEntryID;
@@ -1854,7 +1800,7 @@ ZEND_FUNCTION(mapi_msgstore_getarchiveentryid)
 
 	ZEND_FETCH_RESOURCE_C(pMDB, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
 
-	MAPI_G(hr) = pMDB->QueryInterface(ptrSA.iid(), &~ptrSA);
+	MAPI_G(hr) = pMDB->QueryInterface(iid_of(ptrSA), &~ptrSA);
 	if(MAPI_G(hr) != hrSuccess) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "IECServiceAdmin interface was not supported by given store.");
 		goto exit;
@@ -1883,7 +1829,7 @@ ZEND_FUNCTION(mapi_msgstore_openentry)
 	// params
 	zval		*res;
 	LPMDB		pMDB		= NULL;
-	size_t cbEntryID = 0;
+	php_stringsize_t cbEntryID = 0;
 	LPENTRYID	lpEntryID	= NULL;
 	long		ulFlags = MAPI_BEST_ACCESS;
 	// return value
@@ -1899,16 +1845,24 @@ ZEND_FUNCTION(mapi_msgstore_openentry)
 	ZEND_FETCH_RESOURCE_C(pMDB, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
 
 	// returns a folder
-	MAPI_G(hr) = pMDB->OpenEntry(cbEntryID, lpEntryID, nullptr, ulFlags,
-	             &ulObjType, &~lpUnknown);
+	MAPI_G(hr) = pMDB->OpenEntry(cbEntryID, lpEntryID, &iid_of(lpUnknown),
+	             ulFlags, &ulObjType, &~lpUnknown);
 	if (FAILED(MAPI_G(hr)))
 		goto exit;
 
 	if (ulObjType == MAPI_FOLDER) {
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_folder);
+		object_ptr<IMAPIFolder> fld;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(fld), &~fld);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, fld.release(), le_mapi_folder);
 	}
 	else if(ulObjType == MAPI_MESSAGE) {
-		ZEND_REGISTER_RESOURCE(return_value, lpUnknown.release(), le_mapi_message);
+		object_ptr<IMessage> msg;
+		MAPI_G(hr) = lpUnknown->QueryInterface(iid_of(msg), &~msg);
+		if (FAILED(MAPI_G(hr)))
+			goto exit;
+		ZEND_REGISTER_RESOURCE(return_value, msg.release(), le_mapi_message);
 	} else {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "EntryID is not a folder or a message.");
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -1926,10 +1880,9 @@ ZEND_FUNCTION(mapi_msgstore_entryidfromsourcekey)
 	LOG_BEGIN();
 	zval	*resStore = NULL;
 	BYTE 	*lpSourceKeyMessage = NULL;
-	size_t cbSourceKeyMessage = 0;
+	php_stringsize_t cbSourceKeyMessage = 0, cbSourceKeyFolder = 0;
 	LPMDB	lpMsgStore = NULL;
 	BYTE	*lpSourceKeyFolder = NULL;
-	size_t cbSourceKeyFolder = 0;
 	memory_ptr<ENTRYID> lpEntryId;
 	ULONG		cbEntryId = 0;
 	object_ptr<IExchangeManageStore> lpIEMS;
@@ -1963,7 +1916,7 @@ ZEND_FUNCTION(mapi_msgstore_advise)
 	LPMDB	lpMsgStore = NULL;
 	IMAPIAdviseSink *lpSink = NULL;
 	LPENTRYID lpEntryId = NULL;
-	size_t cbEntryId = 0;
+	php_stringsize_t cbEntryId = 0;
 	long	ulMask = 0;
 	ULONG 	ulConnection = 0;
 
@@ -2541,7 +2494,7 @@ ZEND_FUNCTION(mapi_msgstore_getreceivefolder)
 	zval			*res;
 	LPMDB			pMDB		= NULL;
 	// return value
-	LPUNKNOWN		lpFolder	= NULL;
+	object_ptr<IMAPIFolder> lpFolder;
 	// locals
 	ULONG			cbEntryID	= 0;
 	memory_ptr<ENTRYID> lpEntryID;
@@ -2557,12 +2510,11 @@ ZEND_FUNCTION(mapi_msgstore_getreceivefolder)
 	MAPI_G(hr) = pMDB->GetReceiveFolder(NULL, 0, &cbEntryID, &~lpEntryID, NULL);
 	if(FAILED(MAPI_G(hr)))
 		goto exit;
-
-	MAPI_G(hr) = pMDB->OpenEntry(cbEntryID, lpEntryID, NULL, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN*)&lpFolder);
-
+	MAPI_G(hr) = pMDB->OpenEntry(cbEntryID, lpEntryID, &iid_of(lpFolder),
+	             MAPI_BEST_ACCESS, &ulObjType, &~lpFolder);
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
-	ZEND_REGISTER_RESOURCE(return_value, lpFolder, le_mapi_folder);
+	ZEND_REGISTER_RESOURCE(return_value, lpFolder.release(), le_mapi_folder);
 exit:
 	LOG_END();
 	THROW_ON_ERROR();
@@ -2590,7 +2542,7 @@ ZEND_FUNCTION(mapi_msgstore_openmultistoretable)
 	// locals
 	object_ptr<IECMultiStoreTable> lpECMST;
 	memory_ptr<ENTRYLIST> lpEntryList;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -2947,7 +2899,7 @@ ZEND_FUNCTION(mapi_stream_write)
 	zval		*res = NULL;
 	LPSTREAM	pStream = NULL;
 	char		*pv = NULL;
-	size_t cb = 0;
+	php_stringsize_t cb = 0;
 	// return value
 	ULONG		pcbWritten = 0;
 
@@ -3048,7 +3000,7 @@ ZEND_FUNCTION(mapi_openpropertytostream)
 	LPMAPIPROP	lpMapiProp	= NULL;
 	long		proptag		= 0, flags = 0; // open default readable
 	char		*guidStr	= NULL; // guid is given as a char array
-	size_t guidLen = 0;
+	php_stringsize_t guidLen = 0;
 	// return value
 	LPSTREAM	pStream		= NULL;
 	// local
@@ -3373,7 +3325,7 @@ ZEND_FUNCTION(mapi_copyto)
 	LPMAPIPROP lpSrcObj = NULL;
 	LPVOID lpDstObj = NULL;
 	LPCIID lpInterface = NULL;
-	LPCIID lpExcludeIIDs = NULL;
+	memory_ptr<IID> lpExcludeIIDs;
 	ULONG cExcludeIIDs = 0;
 
 	// params
@@ -3406,7 +3358,7 @@ ZEND_FUNCTION(mapi_copyto)
 		goto exit;
 	}
 
-	MAPI_G(hr) = PHPArraytoGUIDArray(excludeiid, NULL, &cExcludeIIDs, (LPGUID*)&lpExcludeIIDs TSRMLS_CC);
+	MAPI_G(hr) = PHPArraytoGUIDArray(excludeiid, nullptr, &cExcludeIIDs, &~lpExcludeIIDs TSRMLS_CC);
 	if (MAPI_G(hr) != hrSuccess) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to parse IIDs");
 		goto exit;
@@ -3445,7 +3397,6 @@ ZEND_FUNCTION(mapi_copyto)
 	RETVAL_TRUE;
 
 exit:
-	MAPIFreeBuffer((void*)lpExcludeIIDs);
 	LOG_END();
 	THROW_ON_ERROR();
 }
@@ -3554,7 +3505,7 @@ ZEND_FUNCTION(mapi_openproperty)
 	LPMAPIPROP	lpMapiProp	= NULL;
 	long		proptag		= 0, flags = 0, interfaceflags = 0; // open default readable
 	char		*guidStr	= NULL; // guid is given as a char array
-	size_t guidLen = 0;
+	php_stringsize_t guidLen = 0;
 	// return value
 	IUnknown*	lpUnk		= NULL;
 	// local
@@ -3617,7 +3568,7 @@ ZEND_FUNCTION(mapi_openproperty)
 			ULONG cRead;
 
 			// do not use queryinterface, since we don't return the stream, but the contents
-			lpStream.reset((IStream *)lpUnk, false);
+			lpStream.reset(reinterpret_cast<IStream *>(lpUnk), false);
 			MAPI_G(hr) = lpStream->Stat(&stat, STATFLAG_NONAME);
 			if(MAPI_G(hr) != hrSuccess)
 				goto exit;
@@ -3822,7 +3773,7 @@ ZEND_FUNCTION(mapi_decompressrtf)
 	LOG_BEGIN();
 	// params
 	char * rtfBuffer = NULL;
-	size_t rtfBufferLen = 0;
+	php_stringsize_t rtfBufferLen = 0, bufsize = 10240;
 	// return value
 	std::unique_ptr<char[]> htmlbuf;
 	// local
@@ -3830,7 +3781,6 @@ ZEND_FUNCTION(mapi_decompressrtf)
 	ULONG cbRead = 0;
 	object_ptr<IStream> pStream, deCompressedStream;
 	LARGE_INTEGER begin = { { 0, 0 } };
-	size_t bufsize = 10240;
 	std::string strUncompressed;
 
 	RETVAL_FALSE;
@@ -3858,7 +3808,7 @@ ZEND_FUNCTION(mapi_decompressrtf)
 	// amount of text we've read in so far. If our buffer wasn't big enough,
 	// we enlarge it and continue. We have to do this, instead of allocating
 	// it up front, because Stream::Stat() doesn't work for the unc.stream
-	bufsize = max(rtfBufferLen * 2, bufsize);
+	bufsize = std::max(rtfBufferLen * 2, bufsize);
 	htmlbuf.reset(new char[bufsize]);
 
 	while(1) {
@@ -4046,9 +3996,7 @@ exit:
 }
 
 /**
-*
-* Add's, modifies or deletes rows from the rules table
-*
+ * Adds, modifies or deletes rows from the rules table
 */
 ZEND_FUNCTION(mapi_rules_modifytable) {
 	PMEASURE_FUNC;
@@ -4096,13 +4044,10 @@ ZEND_FUNCTION(mapi_zarafa_createuser)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	char			*lpszUsername = NULL;
-	size_t ulUsernameLen = 0;
 	char			*lpszFullname = NULL;
-	size_t ulFullname = 0;
 	char			*lpszEmail = NULL;
-	size_t ulEmail = 0;
 	char			*lpszPassword = NULL;
-	size_t ulPassword = 0;
+	php_stringsize_t ulUsernameLen = 0, ulFullname = 0, ulEmail = 0, ulPassword = 0;
 	long			ulIsNonactive = false;
 	long			ulIsAdmin = false;
 
@@ -4111,7 +4056,7 @@ ZEND_FUNCTION(mapi_zarafa_createuser)
 	memory_ptr<ENTRYID> lpUserId;
 
 	// local
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ECUSER			sUser = { 0 };
 
@@ -4166,20 +4111,16 @@ ZEND_FUNCTION(mapi_zarafa_setuser)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
 	char			*lpszUsername = NULL;
-	size_t ulUsername = 0;
 	char			*lpszFullname = NULL;
-	size_t ulFullname = 0;
 	char			*lpszEmail = NULL;
-	size_t ulEmail = 0;
 	char			*lpszPassword = NULL;
-	size_t ulPassword = 0;
+	php_stringsize_t cbUserId = 0, ulUsername = 0, ulFullname = 0, ulEmail = 0, ulPassword = 0;
 	long			ulIsNonactive = 0;
 	long			ulIsAdmin = 0;
 
 	// local
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ECUSER			sUser;
 
@@ -4238,10 +4179,10 @@ ZEND_FUNCTION(mapi_zarafa_deleteuser)
 	ULONG			cbUserId = 0;
 	memory_ptr<ENTRYID> lpUserId;
 	char*			lpszUserName = NULL;
-	size_t ulUserName;
+	php_stringsize_t ulUserName;
 
 	// local
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 
 	RETVAL_FALSE;
@@ -4289,9 +4230,9 @@ ZEND_FUNCTION(mapi_zarafa_createstore)
 	LPMDB			lpMsgStore = NULL;
 	long			ulStoreType;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbUserId = 0;
 	// local
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ENTRYID> lpStoreID, lpRootID;
 	ULONG			cbStoreID = 0;
@@ -4330,9 +4271,9 @@ exit:
 }
 
 /**
-* Retrieve a list of users from zarafa
+* Retrieve a list of users
 * @param  logged on msgstore
-* @param  zarafa company entryid
+* @param  company entryid
 * @return array(username => array(fullname, emaladdress, userid, admin));
 */
 ZEND_FUNCTION(mapi_zarafa_getuserlist)
@@ -4344,13 +4285,13 @@ ZEND_FUNCTION(mapi_zarafa_getuserlist)
 	zval			zval_data_value;
 	LPMDB			lpMsgStore = NULL;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbCompanyId = 0;
 	// return value
 
 	// local
 	ULONG		nUsers, i;
 	memory_ptr<ECUSER> lpUsers;
-	IECUnknown	*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECSecurity> lpSecurity;
 
 	RETVAL_FALSE;
@@ -4393,7 +4334,7 @@ exit:
 }
 
 /**
- * Retrieve quota values of a users from zarafa
+ * Retrieve quota values of a users
  * @param  logged on msgstore
  * @param  user entryid to get quota information from
  * @return array(usedefault, isuserdefault, warnsize, softsize, hardsize);
@@ -4406,11 +4347,11 @@ ZEND_FUNCTION(mapi_zarafa_getquota)
 	zval            *res = NULL;
 	LPMDB           lpMsgStore = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbUserId = 0;
 	// return value
 
 	// local
-	IECUnknown      *lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECQUOTA> lpQuota;
 
@@ -4461,12 +4402,12 @@ ZEND_FUNCTION(mapi_zarafa_setquota)
 	zval            *res = NULL;
 	LPMDB           lpMsgStore = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbUserId = 0;
 	zval			*array = NULL;
 	// return value
 
 	// local
-	IECUnknown      *lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECQUOTA> lpQuota;
 	HashTable		*data = NULL;
@@ -4544,7 +4485,7 @@ exit:
 }
 
 /**
-* Retrieve user information from zarafa
+* Retrieve user information
 * @param  logged on msgstore
 * @param  username
 * @return array(fullname, emailaddress, userid, admin);
@@ -4557,12 +4498,12 @@ ZEND_FUNCTION(mapi_zarafa_getuser_by_name)
 	zval		*res = NULL;
 	LPMDB		lpMsgStore = NULL;
 	char			*lpszUsername;
-	size_t ulUsername;
+	php_stringsize_t ulUsername;
 	// return value
 
 	// local
 	memory_ptr<ECUSER> lpUsers;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ENTRYID> lpUserId;
 	unsigned int	cbUserId = 0;
@@ -4609,7 +4550,7 @@ exit:
 }
 
 /**
-* Retrieve user information from zarafa
+* Retrieve user information
 * @param  logged on msgstore
 * @param  userid
 * @return array(fullname, emailaddress, userid, admin);
@@ -4622,12 +4563,12 @@ ZEND_FUNCTION(mapi_zarafa_getuser_by_id)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbUserId = 0;
 	// return value
 
 	// local
 	memory_ptr<ECUSER> lpUsers;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 
 	RETVAL_FALSE;
@@ -4673,12 +4614,12 @@ ZEND_FUNCTION(mapi_zarafa_creategroup)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	ECGROUP			sGroup;
-	size_t cbGroupname;
+	php_stringsize_t cbGroupname;
 	// return value
 	memory_ptr<ENTRYID> lpGroupId;
 	unsigned int	cbGroupId = 0;
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 
 	RETVAL_FALSE;
@@ -4719,10 +4660,10 @@ ZEND_FUNCTION(mapi_zarafa_deletegroup)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	char			*lpszGroupname;
-	size_t cbGroupname;
+	php_stringsize_t cbGroupname;
 	// return value
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ENTRYID> lpGroupId;
 	unsigned int	cbGroupId = 0;
@@ -4767,12 +4708,11 @@ ZEND_FUNCTION(mapi_zarafa_addgroupmember)
 	// params
 	zval 			*res = NULL;
 	LPENTRYID		lpGroupId = NULL;
-	size_t cbGroupId = 0;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbGroupId = 0, cbUserId = 0;
 	// return value
 	// locals
-	IECUnknown	*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore	*lpMsgStore = NULL;
 
@@ -4810,12 +4750,11 @@ ZEND_FUNCTION(mapi_zarafa_deletegroupmember)
 	// params
 	zval 			*res = NULL;
 	LPENTRYID		lpGroupId = NULL;
-	size_t cbGroupId = 0;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbGroupId = 0, cbUserId = 0;
 	// return value
 	// locals
-	IECUnknown	*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore	*lpMsgStore = NULL;
 
@@ -4854,13 +4793,12 @@ ZEND_FUNCTION(mapi_zarafa_setgroup)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	char			*lpszGroupname;
-	size_t cbGroupname;
 	LPENTRYID		*lpGroupId = NULL;
-	size_t cbGroupId = 0;
+	php_stringsize_t cbGroupname, cbGroupId = 0;
 
 	// return value
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ECGROUP			sGroup;
 
@@ -4903,10 +4841,10 @@ ZEND_FUNCTION(mapi_zarafa_getgroup_by_id)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	LPENTRYID		lpGroupId = NULL;
-	size_t cbGroupId = 0;
+	php_stringsize_t cbGroupId = 0;
 	// return value
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECGROUP> lpsGroup;
 
@@ -4945,10 +4883,10 @@ ZEND_FUNCTION(mapi_zarafa_getgroup_by_name)
 	// params
 	zval			*res = NULL;
 	char			*lpszGroupname = NULL;
-	size_t ulGroupname;
+	php_stringsize_t ulGroupname;
 	// locals
 	LPMDB lpMsgStore = NULL;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECGROUP> lpsGroup;
 	// return value
@@ -4996,12 +4934,12 @@ ZEND_FUNCTION(mapi_zarafa_getgrouplist)
 	// params
 	zval			*res = NULL;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbCompanyId = 0;
 	// return value
 	// locals
 	zval			zval_data_value;
 	LPMDB			lpMsgStore = NULL;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ULONG			ulGroups;
 	memory_ptr<ECGROUP> lpsGroups;
@@ -5048,12 +4986,12 @@ ZEND_FUNCTION(mapi_zarafa_getgrouplistofuser)
 	// params
 	zval			*res = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
+	php_stringsize_t cbUserId = 0;
 	// return value
 	// locals
 	zval			zval_data_value;
 	LPMDB			lpMsgStore = NULL;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ULONG			ulGroups;
 	memory_ptr<ECGROUP> lpsGroups;
@@ -5100,12 +5038,12 @@ ZEND_FUNCTION(mapi_zarafa_getuserlistofgroup)
 	// params
 	zval			*res = NULL;
 	LPENTRYID		lpGroupId = NULL;
-	size_t cbGroupId = 0;
+	php_stringsize_t cbGroupId = 0;
 	// return value
 	// locals
 	zval			zval_data_value;
 	LPMDB			lpMsgStore = NULL;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ULONG			ulUsers;
 	memory_ptr<ECUSER> lpsUsers;
@@ -5157,12 +5095,12 @@ ZEND_FUNCTION(mapi_zarafa_createcompany)
 	zval *res = NULL;
 	LPMDB lpMsgStore = NULL;
 	ECCOMPANY sCompany;
-	size_t cbCompanyname;
+	php_stringsize_t cbCompanyname;
 	// return value
 	memory_ptr<ENTRYID> lpCompanyId;
 	unsigned int	cbCompanyId = 0;
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 
 	RETVAL_FALSE;
@@ -5202,10 +5140,10 @@ ZEND_FUNCTION(mapi_zarafa_deletecompany)
 	zval *res = NULL;
 	LPMDB lpMsgStore = NULL;
 	char *lpszCompanyname;
-	size_t cbCompanyname;
+	php_stringsize_t cbCompanyname = 0;
 	// return value
 	// locals
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ENTRYID> lpCompanyId;
 	unsigned int	cbCompanyId = 0;
@@ -5252,10 +5190,10 @@ ZEND_FUNCTION(mapi_zarafa_getcompany_by_id)
 	zval			*res = NULL;
 	LPMDB			lpMsgStore = NULL;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbCompanyId = 0;
 	// return value
 	// locals
-	IECUnknown *lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECCOMPANY> lpsCompany;
 
@@ -5296,12 +5234,12 @@ ZEND_FUNCTION(mapi_zarafa_getcompany_by_name)
 	zval *res = NULL;
 	LPMDB lpMsgStore = NULL;
 	char *lpszCompanyname = NULL;
-	size_t ulCompanyname;
+	php_stringsize_t ulCompanyname;
 	memory_ptr<ENTRYID> lpCompanyId;
 	unsigned int cbCompanyId = 0;
 	// return value
 	// locals
-	IECUnknown *lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	memory_ptr<ECCOMPANY> lpsCompany;
 
@@ -5352,7 +5290,7 @@ ZEND_FUNCTION(mapi_zarafa_getcompanylist)
 	// local
 	ULONG nCompanies, i;
 	memory_ptr<ECCOMPANY> lpCompanies;
-	IECUnknown *lpUnknown = NULL;;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECSecurity> lpSecurity;
 
 	RETVAL_FALSE;
@@ -5395,12 +5333,11 @@ ZEND_FUNCTION(mapi_zarafa_add_company_remote_viewlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpSetCompanyId = NULL;
-	size_t cbSetCompanyId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbSetCompanyId = 0, cbCompanyId = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
@@ -5438,12 +5375,11 @@ ZEND_FUNCTION(mapi_zarafa_del_company_remote_viewlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpSetCompanyId = NULL;
-	size_t cbSetCompanyId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbSetCompanyId = 0, cbCompanyId = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
@@ -5481,11 +5417,11 @@ ZEND_FUNCTION(mapi_zarafa_get_remote_viewlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbCompanyId = 0;
 
 	/* Locals */
 	zval			zval_data_value;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 	ULONG			ulCompanies = 0;
@@ -5531,12 +5467,11 @@ ZEND_FUNCTION(mapi_zarafa_add_user_remote_adminlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbUserId = 0, cbCompanyId = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
@@ -5574,12 +5509,11 @@ ZEND_FUNCTION(mapi_zarafa_del_user_remote_adminlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpUserId = NULL;
-	size_t cbUserId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbUserId = 0, cbCompanyId = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
@@ -5617,11 +5551,11 @@ ZEND_FUNCTION(mapi_zarafa_get_remote_adminlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbCompanyId = 0;
 
 	/* Locals */
 	zval			zval_data_value;
-	IECUnknown		*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 	ULONG			ulUsers = 0;
@@ -5667,14 +5601,13 @@ ZEND_FUNCTION(mapi_zarafa_add_quota_recipient)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpRecipientId = NULL;
-	size_t cbRecipientId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbRecipientId = 0, cbCompanyId = 0;
 	long			ulType = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
-	IECServiceAdmin	*lpServiceAdmin = NULL;
+	IUnknown *lpUnknown = nullptr;
+	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
 	RETVAL_FALSE;
@@ -5690,8 +5623,7 @@ ZEND_FUNCTION(mapi_zarafa_add_quota_recipient)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Specified object is not a Kopano store");
 		goto exit;
 	}
-
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, (void**)&lpServiceAdmin);
+	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -5712,14 +5644,13 @@ ZEND_FUNCTION(mapi_zarafa_del_quota_recipient)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpRecipientId = NULL;
-	size_t cbRecipientId = 0;
 	LPENTRYID		lpCompanyId = NULL;
-	size_t cbCompanyId = 0;
+	php_stringsize_t cbRecipientId = 0, cbCompanyId = 0;
 	long			ulType = 0;
 
 	/* Locals */
-	IECUnknown		*lpUnknown = NULL;
-	IECServiceAdmin	*lpServiceAdmin = NULL;
+	IUnknown *lpUnknown = nullptr;
+	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 
 	RETVAL_FALSE;
@@ -5735,8 +5666,7 @@ ZEND_FUNCTION(mapi_zarafa_del_quota_recipient)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Specified object is not a Kopano store");
 		goto exit;
 	}
-
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, (void**)&lpServiceAdmin);
+	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -5757,12 +5687,12 @@ ZEND_FUNCTION(mapi_zarafa_get_quota_recipientlist)
 	LOG_BEGIN();
 	zval			*res = NULL;
 	LPENTRYID		lpObjectId = NULL;
-	size_t cbObjectId = 0;
+	php_stringsize_t cbObjectId = 0;
 
 	/* Locals */
 	zval			zval_data_value;
-	IECUnknown		*lpUnknown = NULL;
-	IECServiceAdmin	*lpServiceAdmin = NULL;
+	IUnknown *lpUnknown = nullptr;
+	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	IMsgStore		*lpMsgStore = NULL;
 	ULONG			ulUsers = 0;
 	memory_ptr<ECUSER> lpsUsers;
@@ -5780,8 +5710,7 @@ ZEND_FUNCTION(mapi_zarafa_get_quota_recipientlist)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Specified object is not a Kopano store");
 		goto exit;
 	}
-
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, (void**)&lpServiceAdmin);
+	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 	MAPI_G(hr) = lpServiceAdmin->GetQuotaRecipients(cbObjectId, lpObjectId, 0, &ulUsers, &~lpsUsers);
@@ -5797,84 +5726,6 @@ ZEND_FUNCTION(mapi_zarafa_get_quota_recipientlist)
 		add_assoc_zval(return_value, (char*)lpsUsers[i].lpszUsername, &zval_data_value);
 	}
 
-exit:
-	LOG_END();
-	THROW_ON_ERROR();
-}
-
-ZEND_FUNCTION(mapi_zarafa_check_license)
-{
-	PMEASURE_FUNC;
-	LOG_BEGIN();
-	zval *res = NULL;
-	IMsgStore *lpMsgStore = NULL;
-	char *szFeature = NULL;
-	size_t cbFeature = 0;
-	IECUnknown *lpUnknown = NULL;
-	object_ptr<IECLicense> lpLicense;
-	memory_ptr<char *> lpszCapas;
-	unsigned int ulCapas = 0;
-	
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &res, &szFeature, &cbFeature) == FAILURE)
-	return;
-
-	ZEND_FETCH_RESOURCE_C(lpMsgStore, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
-
-	MAPI_G(hr) = GetECObject(lpMsgStore, &lpUnknown TSRMLS_CC);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECLicense, &~lpLicense);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-	MAPI_G(hr) = lpLicense->LicenseCapa(0/*SERVICE_TYPE_ZCP*/, &~lpszCapas, &ulCapas);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-        
-	for (ULONG i = 0; i < ulCapas; ++i)
-		if(strcasecmp(lpszCapas[i], szFeature) == 0) {
-			RETVAL_TRUE;
-			break;
-		}
-exit:
-	LOG_END();
-	THROW_ON_ERROR();
-}
-
-ZEND_FUNCTION(mapi_zarafa_getcapabilities)
-{
-	PMEASURE_FUNC;
-	LOG_BEGIN();
-	zval *res = NULL;
-	IMsgStore *lpMsgStore = NULL;
-	IECUnknown *lpUnknown = NULL;
-	object_ptr<IECLicense> lpLicense;
-	memory_ptr<char *> lpszCapas;
-	unsigned int ulCapas = 0;
-	
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &res) == FAILURE)
-	return;
-
-	ZEND_FETCH_RESOURCE_C(lpMsgStore, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
-
-	MAPI_G(hr) = GetECObject(lpMsgStore, &lpUnknown TSRMLS_CC);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECLicense, &~lpLicense);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-	MAPI_G(hr) = lpLicense->LicenseCapa(0/*SERVICE_TYPE_ZCP*/, &~lpszCapas, &ulCapas);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-
-	array_init(return_value);
-	for (ULONG i = 0; i < ulCapas; ++i)
-		add_index_string(return_value, i, lpszCapas[i]);
 exit:
 	LOG_END();
 	THROW_ON_ERROR();
@@ -5896,8 +5747,8 @@ ZEND_FUNCTION(mapi_zarafa_getpermissionrules)
 
 	// local
 	int type = -1;
-	IECUnknown	*lpUnknown = NULL;
-	IECSecurity *lpSecurity = NULL;
+	IUnknown *lpUnknown = nullptr;
+	object_ptr<IECSecurity> lpSecurity;
 	ULONG i;
 
 	RETVAL_FALSE;
@@ -5926,8 +5777,7 @@ ZEND_FUNCTION(mapi_zarafa_getpermissionrules)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Specified object is not a Kopano object");
 		goto exit;
 	}
-
-	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECSecurity, (void**)&lpSecurity);
+	MAPI_G(hr) = lpUnknown->QueryInterface(IID_IECSecurity, &~lpSecurity);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 	MAPI_G(hr) = lpSecurity->GetPermissionRules(ulType, &cPerms, &~lpECPerms);
@@ -5962,7 +5812,7 @@ ZEND_FUNCTION(mapi_zarafa_setpermissionrules)
 
 	// local
 	int type = -1;
-	IECUnknown	*lpUnknown = NULL;
+	IUnknown *lpUnknown = nullptr;
 	object_ptr<IECSecurity> lpSecurity;
 	ULONG cPerms = 0;
 	memory_ptr<ECPERMISSION> lpECPerms;
@@ -6091,12 +5941,10 @@ ZEND_FUNCTION(mapi_freebusysupport_open)
 	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|r", &resSession, &resStore) == FAILURE) return;
 
 	ZEND_FETCH_RESOURCE_C(lpSession, IMAPISession*, &resSession, -1, name_mapi_session, le_mapi_session);
-
-	if(resStore != NULL) {
+	if (resStore != nullptr)
 		ZEND_FETCH_RESOURCE_C(lpUserStore, LPMDB, &resStore, -1, name_mapi_msgstore, le_mapi_msgstore);
-	}
 
-	// Create the zarafa freebusy support object
+	// Create the freebusy support object
 	MAPI_G(hr) = ECFreeBusySupport::Create(&~lpecFBSupport);
 	if( MAPI_G(hr) != hrSuccess)
 		goto exit;
@@ -6284,7 +6132,7 @@ ZEND_FUNCTION(mapi_freebusysupport_loadupdate)
                         rid = zend_register_resource(lppFBUpdate[i], le_freebusy_update);
 			// Add item to return list
 			add_next_index_resource(return_value, rid);
-		}else {
+		} else {
 			// Add empty item to return list
 			add_next_index_null(return_value);
 		}
@@ -6667,45 +6515,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-ZEND_FUNCTION(mapi_favorite_add)
-{
-	PMEASURE_FUNC;
-	LOG_BEGIN();
-	// params
-	zval *				resSession = NULL;
-	zval *				resFolder = NULL;
-	LPSTR lpszAliasName = NULL;
-	size_t cbAliasName = 0;
-	long				ulFlags = 0;
-	// local
-	LPMAPIFOLDER lpFolder = NULL;
-	IMAPISession *lpSession = NULL;
-	object_ptr<IMAPIFolder> lpShortCutFolder;
-
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rr|sl", &resSession, &resFolder, &lpszAliasName, &cbAliasName, &ulFlags) == FAILURE) return;
-
-	ZEND_FETCH_RESOURCE_C(lpSession, IMAPISession *, &resSession, -1, name_mapi_session, le_mapi_session);
-	ZEND_FETCH_RESOURCE_C(lpFolder, LPMAPIFOLDER, &resFolder, -1, name_mapi_folder, le_mapi_folder);
-	
-	if(cbAliasName == 0)
-		lpszAliasName = NULL;
-	MAPI_G(hr) = GetShortcutFolder(lpSession, nullptr, nullptr, MAPI_CREATE, &~lpShortCutFolder); // use english language
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-
-	MAPI_G(hr) = AddFavoriteFolder(lpShortCutFolder, lpFolder, (LPCTSTR) lpszAliasName, ulFlags);
-	if(MAPI_G(hr) != hrSuccess)
-		goto exit;
-
-	RETVAL_TRUE;
-exit:
-	LOG_END();
-	THROW_ON_ERROR();
-}
-
 /*
  ***********************************************************************************
  * ICS interfaces
@@ -7059,15 +6868,15 @@ ZEND_FUNCTION(mapi_importcontentschanges_importmessagemove)
 {
 	PMEASURE_FUNC;
 	LOG_BEGIN();
-	size_t cbSourceKeySrcFolder = 0;
+	php_stringsize_t cbSourceKeySrcFolder = 0;
+	php_stringsize_t cbSourceKeySrcMessage = 0;
+	php_stringsize_t cbPCLMessage = 0;
+	php_stringsize_t cbSourceKeyDestMessage = 0;
+	php_stringsize_t cbChangeNumDestMessage = 0;
 	BYTE *			pbSourceKeySrcFolder = NULL;
-	size_t cbSourceKeySrcMessage = 0;
 	BYTE *			pbSourceKeySrcMessage = NULL;
-	size_t cbPCLMessage = 0;
 	BYTE *			pbPCLMessage = NULL;
-	size_t cbSourceKeyDestMessage = 0;
 	BYTE *			pbSourceKeyDestMessage = NULL;
-	size_t cbChangeNumDestMessage = 0;
 	BYTE *			pbChangeNumDestMessage = NULL;
 
 	zval *			resImportContentsChanges;
@@ -7342,7 +7151,7 @@ ZEND_FUNCTION(mapi_inetmapi_imtomapi)
     zval *resMessage;
     zval *resOptions;
     delivery_options dopt;
-    size_t cbString = 0;
+	php_stringsize_t cbString = 0;
     char *szString = NULL;
     
     imopt_default_delivery_options(&dopt);
@@ -7378,7 +7187,6 @@ ZEND_FUNCTION(mapi_inetmapi_imtomapi)
 exit:
 	LOG_END();
     THROW_ON_ERROR();
-    return;
 }    
 
 ZEND_FUNCTION(mapi_icaltomapi)
@@ -7390,7 +7198,7 @@ ZEND_FUNCTION(mapi_icaltomapi)
 	zval *resAddrBook;
 	zval *resMessage;
 	zend_bool *noRecipients;
-	size_t cbString = 0;
+	php_stringsize_t cbString = 0;
 	char *szString = nullptr;
 	IMAPISession *lpMAPISession = nullptr;
 	IAddrBook *lpAddrBook = nullptr;
@@ -7426,11 +7234,10 @@ ZEND_FUNCTION(mapi_icaltomapi)
 	MAPI_G(hr) = lpIcalToMapi->GetItem(0, 0, lpMessage);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
- exit:
 	RETVAL_TRUE;
+ exit:
 	LOG_END();
-    	THROW_ON_ERROR();
-	return;
+	THROW_ON_ERROR();
 }
 
 ZEND_FUNCTION(mapi_mapitoical)
@@ -7508,11 +7315,10 @@ ZEND_FUNCTION(mapi_vcftomapi)
 	MAPI_G(hr) = conv->get_item(lpMessage);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
- exit:
 	RETVAL_TRUE;
+ exit:
 	LOG_END();
 	THROW_ON_ERROR();
-	return;
 }
 
 ZEND_FUNCTION(mapi_mapitovcf)
@@ -7528,6 +7334,7 @@ ZEND_FUNCTION(mapi_mapitovcf)
 	std::unique_ptr<mapitovcf> conv;
 	std::string vcf;
 
+	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rrra",
 	    &resSession, &resAddrBook, &resMessage, &resOptions) == FAILURE)
@@ -7568,7 +7375,6 @@ ZEND_FUNCTION(mapi_enable_exceptions)
     }
     
 	LOG_END();
-    return;
 }
 
 // Can be queried by client applications to check whether certain API features are supported or not.
@@ -7577,19 +7383,78 @@ ZEND_FUNCTION(mapi_feature)
 	PMEASURE_FUNC;
 	LOG_BEGIN();
 	static const char *const features[] =
-		{"LOGONFLAGS", "NOTIFICATIONS", "INETMAPI_IMTOMAPI"};
+		{"LOGONFLAGS", "NOTIFICATIONS", "INETMAPI_IMTOMAPI", "ST_ONLY_WHEN_OOF"};
 	const char *szFeature = NULL;
-    size_t cbFeature = 0;
+	php_stringsize_t cbFeature = 0;
     
     RETVAL_FALSE;
     
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &szFeature, &cbFeature) == FAILURE) return;
-    
-	for (unsigned int i = 0; i < arraySize(features); ++i)
+	for (size_t i = 0; i < ARRAY_SIZE(features); ++i)
         if(strcasecmp(features[i], szFeature) == 0) {
             RETVAL_TRUE;
             break;
 	}
     LOG_END();
-    return;
+}
+
+ZEND_FUNCTION(kc_session_save)
+{
+	PMEASURE_FUNC;
+	zval *res = nullptr, *outstr = nullptr;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rz", &res, &outstr) == FAILURE)
+		return;
+	IMAPISession *ses;
+	ZEND_FETCH_RESOURCE_C(ses, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
+	std::string data;
+	MAPI_G(hr) = KC::kc_session_save(ses, data);
+	if (MAPI_G(hr) == hrSuccess) {
+		ZVAL_DEREF(outstr);
+		ZVAL_STRINGL(outstr, data.c_str(), data.size());
+	}
+	RETVAL_LONG(MAPI_G(hr));
+	LOG_END();
+}
+
+ZEND_FUNCTION(kc_session_restore)
+{
+	PMEASURE_FUNC;
+	zval *data, *res;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "zz", &data, &res) == FAILURE)
+		return;
+	if (Z_TYPE_P(data) != IS_STRING) {
+		php_error_docref(NULL TSRMLS_CC, E_ERROR, "kc_session_restore() expects parameter 1 to be string, but something else was given");
+		RETVAL_LONG(MAPI_G(hr) = MAPI_E_INVALID_PARAMETER);
+		LOG_END();
+		return;
+	}
+	object_ptr<IMAPISession> ses = nullptr;
+	MAPI_G(hr) = KC::kc_session_restore(std::string(Z_STRVAL_P(data), Z_STRLEN_P(data)), &~ses);
+	if (MAPI_G(hr) == hrSuccess) {
+		ZVAL_DEREF(res);
+		ZEND_REGISTER_RESOURCE(res, ses.release(), le_mapi_session);
+	}
+	RETVAL_LONG(MAPI_G(hr));
+	LOG_END();
+}
+
+ZEND_FUNCTION(mapi_msgstore_abortsubmit)
+{
+	PMEASURE_FUNC;
+	LOG_BEGIN();
+	zval *res;
+	IMsgStore *store = nullptr;
+	ENTRYID *eid = nullptr;
+	size_t eid_size = 0;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|s", &res, &eid, &eid_size) == FAILURE)
+		return;
+	ZEND_FETCH_RESOURCE_C(store, IMsgStore *, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
+	MAPI_G(hr) = store->AbortSubmit(eid_size, eid, 0);
+	LOG_END();
+	THROW_ON_ERROR();
 }

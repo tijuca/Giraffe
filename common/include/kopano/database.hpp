@@ -4,6 +4,7 @@
 #include <mutex>
 #include <string>
 #include <utility>
+#include <mapidefs.h>
 #include <mysql.h>
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
@@ -38,6 +39,7 @@ struct sSQLDatabase_t {
 	const char *lpSQL;
 };
 
+class ECConfig;
 class KDatabase;
 
 class _kc_export DB_RESULT _kc_final {
@@ -46,34 +48,63 @@ class _kc_export DB_RESULT _kc_final {
 	DB_RESULT(KDatabase *d, void *r) : m_res(r), m_db(d) {}
 	DB_RESULT(DB_RESULT &&o) = default;
 	~DB_RESULT(void);
-	void operator=(DB_RESULT &&o)
-	{
-		std::swap(m_res, o.m_res);
-		std::swap(m_db, o.m_db);
-	}
+	DB_RESULT &operator=(DB_RESULT &&o);
 	operator bool(void) const { return m_res != nullptr; }
-	bool operator==(std::nullptr_t) const { return m_res == nullptr; }
-	bool operator!=(std::nullptr_t) const { return m_res != nullptr; }
-	void *get(void) const { return m_res; }
-	void *release(void)
+	bool operator==(std::nullptr_t) const noexcept { return m_res == nullptr; }
+	bool operator!=(std::nullptr_t) const noexcept { return m_res != nullptr; }
+	void *get(void) const noexcept { return m_res; }
+	void *release(void) noexcept
 	{
 		void *p = m_res;
 		m_res = nullptr;
 		return p;
 	}
 
+	size_t get_num_rows(void) const;
+	DB_ROW fetch_row(void);
+	DB_LENGTHS fetch_row_lengths(void);
+
 	private:
 	void *m_res = nullptr;
 	KDatabase *m_db = nullptr;
 };
 
+class kt_completion {
+	public:
+	virtual ECRESULT Commit() = 0;
+	virtual ECRESULT Rollback() = 0;
+};
+
+/**
+ * kd_trans is an explicit variable wrapper around a database transaction.
+ * The transaction's scope is bounded by the scope of a certain kd_trans.
+ * Essentially, this gives the programmer an implicit rollback whenever
+ * a kd_trans did not have commit() called.
+ */
+class _kc_export kd_trans final {
+	public:
+	kd_trans();
+	kd_trans(kt_completion &d, ECRESULT &r) : m_db(&d), m_result(&r) {}
+	kd_trans(kd_trans &&);
+	~kd_trans();
+	kd_trans &operator=(kd_trans &&);
+	ECRESULT commit();
+	ECRESULT rollback();
+
+	private:
+	kt_completion *m_db;
+	ECRESULT *m_result;
+	bool m_done = false;
+};
+
 class _kc_export KDatabase {
 	public:
 	KDatabase(void);
-	virtual ~KDatabase(void) _kc_impdtor;
+	virtual ~KDatabase(void) = default;
 	ECRESULT Close(void);
 	virtual ECRESULT Connect(ECConfig *, bool, unsigned int, unsigned int);
 	virtual ECRESULT CreateDatabase(ECConfig *, bool);
+	virtual ECRESULT CreateTables(void);
 	virtual ECRESULT DoDelete(const std::string &query, unsigned int *affect = nullptr);
 	virtual ECRESULT DoInsert(const std::string &query, unsigned int *insert_id = nullptr, unsigned int *affect = nullptr);
 	virtual ECRESULT DoSelect(const std::string &query, DB_RESULT *, bool stream = false);
@@ -81,14 +112,12 @@ class _kc_export KDatabase {
 	virtual ECRESULT DoSequence(const std::string &seq, unsigned int count, unsigned long long *first_id);
 	virtual ECRESULT DoUpdate(const std::string &query, unsigned int *affect = nullptr);
 	std::string Escape(const std::string &);
-	std::string EscapeBinary(const unsigned char *, size_t);
-	std::string EscapeBinary(const std::string &);
-	DB_ROW FetchRow(DB_RESULT &);
-	DB_LENGTHS FetchRowLengths(DB_RESULT &);
+	std::string EscapeBinary(const void *, size_t);
+	std::string EscapeBinary(const std::string &s) { return EscapeBinary(s.c_str(), s.size()); }
+	std::string EscapeBinary(const SBinary &s) { return EscapeBinary(s.lpb, s.cb); }
 	const char *GetError(void);
 	DB_ERROR GetLastError(void);
 	unsigned int GetMaxAllowedPacket(void) const { return m_ulMaxAllowedPacket; }
-	unsigned int GetNumRows(const DB_RESULT &) const;
 	/*
 	 * Transactions.
 	 * These functions should be used to wrap blocks of queries into
@@ -119,7 +148,7 @@ class _kc_export KDatabase {
 	bool isConnected(void) const { return m_bConnected; }
 	ECRESULT IsInnoDBSupported(void);
 	virtual ECRESULT Query(const std::string &q);
-	ECRESULT _Update(const std::string &q, unsigned int *affected);
+	ECRESULT I_Update(const std::string &q, unsigned int *affected);
 
 	MYSQL m_lpMySQL;
 	unsigned int m_ulMaxAllowedPacket = KC_DFL_MAX_PACKET_SIZE;

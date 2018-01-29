@@ -18,6 +18,8 @@
 #include <kopano/platform.h>
 
 #include <iostream>
+#include <iterator>
+#include <string>
 #include <utility>
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
@@ -35,7 +37,6 @@ using namespace KCHL;
 
 HRESULT FsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropertyArray;
 	memory_ptr<SPropTagArray> lpPropertyTagArray;
 	memory_ptr<MAPINAMEID *> lppTagArray;
@@ -52,7 +53,7 @@ HRESULT FsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -73,28 +74,25 @@ HRESULT FsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 		return hr;
 
 	for (ULONG i = 0; i < TAG_COUNT; ++i) {
-		if (PROP_TYPE(lpPropertyArray[i].ulPropTag) == PT_ERROR) {
-			__UPV Value;
-			Value.b = false;
-
-			hr = AddMissingProperty(lpMessage, strTagName[i],
-						CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[i], PT_BOOLEAN),
-						Value);
-			if (hr != hrSuccess)
-				return hr;
-		}
+		if (PROP_TYPE(lpPropertyArray[i].ulPropTag) != PT_ERROR)
+			continue;
+		__UPV Value;
+		Value.b = false;
+		hr = AddMissingProperty(lpMessage, strTagName[i],
+					CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[i], PT_BOOLEAN),
+					Value);
+		if (hr != hrSuccess)
+			return hr;
 	}
 	return hrSuccess;
 }
 
 HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropertyArray;
 	memory_ptr<SPropTagArray> lpPropertyTagArray;
 	memory_ptr<MAPINAMEID *> lppTagArray;
 	const FILETIME *lpStart, *lpEnd, *lpCommonStart, *lpCommonEnd;
-	LONG ulDuration;
 
 	enum {
 		E_START,
@@ -108,7 +106,7 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -232,7 +230,7 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 	}
 
 	if ((*lpEnd - *lpStart) != (*lpCommonEnd - *lpCommonStart)) {
-		std::cout << "Difference in duration: " << endl;
+		std::cout << "Difference in duration: " << std::endl;
 		std::cout << "Common duration (" << (*lpCommonEnd - *lpCommonStart) << ") ";
 		std::cout << "- Whole duration (" << (*lpEnd - *lpStart) << ")" <<std::endl;
 		return E_INVALIDARG;
@@ -250,7 +248,7 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 					CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_DURATION], PT_LONG),
 					Value);
 
-	ulDuration = lpPropertyArray[E_DURATION].Value.l;
+	auto ulDuration = lpPropertyArray[E_DURATION].Value.l;
 	/*
 	 * We already compared duration between common and start,
 	 * now we have to check if that duration also equals what was set.
@@ -265,7 +263,6 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 
 HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropertyArray;
 	memory_ptr<SPropTagArray> lpPropertyTagArray;
 	BOOL bRecurring = FALSE;
@@ -285,7 +282,7 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -340,14 +337,14 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	 *	3 - Monthly
 	 *	4 - Yearly
 	 */
-	if (PROP_TYPE(lpPropertyArray[E_RECURRENCE_TYPE].ulPropTag) == PT_ERROR) {
-		if (bRecurring) {
-			std::cout << "Item is recurring but is missing recurrence type" << std::endl;
-			return E_INVALIDARG;
-		} else
-			ulType = 0;
-	} else
+	if (PROP_TYPE(lpPropertyArray[E_RECURRENCE_TYPE].ulPropTag) != PT_ERROR) {
 		ulType = lpPropertyArray[E_RECURRENCE_TYPE].Value.l;
+	} else if (bRecurring) {
+		std::cout << "Item is recurring but is missing recurrence type" << std::endl;
+		return E_INVALIDARG;
+	} else {
+		ulType = 0;
+	}
 
 	if (!bRecurring && ulType > 0) {
 		__UPV Value;
@@ -395,131 +392,112 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 			return hr;
 	}
 
-	if (PROP_TYPE(lpPropertyArray[E_RECURRENCE_PATTERN].ulPropTag) == PT_ERROR ||
-	    strcmp(lpPropertyArray[E_RECURRENCE_PATTERN].Value.lpszA, "") == 0) {
-		if (bRecurring) {
-			__UPV Value;
+	if ((PROP_TYPE(lpPropertyArray[E_RECURRENCE_PATTERN].ulPropTag) == PT_ERROR ||
+	    strcmp(lpPropertyArray[E_RECURRENCE_PATTERN].Value.lpszA, "") == 0) && bRecurring) {
+		__UPV Value;
 	
-			switch (ulType) {
-			case 1:
-				Value.lpszA = const_cast<char *>("Daily");
-				break;
-			case 2:
-				Value.lpszA = const_cast<char *>("Weekly");
-				break;
-			case 3:
-				Value.lpszA = const_cast<char *>("Monthly");
-				break;
-			case 4:
-				Value.lpszA = const_cast<char *>("Yearly");
-				break;
-			default:
-				Value.lpszA = const_cast<char *>("Invalid");
-				break;
-			}
-
-			hr = AddMissingProperty(lpMessage, "dispidRecurrencePattern",
-						CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE_PATTERN], PT_STRING8),
-						Value);
-			if (hr != hrSuccess)
-				return hr;
-		}
-	}
-	
-	if (bRecurring && PROP_TYPE(lpPropertyArray[E_RECURRENCE_STATE].ulPropTag) != PT_ERROR) {
-	    // Check the actual recurrence state
-	    RecurrenceState r;
-	    __UPV Value;
-        std::vector<RecurrenceState::Exception>::iterator iEx;
-        std::vector<RecurrenceState::ExtendedException>::iterator iEEx;
-		convert_context convertContext;
-
-	    switch (r.ParseBlob(reinterpret_cast<char *>(lpPropertyArray[E_RECURRENCE_STATE].Value.bin.lpb), lpPropertyArray[E_RECURRENCE_STATE].Value.bin.cb, RECURRENCE_STATE_CALENDAR)) {
-	        case hrSuccess:
-	        case MAPI_W_ERRORS_RETURNED:
-	            // Recurrence state is readable, but may have errors.
-	            
-	            // First, make sure the number of extended exceptions is correct
-	            while (r.lstExtendedExceptions.size() > r.lstExceptions.size())
-	                r.lstExtendedExceptions.erase(--r.lstExtendedExceptions.end());
-	            
-	            // Add new extendedexceptions if missing
-                iEx = r.lstExceptions.begin();
-	            
-	            for (size_t i = 0; i < r.lstExtendedExceptions.size(); ++i)
-			++iEx;
-	            
-	            while(r.lstExtendedExceptions.size() < r.lstExceptions.size()) {
-	                wstring wstr;
-	                RecurrenceState::ExtendedException ex;
-	                
-	                ex.ulStartDateTime = iEx->ulStartDateTime;
-	                ex.ulEndDateTime = iEx->ulEndDateTime;
-	                ex.ulOriginalStartDate = iEx->ulOriginalStartDate;
-	                
-					TryConvert(convertContext, iEx->strSubject, rawsize(iEx->strSubject), "windows-1252", wstr);
-	                ex.strWideCharSubject.assign(wstr.c_str(), wstr.size());
-	                
-					TryConvert(convertContext, iEx->strLocation, rawsize(iEx->strLocation), "windows-1252", wstr);
-	                ex.strWideCharLocation.assign(wstr.c_str(), wstr.size());
-	                
-	                r.lstExtendedExceptions.push_back(std::move(ex));
-	                ++iEx;
-                }
-                
-                // Set some defaults right for exceptions
-                for (iEx = r.lstExceptions.begin(); iEx != r.lstExceptions.end(); ++iEx)
-                    iEx->ulOriginalStartDate = (iEx->ulOriginalStartDate / 1440) * 1440;
-                
-                // Set some defaults for extended exceptions
-                iEx = r.lstExceptions.begin();
-                for (iEEx = r.lstExtendedExceptions.begin(); iEEx != r.lstExtendedExceptions.end(); ++iEEx) {
-                    wstring wstr;
-                    iEEx->strReservedBlock1 = "";
-                    iEEx->strReservedBlock2 = "";
-                    iEEx->ulChangeHighlightValue = 0;
-                    iEEx->ulOriginalStartDate = (iEx->ulOriginalStartDate / 1440) * 1440;
-
-					TryConvert(convertContext, iEx->strSubject, rawsize(iEx->strSubject), "windows-1252", wstr);
-	                iEEx->strWideCharSubject.assign(wstr.c_str(), wstr.size());
-
-					TryConvert(convertContext, iEx->strLocation, rawsize(iEx->strLocation), "windows-1252", wstr);
-	                iEEx->strWideCharLocation.assign(wstr.c_str(), wstr.size());
-                    ++iEx;
-                }
-                
-                // Reset reserved data to 0
-                r.strReservedBlock1 = "";
-                r.strReservedBlock2 = "";
-                
-                // These are constant
-                r.ulReaderVersion = 0x3004;
-                r.ulWriterVersion = 0x3004;
-                
-                r.GetBlob(&~lpData, &ulLen);
-                Value.bin.lpb = reinterpret_cast<unsigned char *>(lpData.get());
-                Value.bin.cb = ulLen;
-    
-			// Update the recurrence if there is a change
-			if (ulLen != lpPropertyArray[E_RECURRENCE_STATE].Value.bin.cb ||
-			    memcmp(lpPropertyArray[E_RECURRENCE_STATE].Value.bin.lpb, lpData, ulLen) != 0)
-				hr = ReplaceProperty(lpMessage, "dispidRecurrenceState", CHANGE_PROP_TYPE(lpPropertyArray[E_RECURRENCE_STATE].ulPropTag, PT_BINARY), "Recoverable recurrence state.", Value);
+		switch (ulType) {
+		case 1:
+			Value.lpszA = const_cast<char *>("Daily");
+			break;
+		case 2:
+			Value.lpszA = const_cast<char *>("Weekly");
+			break;
+		case 3:
+			Value.lpszA = const_cast<char *>("Monthly");
+			break;
+		case 4:
+			Value.lpszA = const_cast<char *>("Yearly");
 			break;
 		default:
-			/* Recurrence state is useless */
-			Value.l = 0;
-
-			hr = ReplaceProperty(lpMessage, "dispidRecurrenceState",
-			     CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE], PT_LONG),
-			     "Invalid recurrence state, disabling recurrence.",
-			     Value);
+			Value.lpszA = const_cast<char *>("Invalid");
 			break;
 		}
 
+		hr = AddMissingProperty(lpMessage, "dispidRecurrencePattern",
+					CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE_PATTERN], PT_STRING8),
+					Value);
 		if (hr != hrSuccess)
 			return hr;
 	}
-	return hrSuccess;
+
+	if (!bRecurring || PROP_TYPE(lpPropertyArray[E_RECURRENCE_STATE].ulPropTag) == PT_ERROR)
+		return hrSuccess;
+
+	// Check the actual recurrence state
+	RecurrenceState r;
+	__UPV Value;
+	convert_context convertContext;
+
+	hr = r.ParseBlob(reinterpret_cast<char *>(lpPropertyArray[E_RECURRENCE_STATE].Value.bin.lpb), lpPropertyArray[E_RECURRENCE_STATE].Value.bin.cb, RECURRENCE_STATE_CALENDAR);
+	if (hr != hrSuccess && hr != MAPI_W_ERRORS_RETURNED) {
+		/* Recurrence state is useless */
+		Value.l = 0;
+		return ReplaceProperty(lpMessage, "dispidRecurrenceState",
+		       CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE], PT_LONG),
+		       "Invalid recurrence state, disabling recurrence.", Value);
+	}
+
+	// Recurrence state is readable, but may have errors.
+	// First, make sure the number of extended exceptions is correct
+	while (r.lstExtendedExceptions.size() > r.lstExceptions.size())
+		r.lstExtendedExceptions.erase(--r.lstExtendedExceptions.end());
+
+	// Add new extendedexceptions if missing
+	auto iEx = r.lstExceptions.begin();
+	std::advance(iEx, r.lstExtendedExceptions.size());
+
+	while (r.lstExtendedExceptions.size() < r.lstExceptions.size()) {
+		std::wstring wstr;
+		RecurrenceState::ExtendedException ex;
+
+		ex.ulStartDateTime = iEx->ulStartDateTime;
+		ex.ulEndDateTime = iEx->ulEndDateTime;
+		ex.ulOriginalStartDate = iEx->ulOriginalStartDate;
+		TryConvert(convertContext, iEx->strSubject, rawsize(iEx->strSubject), "windows-1252", wstr);
+		ex.strWideCharSubject.assign(wstr.c_str(), wstr.size());
+		TryConvert(convertContext, iEx->strLocation, rawsize(iEx->strLocation), "windows-1252", wstr);
+		ex.strWideCharLocation.assign(wstr.c_str(), wstr.size());
+		r.lstExtendedExceptions.emplace_back(std::move(ex));
+		++iEx;
+	}
+
+	// Set some defaults right for exceptions
+	for (auto &ex : r.lstExceptions)
+		ex.ulOriginalStartDate = (ex.ulOriginalStartDate / 1440) * 1440;
+
+	// Set some defaults for extended exceptions
+	iEx = r.lstExceptions.begin();
+	for (auto &eex : r.lstExtendedExceptions) {
+		std::wstring wstr;
+		eex.strReservedBlock1.clear();
+		eex.strReservedBlock2.clear();
+		eex.ulChangeHighlightValue = 0;
+		eex.ulOriginalStartDate = (iEx->ulOriginalStartDate / 1440) * 1440;
+		TryConvert(convertContext, iEx->strSubject, rawsize(iEx->strSubject), "windows-1252", wstr);
+		eex.strWideCharSubject.assign(wstr.c_str(), wstr.size());
+		TryConvert(convertContext, iEx->strLocation, rawsize(iEx->strLocation), "windows-1252", wstr);
+		eex.strWideCharLocation.assign(wstr.c_str(), wstr.size());
+		++iEx;
+	}
+
+	// Reset reserved data to 0
+	r.strReservedBlock1.clear();
+	r.strReservedBlock2.clear();
+
+	// These are constant
+	r.ulReaderVersion = 0x3004;
+	r.ulWriterVersion = 0x3004;
+
+	r.GetBlob(&~lpData, &ulLen);
+	Value.bin.lpb = reinterpret_cast<unsigned char *>(lpData.get());
+	Value.bin.cb = ulLen;
+
+	// Update the recurrence if there is a change
+	if (ulLen != lpPropertyArray[E_RECURRENCE_STATE].Value.bin.cb ||
+	    memcmp(lpPropertyArray[E_RECURRENCE_STATE].Value.bin.lpb, lpData, ulLen) != 0)
+		hr = ReplaceProperty(lpMessage, "dispidRecurrenceState", CHANGE_PROP_TYPE(lpPropertyArray[E_RECURRENCE_STATE].ulPropTag, PT_BINARY), "Recoverable recurrence state.", Value);
+	return hr;
 }
 
 HRESULT FsckCalendar::ValidateItem(LPMESSAGE lpMessage,

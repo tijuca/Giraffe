@@ -28,6 +28,7 @@
 #include <inetmapi/options.h>
 #include <mapidefs.h>
 #include <kopano/charset/convert.h>
+#include <kopano/memory.hpp>
 #include "SMIMEMessage.h"
 
 namespace KC {
@@ -45,15 +46,13 @@ class MAPIToVMIME _kc_final {
 public:
 	MAPIToVMIME();
 	MAPIToVMIME(IMAPISession *, IAddrBook *, sending_options);
-	~MAPIToVMIME();
-
 	HRESULT convertMAPIToVMIME(IMessage *in, vmime::shared_ptr<vmime::message> *out, unsigned int = MTV_NONE);
 	std::wstring getConversionError(void) const;
 
 private:
 	sending_options sopt;
-	LPADRBOOK m_lpAdrBook;
-	LPMAPISESSION m_lpSession;
+	KCHL::object_ptr<IAddrBook> m_lpAdrBook;
+	KCHL::object_ptr<IMAPISession> m_lpSession;
 	std::wstring m_strError;
 	convert_context m_converter;
 	vmime::charset m_vmCharset;		//!< charset to use in email
@@ -65,7 +64,7 @@ private:
 	HRESULT fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime::messageBuilder* lpVMMessageBuilder);
 
 	HRESULT handleTextparts(IMessage* lpMessage, vmime::messageBuilder* lpVMMessageBuilder, eBestBody *bestBody);
-	HRESULT getMailBox(LPSRow lpRow, vmime::shared_ptr<vmime::address> *mbox);
+	HRESULT getMailBox(SRow *lpRow, vmime::shared_ptr<vmime::address> &mbox);
 	HRESULT processRecipients(IMessage* lpMessage, vmime::messageBuilder* lpVMMessageBuilder);
 	HRESULT handleExtraHeaders(IMessage *in, vmime::shared_ptr<vmime::header> out, unsigned int);
 	HRESULT handleReplyTo(IMessage *in, vmime::shared_ptr<vmime::header> hdr);
@@ -88,9 +87,8 @@ private:
 	void removeEnters(WCHAR *s);
 	vmime::text getVmimeTextFromWide(const WCHAR* lpszwInput, bool bWrapInWord = true);
 	vmime::text getVmimeTextFromWide(const std::wstring& strwInput, bool bWrapInWord = true);
-
-	bool is_voting_request(IMessage *lpMessage);
-	bool has_reminder(IMessage *);
+	bool is_voting_request(IMessage *lpMessage) const;
+	bool has_reminder(IMessage *) const ;
 };
 
 } /* namespace */

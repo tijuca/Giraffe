@@ -7,7 +7,7 @@
 .\"    Source: Kopano 8
 .\"  Language: English
 .\"
-.TH "KOPANO\-MONITOR\&.CF" "5" "November 2016" "Kopano 8" "Kopano Core user reference"
+.TH "KOPANO\-MONITOR.CFG" "5" "November 2016" "Kopano 8" "Kopano Core user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,17 +31,17 @@
 kopano-monitor.cfg \- The Kopano monitor configuration file
 .SH "SYNOPSIS"
 .PP
-\fBmonitor\&.cfg\fR
+\fBmonitor.cfg\fR
 .SH "DESCRIPTION"
 .PP
 The
-monitor\&.cfg
-is a configuration file for the Kopano Monitor\&.
-monitor\&.cfg
-contains instructions for the software to set up the logging system\&.
+monitor.cfg
+is a configuration file for the Kopano Monitor.
+monitor.cfg
+contains instructions for the software to set up the logging system.
 .SH "FILE FORMAT"
 .PP
-The file consists of one big section, but parameters can be grouped by functionality\&.
+The file consists of one big section, but parameters can be grouped by functionality.
 .PP
 The parameters are written in the form:
 .PP
@@ -49,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Kopano\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
+The file is line\-based. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Kopano. Parameter names are case sensitive. Lines beginning with `!\*(Aq are directives.
 .PP
 Directives are written in the form:
 .PP
@@ -62,190 +62,157 @@ The following directives exist:
 .RS 4
 Include and process
 \fIargument\fR
-.sp
-Example: !include common\&.cfg
+.PP
+Example: !include common.cfg
 .RE
 .PP
-The types of parameters for the spooler are: server, smtp and log\&.
+The types of parameters for the spooler are: server, smtp and log.
 .SH "EXPLANATION OF EACH PARAMETER"
+.SS quota_check_interval
 .PP
-\fBquota_check_interval\fR
-.RS 4
-Set the interval (in minutes) for checking the quota for all Kopano users\&.
-.sp
+Set the interval (in minutes) for checking the quota for all Kopano users.
+.PP
 Default:
 \fI15\fR
-.RE
+.SS mailquota_resend_interval
 .PP
-\fBmailquota_resend_interval\fR
-.RS 4
-Send interval of a quota mail in days when a user reache his warning, soft or hard quota\&.
-.sp
+Send interval of a quota mail in days when a user reache his warning, soft or hard quota.
+.PP
 Default:
 \fI1\fR
-.RE
+.SS server_socket
 .PP
-\fBserver_socket\fR
-.RS 4
-Connection URL to find the connection to the Kopano server\&.
-.sp
+Connection URL to find the connection to the Kopano server.
+.PP
 Default:
-\fIfile:///var/run/kopano/server\&.sock\fR
-.RE
+\fIfile:///var/run/kopano/server.sock\fR
+.SS run_as_user
 .PP
-\fBrun_as_user\fR
-.RS 4
-After correctly starting, the monitor process will become this user, dropping root privileges\&. Note that the log file needs to be writeable by this user, and the directory too to create new logfiles after logrotation\&. This can also be achieved by setting the correct group and permissions\&.
-.sp
-Default value is empty, not changing the user after starting\&.
-.RE
+After correctly starting, the monitor process will become this user, dropping root privileges. Note that the log file needs to be writeable by this user, and the directory too to create new logfiles after logrotation. This can also be achieved by setting the correct group and permissions.
 .PP
-\fBrun_as_group\fR
-.RS 4
-After correctly starting, the monitor process will become this group, dropping root privileges\&.
-.sp
-Default value is empty, not changing the group after starting\&.
-.RE
+Default value is empty, not changing the user after starting.
+.SS run_as_group
 .PP
-\fBpid_file\fR
-.RS 4
-Write the process ID number to this file\&. This is used by the init\&.d script to correctly stop/restart the service\&.
-.sp
-Default value: /var/run/kopano/monitor\&.pid
-.RE
+After correctly starting, the monitor process will become this group, dropping root privileges.
 .PP
-\fBrunning_path\fR
-.RS 4
-Change directory to this path when running in daemonize mode\&. When using the \-F switch to run in the foreground the directory will not be changed\&.
-.sp
+Default value is empty, not changing the group after starting.
+.SS pid_file
+.PP
+Write the process ID number to this file. This is used by the init.d script to correctly stop/restart the service.
+.PP
+Default value: /var/run/kopano/monitor.pid
+.SS running_path
+.PP
+Change directory to this path when running in daemonize mode. When using the \-F switch to run in the foreground the directory will not be changed.
+.PP
 Default:
 \fI/\fR
-.RE
+.SS sslkey_file
 .PP
-\fBsslkey_file\fR
-.RS 4
-Use this file as key to logon to the server\&. This is only used when server_socket is set to an HTTPS transport\&. See the
+Use this file as key to logon to the server. This is only used when server_socket is set to an HTTPS transport. See the
 \fBkopano-server\fR(8)
-manual page on how to setup SSL keys\&.
-.sp
-Default: value not set\&.
-.RE
+manual page on how to setup SSL keys.
 .PP
-\fBsslkey_pass\fR
-.RS 4
-The password of the SSL key file that is set in sslkey_file\&.
-.sp
-Default: value not set\&.
-.RE
+Default: value not set.
+.SS sslkey_pass
 .PP
-\fBlog_method\fR
-.RS 4
-The method which should be used for logging\&. Valid values are:
+The password of the SSL key file that is set in sslkey_file.
 .PP
+Default: value not set.
+.SS log_method
+.PP
+The method which should be used for logging. Valid values are:
+.TP
 \fIsyslog\fR
-.RS 4
-Use the Linux system log\&. All messages will be written to the mail facility\&. See also
-\fBsyslog.conf\fR(5)\&.
-.RE
-.PP
+Use the Linux system log. All messages will be written to the mail facility. See also
+\fBsyslog.conf\fR(5).
+.TP
 \fIfile\fR
-.RS 4
-Log to a file\&. The filename will be specified in
-\fBlog_file\fR\&.
-.RE
-.sp
+Log to a file. The filename will be specified in
+\fBlog_file\fR.
+.PP
 Default:
 \fIfile\fR
-.RE
+.SS log_file
 .PP
-\fBlog_file\fR
-.RS 4
-When logging to a file, specify the filename in this parameter\&. Use
+When logging to a file, specify the filename in this parameter. Use
 \fI\-\fR
-(minus sign) for stderr output\&.
-.sp
-Default:
-\fI/var/log/kopano/monitor\&.log\fR
-.RE
+(minus sign) for stderr output.
 .PP
-\fBlog_timestamp\fR
-.RS 4
-Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
-.sp
+Default:
+\fI/var/log/kopano/monitor.log\fR
+.SS log_timestamp
+.PP
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode.
+.PP
 Default:
 \fI1\fR
-.RE
+.SS log_buffer_size
 .PP
-\fBlog_buffer_size\fR
-.RS 4
-Buffer logging in what sized blocks\&. The special value 0 selects line buffering\&.
-.sp
+Buffer logging in what sized blocks. The special value 0 selects line buffering.
+.PP
 Default:
 \fI0\fR
-.RE
+.SS log_level
 .PP
-\fBlog_level\fR
-.RS 4
-The level of output for logging in the range from 0 to 5\&. 0 means no logging, 5 means full logging\&.
-.sp
+The level of output for logging in the range from 0 to 5. 0 means no logging, 5 means full logging.
+.PP
 Default:
 \fI2\fR
-.RE
+.SS userquota_warning_template, companyquota_warning_template
 .PP
-\fBuserquota_warning_template\fR, \fBcompanyquota_warning_template\fR
-.RS 4
-These templates are read by the kopano\-monitor when a user or tenant exceeds a particular quota level\&. In these templates multiple variables can be used which will be replaced before sending the quota warning email\&.
-.sp
-These files should be saved in the UTF\-8 charset\&. UTF\-8 is compatible with US\-ASCII, so if you only use western characters, there is no need for special measurements\&.
+These templates are read by the kopano\-monitor when a user or tenant exceeds a particular quota level. In these templates multiple variables can be used which will be replaced before sending the quota warning email.
+.PP
+These files should be saved in the UTF\-8 charset. UTF\-8 is compatible with US\-ASCII, so if you only use western characters, there is no need for special measurements.
 .PP
 \fI${KOPANO_QUOTA_NAME}\fR
 .RS 4
 userquota template: The name of the user who exceeded his quota
-.sp
+.PP
 companyquota template: The name of the tenant which exceeded its quota
 .RE
 .PP
 \fI${KOPANO_QUOTA_FULLNAME}\fR
 .RS 4
 userquota template: The fullname for the user who exceeded his quota
-.sp
+.PP
 tenantquota template: The name of the tenant which exceeded its quota
 .RE
 .PP
 \fI${KOPANO_QUOTA_COMPANY}\fR
 .RS 4
 userquota template: The name of the tenant to which the user belongs
-.sp
+.PP
 tenantquota template: The name of the tenant which exceeded its quota
 .RE
 .PP
 \fI${KOPANO_QUOTA_STORE_SIZE}\fR
 .RS 4
 userquota template: The total size of the user\*(Aqs store
-.sp
+.PP
 companyquota template: The total size of all stores (including the public store) which belong to this tenant
-.sp
+.PP
 Note: The size unit (KB,MB) is part of the variable
 .RE
 .PP
 \fI${KOPANO_QUOTA_WARN_SIZE}\fR
 .RS 4
 The quota warning level
-.sp
+.PP
 Note: The size unit (KB,MB) is part of the variable
 .RE
 .PP
 \fI${KOPANO_QUOTA_SOFT_SIZE}\fR
 .RS 4
 The quota soft level
-.sp
+.PP
 Note: The size unit (KB,MB) is part of the variable
 .RE
 .PP
 \fI${KOPANO_QUOTA_HARD_SIZE}\fR
 .RS 4
 The quota hard limit
-.sp
+.PP
 Note: The size unit (KB,MB) is part of the variable
 .RE
 .RE
@@ -253,18 +220,16 @@ Note: The size unit (KB,MB) is part of the variable
 .PP
 The following options are reloadable by sending the kopano\-monitor process a HUP signal:
 .PP
-log_level, mailquota_resend_interval, userquota_warning_template
-.RS 4
-.RE
+log_level, mailquota_resend_interval
 .SH "FILES"
 .PP
-/etc/kopano/monitor\&.cfg
+/etc/kopano/monitor.cfg
 .RS 4
-The Kopano monitor configuration file\&.
+The Kopano monitor configuration file.
 .RE
 .SH "AUTHOR"
 .PP
-Written by Kopano\&.
+Written by Kopano.
 .SH "SEE ALSO"
 .PP
 \fBkopano-monitor\fR(8)

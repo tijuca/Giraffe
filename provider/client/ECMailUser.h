@@ -19,11 +19,30 @@
 #define ECMAILUSER
 
 #include <kopano/zcdefs.h>
+#include <kopano/Util.h>
 #include <mapidefs.h>
-
+#include "ECABContainer.h"
 #include "ECABProp.h"
 
-class ECMailUser _kc_final : public ECABProp {
+class ECDistList _kc_final : public ECABContainer, public IDistList {
+	public:
+	static HRESULT Create(void *provider, BOOL modify, ECDistList **);
+	static HRESULT TableRowGetProp(void *provider, struct propVal *src, SPropValue *dst, void **base, ULONG type);
+
+	// Override IMAPIProp
+	virtual HRESULT CopyTo(ULONG nexcl, const IID *excl, const SPropTagArray *exclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **);
+	virtual HRESULT CopyProps(const SPropTagArray *inclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **);
+
+	// override IUnknown
+	virtual HRESULT	QueryInterface(REFIID refiid, void **) _kc_override;
+	virtual HRESULT OpenProperty(ULONG proptag, const IID *, ULONG iface_opts, ULONG flags, IUnknown **);
+
+	protected:
+	ECDistList(void *provider, BOOL modify);
+	ALLOC_WRAP_FRIEND;
+};
+
+class ECMailUser _kc_final : public ECABProp, public IMailUser {
 private:
 	ECMailUser(void* lpProvider, BOOL fModify);
 
@@ -37,11 +56,7 @@ public:
 	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk);
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-
-	class xMailUser _kc_final : public IMailUser {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xMailUser;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // #ifndef ECMAILUSER

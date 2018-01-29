@@ -47,29 +47,14 @@ struct INFOGUID {
 
 extern _kc_export std::string GetMAPIErrorDescription(HRESULT);
 std::string DBGGUIDToString(REFIID iid);
-std::string MapiNameIdListToString(ULONG cNames, const MAPINAMEID *const *ppNames, const SPropTagArray *pptaga = NULL);
 std::string MapiNameIdToString(const MAPINAMEID *pNameId);
 
 std::string PropNameFromPropTagArray(const SPropTagArray *);
 std::string PropNameFromPropArray(ULONG cValues, const SPropValue *lpPropArray);
 extern _kc_export std::string PropNameFromPropTag(ULONG tag);
 std::string RestrictionToString(const SRestriction *lpRestriction, unsigned int indent=0);
-std::string RowToString(const SRow *lpRow);
 std::string RowSetToString(const SRowSet *lpRows);
 std::string AdrRowSetToString(const ADRLIST *lpAdrList, const FlagList *lpFlagList);
-std::string RowEntryToString(const ROWENTRY *lpRowEntry);
-std::string RowListToString(const ROWLIST *lprowList);
-const char *ActionToString(const ACTION *);
-
-std::string SortOrderToString(const SSortOrder *lpSort);
-std::string SortOrderSetToString(const SSortOrderSet *lpSortCriteria);
-
-std::string NotificationToString(ULONG cNotification, const NOTIFICATION *lpNotification);
-
-std::string ProblemArrayToString(const SPropProblemArray *lpProblemArray);
-
-const char *MsgServiceContextToString(ULONG ulContext);
-const char *ResourceTypeToString(ULONG ulResourceType);
 
 //Internal used only
 extern _kc_export const char *RelationalOperatorToString(ULONG relop);

@@ -40,8 +40,8 @@ bool KeyEntryOrder(const KeyEntry<Key> &a, const KeyEntry<Key> &b) {
 	return a.ulLastAccess < b.ulLastAccess;
 }
 
-template<typename Value>
-unsigned int GetCacheAdditionalSize(const Value &val) {
+template<typename Value> size_t GetCacheAdditionalSize(const Value &val)
+{
 	return 0;
 }
 
@@ -55,7 +55,7 @@ public:
 	typedef unsigned long		count_type;
 		typedef uint64_t	size_type;
 
-	_kc_hidden virtual ~ECCacheBase(void) _kc_impdtor;
+	_kc_hidden virtual ~ECCacheBase(void) = default;
 	_kc_hidden virtual count_type ItemCount(void) const = 0;
 	_kc_hidden virtual size_type Size(void) const = 0;
 	_kc_hidden size_type MaxSize(void) const { return m_ulMaxSize; }
@@ -89,11 +89,10 @@ private:
 	size_type m_ulCacheHit = 0, m_ulCacheValid = 0;
 };
 
-
-template<typename _MapType> class ECCache _kc_final : public ECCacheBase {
+template<typename MapType> class ECCache _kc_final : public ECCacheBase {
 public:
-	typedef typename _MapType::key_type		key_type;
-	typedef typename _MapType::mapped_type	mapped_type;
+	typedef typename MapType::key_type key_type;
+	typedef typename MapType::mapped_type mapped_type;
 	
 	ECCache(const std::string &strCachename, size_type ulMaxSize, long lMaxAge)
 		: ECCacheBase(strCachename, ulMaxSize, lMaxAge)
@@ -115,8 +114,8 @@ public:
 	
 	size_type Size(void) const _kc_override
 	{
-		// it works with map and hash_map
-		return (m_map.size() * (sizeof(typename _MapType::value_type) + sizeof(_MapType) )) + m_ulSize;
+		/* It works with map and unordered_map. */
+		return m_map.size() * (sizeof(typename MapType::value_type) + sizeof(MapType)) + m_ulSize;
 	}
 
 	ECRESULT RemoveCacheItem(const key_type &key) 
@@ -133,67 +132,58 @@ public:
 	
 	ECRESULT GetCacheItem(const key_type &key, mapped_type **lppValue)
 	{
-		ECRESULT er = erSuccess;
 		time_t	tNow  = GetProcessTime();
 		auto iter = m_map.find(key);
 		
-		if (iter != m_map.end()) {
-			// Cache age of the cached item, if expired remove the item from the cache
-			if (MaxAge() != 0 && (long)(tNow - iter->second.ulLastAccess) >= MaxAge()) {
-				/*
-				 * Because of templates, there is no guarantee
-				 * that m_map keeps iterators valid while
-				 * elements are deleted from it. Track them in
-				 * a separate delete list.
-				 */
-				std::vector<key_type> dl;
-
-				// Loop through all items and check
-				for (iter = m_map.begin(); iter != m_map.end(); ++iter)
-					if ((long)(tNow - iter->second.ulLastAccess) >= MaxAge())
-						dl.push_back(iter->first);
-				for (const auto &i : dl)
-					m_map.erase(i);
-				er = KCERR_NOT_FOUND;
-			} else {
-				*lppValue = &iter->second;
-				// If we have an aging cache, we don't update the timestamp,
-				// so we can't keep a value longer in the cache than the max age.
-				// If we have a non-aging cache, we need to update it,
-				// to see the oldest 5% to purge from the cache.
-				if (MaxAge() == 0)
-					iter->second.ulLastAccess = tNow;
-				er = erSuccess;
-			}
-		} else {
-			er = KCERR_NOT_FOUND;
+		if (iter == m_map.end()) {
+			IncrementHitCount();
+			return KCERR_NOT_FOUND;
 		}
-
-		IncrementHitCount();
-		if (er == erSuccess)
+		if (MaxAge() == 0 || static_cast<long>(tNow - iter->second.ulLastAccess) < MaxAge()) {
+			*lppValue = &iter->second;
+			// If we have an aging cache, we don't update the timestamp,
+			// so we can't keep a value longer in the cache than the max age.
+			// If we have a non-aging cache, we need to update it,
+			// to see the oldest 5% to purge from the cache.
+			if (MaxAge() == 0)
+				iter->second.ulLastAccess = tNow;
+			IncrementHitCount();
 			IncrementValidCount();
+			return erSuccess;
+		}
+		// Cache age of the cached item, if expired remove the item from the cache
+		/*
+		 * Because of templates, there is no guarantee
+		 * that m_map keeps iterators valid while
+		 * elements are deleted from it. Track them in
+		 * a separate delete list.
+		 */
+		std::vector<key_type> dl;
 
-		return er;
+		// Loop through all items and check
+		for (iter = m_map.begin(); iter != m_map.end(); ++iter)
+			if ((long)(tNow - iter->second.ulLastAccess) >= MaxAge())
+				dl.emplace_back(iter->first);
+		for (const auto &i : dl)
+			m_map.erase(i);
+		IncrementHitCount();
+		return KCERR_NOT_FOUND;
 	}
 
-	ECRESULT GetCacheRange(const key_type &lower, const key_type &upper, std::list<typename _MapType::value_type> *values)
+	ECRESULT GetCacheRange(const key_type &lower, const key_type &upper, std::list<typename MapType::value_type> *values)
 	{
 		auto iLower = m_map.lower_bound(lower);
 		auto iUpper = m_map.upper_bound(upper);
 		for (auto i = iLower; i != iUpper; ++i)
-			values->push_back(*i);
-
+			values->emplace_back(*i);
 		return erSuccess;
 	}
 	
 	ECRESULT AddCacheItem(const key_type &key, const mapped_type &value)
 	{
-		typedef typename _MapType::value_type value_type;
-
 		if (MaxSize() == 0)
 			return erSuccess;
-
-		auto result = m_map.insert(value_type(key, value));
+		auto result = m_map.emplace(key, value);
 		if (result.second == false) {
 			// The key already exists but its value is unmodified. So update it now
 			m_ulSize += GetCacheAdditionalSize(value);
@@ -201,16 +191,13 @@ public:
 			result.first->second = value;
 			result.first->second.ulLastAccess = GetProcessTime();
 			// Since there is a very small chance that we need to purge the cache, we're skipping that here.
-		} else {
-			// We just inserted a new entry.
-			m_ulSize += GetCacheAdditionalSize(value);
-			m_ulSize += GetCacheAdditionalSize(key);
-			
-			result.first->second.ulLastAccess = GetProcessTime();
-			
-			UpdateCache(0.05F);
+			return erSuccess;
 		}
-
+		// We just inserted a new entry.
+		m_ulSize += GetCacheAdditionalSize(value);
+		m_ulSize += GetCacheAdditionalSize(key);
+		result.first->second.ulLastAccess = GetProcessTime();
+		UpdateCache(0.05F);
 		return erSuccess;
 	}
 	
@@ -230,13 +217,13 @@ private:
 			KeyEntry<key_type> k;
 			k.key = im.first;
 			k.ulLastAccess = im.second.ulLastAccess;
-			lstEntries.push_back(std::move(k));
+			lstEntries.emplace_back(std::move(k));
 		}
 
 		lstEntries.sort(KeyEntryOrder<key_type>);
 
 		// We now have a list of all cache items, sorted by access time, (oldest first)
-		unsigned int ulDelete = (unsigned int)(m_map.size() * ratio);
+		size_t ulDelete = m_map.size() * ratio;
 
 		// Remove the oldest ulDelete entries from the cache, removing [ratio] % of all
 		// cache entries.
@@ -255,14 +242,12 @@ private:
 	
 	ECRESULT UpdateCache(float ratio)
 	{
-		if( Size() > MaxSize()) {
+		if (Size() > MaxSize())
 			PurgeCache(ratio);
-		}
-
 		return erSuccess;
 	}
 
-	_MapType			m_map;	
+	MapType m_map;	
 	size_type			m_ulSize;
 };
 

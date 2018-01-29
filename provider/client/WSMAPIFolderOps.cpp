@@ -14,7 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
+#include <stdexcept>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "WSMAPIFolderOps.h"
@@ -40,17 +41,16 @@
  * The WSMAPIFolderOps for use with the WebServices transport
  */
 
-WSMAPIFolderOps::WSMAPIFolderOps(KCmd *lpCmd, std::recursive_mutex &data_lock,
-    ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId,
+WSMAPIFolderOps::WSMAPIFolderOps(KCmd *cmd, std::recursive_mutex &data_lock,
+    ECSESSIONID sid, ULONG cbEntryId, ENTRYID *lpEntryId,
     WSTransport *lpTransport) :
-	ECUnknown("WSMAPIFolderOps"), lpDataLock(data_lock),
-	m_lpTransport(lpTransport)
+	ECUnknown("WSMAPIFolderOps"), lpCmd(cmd), lpDataLock(data_lock),
+	ecSessionId(sid), m_lpTransport(lpTransport)
 {
-	this->lpCmd = lpCmd;
-	this->ecSessionId = ecSessionId;
 	lpTransport->AddSessionReloadCallback(this, Reload, &m_ulSessionReloadCallback);
-
-	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
+	auto ret = CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
+	if (ret != hrSuccess)
+		throw std::runtime_error("CopyMAPIEntryIdToSOAPEntryId");
 }
 
 WSMAPIFolderOps::~WSMAPIFolderOps()
@@ -64,17 +64,8 @@ HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, std::recursive_mutex &lpDataLock,
     ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId,
     WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
 {
-	HRESULT hr = hrSuccess;
-	WSMAPIFolderOps *lpFolderOps = NULL;
-
-	lpFolderOps = new WSMAPIFolderOps(lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport);
-
-	hr = lpFolderOps->QueryInterface(IID_ECMAPIFolderOps, (void **)lppFolderOps);
-
-	if(hr != hrSuccess)
-		delete lpFolderOps;
-
-	return hr;
+	return alloc_wrap<WSMAPIFolderOps>(lpCmd, lpDataLock, ecSessionId,
+	       cbEntryId, lpEntryId, lpTransport).put(lppFolderOps);
 }
 
 HRESULT WSMAPIFolderOps::QueryInterface(REFIID refiid, void **lppInterface)
@@ -113,7 +104,9 @@ HRESULT WSMAPIFolderOps::HrCreateFolder(ULONG ulFolderType,
 
 	START_SOAP_CALL
 	{
-		if(SOAP_OK != lpCmd->ns__createFolder(ecSessionId, m_sEntryId, lpsEntryId, ulFolderType, (char*)strFolderName.c_str(), (char*)strComment.c_str(), fOpenIfExists == 0 ? false : true, ulSyncId, sSourceKey, &sResponse))
+		if (lpCmd->ns__createFolder(ecSessionId, m_sEntryId, lpsEntryId,
+		    ulFolderType, strFolderName.c_str(), strComment.c_str(),
+		    !!fOpenIfExists, ulSyncId, sSourceKey, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -136,7 +129,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSMAPIFolderOps::HrDeleteFolder(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ULONG ulSyncId)
+HRESULT WSMAPIFolderOps::HrDeleteFolder(ULONG cbEntryId,
+    const ENTRYID *lpEntryId, ULONG ulFlags, ULONG ulSyncId)
 {
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
@@ -267,8 +261,8 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 {
 	HRESULT			hr = hrSuccess;
 	ECRESULT		er = erSuccess;
-	ENTRYLIST*		lpMsgList = NULL;
-	SRestriction*	lpRestriction = NULL;
+	ecmem_ptr<ENTRYLIST> lpMsgList;
+	ecmem_ptr<SRestriction> lpRestriction;
 
 	struct tableGetSearchCriteriaResponse sResponse;
 
@@ -284,8 +278,7 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 	END_SOAP_CALL
 
 	if(lppRestriction) {
-
-		hr = ECAllocateBuffer(sizeof(SRestriction), (void **)&lpRestriction);
+		hr = ECAllocateBuffer(sizeof(SRestriction), &~lpRestriction);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -295,30 +288,21 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 	}
 
 	if(lppMsgList) {
-		hr = CopySOAPEntryListToMAPIEntryList(sResponse.lpFolderIDs, &lpMsgList);
+		hr = CopySOAPEntryListToMAPIEntryList(sResponse.lpFolderIDs, &~lpMsgList);
 		if(hr != hrSuccess)
 			goto exit;
 
 	}
 
 	if(lppMsgList)
-		*lppMsgList = lpMsgList;
-
+		*lppMsgList = lpMsgList.release();
 	if(lppRestriction)
-		*lppRestriction = lpRestriction;
-	
+		*lppRestriction = lpRestriction.release();
 	if(lpulFlags)
 		*lpulFlags = sResponse.ulFlags;
 
 exit:
 	UnLockSoap();
-
-	if(hr != hrSuccess && lpMsgList)
-		ECFreeBuffer(lpMsgList);
-
-	if(hr != hrSuccess && lpRestriction)
-		ECFreeBuffer(lpRestriction);
-
 	return hr;
 }
 
@@ -341,7 +325,8 @@ HRESULT WSMAPIFolderOps::HrCopyFolder(ULONG cbEntryFrom, LPENTRYID lpEntryFrom, 
 
 	START_SOAP_CALL
 	{
-		if(SOAP_OK != lpCmd->ns__copyFolder(ecSessionId, sEntryFrom, sEntryDest, (char*)strNewFolderName.c_str(), ulFlags, ulSyncId, &er))
+		if (lpCmd->ns__copyFolder(ecSessionId, sEntryFrom, sEntryDest,
+		    strNewFolderName.c_str(), ulFlags, ulSyncId, &er) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
@@ -388,7 +373,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSMAPIFolderOps::HrGetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG *lpulMessageStatus)
+HRESULT WSMAPIFolderOps::HrGetMessageStatus(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulFlags, ULONG *lpulMessageStatus)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
@@ -424,7 +410,9 @@ exit:
 	return hr;
 }
 
-HRESULT WSMAPIFolderOps::HrSetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulNewStatus, ULONG ulNewStatusMask, ULONG ulSyncId, ULONG *lpulOldStatus)
+HRESULT WSMAPIFolderOps::HrSetMessageStatus(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulNewStatus, ULONG ulNewStatusMask,
+    ULONG ulSyncId, ULONG *lpulOldStatus)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
@@ -464,7 +452,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	entryId		sEntryId = {0};
+	entryId sEntryId;
 	KCHL::memory_ptr<SPropValue> lpSPropValPCL, lpSPropValCK;
 	getChangeInfoResponse sChangeInfo{__gszeroinit};
 
@@ -538,10 +526,6 @@ HRESULT WSMAPIFolderOps::UnLockSoap()
 
 HRESULT WSMAPIFolderOps::Reload(void *lpParam, ECSESSIONID sessionid)
 {
-	HRESULT hr = hrSuccess;
-	WSMAPIFolderOps *lpThis = (WSMAPIFolderOps *)lpParam;
-
-	lpThis->ecSessionId = sessionid;
-
-	return hr;
+	static_cast<WSMAPIFolderOps *>(lpParam)->ecSessionId = sessionid;
+	return hrSuccess;
 }

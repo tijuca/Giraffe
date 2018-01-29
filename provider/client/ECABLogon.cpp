@@ -13,8 +13,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <mapiutil.h>
 #include "kcore.hpp"
 #include <kopano/ECGuid.h>
@@ -24,8 +24,6 @@
 
 #include "ECABContainer.h"
 #include "ECMailUser.h"
-#include "ECDistList.h"
-
 #include <kopano/ECDebug.h>
 
 #include "WSTransport.h"
@@ -38,22 +36,16 @@
 using namespace KCHL;
 
 ECABLogon::ECABLogon(LPMAPISUP lpMAPISup, WSTransport *lpTransport,
-    ULONG ulProfileFlags, GUID *lpGUID) :
+    ULONG ulProfileFlags, const GUID *lpGUID) :
 	ECUnknown("IABLogon"), m_lpMAPISup(lpMAPISup),
-	m_lpTransport(lpTransport)
+	m_lpTransport(lpTransport),
+	/* The "legacy" guid used normally (all AB entryIDs have this GUID) */
+	m_guid(MUIDECSAB),
+	/* The specific GUID for *this* addressbook provider, if available */
+	m_ABPGuid((lpGUID != nullptr) ? *lpGUID : GUID_NULL)
 {
-	// The 'legacy' guid used normally (all AB entryIDs have this GUID)
-	m_guid = MUIDECSAB;
-
-	// The specific GUID for *this* addressbook provider, if available
-	m_ABPGuid = (lpGUID != nullptr) ? *lpGUID : GUID_NULL;
-	if(m_lpTransport)
-		m_lpTransport->AddRef();
-	if(m_lpMAPISup)
-		m_lpMAPISup->AddRef();
-
 	if (! (ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS))
-		ECNotifyClient::Create(MAPI_ADDRBOOK, this, ulProfileFlags, lpMAPISup, &m_lpNotifyClient);
+		ECNotifyClient::Create(MAPI_ADDRBOOK, this, ulProfileFlags, lpMAPISup, &~m_lpNotifyClient);
 }
 
 ECABLogon::~ECABLogon()
@@ -64,36 +56,21 @@ ECABLogon::~ECABLogon()
 	// Disable all advises
 	if(m_lpNotifyClient)
 		m_lpNotifyClient->ReleaseAll();
-
-	if(m_lpNotifyClient)
-		m_lpNotifyClient->Release();
-	if (m_lpMAPISup != nullptr)
-		m_lpMAPISup->Release();
-	if(m_lpTransport)
-		m_lpTransport->Release();
 }
 
-HRESULT ECABLogon::Create(LPMAPISUP lpMAPISup, WSTransport* lpTransport, ULONG ulProfileFlags, GUID *lpGuid, ECABLogon **lppECABLogon)
+HRESULT ECABLogon::Create(IMAPISupport *lpMAPISup, WSTransport *lpTransport,
+    ULONG ulProfileFlags, const GUID *lpGuid, ECABLogon **lppECABLogon)
 {
-	HRESULT hr = hrSuccess;
-
-	ECABLogon *lpABLogon = new ECABLogon(lpMAPISup, lpTransport, ulProfileFlags, lpGuid);
-
-	hr = lpABLogon->QueryInterface(IID_ECABLogon, (void **)lppECABLogon);
-
-	if(hr != hrSuccess)
-		delete lpABLogon;
-
-	return hr;
+	return alloc_wrap<ECABLogon>(lpMAPISup, lpTransport, ulProfileFlags,
+	       lpGuid).put(lppECABLogon);
 }
 
 HRESULT ECABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECABLogon, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IABLogon, &this->m_xABLogon);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xABLogon);
-	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
+	REGISTER_INTERFACE2(IABLogon, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -109,23 +86,19 @@ HRESULT ECABLogon::Logoff(ULONG ulFlags)
 	//FIXME: Release all Other open objects ?
 	//Releases all open objects, such as any subobjects or the status object. 
 	//Releases the provider's support object.
-
-	if(m_lpMAPISup)
-	{
-		m_lpMAPISup->Release();
-		m_lpMAPISup = NULL;
-	}
-
+	m_lpMAPISup.reset();
 	return hr;
 }
 
-HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
+HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    const IID *lpInterface, ULONG ulFlags, ULONG *lpulObjType,
+    IUnknown **lppUnk)
 {
 	HRESULT			hr = hrSuccess;
 	object_ptr<ECABContainer> lpABContainer;
 	BOOL			fModifyObject = FALSE;
 	ABEID			eidRoot =  ABEID(MAPI_ABCONT, MUIDECSAB, 0);
-	ABEID *lpABeid = NULL;
+	ABEID lpABeid;
 	object_ptr<IECPropStorage> lpPropStorage;
 	object_ptr<ECMailUser> lpMailUser;
 	object_ptr<ECDistList> 	lpDistList;
@@ -147,10 +120,9 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	*/
 
 	if(cbEntryID == 0 && lpEntryID == NULL) {
-		lpABeid = &eidRoot;
-
-		cbEntryID = CbABEID(lpABeid);
-		lpEntryID = (LPENTRYID)lpABeid;
+		memcpy(&lpABeid, &eidRoot, sizeof(lpABeid));
+		cbEntryID = CbABEID(&lpABeid);
+		lpEntryID = reinterpret_cast<ENTRYID *>(&lpABeid);
 	} else {
 		if (cbEntryID == 0 || lpEntryID == nullptr)
 			return MAPI_E_UNKNOWN_ENTRYID;
@@ -160,24 +132,23 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 
 		memcpy(lpEntryIDServer, lpEntryID, cbEntryID);
 		lpEntryID = lpEntryIDServer;
-
-		lpABeid = reinterpret_cast<ABEID *>(lpEntryID);
+		memcpy(&lpABeid, lpEntryID, sizeof(ABEID));
 
 		// Check sane entryid
-		if (lpABeid->ulType != MAPI_ABCONT && lpABeid->ulType != MAPI_MAILUSER && lpABeid->ulType != MAPI_DISTLIST) 
+		if (lpABeid.ulType != MAPI_ABCONT &&
+		    lpABeid.ulType != MAPI_MAILUSER &&
+		    lpABeid.ulType != MAPI_DISTLIST)
 			return MAPI_E_UNKNOWN_ENTRYID;
 
 		// Check entryid GUID, must be either MUIDECSAB or m_ABPGuid
-		if (memcmp(&lpABeid->guid, &MUIDECSAB, sizeof(MAPIUID)) != 0 &&
-		    memcmp(&lpABeid->guid, &m_ABPGuid, sizeof(MAPIUID)) != 0)
+		if (memcmp(&lpABeid.guid, &MUIDECSAB, sizeof(MAPIUID)) != 0 &&
+		    memcmp(&lpABeid.guid, &m_ABPGuid, sizeof(MAPIUID)) != 0)
 			return MAPI_E_UNKNOWN_ENTRYID;
-
-		memcpy(&lpABeid->guid, &MUIDECSAB, sizeof(MAPIUID));
+		memcpy(&lpABeid.guid, &MUIDECSAB, sizeof(MAPIUID));
 	}
 
 	//TODO: check entryid serverside?
-
-	switch(lpABeid->ulType) {
+	switch (lpABeid.ulType) {
 	case MAPI_ABCONT:
 		hr = ECABContainer::Create(this, MAPI_ABCONT, fModifyObject, &~lpABContainer);
 		if (hr != hrSuccess)
@@ -246,11 +217,13 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	}
 
 	if(lpulObjType)
-		*lpulObjType = lpABeid->ulType;
+		*lpulObjType = lpABeid.ulType;
 	return hrSuccess;
 }
 
-HRESULT ECABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
+HRESULT ECABLogon::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
+    ULONG cbEntryID2, const ENTRYID *lpEntryID2, ULONG ulFlags,
+    ULONG *lpulResult)
 {
 	if(lpulResult)
 		*lpulResult = (CompareABEID(cbEntryID1, lpEntryID1, cbEntryID2, lpEntryID2) ? TRUE : FALSE);
@@ -306,13 +279,12 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags,
 	ABEID *lpABeid = NULL;
 	ULONG			cbABeid;
 	ULONG			cValues;
-	LPSPropValue	lpPropArray = NULL;
-	LPSPropValue	lpNewPropArray = NULL;
+	ecmem_ptr<SPropValue> lpPropArray, lpNewPropArray;
 	unsigned int	j;
 	ULONG			ulObjType;
 
 	if(lpPropTagArray == NULL || lpPropTagArray->cValues == 0) // There is no work to do.
-		goto exit;
+		return hrSuccess;
 
 	for (unsigned int i = 0; i < lpRecipList->cEntries; ++i) {
 		rgpropvalsRecip	= lpRecipList->aEntries[i].rgPropVals;
@@ -337,13 +309,14 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags,
 		hr = OpenEntry(cbABeid, reinterpret_cast<ENTRYID *>(lpABeid), nullptr, 0, &ulObjType, &~lpIMailUser);
 		if(hr != hrSuccess)
 			continue;	// no
-		
-		hr = lpIMailUser->GetProps(lpPropTagArray, 0, &cValues, &lpPropArray);
+		hr = lpIMailUser->GetProps(lpPropTagArray, 0, &cValues, &~lpPropArray);
 		if(FAILED(hr) != hrSuccess)
-			goto skip;	// no
+			continue;	// no
 
 		// merge the properties
-		ECAllocateBuffer((cValues+cPropsRecip)*sizeof(SPropValue), (void**)&lpNewPropArray);
+		hr = ECAllocateBuffer((cValues + cPropsRecip) * sizeof(SPropValue), &~lpNewPropArray);
+		if (hr != hrSuccess)
+			return hr;
 
 		for (j = 0; j < cValues; ++j) {
 			lpPropVal = NULL;
@@ -356,7 +329,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags,
 
 			hr = Util::HrCopyProperty(lpNewPropArray + j, lpPropVal, lpNewPropArray);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 
 		for (j = 0; j < cPropsRecip; ++j) {
@@ -366,46 +339,19 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags,
 			
 			hr = Util::HrCopyProperty(lpNewPropArray + cValues, &rgpropvalsRecip[j], lpNewPropArray);
 			if(hr != hrSuccess)
-				goto exit;			
+				return hr;
 			++cValues;
 		}
 
-		lpRecipList->aEntries[i].rgPropVals	= lpNewPropArray;
+		lpRecipList->aEntries[i].rgPropVals	= lpNewPropArray.release();
 		lpRecipList->aEntries[i].cValues	= cValues;
 
 		if(rgpropvalsRecip) {
 			ECFreeBuffer(rgpropvalsRecip); 
 			rgpropvalsRecip = NULL;
 		}
-		
-		lpNewPropArray = NULL; // Everthing oke, should not be freed..
-
-	skip:
-		if(lpPropArray){ ECFreeBuffer(lpPropArray); lpPropArray = NULL; }
 	}
 
 	// Always succeeded on this point
-	hr = hrSuccess;
-
-exit:
-	if(lpPropArray)
-		ECFreeBuffer(lpPropArray);
-
-	if(lpNewPropArray)
-		ECFreeBuffer(lpNewPropArray);
-	return hr;
+	return hrSuccess;
 }
-
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Logoff, (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, CompareEntryIDs, (ULONG, cbEntryID1), (LPENTRYID, lpEntryID1), (ULONG, cbEntryID2), (LPENTRYID, lpEntryID2), (ULONG, ulFlags), (ULONG *, lpulResult))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Advise, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Unadvise, (ULONG, ulConnection))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenStatusEntry, (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPMAPISTATUS *, lppMAPIStatus))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenTemplateID, (ULONG, cbTemplateID), (LPENTRYID, lpTemplateID), (ULONG, ulTemplateFlags), (LPMAPIPROP, lpMAPIPropData), (LPCIID, lpInterface), (LPMAPIPROP *, lppMAPIPropNew), (LPMAPIPROP, lpMAPIPropSibling))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, GetOneOffTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
-DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, PrepareRecips, (ULONG, ulFlags), (const SPropTagArray *, lpPropTagArray), (LPADRLIST, lpRecipList))

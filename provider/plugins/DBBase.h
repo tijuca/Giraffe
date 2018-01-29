@@ -66,48 +66,6 @@ namespace KC {
 #define OP_COMPANYADMIN		"companyadmin"
 
 /**
- * Memory wrapper class for database results
- *
- * Wrapper class around DB_RESULT which makes
- * sure the DB_RESULT memory is freed when
- * the the object goes out of scope.
- *
- * @todo move the class DB_RESULT_AUTOFREE to a common place
- */
-class DB_RESULT_AUTOFREE _kc_final {
-public:
-	/**
-	 * @param[in]	lpDatabase
-	 *					The database to which the result belongs
-	 */
-    DB_RESULT_AUTOFREE(ECDatabase *lpDatabase) {
-        m_lpDatabase = lpDatabase;
-    };
-
-	/**
-	 * Cast DB_RESULT_AUTOFREE to DB_RESULT
-	 */
-	operator DB_RESULT &(void) { return m_lpResult; }
-
-	/**
-	 * Obtain reference to DB_RESULT
-	 * This will free the existing result before
-	 * returning the reference to the empty result.
-	 *
-	 * @return Pointer to DB_RESULT
-	 */
-    DB_RESULT * operator & () {
-        // Assume overwrite will happen soon
-        m_lpResult = DB_RESULT();
-        return &m_lpResult;
-    };
-
-private:
-    DB_RESULT		m_lpResult;
-    ECDatabase *	m_lpDatabase;
-};
-
-/**
  * User managment helper class for database access
  * 
  * This class implements most of the Database Access functions
@@ -145,7 +103,7 @@ public:
 	 * @return The list of object signatures of all objects which were found
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
+	virtual signatures_t getAllObjects(const objectid_t &company, objectclass_t) override;
 
 	/**
 	 * Obtain the object details for the given object
@@ -157,7 +115,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw objectnotfound when the object was not found
 	 */
-	virtual std::unique_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
+	virtual objectdetails_t getObjectDetails(const objectid_t &) override;
 
     /**
 	 * Obtain the object details for the given objects
@@ -170,7 +128,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw runtime_error when SQL problems occur.
 	 */
-	virtual std::unique_ptr<std::map<objectid_t, objectdetails_t> > getObjectDetails(const std::list<objectid_t> &objectids);
+	virtual std::map<objectid_t, objectdetails_t> getObjectDetails(const std::list<objectid_t> &objectids) override;
 
 	/**
 	 * Get all children for a parent for a given relation type.
@@ -185,7 +143,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
+	virtual signatures_t getSubObjectsForObject(userobject_relation_t, const objectid_t &parentobject) override;
 
     /**
 	 * Request all parents for a childobject for a given relation type.
@@ -200,7 +158,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw std::exception
 	 */
-	virtual std::unique_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
+	virtual signatures_t getParentObjectsForObject(userobject_relation_t, const objectid_t &childobject) override;
 
 	/**
 	 * Update an object with new details
@@ -282,7 +240,7 @@ public:
 	 * @return The quota details
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual std::unique_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault);
+	virtual quotadetails_t getQuota(const objectid_t &, bool get_user_default) override;
 
 	/**
 	 * Update object with quota information
@@ -303,7 +261,7 @@ public:
 	 * @return	a empty list of properties
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual std::unique_ptr<abprops_t> getExtraAddressbookProperties(void);
+	virtual abprops_t getExtraAddressbookProperties() override;
 	
 	virtual void removeAllObjects(objectid_t except);
 
@@ -323,7 +281,7 @@ private:
 	 * @return The list of object signatures which were returned by the SQL query
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual std::unique_ptr<signatures_t> CreateSignatureList(const std::string &query);
+	virtual signatures_t CreateSignatureList(const std::string &query) final;
 
 	/**
 	 * Convert a string to MD5Hash
@@ -374,7 +332,7 @@ protected:
 	 * @return The list of object signatures which match the search term
 	 * @throw objectnotfound when no results have been found
 	 */
-	virtual std::unique_ptr<signatures_t> searchObjects(const std::string &match, const char **search_props, const char *return_prop, unsigned int ulFlags);
+	virtual signatures_t searchObjects(const std::string &match, const char *const *search_props, const char *return_prop, unsigned int flags) final;
 
 	/**
 	 * Update objectdetails with sendas information.

@@ -16,9 +16,6 @@
  *
  */
 
-?>
-<?php
-
 class Meetingrequest {
 	/*
 	 * NOTE
@@ -226,8 +223,8 @@ class Meetingrequest {
 
 
 	/**
-	 * Process an incoming meeting request response as Delegate. This will updates the appointment
-	 * in Organiser's calendar.
+	 * Process an incoming meeting request response as Delegate. This will update the appointment
+	 * in the organizer's calendar.
 	 * @returns the entryids(storeid, parententryid, entryid, also basedate if response is occurrence) 
 	 * of corresponding meeting in Calendar
 	 */
@@ -348,9 +345,7 @@ class Meetingrequest {
 		$data["basedate"] = $basedate;
 		$data["updatecounter"] = isset($calendaritemProps[$this->proptags['updatecounter']]) ? $calendaritemProps[$this->proptags['updatecounter']] : 0;
 
-		/**
-		 * Check if meeting is updated or not in organizer's calendar
-		 */
+		/* Check if meeting is updated or not in the organizer's calendar */
 		$data["meeting_updated"] = $this->isMeetingUpdated();
 
 		if(isset($messageprops[PR_PROCESSED]) && $messageprops[PR_PROCESSED] == true) {
@@ -361,8 +356,7 @@ class Meetingrequest {
 			mapi_savechanges($this->message);
 		}
 
-		// if meeting is updated in organizer's calendar then we don't need to process
-		// old response
+		/* If the meeting is updated in the organizer's calendar, we do not need to process the old response. */
 		if ($data['meeting_updated'] === true)
 			return $data;
 
@@ -393,7 +387,7 @@ class Meetingrequest {
 				$recurr->createException($exception_props, $basedate, false, $recips);
 			}
 
-			mapi_message_savechanges($calendaritem);
+			mapi_savechanges($calendaritem);
 
 			$attach = $recurr->getExceptionAttachment($basedate);
 			if (!$attach)
@@ -470,7 +464,7 @@ class Meetingrequest {
 
 //TODO: Upate counter proposal number property on message
 /*
-If it is the first time this attendee has proposed a new date/time, increment the value of the PidLidAppointmentProposalNumber property on the organizer’s meeting object, by 0x00000001. If this property did not previously exist on the organizer’s meeting object, it MUST be set with a value of 0x00000001.
+If it is the first time this attendee has proposed a new date/time, increment the value of the PidLidAppointmentProposalNumber property on the organizer's meeting object, by 0x00000001. If this property did not previously exist on the organizer's meeting object, it MUST be set with a value of 0x00000001.
 */
 		// If this is a counter proposal, set the counter proposal indicator boolean
 		if(isset($messageprops[$this->proptags['counter_proposal']])){
@@ -479,13 +473,13 @@ If it is the first time this attendee has proposed a new date/time, increment th
 				$props[$this->proptags['counter_proposal']] = true;
 			else
 				$props[$this->proptags['counter_proposal']] = false;
-			mapi_message_setprops($calendaritem, $props);
+			mapi_setprops($calendaritem, $props);
 		}
 		
-		mapi_message_savechanges($calendaritem);
+		mapi_savechanges($calendaritem);
 		if (isset($attach)) {
-			mapi_message_savechanges($attach);
-			mapi_message_savechanges($recurringItem);
+			mapi_savechanges($attach);
+			mapi_savechanges($recurringItem);
 		}
 
 		return $data;
@@ -569,7 +563,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			foreach($calendaritems as $entryid) {
 				// Open each calendar item and set the properties of the cancellation object
 				$calendaritem = mapi_msgstore_openentry($store, $entryid);
-				mapi_message_setprops($calendaritem, $messageprops);
+				mapi_setprops($calendaritem, $messageprops);
 				mapi_savechanges($calendaritem);
 			}
 		}
@@ -581,7 +575,8 @@ If it is the first time this attendee has proposed a new date/time, increment th
 	function isInCalendar() {
 		$messageprops = mapi_getprops($this->message, Array($this->proptags['goid'], $this->proptags['goid2'], PR_RCVD_REPRESENTING_NAME));
 		$goid = $messageprops[$this->proptags['goid']];
-		$goid2 = $messageprops[$this->proptags['goid2']];
+		if (isset($messageprops[$this->proptags['goid2']]))
+			$goid2 = $messageprops[$this->proptags['goid2']];
 
 		$basedate = $this->getBasedateFromGlobalID($goid);
 
@@ -600,10 +595,12 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			// First try with GlobalID(0x3) (case 1)
 			$entryid = $this->findCalendarItems($goid, $calFolder);
 			// If not found then try with CleanGlobalID(0x23) (case 2)
-			if (!is_array($entryid))
+			if (!is_array($entryid) && isset($goid2))
 				$entryid = $this->findCalendarItems($goid2, $calFolder);
-		} else {
+		} else if (isset($goid2)) {
 			$entryid = $this->findCalendarItems($goid2, $calFolder);
+		} else {
+			return false;
 		}
 
 		return is_array($entryid);
@@ -618,7 +615,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 	 * inbox probably) to the calendar. If you don't, it is copied into
      * your calendar.
 	 *@param boolean $tentative true if user as tentative accepted the meeting
-	 *@param boolean $sendresponse true if a response has to be send to organizer
+	 * @param boolean $sendresponse true if a response has to be sent to organizer
 	 *@param boolean $move true if the meeting request should be moved to the deleted items after processing
 	 *@param string $newProposedStartTime contains starttime if user has proposed other time
 	 *@param string $newProposedEndTime contains endtime if user has proposed other time
@@ -637,7 +634,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		 *	if this function is called automatically with meeting request object then there will be
 		 *	two possibilitites 
 		 *	1) meeting request is opened first time, in this case make a tentative appointment in 
-				recipient's calendar
+			   the recipient's calendar
 		 *	2) after this every subsequest request to open meeting request will not do any processing
 		 */
 		if($messageprops[PR_MESSAGE_CLASS] == "IPM.Schedule.Meeting.Request" && $userAction == false) {
@@ -646,10 +643,10 @@ If it is the first time this attendee has proposed a new date/time, increment th
 				return false;
 			}
 			mapi_setprops($this->message, Array(PR_PROCESSED => true));
-			mapi_message_savechanges($this->message);
+			mapi_savechanges($this->message);
 		}
 
-		// If this meeting request is received by a delegate then open delegator's store.
+		/* If this meeting request is received by a delegate, open the delegator's store. */
 		if (isset($messageprops[PR_RCVD_REPRESENTING_NAME])) {
 			$delegatorStore = $this->getDelegatorStore($messageprops);
 
@@ -878,7 +875,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 							mapi_message_modifyrecipients($calmsg, MODRECIP_ADD, $recips);
 						}
 
-						mapi_message_savechanges($calmsg);
+						mapi_savechanges($calmsg);
 
 						// Move the message to the wastebasket
 						$wastebasket = $this->openDefaultWastebasket();
@@ -904,6 +901,12 @@ If it is the first time this attendee has proposed a new date/time, increment th
 						} else {
 							$props[$this->proptags['busystatus']] = $tentative ? fbTentative : fbBusy;
 						}
+
+						// ZP-341 - we need to copy as well the attachments
+						// Copy attachments too
+						$this->replaceAttachments($this->message, $new);
+						// ZP-341 - end
+
 						if ($userAction)
 							// if user has responded then set replytime
 							$props[$this->proptags['replytime']] = time();
@@ -932,10 +935,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 							mapi_message_modifyrecipients($new, MODRECIP_ADD, $recips);
 						}
 
-						// Copy attachments too
-						$this->replaceAttachments($this->message, $new);
-
-						mapi_message_savechanges($new);
+						mapi_savechanges($new);
 
 						$props = mapi_getprops($new, array(PR_ENTRYID));
 						$entryid = $props[PR_ENTRYID];
@@ -1014,7 +1014,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		// Remove any previous calendar items with this goid and appt id
 		$messageprops = mapi_getprops($this->message, Array($this->proptags['goid'], $this->proptags['goid2'], PR_RCVD_REPRESENTING_NAME));
 
-		// If this meeting request is received by a delegate then open delegator's store.
+		/* If this meeting request is received by a delegate, open the delegator's store. */
 		if (isset($messageprops[PR_RCVD_REPRESENTING_NAME])) {
 			$delegatorStore = $this->getDelegatorStore($messageprops);
 
@@ -1246,7 +1246,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 
 		/**
 		 * While sending recurrence meeting exceptions are not send as attachments
-		 * because first all exceptions are send and then recurrence meeting is sent.
+		 * because first all exceptions are sent and then recurrence meeting is sent.
 		 */
 		if (isset($messageprops[$this->proptags['recurring']]) && $messageprops[$this->proptags['recurring']] && !$basedate) {
 			// Book resource
@@ -1273,12 +1273,12 @@ If it is the first time this attendee has proposed a new date/time, increment th
 				}
 			}
 		} else {
-			// Basedate found, an exception is to be send
+			// Basedate found, an exception is to be sent
 			if ($basedate) {
 				$recurr = new Recurrence($this->openDefaultStore(), $this->message);
 
 				if ($cancel) {
-					//@TODO: remove occurrence from Resource's Calendar if resource was booked for whole series
+					/* @TODO: remove occurrence from the resource's calendar if resource was booked for whole series. */
 					$this->submitMeetingRequest($this->message, $cancel, $prefix, $basedate, $recurr, false);
 				} else {
 					$attach = $recurr->getExceptionAttachment($basedate);
@@ -1322,8 +1322,11 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		$result = array();
 		$fbsupport = mapi_freebusysupport_open($this->session);
 
-		if (mapi_last_hresult() != NOERROR)
+		if (mapi_last_hresult() != NOERROR) {
+			if (function_exists("dump"))
+				dump("Error in opening freebusysupport object.");
 			return $result;
+		}
 
 		$fbDataArray = mapi_freebusysupport_loaddata($fbsupport, array($entryID));
 
@@ -1691,7 +1694,6 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$storeProps = mapi_getprops($store, array(PR_ENTRYID));
 			$defaultStoreProps = mapi_getprops($defaultStore, array(PR_ENTRYID));
 
-			// @FIXME use entryid comparison functions here
 			if($storeProps[PR_ENTRYID] !== $defaultStoreProps[PR_ENTRYID]){
 				// get the properties of the other user (for which the logged in user is a delegate).
 				$storeProps = mapi_getprops($store, array(PR_MAILBOX_OWNER_ENTRYID));
@@ -1723,7 +1725,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		$message = mapi_folder_createmessage($outbox);
 		mapi_setprops($message, $props);
 		mapi_message_modifyrecipients($message, MODRECIP_ADD, Array($recip));
-		mapi_message_savechanges($message);
+		mapi_savechanges($message);
 		mapi_message_submitmessage($message);
 	}
 
@@ -1820,11 +1822,11 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		if($ownerEntryId) {
 			$ab = mapi_openaddressbook($this->session);
 
-			$zuser = mapi_ab_openentry($ab, $ownerEntryId);
-			if(!$zuser)
+			$kopanoUser = mapi_ab_openentry($ab, $ownerEntryId);
+			if (!$kopanoUser)
 				return false;
 
-			$ownerProps = mapi_getprops($zuser, array(PR_ADDRTYPE, PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_SEARCH_KEY));
+			$ownerProps = mapi_getprops($kopanoUser, array(PR_ADDRTYPE, PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_SEARCH_KEY));
 
 			$addrType = $ownerProps[PR_ADDRTYPE];
 			$name = $ownerProps[PR_DISPLAY_NAME];
@@ -1952,7 +1954,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 	}
 
 	/**
-	 * Function which sets basedate in globalID of changed occurrance which is to be send.
+	 * Function which sets basedate in globalID of changed occurrance which is to be sent.
 	 *@param binary $goid globalID
 	 *@param string basedate of changed occurrance
 	 *@return binary globalID with basedate in it
@@ -2030,8 +2032,8 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		mapi_message_modifyrecipients($copy_to, MODRECIP_ADD, $recipients);
 	}
 	/**
-	 * Function creates meeting item in resource's calendar.
-	 *@param resource $message MAPI_message which is to create in resource's calendar
+	 * Function creates meeting item in the resource's calendar.
+	 *@param resource $message MAPI_message which is to be created in the resource's calendar
 	 *@param boolean $cancel cancel meeting
 	 *@param string $prefix prefix for subject of meeting
 	 */
@@ -2330,7 +2332,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		// Publish updated free/busy information
 		if(!$this->errorSetResource){
 			for($i = 0, $len = count($resourceRecipData); $i < $len; $i++){
-				$storeProps = mapi_msgstore_getprops($resourceRecipData[$i]['store'], array(PR_MAILBOX_OWNER_ENTRYID));
+				$storeProps = mapi_getprops($resourceRecipData[$i]['store'], array(PR_MAILBOX_OWNER_ENTRYID));
 				if (isset($storeProps[PR_MAILBOX_OWNER_ENTRYID])){
 					$pub = new FreeBusyPublish($this->session, $resourceRecipData[$i]['store'], $resourceRecipData[$i]['folder'], $storeProps[PR_MAILBOX_OWNER_ENTRYID]);
 					$pub->publishFB(time() - (7 * 24 * 60 * 60), 6 * 30 * 24 * 60 * 60); // publish from one week ago, 6 months ahead
@@ -2411,7 +2413,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 
 	/**
 	 * Function which submits meeting request based on arguments passed to it.
-	 *@param resource $message MAPI_message whose meeting request is to be send
+	 * @param resource $message MAPI_message whose meeting request is to be sent
 	 *@param boolean $cancel if true send request, else send cancellation
 	 *@param string $prefix subject prefix
 	 *@param integer $basedate basedate for an occurrence
@@ -2606,7 +2608,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			}
 
 			mapi_setprops($new, $newmessageprops);
-			mapi_message_savechanges($new);
+			mapi_savechanges($new);
 
 			// Submit message to non-resource recipients
 			mapi_message_submitmessage($new);
@@ -2626,7 +2628,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 				$newmessageprops[PR_SUBJECT] = dgettext("kopano","Canceled").": " . $newmessageprops[PR_SUBJECT];
 
 			mapi_setprops($new, $newmessageprops);
-			mapi_message_savechanges($new);
+			mapi_savechanges($new);
 
 			// Submit message to non-resource recipients
 			mapi_message_submitmessage($new);
@@ -2662,8 +2664,8 @@ If it is the first time this attendee has proposed a new date/time, increment th
 	 * also additionally we are sending these properties.
 	 * Ref: MS-OXCICAL 2.2.1.20.20 Property: RECURRENCE-ID
 	 * @param Object $recurObject instance of recurrence class for this message
-	 * @param Array $messageprops properties of meeting object that is going to be send
-	 * @param Array $newmessageprops properties of meeting request/response that is going to be send
+	 * @param Array $messageprops properties of meeting object that is going to be sent
+	 * @param Array $newmessageprops properties of meeting request/response that is going to be sent
 	 */
 	function generateRecurDates($recurObject, $messageprops, &$newmessageprops)
 	{
@@ -2895,7 +2897,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 
 		$basedate = $this->getBasedateFromGlobalID($props[$this->proptags['goid']]);
 
-		// If Delegate is processing mr for Delegator then retrieve Delegator's store and calendar.
+		/* If the delegate is processing MR for the delegator, retrieve the delegator's store and calendar. */
 		if (isset($props[PR_RCVD_REPRESENTING_NAME])) {
 			$delegatorStore = $this->getDelegatorStore($props);
 			$store = $delegatorStore['store'];
@@ -3077,4 +3079,3 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		$this->meetingTimeInfo = $meetingTimeInfo;
 	}
 }
-?>

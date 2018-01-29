@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <iterator>
 #include <memory>
 #include "ECSyncUtil.h"
 #include <kopano/mapi_ptr.h>
@@ -28,7 +29,6 @@ namespace KC {
 
 HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpulChangeId, PROCESSEDCHANGESSET *lpSetProcessChanged)
 {
-	HRESULT		hr = hrSuccess;
 	STATSTG		stat;
 	ULONG		ulSyncId = 0;
 	ULONG		ulChangeId = 0;
@@ -38,7 +38,7 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 	LARGE_INTEGER		liPos = {{0, 0}};
 	PROCESSEDCHANGESSET setProcessedChanged;
 
-	hr = lpStream->Stat(&stat, STATFLAG_NONAME);
+	auto hr = lpStream->Stat(&stat, STATFLAG_NONAME);
 	if(hr != hrSuccess)
 		return hr;
 	
@@ -81,7 +81,7 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 				hr = lpStream->Read(lpData.get(), ulSourceKeySize, NULL);
 				if(hr != hrSuccess)
 					return hr;
-				setProcessedChanged.insert(std::pair<unsigned int, std::string>(ulProcessedChangeId, std::string(lpData.get(), ulSourceKeySize)));
+				setProcessedChanged.emplace(ulProcessedChangeId, std::string(lpData.get(), ulSourceKeySize));
 			}
 		}
 	}
@@ -93,7 +93,7 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 		*lpulChangeId = ulChangeId;
 
 	if (lpSetProcessChanged)
-		lpSetProcessChanged->insert(setProcessedChanged.begin(), setProcessedChanged.end());
+		lpSetProcessChanged->insert(gcc5_make_move_iterator(setProcessedChanged.begin()), gcc5_make_move_iterator(setProcessedChanged.end()));
 	return hrSuccess;
 }
 
@@ -125,37 +125,6 @@ HRESULT CreateNullStatusStream(LPSTREAM *lppStream)
 		return hr;
 	return ptrStream->QueryInterface(IID_IStream,
 	       reinterpret_cast<LPVOID *>(lppStream));
-}
-
-HRESULT HrGetOneBinProp(IMAPIProp *lpProp, ULONG ulPropTag, LPSPropValue *lppPropValue)
-{
-	HRESULT hr = hrSuccess;
-	object_ptr<IStream> lpStream;
-	memory_ptr<SPropValue> lpPropValue;
-	STATSTG sStat;
-	ULONG ulRead = 0;
-
-	if (lpProp == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
-	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, &~lpStream);
-	if(hr != hrSuccess)
-		return hr;
-	hr = lpStream->Stat(&sStat, 0);
-	if(hr != hrSuccess)
-		return hr;
-	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropValue);
-	if(hr != hrSuccess)
-		return hr;
-	hr = MAPIAllocateMore(sStat.cbSize.LowPart, lpPropValue, (void **) &lpPropValue->Value.bin.lpb);
-	if(hr != hrSuccess)
-		return hr;
-	hr = lpStream->Read(lpPropValue->Value.bin.lpb, sStat.cbSize.LowPart, &ulRead);
-	if(hr != hrSuccess)
-		return hr;
-	lpPropValue->Value.bin.cb = ulRead;
-
-	*lppPropValue = lpPropValue.release();
-	return hrSuccess;
 }
 
 } /* namespace */

@@ -17,6 +17,7 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
+#include <string>
 #include <utility>
 #include <mapi.h>
 #include <mapiutil.h>
@@ -28,21 +29,16 @@
 #include <kopano/charset/convert.h>
 #include <kopano/ECDefs.h>
 #include <kopano/ECGuid.h>
-#include <kopano/IECServiceAdmin.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-#include <kopano/IECLicense.h>
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/CommonUtil.h>
 #include <kopano/ECRestriction.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/mapiguidext.h>
 #include <kopano/Util.h>
 
-using namespace std;
-
 namespace KC {
-
-typedef KCHL::object_ptr<IECLicense, IID_IECLicense> ECLicensePtr;
 
 class servername _kc_final {
 public:
@@ -59,26 +55,18 @@ public:
 		return (LPTSTR)m_strName.c_str();
 	}
 
-	bool operator<(const servername &other) const {
+	bool operator<(const servername &other) const noexcept
+	{
 		return wcscasecmp(m_strName.c_str(), other.m_strName.c_str()) < 0;
 	}
 
 private:
-	wstring	m_strName;
+	std::wstring m_strName;
 };
 
 static HRESULT GetMailboxDataPerServer(const char *lpszPath, const char *lpSSLKey, const char *lpSSLPass, DataCollector *lpCollector);
 static HRESULT GetMailboxDataPerServer(IMAPISession *lpSession, const char *lpszPath, DataCollector *lpCollector);
 static HRESULT UpdateServerList(IABContainer *lpContainer, std::set<servername> &listServers);
-
-class UserCountCollector _kc_final : public DataCollector {
-public:
-	virtual HRESULT CollectData(LPMAPITABLE store_table) _kc_override;
-	unsigned int result() const;
-
-private:
-	unsigned int m_ulUserCount = 0;
-};
 
 template <typename string_type, ULONG prAccount>
 class UserListCollector _kc_final : public DataCollector {
@@ -86,7 +74,7 @@ public:
 	UserListCollector(IMAPISession *lpSession);
 	virtual HRESULT GetRequiredPropTags(LPMAPIPROP prop, LPSPropTagArray *) const _kc_override;
 	virtual HRESULT CollectData(LPMAPITABLE store_table) _kc_override;
-	void swap_result(std::list<string_type> *lplstUsers);
+	void move_result(std::list<string_type> *lplstUsers);
 
 private:
 	void push_back(LPSPropValue lpPropAccount);
@@ -124,20 +112,6 @@ HRESULT DataCollector::GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRest
 	return hr;
 }
 
-HRESULT UserCountCollector::CollectData(LPMAPITABLE lpStoreTable) {
-	ULONG ulCount = 0;
-	HRESULT hr = lpStoreTable->GetRowCount(0, &ulCount);
-	if (hr != hrSuccess)
-		return hr;
-
-	m_ulUserCount += ulCount;
-	return hrSuccess;
-}
-
-inline unsigned int UserCountCollector::result() const {
-	return m_ulUserCount;
-}
-
 template<typename string_type, ULONG prAccount>
 UserListCollector<string_type, prAccount>::UserListCollector(IMAPISession *lpSession): m_ptrSession(lpSession, true) {}
 
@@ -153,7 +127,7 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 	while (true) {
 		SRowSetPtr ptrRows;
 
-		HRESULT hr = lpStoreTable->QueryRows(50, 0, &ptrRows);
+		HRESULT hr = lpStoreTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -165,7 +139,9 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 			MAPIPropPtr ptrUser;
 			SPropValuePtr ptrAccount;
 
-			hrTmp = m_ptrSession->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrRows[i].lpProps[0].Value.bin.lpb), &ptrUser.iid(), 0, &ulType, &~ptrUser);
+			hrTmp = m_ptrSession->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb,
+			        reinterpret_cast<ENTRYID *>(ptrRows[i].lpProps[0].Value.bin.lpb),
+			        &iid_of(ptrUser), 0, &ulType, &~ptrUser);
 			if (hrTmp != hrSuccess)
 				continue;
 			hrTmp = HrGetOneProp(ptrUser, prAccount, &~ptrAccount);
@@ -181,8 +157,8 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 }
 
 template<typename string_type, ULONG prAccount>
-void UserListCollector<string_type, prAccount>::swap_result(std::list<string_type> *lplstUsers) {
-	lplstUsers->swap(m_lstUsers);
+void UserListCollector<string_type, prAccount>::move_result(std::list<string_type> *lplstUsers) {
+	*lplstUsers = std::move(m_lstUsers);
 }
 
 template<>
@@ -203,7 +179,7 @@ HRESULT GetArchivedUserList(IMAPISession *lpMapiSession, const char *lpSSLKey,
 	             bLocalOnly, &collector);
 	if (hr != hrSuccess)
 		return hr;
-	collector.swap_result(lplstUsers);
+	collector.move_result(lplstUsers);
 	return hrSuccess;
 }
 
@@ -215,7 +191,7 @@ HRESULT GetArchivedUserList(IMAPISession *lpMapiSession, const char *lpSSLKey,
 	             bLocalOnly, &collector);
 	if (hr != hrSuccess)
 		return hr;
-	collector.swap_result(lplstUsers);
+	collector.move_result(lplstUsers);
 	return hrSuccess;
 }
 
@@ -255,7 +231,8 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 		ec_log_crit("Unable to open default addressbook: 0x%08X", hr);
 		return hr;
 	}
-	hr = ptrAdrBook->OpenEntry(cbDDEntryID, ptrDDEntryID, NULL, 0, &ulObj, &~ptrDefaultDir);
+	hr = ptrAdrBook->OpenEntry(cbDDEntryID, ptrDDEntryID,
+	     &iid_of(ptrDefaultDir), 0, &ulObj, &~ptrDefaultDir);
 	if(hr != hrSuccess) {
 		ec_log_crit("Unable to open GAB: 0x%08X", hr);
 		return hr;
@@ -282,7 +259,7 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 		}
 
 		/* multi-tenancy, loop through all subcontainers to find all users */
-		hr = ptrHierarchyTable->QueryRows(ulCompanyCount, 0, &ptrRows);
+		hr = ptrHierarchyTable->QueryRows(ulCompanyCount, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 		
@@ -291,7 +268,9 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 				ec_log_crit("Unable to get entryid to open tenancy Address Book");
 				return MAPI_E_INVALID_PARAMETER;
 			}
-			hr = ptrAdrBook->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrRows[i].lpProps[0].Value.bin.lpb), NULL, 0, &ulObj, &~ptrCompanyDir);
+			hr = ptrAdrBook->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb,
+			     reinterpret_cast<ENTRYID *>(ptrRows[i].lpProps[0].Value.bin.lpb),
+			     &iid_of(ptrCompanyDir), 0, &ulObj, &~ptrCompanyDir);
 			if (hr != hrSuccess) {
 				ec_log_crit("Unable to open tenancy Address Book: 0x%08X", hr);
 				return hr;
@@ -335,10 +314,7 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 	hr = ptrServiceAdmin->GetServerDetails(lpSrvNameList, MAPI_UNICODE, &~lpSrvList);
 	if (hr == MAPI_E_NETWORK_ERROR) {
 		//support single server
-		hr = GetMailboxDataPerServer(lpMapiSession, "", lpCollector);
-		if (hr != hrSuccess)
-			return hr;
-		return hrSuccess;
+		return GetMailboxDataPerServer(lpMapiSession, "", lpCollector);
 	} else if (FAILED(hr)) {
 		ec_log_err("Unable to get server details: 0x%08X", hr);
 		if (hr == MAPI_E_NOT_FOUND) {
@@ -490,7 +466,7 @@ HRESULT UpdateServerList(IABContainer *lpContainer,
 	}
 
 	while (true) {
-		hr = ptrTable->QueryRows(50, 0, &ptrRows);
+		hr = ptrTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
 		if (ptrRows.empty())
@@ -499,7 +475,7 @@ HRESULT UpdateServerList(IABContainer *lpContainer,
 		for (unsigned int i = 0; i < ptrRows.size(); ++i) {
 			if (ptrRows[i].lpProps[0].ulPropTag != PR_EC_HOMESERVER_NAME_W)
 				continue;
-			listServers.insert(ptrRows[i].lpProps[0].Value.lpszW);
+			listServers.emplace(ptrRows[i].lpProps[0].Value.lpszW);
 			if (ptrRows[i].lpProps[1].ulPropTag == PR_DISPLAY_NAME_W)
 				ec_log_info("User: %ls on server \"%ls\"", ptrRows[i].lpProps[1].Value.lpszW, ptrRows[i].lpProps[0].Value.lpszW);
 		}

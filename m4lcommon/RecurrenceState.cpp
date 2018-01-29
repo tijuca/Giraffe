@@ -54,7 +54,7 @@ public:
         if(m_ulCursor + 1 > m_ulLen)
             return -1;
             
-        DEBUGPRINT("%s ", bin2hex(1, (BYTE *)m_lpData+m_ulCursor).c_str());
+		DEBUGPRINT("%s ", bin2hex(1, m_lpData + m_ulCursor).c_str());
         *lpData = m_lpData[m_ulCursor];
         m_ulCursor+=1;
         
@@ -66,8 +66,10 @@ public:
         if(m_ulCursor + 2 > m_ulLen)
             return -1;
             
-        DEBUGPRINT("%s ", bin2hex(2, (BYTE *)m_lpData+m_ulCursor).c_str());
-        *lpData = *(unsigned short *)&m_lpData[m_ulCursor];
+		DEBUGPRINT("%s ", bin2hex(2, m_lpData + m_ulCursor).c_str());
+		unsigned short tmp;
+		memcpy(&tmp, m_lpData + m_ulCursor, sizeof(tmp));
+		*lpData = le16_to_cpu(tmp);
         m_ulCursor+=2;
         
         DEBUGPRINT("%10u %08X ", *lpData, *lpData);
@@ -78,8 +80,10 @@ public:
         if(m_ulCursor + 4 > m_ulLen)
             return -1;
             
-        DEBUGPRINT("%s ", bin2hex(4, (BYTE *)m_lpData+m_ulCursor).c_str());
-        *lpData = *(unsigned int *)&m_lpData[m_ulCursor];
+		DEBUGPRINT("%s ", bin2hex(4, m_lpData + m_ulCursor).c_str());
+		unsigned int tmp;
+		memcpy(&tmp, m_lpData + m_ulCursor, sizeof(tmp));
+		*lpData = le32_to_cpu(tmp);
         m_ulCursor+=4;
         
         DEBUGPRINT("%10u %08X ", *lpData, *lpData);
@@ -93,10 +97,9 @@ public:
             return -1;
 
         if(reallen)      
-            DEBUGPRINT("%s ", bin2hex(len > m_ulLen - m_ulCursor ? m_ulLen - m_ulCursor : len, (BYTE *)m_lpData+m_ulCursor).c_str());
+			DEBUGPRINT("%s ", bin2hex(len > m_ulLen - m_ulCursor ? m_ulLen - m_ulCursor : len, m_lpData+m_ulCursor).c_str());
         
         lpData->assign(&m_lpData[m_ulCursor], reallen);
-        lpData->substr(0, reallen);
         
         m_ulCursor+=reallen;
         
@@ -133,16 +136,18 @@ public:
     }
     
     int WriteByte(unsigned int b) {
-        m_strData.append((char *)&b, 1);
+		m_strData.append(1, static_cast<char>(b));
         return 1;
     }
     
     int WriteShort(unsigned short s) {
+		s = cpu_to_le16(s);
         m_strData.append((char *)&s, 2);
         return 2;
     }
     
     int WriteLong(unsigned int l) {
+		l = cpu_to_le32(l);
         m_strData.append((char *)&l, 4);
         return 4;
     }
@@ -248,7 +253,7 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
     for (i = 0; i < ulDeletedInstanceCount; ++i) {
         unsigned int ulDeletedInstanceDate;
         READLONG(ulDeletedInstanceDate);
-        lstDeletedInstanceDates.push_back(ulDeletedInstanceDate);
+		lstDeletedInstanceDates.emplace_back(ulDeletedInstanceDate);
     }
     
     READLONG(ulModifiedInstanceCount);
@@ -256,7 +261,7 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
     for (i = 0; i < ulModifiedInstanceCount; ++i) {
         unsigned int ulModifiedInstanceDate;
         READLONG(ulModifiedInstanceDate);
-        lstModifiedInstanceDates.push_back(ulModifiedInstanceDate);
+		lstModifiedInstanceDates.emplace_back(ulModifiedInstanceDate);
     }
     
     READLONG(ulStartDate);
@@ -309,7 +314,7 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
             READLONG(sException.ulSubType);
         if (sException.ulOverrideFlags & ARO_APPTCOLOR)
             READLONG(sException.ulAppointmentColor);
-        lstExceptions.push_back(std::move(sException));
+		lstExceptions.emplace_back(std::move(sException));
     }
     
     bReadValid  = true;
@@ -361,7 +366,7 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
             READLONG(ulReservedBlock2Size);
             READSTRING(sExtendedException.strReservedBlock2, ulReservedBlock2Size);
         }
-        lstExtendedExceptions.push_back(std::move(sExtendedException));
+		lstExtendedExceptions.emplace_back(std::move(sExtendedException));
     }
 	bExtended = true;
 
@@ -375,38 +380,32 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
     }
     
 exit:
-    if (hr != hrSuccess && bReadValid) {
+	if (hr == hrSuccess || !bReadValid)
+		return hr;
         hr = MAPI_W_ERRORS_RETURNED;
+	// sync normal exceptions to extended exceptions, it those aren't present
+	if (bExtended)
+		return hr;
 
-		// sync normal exceptions to extended exceptions, it those aren't present
-		if (!bExtended) {
-			lstExtendedExceptions.clear(); // remove any half exception maybe read
+	lstExtendedExceptions.clear(); // remove any half exception maybe read
+	for (ULONG i = 0; i < ulExceptionCount; ++i) {
+		ExtendedException cEx;
+		cEx.ulChangeHighlightValue = 0;
+		cEx.ulStartDateTime = lstExceptions[i].ulStartDateTime;
+		cEx.ulEndDateTime = lstExceptions[i].ulEndDateTime;
+		cEx.ulOriginalStartDate = lstExceptions[i].ulOriginalStartDate;
+		// subject & location in UCS2
+		if (lstExceptions[i].ulOverrideFlags & ARO_SUBJECT)
+			TryConvert(converter, lstExceptions[i].strSubject, rawsize(lstExceptions[i].strSubject), "windows-1252", cEx.strWideCharSubject);
+		if (lstExceptions[i].ulOverrideFlags & ARO_LOCATION)
+			TryConvert(converter, lstExceptions[i].strLocation, rawsize(lstExceptions[i].strLocation), "windows-1252", cEx.strWideCharLocation);
+		lstExtendedExceptions.emplace_back(cEx);
 
-			for (ULONG i = 0; i < ulExceptionCount; ++i) {
-				ExtendedException cEx;
-
-				cEx.ulChangeHighlightValue = 0;
-				cEx.ulStartDateTime = lstExceptions[i].ulStartDateTime;
-				cEx.ulEndDateTime = lstExceptions[i].ulEndDateTime;
-				cEx.ulOriginalStartDate = lstExceptions[i].ulOriginalStartDate;
-
-				// subject & location in UCS2
-				if (lstExceptions[i].ulOverrideFlags & ARO_SUBJECT)
-					TryConvert(converter, lstExceptions[i].strSubject, rawsize(lstExceptions[i].strSubject), "windows-1252", cEx.strWideCharSubject);
-
-				if (lstExceptions[i].ulOverrideFlags & ARO_LOCATION)
-					TryConvert(converter, lstExceptions[i].strLocation, rawsize(lstExceptions[i].strLocation), "windows-1252", cEx.strWideCharLocation);
-
-				lstExtendedExceptions.push_back(cEx);
-
-				// clear for next exception
-				cEx.strWideCharSubject.clear();
-				cEx.strWideCharLocation.clear();
-			}
-		}
+		// clear for next exception
+		cEx.strWideCharSubject.clear();
+		cEx.strWideCharLocation.clear();
 	}
-
-    return hr;
+	return hr;
 }
 
 /**

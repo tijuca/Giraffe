@@ -23,64 +23,56 @@
 
 #include <kopano/ECUnknown.h>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 
 namespace KC {
 
-ECUnknown::ECUnknown(const char *szClassName)
-{
-	this->szClassName = szClassName;
-}
+ECUnknown::ECUnknown(const char *name) :
+	szClassName(name)
+{}
 
 ECUnknown::~ECUnknown()
 {
-	if (this->lpParent != nullptr)
+	if (lpParent != nullptr)
 		assert(false);	// apparently, we're being destructed with delete() while
 						// a parent was set up, so we should be deleted via Suicide() !
 }
 
 ULONG ECUnknown::AddRef() {
-	scoped_lock lock(mutex);
-	return ++this->m_cRef;
+	return ++m_cRef;
 }
 
 ULONG ECUnknown::Release() {
-	bool bLastRef = false;
-	
-	ulock_normal locker(mutex);
-	ULONG nRef = --this->m_cRef;
-	if((int)m_cRef == -1)
+	ULONG nRef = --m_cRef;
+	if (static_cast<int>(nRef) == -1)
 		assert(false);
-		
-	bLastRef = this->lstChildren.empty() && this->m_cRef == 0;
+	if (nRef != 0)
+		return nRef;
+	ulock_normal locker(mutex);
+	bool lastref = lstChildren.empty();
 	locker.unlock();
-	if(bLastRef)
-		this->Suicide();
-
+	if (lastref)
+		Suicide();
 	// The object may be deleted now
-
 	return nRef;
 }
 
 HRESULT ECUnknown::QueryInterface(REFIID refiid, void **lppInterface) {
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xUnknown);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECUnknown::AddChild(ECUnknown *lpChild) {
-	
+	if (lpChild == nullptr)
+		return hrSuccess;
 	scoped_lock locker(mutex);
-	if(lpChild) {
-		this->lstChildren.push_back(lpChild);
-		lpChild->SetParent(this);
-	}
+	lstChildren.emplace_back(lpChild);
+	lpChild->SetParent(this);
 	return hrSuccess;
 }
 
 HRESULT ECUnknown::RemoveChild(ECUnknown *lpChild) {
 	std::list<ECUnknown *>::iterator iterChild;
-	bool bLastRef;
 	ulock_normal locker(mutex);
 
 	if (lpChild != NULL)
@@ -90,21 +82,19 @@ HRESULT ECUnknown::RemoveChild(ECUnknown *lpChild) {
 	if (iterChild == lstChildren.end())
 		return MAPI_E_NOT_FOUND;
 	lstChildren.erase(iterChild);
-
-	bLastRef = this->lstChildren.empty() && this->m_cRef == 0;
+	bool bLastRef = lstChildren.empty() && m_cRef == 0;
 	locker.unlock();
 	if(bLastRef)
-		this->Suicide();
-
+		Suicide();
 	// The object may be deleted now
 	return hrSuccess;
 }
 
-HRESULT ECUnknown::SetParent(ECUnknown *lpParent) {
+HRESULT ECUnknown::SetParent(ECUnknown *parent)
+{
 	// Parent object may only be set once
-	assert(this->lpParent == NULL);
-	this->lpParent = lpParent;
-
+	assert(lpParent == nullptr);
+	lpParent = parent;
 	return hrSuccess;
 }
 
@@ -115,12 +105,12 @@ HRESULT ECUnknown::SetParent(ECUnknown *lpParent) {
  * 
  * @return this is a parent of lpObject, or not
  */
-BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) {
-	while (lpObject && lpObject->lpParent) {
+BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) const
+{
+	for (; lpObject != nullptr && lpObject->lpParent != nullptr;
+	     lpObject = lpObject->lpParent)
 		if (lpObject->lpParent == this)
 			return TRUE;
-		lpObject = lpObject->lpParent;
-	}
 	return FALSE;
 }
 
@@ -131,15 +121,13 @@ BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) {
  * 
  * @return lpObject is a parent of this, or not
  */
-BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) {
-	if (lpObject) {
-		for (auto p : lpObject->lstChildren) {
-			if (this == p)
-				return TRUE;
-			if (this->IsChildOf(p))
-				return TRUE;
-		}
-	}
+BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) const
+{
+	if (lpObject == nullptr)
+		return false;
+	for (auto p : lpObject->lstChildren)
+		if (this == p || IsChildOf(p))
+			return TRUE;
 	return FALSE;
 }
 
@@ -147,11 +135,11 @@ BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) {
 // (AddChild) objects depending on us. 
 
 HRESULT ECUnknown::Suicide() {
-	ECUnknown *lpParent = this->lpParent;
+	auto parent = lpParent;
 	auto self = this;
 
 	// First, destroy the current object
-	this->lpParent = NULL;
+	lpParent = nullptr;
 	delete this;
 
 	// WARNING: The child list of our parent now contains a pointer to this 
@@ -160,13 +148,9 @@ HRESULT ECUnknown::Suicide() {
 	// and may only be access through functions in ECUnknown.
 
 	// Now, tell our parent to delete this object
-	if (lpParent != nullptr)
-		lpParent->RemoveChild(self);
+	if (parent != nullptr)
+		parent->RemoveChild(self);
 	return hrSuccess;
 }
-
-DEF_HRMETHOD0(ECUnknown, Unknown, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD0(ECUnknown, Unknown, AddRef, (void))
-DEF_ULONGMETHOD0(ECUnknown, Unknown, Release, (void))
 
 } /* namespace */

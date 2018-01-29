@@ -22,7 +22,6 @@
 #include <kopano/ECThreadPool.h>
 #include <kopano/lockhelper.hpp>
 #include <algorithm>
-#include <sys/time.h> /* gettimeofday */
 
 namespace KC {
 
@@ -47,19 +46,16 @@ ECThreadPool::~ECThreadPool()
 /**
  * Dispatch a task object on the threadpool instance.
  * @param[in]	lpTask			The task object to dispatch.
- * @param[in]	bTakeOwnership	Boolean parameter specifying wether the threadpool
+ * @param[in]	bTakeOwnership	Boolean parameter specifying whether the threadpool
  *                              should take ownership of the task object, and thus
  *                              is responsible for deleting the object when done.
  * @returns true if the task was successfully queued, false otherwise.
  */
 bool ECThreadPool::dispatch(ECTask *lpTask, bool bTakeOwnership)
 {
-	STaskInfo sTaskInfo = {lpTask, bTakeOwnership, {0, 0}};
-	
-	gettimeofday(&sTaskInfo.tvQueueTime, NULL);
-	
+	STaskInfo sTaskInfo = {lpTask, bTakeOwnership};
 	ulock_normal locker(m_hMutex);
-	m_listTasks.push_back(std::move(sTaskInfo));
+	m_listTasks.emplace_back(std::move(sTaskInfo));
 	m_hCondition.notify_one();
 	joinTerminated(locker);
 	return true;
@@ -101,7 +97,7 @@ void ECThreadPool::setThreadCount(unsigned ulThreadCount, bool bWait)
 		
 				pthread_create(&hThread, NULL, &threadFunc, this);
 				set_thread_name(hThread, "ECThreadPool");
-				m_setThreads.insert(hThread);
+				m_setThreads.emplace(hThread);
 			}
 		}
 	}
@@ -135,9 +131,11 @@ bool ECThreadPool::getNextTask(STaskInfo *lpsTaskInfo, ulock_normal &locker)
 		m_hCondition.wait(locker);
 		
 	if (bTerminate) {
-		auto iThread = std::find_if(m_setThreads.cbegin(), m_setThreads.cend(), &isCurrentThread);
+		pthread_t self = pthread_self();
+		auto iThread = std::find_if(m_setThreads.cbegin(), m_setThreads.cend(),
+			[self](pthread_t t) { return pthread_equal(t, self) != 0; });
 		assert(iThread != m_setThreads.cend());
-		m_setTerminated.insert(*iThread);
+		m_setTerminated.emplace(*iThread);
 		m_setThreads.erase(iThread);
 		--m_ulTermReq;
 		m_hCondTerminated.notify_one();
@@ -163,23 +161,13 @@ void ECThreadPool::joinTerminated(ulock_normal &locker)
 }
 
 /**
- * Check if the calling thread equals the passed thread handle.
- * @param[in]	hThread		The thread handle to compare with.
- * @retval	true when matched, false otherwise.
- */
-inline bool ECThreadPool::isCurrentThread(const pthread_t &hThread) 
-{
-	return pthread_equal(hThread, pthread_self()) != 0;
-}
-
-/**
  * The main loop of the worker threads.
  * @param[in]	lpVoid	Pointer to the owning ECThreadPool object cast to a void pointer.
  * @returns NULL
  */
 void* ECThreadPool::threadFunc(void *lpVoid)
 {
-	ECThreadPool *lpPool = static_cast<ECThreadPool*>(lpVoid);
+	auto lpPool = static_cast<ECThreadPool *>(lpVoid);
 	
 	while (true) {
 		STaskInfo sTaskInfo = {NULL, false};
@@ -254,28 +242,21 @@ void ECWaitableTask::execute()
  */
 bool ECWaitableTask::wait(unsigned timeout, unsigned waitMask) const
 {
-	bool bResult = false;
 	ulock_normal locker(m_hMutex);
 	
 	switch (timeout) {
 	case 0:
-		bResult = ((m_state & waitMask) != 0);
-		break;
-		
+		return (m_state & waitMask) != 0;
 	case WAIT_INFINITE:
 		m_hCondition.wait(locker, [&](void) { return m_state & waitMask; });
-		bResult = true;
-		break;
-		
+		return true;
 	default: 
 		while (!(m_state & waitMask))
 			if (m_hCondition.wait_for(locker, std::chrono::milliseconds(timeout)) ==
 			    std::cv_status::timeout)
 				break;
-		bResult = ((m_state & waitMask) != 0);
-		break;
+		return (m_state & waitMask) != 0;
 	}
-	return bResult;
 }
 
 } /* namespace */

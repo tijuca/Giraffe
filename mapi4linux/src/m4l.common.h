@@ -19,19 +19,18 @@
 #define __M4L_COMMON_IMPL_H
 
 #include <kopano/zcdefs.h>
-#include <mutex>
+#include <atomic>
+#include <mapidefs.h>
 
 class M4LUnknown : public virtual IUnknown {
 private:
-    ULONG ref;
-	std::mutex mutex;
+	std::atomic<unsigned int> ref{0};
     
 public:
-    M4LUnknown();
-	virtual ~M4LUnknown(void) _kc_impdtor;
-	virtual ULONG __stdcall AddRef(void) _kc_override;
-	virtual ULONG __stdcall Release(void) _kc_override;
-	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
+	virtual ~M4LUnknown(void) = default;
+	virtual ULONG AddRef(void) _kc_override;
+	virtual ULONG Release(void) _kc_override;
+	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 };
 
 #endif

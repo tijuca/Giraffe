@@ -151,9 +151,14 @@ struct SOAPINFO {
 	void *fdoneparam;
 	ECSESSIONID ulLastSessionId; // Session ID of the last processed request
 	struct timespec threadstart; 	// Start count of when the thread started processing the request
-	double start;			// Start timestamp of when we started processing the request
+	KC::time_point start; /* Start timestamp of when we started processing the request */
 	const char *szFname;
 };
+
+static inline struct SOAPINFO *soap_info(struct soap *s)
+{
+	return static_cast<struct SOAPINFO *>(s->user);
+}
 
 } /* namespace */
 

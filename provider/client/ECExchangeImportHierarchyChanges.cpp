@@ -14,9 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include "ECExchangeImportHierarchyChanges.h"
 #include "ECExchangeImportContentsChanges.h"
@@ -43,56 +42,49 @@ using namespace KCHL;
 
 ECExchangeImportHierarchyChanges::ECExchangeImportHierarchyChanges(ECMAPIFolder *lpFolder) :
 	m_lpFolder(lpFolder)
-{
-	m_lpFolder->AddRef();
-}
-
-ECExchangeImportHierarchyChanges::~ECExchangeImportHierarchyChanges(){
-	m_lpFolder->Release();
-}
+{}
 
 HRESULT ECExchangeImportHierarchyChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTHIERARCHYCHANGES* lppExchangeImportHierarchyChanges){
 
 	if(!lpFolder)
 		return MAPI_E_INVALID_PARAMETER;
-
-	ECExchangeImportHierarchyChanges *lpEIHC = new ECExchangeImportHierarchyChanges(lpFolder);
-	return lpEIHC->QueryInterface(IID_IExchangeImportHierarchyChanges, reinterpret_cast<void **>(lppExchangeImportHierarchyChanges));
+	return alloc_wrap<ECExchangeImportHierarchyChanges>(lpFolder)
+	       .as(IID_IExchangeImportHierarchyChanges,
+	       reinterpret_cast<void **>(lppExchangeImportHierarchyChanges));
 }
 
 HRESULT	ECExchangeImportHierarchyChanges::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECExchangeImportHierarchyChanges, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IExchangeImportHierarchyChanges, &this->m_xExchangeImportHierarchyChanges);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xExchangeImportHierarchyChanges);
+	REGISTER_INTERFACE2(IExchangeImportHierarchyChanges, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECExchangeImportHierarchyChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError){
 	HRESULT		hr = hrSuccess;
-	LPMAPIERROR	lpMapiError = NULL;
+	ecmem_ptr<MAPIERROR> lpMapiError;
 	memory_ptr<TCHAR> lpszErrorMsg;
 	
 	//FIXME: give synchronization errors messages
 	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ECAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError);
+		return hr;
+	hr = ECAllocateBuffer(sizeof(MAPIERROR), &~lpMapiError);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (ulFlags & MAPI_UNICODE) {
 		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg.get());
 		std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
-			goto exit;
+			return hr;
 		wcscpy((wchar_t*)lpMapiError->lpszError, wstrErrorMsg.c_str());
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
-			goto exit;
+			return hr;
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str()); 
 
 	} else {
@@ -100,25 +92,19 @@ HRESULT ECExchangeImportHierarchyChanges::GetLastError(HRESULT hResult, ULONG ul
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy((char*)lpMapiError->lpszError, strErrorMsg.c_str());
 
 		if ((hr = MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy((char*)lpMapiError->lpszComponent, strCompName.c_str());
 	}
 
 	lpMapiError->ulContext		= 0;
 	lpMapiError->ulLowLevelError= 0;
 	lpMapiError->ulVersion		= 0;
-
-	*lppMAPIError = lpMapiError;
-
-exit:
-	if( hr != hrSuccess && lpMapiError)
-		ECFreeBuffer(lpMapiError);
-
-	return hr;
+	*lppMAPIError = lpMapiError.release();
+	return hrSuccess;
 }
 
 HRESULT ECExchangeImportHierarchyChanges::Config(LPSTREAM lpStream, ULONG ulFlags){
@@ -151,7 +137,7 @@ HRESULT ECExchangeImportHierarchyChanges::Config(LPSTREAM lpStream, ULONG ulFlag
 		if(ulLen != 4) {
 			return MAPI_E_INVALID_PARAMETER;
 		}
-		hr = HrGetOneProp(&m_lpFolder->m_xMAPIFolder, PR_SOURCE_KEY, &~lpPropSourceKey);
+		hr = HrGetOneProp(m_lpFolder, PR_SOURCE_KEY, &~lpPropSourceKey);
 		if(hr != hrSuccess)
 			return hr;
 
@@ -392,7 +378,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 		HRESULT hrTmp = hrSuccess;
 		MAPIFolderPtr ptrRoot;
 
-		hrTmp = m_lpFolder->OpenEntry(0, nullptr, &ptrRoot.iid(), MAPI_BEST_ACCESS | MAPI_DEFERRED_ERRORS, &ulObjType, &~ptrRoot);
+		hrTmp = m_lpFolder->OpenEntry(0, nullptr, &iid_of(ptrRoot), MAPI_BEST_ACCESS | MAPI_DEFERRED_ERRORS, &ulObjType, &~ptrRoot);
 		if (hrTmp != hrSuccess)
 			return hr;
 		hrTmp = ptrRoot->SetProps(1, lpPropAdditionalREN, NULL);
@@ -428,12 +414,3 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderDeletion(ULONG ulFlags, LP
 	}
 	return hr;
 }
-
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, Config, (LPSTREAM, lpStream), (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, UpdateState, (LPSTREAM, lpStream))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, ImportFolderChange, (ULONG, cValue), (LPSPropValue, lpPropArray))
-DEF_HRMETHOD1(TRACE_MAPI, ECExchangeImportHierarchyChanges, ExchangeImportHierarchyChanges, ImportFolderDeletion, (ULONG, ulFlags), (LPENTRYLIST, lpSourceEntryList))

@@ -6,19 +6,21 @@ Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
 from MAPI.Tags import (
-    PR_RULE_NAME, PR_RULE_STATE, PR_RULE_PROVIDER, PR_RULE_ACTIONS, ST_ENABLED,
+    PR_RULE_NAME_W, PR_RULE_STATE, PR_RULE_PROVIDER_W, PR_RULE_ACTIONS, ST_ENABLED,
     PR_RULE_CONDITION
 )
 
-from .compat import repr as _repr, fake_unicode as _unicode
+from .compat import repr as _repr
 
 from .restriction import Restriction
 
 class Rule(object):
+    """Rule class"""
+
     def __init__(self, mapirow):
         self.mapirow = mapirow
-        self.name = _unicode(mapirow[PR_RULE_NAME])
-        self.provider = _unicode(mapirow[PR_RULE_PROVIDER])
+        self.name = mapirow[PR_RULE_NAME_W]
+        self.provider = mapirow[PR_RULE_PROVIDER_W]
         self.active = bool(mapirow[PR_RULE_STATE] & ST_ENABLED)
 
     @property

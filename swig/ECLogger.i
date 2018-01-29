@@ -14,7 +14,7 @@ typedef IUnknownImplementor<IECSimpleLogger> ECSimpleLogger;
 class ECLoggerProxy : public KC::ECLogger {
 public:
 	static HRESULT Create(unsigned int ulLevel, ECSimpleLogger *lpSimpleLogger, ECLoggerProxy **lppProxy) {
-		ECLoggerProxy *lpProxy = new ECLoggerProxy(ulLevel, lpSimpleLogger);
+		auto lpProxy = new ECLoggerProxy(ulLevel, lpSimpleLogger);
 		//lpProxy->AddRef();
 		*lppProxy = lpProxy;
 		return hrSuccess;
@@ -27,7 +27,8 @@ public:
 
 	virtual void Reset() { };
 	virtual void Log(unsigned int loglevel, const std::string &message) { Log(loglevel, "%s", message.c_str()); };
-	virtual void Log(unsigned int Loglevel, const char *format, ...) __LIKE_PRINTF(3, 4) { 
+	virtual void Log(unsigned int Loglevel, const char *format, ...) KC_LIKE_PRINTF(3, 4)
+	{
 		va_list va;
 
 		va_start(va, format);

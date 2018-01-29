@@ -20,7 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include <set>
-
+#include <kopano/memory.hpp>
 #include "ECABContainer.h"
 
 namespace KC {
@@ -30,10 +30,10 @@ class ECLogger;
 
 }
 
-class ECExportAddressbookChanges _kc_final : public ECUnknown {
+class ECExportAddressbookChanges _kc_final :
+    public ECUnknown, public IECExportAddressbookChanges {
 public:
 	ECExportAddressbookChanges(ECMsgStore *lpContainer);
-	virtual ~ECExportAddressbookChanges();
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	// IECExportAddressbookChanges
 	virtual HRESULT	Config(LPSTREAM lpState, ULONG ulFlags, IECImportAddressbookChanges *lpCollector);
@@ -43,25 +43,16 @@ public:
 private:
 	static bool LeftPrecedesRight(const ICSCHANGE &left, const ICSCHANGE &right);
 
-	class xECExportAddressbookChanges _kc_final :
-	    public IECExportAddressbookChanges {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		// <kopano/xclsfrag/IECExportAddressbookChanges.hpp>
-		virtual HRESULT __stdcall Config(LPSTREAM lpState, ULONG flags, IECImportAddressbookChanges *lpCollector) _kc_override;
-		virtual HRESULT __stdcall Synchronize(ULONG *lpulSteps, ULONG *lpulProgress) _kc_override;
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpState) _kc_override;
-	} m_xECExportAddressbookChanges;
-	
-	IECImportAddressbookChanges *m_lpImporter = nullptr;
 	unsigned int m_ulChangeId = 0;
 	ECMsgStore *m_lpMsgStore = nullptr;
 	unsigned int m_ulThisChange = 0;
 	ULONG m_ulChanges = 0;
 	ULONG m_ulMaxChangeId =0;
-	ICSCHANGE *m_lpRawChanges = nullptr; // Raw data from server
-	ICSCHANGE *m_lpChanges = nullptr; // Same data, but sorted (users, then groups)
 	std::set<ULONG>				m_setProcessed;
-	ECLogger *m_lpLogger = nullptr;
+	KCHL::object_ptr<ECLogger> m_lpLogger;
+	KCHL::object_ptr<IECImportAddressbookChanges> m_lpImporter;
+	KCHL::memory_ptr<ICSCHANGE> m_lpChanges; /* Same data as @m_lpRawChanges, but sorted (users, then groups) */
+	KCHL::memory_ptr<ICSCHANGE> m_lpRawChanges; /* Raw data from server */
 };
 
 #endif

@@ -22,7 +22,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <kopano/ECLogger.h>
-
+#include <kopano/memory.hpp>
 #include <pthread.h>
 #include <list>
 
@@ -59,11 +59,10 @@ private:
 	_kc_hidden static void *ScheduleThread(void *tmp_scheduler);
 
 	ECScheduleList		m_listScheduler;
-	ECLogger *			m_lpLogger;
-
+	KCHL::object_ptr<ECLogger> m_lpLogger;
 	bool m_bExit = false;
 	std::mutex m_hExitMutex; /* Mutex needed for the release signal */
-	std::condition_variable m_hExitSignal; /* Signal that should be send to the Scheduler when to exit */
+	std::condition_variable m_hExitSignal; /* Signal that should be sent to the Scheduler when to exit */
 	std::recursive_mutex m_hSchedulerMutex; /* Mutex for the locking of the scheduler */
 	pthread_t			m_hMainThread;			// Thread that is used for the Scheduler
 };

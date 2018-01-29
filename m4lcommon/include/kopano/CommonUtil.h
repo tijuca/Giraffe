@@ -36,43 +36,25 @@
 #define CLIENT_VERSION_LATEST			CLIENT_VERSION_OLK2010 /* UPDATE ME */
 
 /* darn, no sane place because of depend include on mapidefs.h */
-extern _kc_export bool operator==(const SBinary &, const SBinary &);
-bool operator <(const SBinary &a, const SBinary &b);
+extern _kc_export bool operator==(const SBinary &, const SBinary &) noexcept;
+extern _kc_export bool operator<(const SBinary &, const SBinary &) noexcept;
 
 namespace KC {
 
 extern _kc_export const char *GetServerUnixSocket(const char *pref = nullptr);
-extern _kc_export std::string GetServerFQDN(void);
 extern _kc_export HRESULT HrOpenECAdminSession(IMAPISession **, const char *const app_ver, const char *app_misc, const char *path = nullptr, ULONG profflags = 0, const char *sslkey_file = nullptr, const char *sslkey_password = nullptr);
 extern _kc_export HRESULT HrOpenECSession(IMAPISession **ses, const char *app_ver, const char *app_misc, const wchar_t *user, const wchar_t *pass, const char *path = nullptr, ULONG profile_flags = 0, const char *sslkey_file = nullptr, const char *sslkey_password = nullptr, const char *profname = nullptr);
-HRESULT HrSearchECStoreEntryId(IMAPISession *lpMAPISession, BOOL bPublic, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-
-HRESULT HrGetECProviderAdmin(LPMAPISESSION lpSession, LPPROVIDERADMIN *lppProviderAdmin);
-
-HRESULT HrOpenDefaultStoreOffline(IMAPISession *lpMAPISession, IMsgStore **lppMsgStore);
-HRESULT HrOpenDefaultStoreOnline(IMAPISession *lpMAPISession, IMsgStore **lppMsgStore);
-HRESULT HrOpenStoreOnline(IMAPISession *lpMAPISession, ULONG cbEntryID, LPENTRYID lpEntryID, IMsgStore **lppMsgStore);
 extern _kc_export HRESULT HrOpenECPublicStoreOnline(IMAPISession *, IMsgStore **ret);
-HRESULT GetProxyStoreObject(IMsgStore *lpMsgStore, IMsgStore **lppMsgStore);
-
-
-HRESULT HrAddArchiveMailBox(LPPROVIDERADMIN lpProviderAdmin, LPCWSTR lpszUserName, LPCWSTR lpszServerName, LPMAPIUID lpProviderUID);
-extern _kc_export HRESULT ECCreateOneOff(LPTSTR name, LPTSTR addrtype, LPTSTR addr, ULONG flags, ULONG *eid_size, LPENTRYID *eid);
+extern _kc_export HRESULT ECCreateOneOff(const TCHAR * name, const TCHAR * addrtype, const TCHAR * addr, ULONG flags, ULONG *eid_size, LPENTRYID *eid);
 extern _kc_export HRESULT ECParseOneOff(const ENTRYID *eid, ULONG eid_size, std::wstring &name, std::wstring &type, std::wstring &addr);
-extern _kc_export std::string ToQuotedPrintable(const std::string &s, const std::string &charset, bool header = true, bool imap = false);
 extern _kc_export HRESULT HrNewMailNotification(IMsgStore *, IMessage *);
 extern _kc_export HRESULT HrCreateEmailSearchKey(const char *type, const char *addr, ULONG *size, LPBYTE *out);
 extern _kc_export HRESULT DoSentMail(IMAPISession *, IMsgStore *, ULONG flags, KCHL::object_ptr<IMessage>);
 extern _kc_export HRESULT GetClientVersion(unsigned int *);
-extern HRESULT CreateProfileTemp(const wchar_t *username, const wchar_t *password, const char *path, const char* szProfName, ULONG ulProfileFlags, const char *sslkey_file, const char *sslkey_password, const char *app_version, const char *app_misc);
-HRESULT DeleteProfileTemp(char *szProfName);
 extern _kc_export HRESULT OpenSubFolder(LPMDB, const wchar_t *folder, wchar_t psep, bool is_public, bool create_folder, LPMAPIFOLDER *subfolder);
-HRESULT FindFolder(LPMAPITABLE lpTable, const WCHAR *folder, LPSPropValue *lppFolderProp);
 extern _kc_export HRESULT HrOpenDefaultCalendar(LPMDB, LPMAPIFOLDER *default_folder);
-HRESULT HrGetPropTags(char **names, IMAPIProp *lpProp, LPSPropTagArray *lppPropTagArray);
 extern _kc_export HRESULT HrGetAllProps(IMAPIProp *prop, ULONG flags, ULONG *nvals, LPSPropValue *props);
-extern _kc_export HRESULT __stdcall UnWrapStoreEntryID(ULONG eid_size, LPENTRYID eid, ULONG *ret_size, LPENTRYID *ret);
-HRESULT DoAddress(IAddrBook *lpAdrBook, ULONG* hWnd, LPADRPARM lpAdrParam, LPADRLIST *lpResult);
+extern _kc_export HRESULT UnWrapStoreEntryID(ULONG eid_size, const ENTRYID *eid, ULONG *ret_size, ENTRYID **ret);
 
 // Auto-accept settings
 extern _kc_export HRESULT HrGetRemoteAdminStore(IMAPISession *, IMsgStore *, LPCTSTR server, ULONG flags, IMsgStore **ret);
@@ -81,27 +63,16 @@ extern _kc_export HRESULT GetConfigMessage(LPMDB, const char *msgname, IMessage 
 extern _kc_export HRESULT HrOpenDefaultStore(IMAPISession *, IMsgStore **ret);
 extern _kc_export HRESULT HrOpenDefaultStore(IMAPISession *, ULONG flags, IMsgStore **ret);
 extern _kc_export HRESULT HrOpenECPublicStore(IMAPISession *, IMsgStore **ret);
-HRESULT HrOpenECPublicStore(IMAPISession *lpMAPISession, ULONG ulFlags, IMsgStore **lppMsgStore);
-HRESULT HrAddECMailBox(LPMAPISESSION lpSession, LPCWSTR lpszUserName);
-HRESULT HrAddECMailBox(LPPROVIDERADMIN lpProviderAdmin, LPCWSTR lpszUserName);
-HRESULT HrRemoveECMailBox(LPMAPISESSION lpSession, LPMAPIUID lpsProviderUID);
-HRESULT HrRemoveECMailBox(LPPROVIDERADMIN lpProviderAdmin, LPMAPIUID lpsProviderUID);
-   HRESULT HrGetAddress(IMAPISession *, LPSPropValue props, ULONG nvals, ULONG proptag_eid, ULONG proptag_name, ULONG proptag_type, ULONG proptag_email, std::wstring &name, std::wstring &type, std::wstring &email);
-HRESULT HrGetAddress(IMAPISession *, IMessage *, ULONG proptag_eid, ULONG proptag_name, ULONG proptag_type, ULONG proptag_email, std::wstring &name, std::wstring &type, std::wstring &email);
 extern _kc_export HRESULT HrGetAddress(LPADRBOOK, IMessage *, ULONG tag_eid, ULONG tag_name, ULONG tag_type, ULONG tag_addr, std::wstring &name, std::wstring &type, std::wstring &addr);
-extern _kc_export HRESULT HrGetAddress(LPADRBOOK, LPSPropValue props, ULONG nvals, ULONG tag_eid, ULONG tag_name, ULONG tag_type, ULONG tag_addr, std::wstring &name, std::wstring &type, std::wstring &addr);
-extern _kc_export HRESULT HrGetAddress(LPADRBOOK, LPENTRYID eid, ULONG eid_size, std::wstring &name, std::wstring &type, std::wstring &addr);
-extern _kc_export std::string ToQuotedBase64Header(const std::string &s, const std::string &charset);
+extern _kc_export HRESULT HrGetAddress(IAddrBook *, const SPropValue *props, ULONG nvals, ULONG tag_eid, ULONG tag_name, ULONG tag_type, ULONG tag_addr, std::wstring &name, std::wstring &type, std::wstring &addr);
+extern _kc_export HRESULT HrGetAddress(IAddrBook *, const ENTRYID *eid, ULONG eid_size, std::wstring &name, std::wstring &type, std::wstring &addr);
 extern _kc_export std::string ToQuotedBase64Header(const std::wstring &);
-HRESULT TestRestriction(LPSRestriction lpCondition, ULONG cValues, LPSPropValue lpPropVals, const ECLocale &locale, ULONG ulLevel = 0);
-extern _kc_export HRESULT TestRestriction(LPSRestriction cond, IMAPIProp *msg, const ECLocale &, ULONG level = 0);
-extern _kc_export HRESULT HrOpenUserMsgStore(LPMAPISESSION, wchar_t *user, LPMDB *store);
-HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, LPMDB lpStore, WCHAR *lpszUser, LPMDB *lppStore);
+extern HRESULT TestRestriction(const SRestriction *cond, ULONG nvals, const SPropValue *props, const ECLocale &, ULONG level = 0);
+extern _kc_export HRESULT TestRestriction(const SRestriction *cond, IMAPIProp *msg, const ECLocale &, ULONG level = 0);
+extern _kc_export HRESULT HrOpenUserMsgStore(LPMAPISESSION, const wchar_t *user, LPMDB *store);
 // Auto-accept settings
 extern _kc_export HRESULT SetAutoAcceptSettings(IMsgStore *, bool auto_accept, bool decline_conflict, bool decline_recurring);
 extern _kc_export HRESULT GetAutoAcceptSettings(IMsgStore *, bool *auto_accept, bool *decline_conflict, bool *decline_recurring);
-HRESULT HrGetGAB(LPMAPISESSION lpSession, LPABCONT *lppGAB);
-HRESULT HrGetGAB(LPADRBOOK lpAddrBook, LPABCONT *lppGAB);
 
 /**
  * NAMED PROPERTY utilities
@@ -144,21 +115,12 @@ private:
     std::vector<ULONG> lstTypes;
 };
 
-#define PROPMAP_DECL() ECPropMap __propmap;
-#define PROPMAP_START(hint) ECPropMap __propmap(hint);
-#define PROPMAP_NAMED_ID(name,type,guid,id) ULONG PROP_##name; __propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
-#define PROPMAP_INIT(lpObject) hr = __propmap.Resolve(lpObject); if(hr != hrSuccess) goto exitpm;
-
+#define PROPMAP_DECL() ECPropMap m_propmap;
+#define PROPMAP_START(hint) ECPropMap m_propmap(hint);
+#define PROPMAP_NAMED_ID(name, type, guid, id) ULONG PROP_##name; m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
+#define PROPMAP_INIT(lpObject) do { hr = m_propmap.Resolve(lpObject); if (hr != hrSuccess) goto exitpm; } while (false);
 #define PROPMAP_DEF_NAMED_ID(name) ULONG PROP_##name = 0;
-#define PROPMAP_INIT_NAMED_ID(name,type,guid,id) __propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
-
-// Determine the size of an array
-template <typename T, unsigned N>
-inline unsigned  arraySize(T (&)[N])   { return N; }
-
-// Get the one-past-end item of an array
-template <typename T, unsigned N>
-inline T* arrayEnd(T (&array)[N])	{ return array + N; }
+#define PROPMAP_INIT_NAMED_ID(name, type, guid, id) m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
 
 } /* namespace */
 

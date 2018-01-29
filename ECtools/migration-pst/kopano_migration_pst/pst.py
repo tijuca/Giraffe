@@ -43,6 +43,17 @@ class PSTException(Exception):
 
 error_log_list = []
 
+if sys.hexversion >= 0x03000000:
+    def to_byte(x):
+        return x
+
+    def is_int(x):
+        return isinstance(x, int)
+else:
+    to_byte = ord
+
+    def is_int(x):
+        return isinstance(x, (int, long))
 
 ##############################################################################################################################
 #  _   _           _        ____        _        _                       ___   _ ____  ______    _
@@ -94,7 +105,7 @@ class NID:
 
     def __init__(self, bytes_or_nid):
 
-        if isinstance(bytes_or_nid, (int,long)):
+        if is_int(bytes_or_nid):
             self.nid = bytes_or_nid
         else:
             self.nid = struct.unpack('I', bytes_or_nid)[0]
@@ -185,7 +196,7 @@ class Page:
                     entry_type = BBTENTRY
                 else: # ptypeNBT
                     entry_type = NBTENTRY
-                    entry_size = entry_size + entry_size/3
+                    entry_size = entry_size + entry_size//3
             else: # BTENTRY
                 entry_type = BTENTRY
 
@@ -299,7 +310,10 @@ class Block:
         239, 53, 156, 132, 43, 21, 213, 119, 52, 73, 182, 18, 10, 127, 113, 136, 253, 157, 24, 65, 125, 147, 216, 88, 44, 206, 254, 36, 175, 222, 184, 54,
         200, 161, 128, 166, 153, 152, 168, 47, 14, 129, 101, 115, 228, 194, 162, 138, 212, 225, 17, 208, 8, 139, 42, 242, 237, 154, 100, 63, 193, 108, 249, 236)
 
-    decrypt_table = string.maketrans(b''.join(map(chr, range(256))), b''.join(map(chr, mpbbCryptFrom512)))
+    if sys.hexversion >= 0x03000000:
+        decrypt_table = bytes.maketrans(bytearray(range(256)), bytearray(mpbbCryptFrom512))
+    else:
+        decrypt_table = string.maketrans(b''.join(map(chr, range(256))), b''.join(map(chr, mpbbCryptFrom512)))
 
     btypeData = 0
     btypeXBLOCK = 1
@@ -613,13 +627,13 @@ class BTH:
         bth_record_list = []
         if bIdxLevel == 0: # leaf
             record_size = self.cbKey + self.cbEnt
-            records = len(bytes) / record_size
+            records = len(bytes) // record_size
             for i in range(records):
                 key, data = struct.unpack('%ss%ss' % (self.cbKey, self.cbEnt) , bytes[i*record_size:(i+1)*record_size])
                 bth_record_list.append(BTHData(key, data))
         else: # intermediate
             record_size = self.cbKey + 4
-            records = len(bytes) / record_size
+            records = len(bytes) // record_size
             for i in range(records):
                 key, hidNextLevel = struct.unpack('%ss4s' % self.cbKey , bytes[i*record_size:(i+1)*record_size])
                 hidNextLevel = HID(hidNextLevel)
@@ -652,7 +666,7 @@ class PCBTHData:
                 else:
                     raise PSTException('Invalid NID subnode reference %s' % self.subnode_nid)
                 datas = hn.ltp.nbd.fetch_all_block_data(subnode_nid_bid)
-                self.value = ptype.value(''.join(datas))
+                self.value = ptype.value(b''.join(datas))
 
     def __repr__(self):
 
@@ -749,25 +763,25 @@ class PType:
             #count = struct.unpack('H', bytes[:2])[0]
             return bytes
         elif self.ptype == PTypeEnum.PtypMultipleInteger16:
-            count = len(bytes) / 2
+            count = len(bytes) // 2
             return [struct.unpack('h', bytes[i*2:(i+1)*2])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleInteger32:
-            count = len(bytes) / 4
+            count = len(bytes) // 4
             return [struct.unpack('i', bytes[i*4:(i+1)*4])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleFloating32:
-            count = len(bytes) / 4
+            count = len(bytes) // 4
             return [struct.unpack('f', bytes[i*4:(i+1)*4])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleFloating64:
-            ccount = len(bytes) / 8
+            ccount = len(bytes) // 8
             return [struct.unpack('d', bytes[i*8:(i+1)*8])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleCurrency:
             return None
 #            raise PSTException('PtypMultipleCurrency value not implemented')
         elif self.ptype == PTypeEnum.PtypMultipleFloatingTime:
-            count = len(bytes) / 8
+            count = len(bytes) // 8
             return [self.get_floating_time(bytes[i*8:(i+1)*8]) for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleInteger64:
-            count = len(bytes) / 8
+            count = len(bytes) // 8
             return [struct.unpack('q', bytes[i*8:(i+1)*8])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleString:
             ulCount, rgulDataOffsets = self.get_multi_value_offsets(bytes)
@@ -782,10 +796,10 @@ class PType:
                 datas.append(bytes[rgulDataOffsets[i]:rgulDataOffsets[i+1]])
             return datas
         elif self.ptype == PTypeEnum.PtypMultipleTime:
-            count = len(bytes) / 8
+            count = len(bytes) // 8
             return [self.get_time(bytes[i*8:(i+1)*8]) for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleGuid:
-            count = len(bytes) / 16
+            count = len(bytes) // 16
             return [bytes[i*16:(i+1)*16] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleBinary:
             ulCount, rgulDataOffsets = self.get_multi_value_offsets(bytes)
@@ -1039,7 +1053,7 @@ class TC: # Table Context
                 row_matrix_datas = self.hn.ltp.nbd.fetch_all_block_data(subnode_nid_bid)
 
             for irow in range(len(self.RowIndex)):
-                BlockIndex = irow / RowsPerBlock
+                BlockIndex = irow // RowsPerBlock
                 RowIndex = irow % RowsPerBlock
                 row_bytes = row_matrix_datas[BlockIndex][RowIndex * row_size:(RowIndex+1) * row_size]
                 dwRowID = struct.unpack('I', row_bytes[:4])[0]
@@ -1047,7 +1061,7 @@ class TC: # Table Context
                 #row_datas = []
                 rowvals = {}
                 for tcoldesc in self.rgTCOLDESC:
-                    is_fCEB = ((struct.unpack('B',rgbCEB[tcoldesc.iBit / 8])[0] & (1 << (7 - (tcoldesc.iBit % 8)))) != 0)
+                    is_fCEB = ((to_byte(rgbCEB[tcoldesc.iBit // 8]) & (1 << (7 - (tcoldesc.iBit % 8)))) != 0)
                     if is_fCEB:
                         data_bytes = row_bytes[tcoldesc.ibData:tcoldesc.ibData+tcoldesc.cbData]
                     else:
@@ -1083,7 +1097,7 @@ class TC: # Table Context
                     else:
                         raise PSTException('Row Matrix Value HNID Subnode invalid: %s' % subnode_nid)
                     datas = self.hn.ltp.nbd.fetch_all_block_data(subnode_nid_bid)
-                    return ptype.value(''.join(datas))
+                    return ptype.value(b''.join(datas))
 
 
     def get_row_ID(self, RowIndex):
@@ -1256,7 +1270,7 @@ class Folder:
         self.DisplayName = self.pc.getval(PropIdEnum.PidTagDisplayName)
         self.path = parent_path+'/'+self.DisplayName.replace('/', '\\/')
 
-        #print 'FOLDER DEBUG', self.DisplayName, self.pc
+        #print('FOLDER DEBUG', self.DisplayName, self.pc)
 
         self.ContentCount = self.pc.getval(PropIdEnum.PidTagContentCount)
         self.ContainerClass = self.pc.getval(PropIdEnum.PidTagContainerClass)
@@ -1496,7 +1510,7 @@ class Messaging:
         self.pc_name_to_id_map = self.ltp.get_pc_by_nid(NID(NID.NID_NAME_TO_ID_MAP))
 
         nameid_entrystream = self.pc_name_to_id_map.getval(PropIdEnum.PidTagNameidStreamEntry)
-        self.nameid_entries = [NAMEID(nameid_entrystream[i*8:(i+1)*8]) for i in range(len(nameid_entrystream)/8)]
+        self.nameid_entries = [NAMEID(nameid_entrystream[i*8:(i+1)*8]) for i in range(len(nameid_entrystream)//8)]
         nameid_stringstream = self.pc_name_to_id_map.getval(PropIdEnum.PidTagNameidStreamString)
         nameid_guidstream = self.pc_name_to_id_map.getval(PropIdEnum.PidTagNameidStreamGuid)
         for nameid in self.nameid_entries:
@@ -1506,9 +1520,9 @@ class Messaging:
             if nameid.wGuid == 0:
                 nameid.guid = None
             elif nameid.wGuid == 1: # PS_MAPI
-                nameid.guid = '(\x03\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
+                nameid.guid = b'(\x03\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
             elif nameid.wGuid == 2: # PS_PUBLIC_STRINGS
-                nameid.guid = ')\x03\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
+                nameid.guid = b')\x03\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00F'
             else:
                 nameid.guid = nameid_guidstream[16*(nameid.wGuid-3):16*(nameid.wGuid-2)]
 
@@ -1808,11 +1822,11 @@ class CRC:
         if cbLength < 4:
             cbRunningLength = 0
         else:
-            cbRunningLength = (cbLength/8)*8
+            cbRunningLength = (cbLength//8)*8
         cbEndUnalignedBytes = cbLength - cbRunningLength
 
         index = 0
-        for i in range(1, (cbRunningLength/8) + 1):
+        for i in range(1, (cbRunningLength//8) + 1):
             dwCRC ^= struct.unpack('I',pv[index:index+4])[0]
             dwCRC = CRC.CrcTableOffset88[dwCRC & 0x000000FF] ^ CRC.CrcTableOffset80[(dwCRC >> 8) & 0x000000FF] ^ CRC.CrcTableOffset72[(dwCRC >> 16) & 0x000000FF] ^ CRC.CrcTableOffset64[(dwCRC >> 24) & 0x000000FF]
             index += 4
@@ -1854,7 +1868,7 @@ class Header:
         self.dwReserved1 = fd.read(FieldSize.DWORD) # ignore
         self.dwReserved2 = fd.read(FieldSize.DWORD) # ignore
 
-        self.validPST = (self.dwMagic == '!BDN' and self.wMagicClient == 'SM')
+        self.validPST = (self.dwMagic == b'!BDN' and self.wMagicClient == b'SM')
         if not self.validPST:
             return
         self.is_ansi = (self.wVer in (14, 15))
@@ -2100,11 +2114,11 @@ def size_friendly(size):
     if size < 1024:
         return '%sB' % (size)
     elif size < 1024*1024:
-        return '%sKB' % (size/1024)
+        return '%sKB' % (size//1024)
     elif size < 1024*1024*1024:
-        return '%sMB' % (size/(1024*1024))
+        return '%sMB' % (size//(1024*1024))
     else:
-        return '%sGB' % (size/(1024*1024*1024))
+        return '%sGB' % (size//(1024*1024*1024))
 
 
 def unicode2ascii(unicode_str):
@@ -2171,9 +2185,9 @@ def log_error(e):
 def test_status_pst(pst_filepath):
 
     pst = PST(pst_filepath)
-    print unicode2ascii(pst.get_pst_status())
-    print 'Total Messages: %s' % pst.get_total_message_count()
-    print 'Total Attachments: %s' % pst.get_total_attachment_count()
+    print(unicode2ascii(pst.get_pst_status()))
+    print('Total Messages: %s' % pst.get_total_message_count())
+    print('Total Attachments: %s' % pst.get_total_attachment_count())
     pst.close()
 
 
@@ -2188,7 +2202,7 @@ def test_dump_pst(pst_filepath, output_path):
     """ dump out all PST email attachments and emails (into text files) to output_path folder"""
 
     pst = PST(pst_filepath)
-    print pst.get_pst_status()
+    print(pst.get_pst_status())
 
     pbar = get_simple_progressbar('Messages: ')
     total_messages = pst.get_total_message_count()
@@ -2214,7 +2228,7 @@ def test_folder_psts(psts_folder):
             error_log_list = []
             pst = PST(pst_filepath)
             status = unicode2ascii(pst.get_pst_status())
-            print status
+            print(status)
             password = ''
             if pst.messaging.PasswordCRC32Hash:
                 password = pst.crack_password(pst.messaging.PasswordCRC32Hash)
@@ -2259,11 +2273,11 @@ if __name__=="__main__":
         output_folder = args.output_folder
 
         if not os.path.exists(input_pst_file):
-            print 'Input PST file does not exist'
+            print('Input PST file does not exist')
             sys.exit(1)
 
         if not os.path.exists(output_folder):
-            print 'Output folder does not exist'
+            print('Output folder does not exist')
             sys.exit(1)
 
         test_dump_pst(input_pst_file,output_folder)
