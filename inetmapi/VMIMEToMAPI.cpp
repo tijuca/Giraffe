@@ -258,6 +258,12 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 		auto vmMessage = vmime::make_shared<vmime::message>();
 		vmMessage->parse(input);
 
+		if (m_dopt.header_strict_rfc) {
+			auto vmHeader = vmMessage->getHeader();
+			if (!vmHeader->hasField(vmime::fields::FROM) && !vmHeader->hasField(vmime::fields::DATE))
+				return MAPI_E_CALL_FAILED;
+		}
+
 		// save imap data first, seems vmMessage may be altered in the rest of the code.
 		if (m_dopt.add_imap_data)
 			createIMAPBody(input, vmMessage, lpMessage);
@@ -2505,7 +2511,7 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::shared_ptr<vmime::header> vmHeade
 	else
 		swap(strHTML, m_mailState.strHTMLBody);
 	if (m_dopt.html_safety_filter)
-		filter_html(lpMessage, lpHTMLStream, ulFlags, strHTML);
+		filter_html(lpMessage, lpHTMLStream, ulFlags, m_mailState.strHTMLBody);
 	return hrSuccess;
 }
 
@@ -2602,7 +2608,7 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::shared_ptr<vmime::header> vmHeader,
 		try {
 			strLocation = vmime::dynamicCast<vmime::text>(vmHeader->ContentLocation()->getValue())->getConvertedText(MAPI_CHARSET);
 		}
-		catch (vmime::exceptions::charset_conv_error) { }
+		catch (const vmime::exceptions::charset_conv_error &) { }
 		if (!strLocation.empty()) {
 			attProps[nProps].ulPropTag = PR_ATTACH_CONTENT_LOCATION_A;
 			attProps[nProps++].Value.lpszA = (char*)strLocation.c_str();
@@ -3788,6 +3794,7 @@ void imopt_default_delivery_options(delivery_options *dopt) {
 	dopt->ascii_upgrade = nullptr;
 	dopt->html_safety_filter = false;
 	dopt->indexed_headers = {"X-"}; // per default save all X- headers
+	dopt->header_strict_rfc = false;
 }
 
 /**

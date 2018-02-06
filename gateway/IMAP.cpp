@@ -745,7 +745,7 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 		flags |= EC_PROFILE_FLAGS_NO_UID_AUTH;
 
 	// do not disable notifications for imap connections, may be idle and sessions on the storage server will disappear.
-	hr = HrOpenECSession(&~lpSession, "gateway/imap", PROJECT_VERSION,
+	hr = HrOpenECSession(&~lpSession, PROJECT_VERSION, "gateway/imap",
 	     strwUsername.c_str(), strwPassword.c_str(), m_strPath.c_str(),
 	     flags, NULL, NULL);
 	if (hr != hrSuccess) {
@@ -1816,13 +1816,20 @@ HRESULT IMAP::HrCmdAppend(const string &strTag, const string &strFolderParam, co
 	}
 
 	if (!strTime.empty()) {
-		lpPropVal->Value.ft = StringToFileTime(strTime);
-		lpPropVal->ulPropTag = PR_MESSAGE_DELIVERY_TIME;
-		HrSetOneProp(lpMessage, lpPropVal);
-		
-		lpPropVal->Value.ft = StringToFileTime(strTime, true);
-		lpPropVal->ulPropTag = PR_EC_MESSAGE_DELIVERY_DATE;
-		HrSetOneProp(lpMessage, lpPropVal);
+		FILETIME res;
+		auto valid = StringToFileTime(strTime, res);
+		if (valid) {
+			lpPropVal->Value.ft = res;
+			lpPropVal->ulPropTag = PR_MESSAGE_DELIVERY_TIME;
+			HrSetOneProp(lpMessage, lpPropVal);
+		}
+
+		valid = StringToFileTime(strTime, res, true);
+		if (valid) {
+			lpPropVal->Value.ft = res;
+			lpPropVal->ulPropTag = PR_EC_MESSAGE_DELIVERY_DATE;
+			HrSetOneProp(lpMessage, lpPropVal);
+		}
 	}
 
 	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE | FORCE_SAVE);
@@ -3253,7 +3260,7 @@ HRESULT IMAP::HrGetSubTree(list<SFolder> &folders, bool public_folders, list<SFo
 		{1, 0, 0, {{PR_DEPTH, TABLE_SORT_ASCEND}}};
 
 	object_ptr<IMAPITable> table;
-	auto hr = folder->GetHierarchyTable(CONVENIENT_DEPTH, &~table);
+	auto hr = folder->GetHierarchyTable(CONVENIENT_DEPTH | MAPI_DEFERRED_ERRORS, &~table);
 	if (hr != hrSuccess)
 		return kc_perror("K-2394", hr);
 	hr = table->SetColumns(cols, TBL_BATCH);
@@ -3400,6 +3407,7 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
 		} else if (strDataItem.compare("INTERNALDATE") == 0) {
 			setProps.emplace(PR_MESSAGE_DELIVERY_TIME);
 			setProps.emplace(PR_CLIENT_SUBMIT_TIME);
+			setProps.emplace(PR_CREATION_TIME);
 		} else if (strDataItem.compare("BODY") == 0) {
 			setProps.emplace(PR_EC_IMAP_BODY);
 		} else if (strDataItem.compare("BODYSTRUCTURE") == 0) {
@@ -3645,10 +3653,12 @@ HRESULT IMAP::HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &st
 			bSkipOpen = PCpropFindProp(lpProps, cValues, m_lpsIMAPTags->aulPropTag[0]) != NULL;
 		else if (iFetch->compare("RFC822.SIZE") == 0)
 			bSkipOpen = PCpropFindProp(lpProps, cValues, PR_EC_IMAP_EMAIL_SIZE) != NULL;
-		else if (strstr(iFetch->c_str(), "HEADER") != NULL)
+		else if (strstr(iFetch->c_str(), "HEADER") != NULL) {
 			// we can only use PR_TRANSPORT_MESSAGE_HEADERS when we have the full email.
-			bSkipOpen = (PCpropFindProp(lpProps, cValues, PR_TRANSPORT_MESSAGE_HEADERS_A) != NULL &&
-						 PCpropFindProp(lpProps, cValues, PR_EC_IMAP_EMAIL_SIZE) != NULL);
+			auto headers = PCpropFindProp(lpProps, cValues, PR_TRANSPORT_MESSAGE_HEADERS_A);
+			auto size = PCpropFindProp(lpProps, cValues, PR_EC_IMAP_EMAIL_SIZE);
+			bSkipOpen = (headers != nullptr && strlen(headers->Value.lpszA) > 0 && size != nullptr);
+		}
 		// full/partial body fetches, or size
 		else if (Prefix(*iFetch, "BODY") || Prefix(*iFetch, "RFC822"))
 			bSkipOpen = false;
@@ -4852,8 +4862,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("BEFORE") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = PR_EC_MESSAGE_DELIVERY_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
 				ECPropertyRestriction(RELOP_LT, pv.ulPropTag, &pv, ECRestriction::Shallow));
@@ -4927,8 +4943,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("ON") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = pv2.ulPropTag = PR_EC_MESSAGE_DELIVERY_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			pv2.Value.ft = AddDay(pv.Value.ft);
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
@@ -4950,8 +4972,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("SENTBEFORE") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = PR_EC_CLIENT_SUBMIT_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
 				ECPropertyRestriction(RELOP_LT, pv.ulPropTag, &pv, ECRestriction::Shallow));
@@ -4959,8 +4987,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("SENTON") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = pv2.ulPropTag = PR_EC_CLIENT_SUBMIT_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			pv2.Value.ft = AddDay(pv.Value.ft);
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
@@ -4970,8 +5004,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("SENTSINCE") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = PR_EC_CLIENT_SUBMIT_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
 				ECPropertyRestriction(RELOP_GE, pv.ulPropTag, &pv, ECRestriction::Shallow));
@@ -4979,8 +5019,14 @@ HRESULT IMAP::HrSearch(std::vector<std::string> &&lstSearchCriteria,
 		} else if (strSearchCriterium.compare("SINCE") == 0) {
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1)
 				return MAPI_E_CALL_FAILED;
+
+			FILETIME res;
+			auto valid = StringToFileTime(lstSearchCriteria[ulStartCriteria+1], res);
+			if (!valid)
+				return MAPI_E_CALL_FAILED;
+
 			pv.ulPropTag = PR_EC_MESSAGE_DELIVERY_DATE;
-			pv.Value.ft  = StringToFileTime(lstSearchCriteria[ulStartCriteria+1]);
+			pv.Value.ft = res;
 			top_rst += ECAndRestriction(
 				ECExistRestriction(pv.ulPropTag) +
 				ECPropertyRestriction(RELOP_GE, pv.ulPropTag, &pv, ECRestriction::Shallow));
@@ -5178,73 +5224,47 @@ string IMAP::FileTimeToString(FILETIME sFileTime) {
  * 
  * @return MAPI FILETIME structure
  */
-FILETIME IMAP::StringToFileTime(string strTime, bool bDateOnly) {
-	FILETIME sFileTime;
+bool IMAP::StringToFileTime(string strTime, FILETIME &sFileTime, bool bDateOnly)
+{
 	struct tm sTm;
-	ULONG ulMonth;
 	time_t sTime;
 	
 	sTm.tm_mday = 1;
-	sTm.tm_mon = 0;
 	sTm.tm_year = 100;			// years since 1900
-	sTm.tm_hour = 0;
-	sTm.tm_min = 0;
-	sTm.tm_sec = 0;
 	sTm.tm_isdst = -1;			// daylight saving time off
+	sTm.tm_mon = sTm.tm_hour = sTm.tm_min = sTm.tm_sec = 0;
 
-	// 01-Jan-2006 00:00:00 +0000
-	if (strTime.size() < 2)
-		goto done;
-	if (strTime.at(1) == '-')
-		strTime = " " + strTime;
+	auto s = strptime(strTime.c_str(), "%d-", &sTm);
+	if (s == nullptr || *s == '\0')
+		return false;
 
-	// day of month
-	if (strTime.at(0) == ' ')
-		sTm.tm_mday = atoi(strTime.substr(1, 1).c_str());
-	else
-		sTm.tm_mday = atoi(strTime.substr(0, 2).c_str());
-	// month name 3 chars
-	if (strTime.size() < 6)
-		goto done;
-
-	sTm.tm_mon = 0;
-	for (ulMonth = 0; ulMonth < 12; ++ulMonth)
-		if (strcasecmp(strMonth[ulMonth].c_str(),strTime.substr(3, 3).c_str()) == 0)
-			sTm.tm_mon = ulMonth;
-	if (strTime.size() < 11)
-		goto done;
-
-	sTm.tm_year = atoi(strTime.substr(7, 4).c_str()) - 1900;	// year 4 chars
-	if (strTime.size() < 14)
-		goto done;
-
-	if (bDateOnly)
-	    goto done;
-
-	sTm.tm_hour = atoi(strTime.substr(12, 2).c_str());	// hours
-	if (strTime.size() < 17)
-		goto done;
-
-	sTm.tm_min = atoi(strTime.substr(15, 2).c_str());	// minutes
-	if (strTime.size() < 20)
-		goto done;
-
-	sTm.tm_sec = atoi(strTime.substr(18, 2).c_str());	// seconds
-	if (strTime.size() < 26)
-		goto done;
-
-	if (strTime.substr(21, 1) == "+") {
-		sTm.tm_hour -= atoi(strTime.substr(22, 2).c_str());
-		sTm.tm_min -= atoi(strTime.substr(24, 2).c_str());
-	} else if (strTime.substr(21, 1) == "-") {
-		sTm.tm_hour += atoi(strTime.substr(22, 2).c_str());
-		sTm.tm_min += atoi(strTime.substr(24, 2).c_str());
+	size_t i = 0;
+	for (; i < 12; ++i) {
+		if (strncasecmp(strMonth[i].c_str(), s, 3) == 0) {
+			sTm.tm_mon = i;
+			break;
+		}
 	}
 
-done:
+	if (i == 12)
+		return false;
+
+	s = strptime(s + 3, "-%Y", &sTm);
+	if (s == nullptr)
+		return false;
+
+	if (!bDateOnly && *s == ' ') {
+		s++;
+		s = strptime(s, "%H:%M:%S", &sTm);
+		if (s != nullptr && *s == ' ') {
+			s++;
+			s = strptime(s, "%z", &sTm);
+		}
+	}
+
 	sTime = timegm(&sTm);
 	UnixTimeToFileTime(sTime, &sFileTime);
-	return sFileTime;
+	return true;
 }
 
 /** 
