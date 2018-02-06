@@ -2089,10 +2089,11 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 #ifdef HAVE_TIDY_H
 	case PROP_ID(PR_EC_BODY_FILTERED): {
 		// does it already exist? (e.g. inserted by dagent/gateway)
-		hr = lpMessage->GetSyncedBodyProp(PR_EC_BODY_FILTERED, ulFlags, lpBase, lpsPropValue);
+		hr = lpMessage->HrGetRealProp(PR_EC_BODY_FILTERED, ulFlags, lpBase, lpsPropValue);
 		if (hr == hrSuccess) // yes, then use that
 			break;
 
+		lpsPropValue->ulPropTag = PR_EC_BODY_FILTERED;
 		// else generate it on the fly
 		memory_ptr<SPropValue> tprop;
 		hr = MAPIAllocateBuffer(sizeof(SPropValue), &~tprop);
@@ -2105,7 +2106,7 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 		}
 
 		std::string fltblk, memblk(reinterpret_cast<const char *>(tprop->Value.bin.lpb), tprop->Value.bin.cb);
-		std::copy_if(fltblk.cbegin(), fltblk.cend(), std::back_inserter(fltblk), [](char x) { return x != '\0'; });
+		std::copy_if(memblk.cbegin(), memblk.cend(), std::back_inserter(fltblk), [](char x) { return x != '\0'; });
 		std::string result;
 		std::vector<std::string> errors;
 		bool rc = rosie_clean_html(fltblk, &result, &errors);
@@ -2114,10 +2115,10 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 		if (rc) {
 			ULONG ulSize = result.size();
 
-			hr = ECAllocateMore(ulSize + 1, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.lpszA));
+			hr = ECAllocateMore(ulSize + 1, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
 			if (hr == hrSuccess) {
-				memcpy(lpsPropValue->Value.lpszA, result.c_str(), ulSize);
-				lpsPropValue->Value.lpszA[ulSize] = '\0';
+				memcpy(lpsPropValue->Value.bin.lpb, result.c_str(), ulSize);
+				lpsPropValue->Value.bin.lpb[ulSize] = '\0';
 				// FIXME store in database if that is what the SysOp wants
 			} else {
 				ulSize = 0;
@@ -2264,17 +2265,19 @@ HRESULT ECMessage::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
     ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	HRESULT hr = hrSuccess;
+	object_ptr<IMAPIProp> destiprop;
 	object_ptr<IUnknown> lpECUnknown;
 	memory_ptr<SPropValue> lpECObject;
 	object_ptr<ECMAPIProp> lpECMAPIProp;
 	GUID sDestServerGuid = {0};
 	GUID sSourceServerGuid = {0};
 
-	if (lpDestObj == nullptr)
+	if (lpInterface == nullptr || lpDestObj == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
 	// Wrap mapi object to kopano object
-	if (HrGetOneProp((LPMAPIPROP)lpDestObj, PR_EC_OBJECT, &~lpECObject) == hrSuccess)
+	if (qi_void_to_imapiprop(lpDestObj, *lpInterface, &~destiprop) == hrSuccess &&
+	    HrGetOneProp(destiprop, PR_EC_OBJECT, &~lpECObject) == hrSuccess)
 		lpECUnknown.reset(reinterpret_cast<IUnknown *>(lpECObject->Value.lpszA));
 
 	// Deny copying within the same object. This is not allowed in exchange either and is required to deny
