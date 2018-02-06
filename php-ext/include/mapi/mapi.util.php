@@ -16,9 +16,6 @@
  *
  */
 
-?>
-<?php
-	
 /**
  * Function to make a MAPIGUID from a php string. 
  * The C++ definition for the GUID is: 
@@ -141,7 +138,7 @@ function getPropIdsFromStrings($store, $mapping)
 }
 
 /**
- * Check wether a call to mapi_getprops returned errors for some properties.
+ * Check whether a call to mapi_getprops returned errors for some properties.
  * mapi_getprops function tries to get values of properties requested but somehow if
  * if a property value can not be fetched then it changes type of property tag as PT_ERROR
  * and returns error for that particular property, probable errors
@@ -308,6 +305,7 @@ function getDefaultStore($session)
     foreach ($msgstores as $row) {
         if($row[PR_DEFAULT_STORE]) {
             $storeentryid = $row[PR_ENTRYID];
+            break;
         }
     }
 
@@ -347,4 +345,3 @@ function forceUTF8($category)
 
     return true;
 }
-?>

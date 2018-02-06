@@ -22,8 +22,10 @@
 #include <cstdio>
 #include <ctime>
 #include <cmath>
-
-using namespace std;
+#if __GNUC_PREREQ(5, 0) && !__GNUC_PREREQ(6, 0)
+using std::isfinite;
+using std::isnan;
+#endif
 
 extern "C" {
 	// Remove these defines to remove warnings
@@ -32,11 +34,6 @@ extern "C" {
 	#undef PACKAGE_NAME
 	#undef PACKAGE_STRING
 	#undef PACKAGE_BUGREPORT
-
-	#if !__GNUC_PREREQ(6,0)
-	#define zend_isnan(a) std::isnan(a)
-	#endif
-	
 	#include "php.h"
    	#include "php_globals.h"
 	#include "ext/standard/info.h"
@@ -136,17 +133,17 @@ HRESULT ECImportContentsChangesProxy::Config(LPSTREAM lpStream, ULONG ulFlags) {
 HRESULT ECImportContentsChangesProxy::UpdateState(LPSTREAM lpStream) {
     zval pvalFuncName;
     zval pvalReturn;
-    zval pvalArgs[1];
+	zval pvalArgs;
     
     if(lpStream) {
-	Z_LVAL_P(&pvalArgs[0]) = (long)lpStream;
-	Z_TYPE_INFO_P(&pvalArgs[0]) = IS_RESOURCE;
+		Z_LVAL_P(&pvalArgs) = reinterpret_cast<uintptr_t>(lpStream);
+		Z_TYPE_INFO_P(&pvalArgs) = IS_RESOURCE;
     } else {
-        ZVAL_NULL(&pvalArgs[0]);
+		ZVAL_NULL(&pvalArgs);
     }
     
     ZVAL_STRING(&pvalFuncName, "UpdateState");
-    if (call_user_function(NULL, &m_lpObj, &pvalFuncName, &pvalReturn, 1, pvalArgs TSRMLS_CC) == FAILURE) {
+	if (call_user_function(nullptr, &m_lpObj, &pvalFuncName, &pvalReturn, 1, &pvalArgs TSRMLS_CC) == FAILURE) {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "UpdateState method not present on ImportContentsChanges object");
         return MAPI_E_CALL_FAILED;
     }
@@ -215,12 +212,11 @@ HRESULT ECImportContentsChangesProxy::ImportMessageDeletion(ULONG ulFlags, LPENT
 HRESULT ECImportContentsChangesProxy::ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState) {
     zval pvalFuncName;
     zval pvalReturn;
-    zval pvalArgs[1];
+	zval pvalArgs;
     
-    ReadStateArraytoPHPArray(cElements, lpReadState, &pvalArgs[0] TSRMLS_CC);
-
+	ReadStateArraytoPHPArray(cElements, lpReadState, &pvalArgs TSRMLS_CC);
     ZVAL_STRING(&pvalFuncName, "ImportPerUserReadStateChange");
-    if (call_user_function(NULL, &m_lpObj, &pvalFuncName, &pvalReturn, 1, pvalArgs TSRMLS_CC) == FAILURE) {
+	if (call_user_function(nullptr, &m_lpObj, &pvalFuncName, &pvalReturn, 1, &pvalArgs TSRMLS_CC) == FAILURE) {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "ImportPerUserReadStateChange method not present on ImportContentsChanges object");
         return MAPI_E_CALL_FAILED;
     }

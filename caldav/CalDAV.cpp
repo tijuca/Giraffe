@@ -18,8 +18,10 @@
 #include "config.h"
 #include <kopano/platform.h>
 #include <memory>
+#include <new>
 #include <type_traits>
 #include <climits>
+#include <poll.h>
 #include "mapidefs.h"
 #include <mapix.h>
 #include <kopano/MAPIErrors.h>
@@ -43,14 +45,9 @@
 #include "SSLUtil.h"
 
 #include "TmpPath.h"
-
-using namespace std;
-
 #include <execinfo.h>
 #include <kopano/UnixUtil.h>
-#ifdef KC_USES_ICU
 #include <unicode/uclean.h>
-#endif
 #include <openssl/ssl.h>
 
 struct HandlerArgs {
@@ -108,9 +105,11 @@ static void sigchld(int)
 
 static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(g_lpLogger, "CalDAV",
-		PROJECT_VERSION_GATEWAY_STR, signr, si, uc);
+	generic_sigsegv_handler(g_lpLogger, "kopano-ical", PROJECT_VERSION, signr, si, uc);
 }
+
+using std::cout;
+using std::endl;
 
 static void PrintHelp(const char *name)
 {
@@ -125,7 +124,7 @@ static void PrintHelp(const char *name)
 
 static void PrintVersion(void)
 {
-	cout << "Product version:\t"  <<  PROJECT_VERSION_CALDAV_STR << endl << "File version:\t\t" << PROJECT_SVN_REV_STR << endl;
+	cout << "kopano-ical " PROJECT_VERSION << endl;
 }
 
 int main(int argc, char **argv) {
@@ -139,24 +138,25 @@ int main(int argc, char **argv) {
 	// Configuration
 	int opt = 0;
 	const char *lpszCfg = ECConfig::GetDefaultPath("ical.cfg");
+	bool exp_config = false;
 	static const configsetting_t lpDefaults[] = {
 		{ "run_as_user", "kopano" },
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/ical.pid" },
 		{ "running_path", "/var/lib/kopano" },
-		{ "process_model", "fork" },
+		{ "process_model", "thread" },
 		{ "server_bind", "" },
-		{ "ical_port", "8080" },
-		{ "ical_enable", "yes" },
-		{ "icals_port", "8443" },
-		{ "icals_enable", "no" },
+		{"ical_port", "8080", CONFIGSETTING_NONEMPTY},
+		{"ical_enable", "yes", CONFIGSETTING_NONEMPTY},
+		{"icals_port", "8443", CONFIGSETTING_NONEMPTY},
+		{"icals_enable", "no", CONFIGSETTING_NONEMPTY},
 		{ "enable_ical_get", "yes", CONFIGSETTING_RELOADABLE },
 		{ "server_socket", "http://localhost:236/" },
 		{ "server_timezone","Europe/Amsterdam"},
 		{ "default_charset","utf-8"},
-		{ "log_method", "file" },
-		{ "log_file", "/var/log/kopano/ical.log" },
-		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
+		{"log_method", "file", CONFIGSETTING_NONEMPTY},
+		{"log_file", "/var/log/kopano/ical.log", CONFIGSETTING_NONEMPTY},
+		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 		{ "log_timestamp", "1" },
 		{ "log_buffer_size", "0" },
         { "ssl_private_key_file", "/etc/kopano/ical/privkey.pem" },
@@ -198,6 +198,7 @@ int main(int argc, char **argv) {
 		switch (opt) {
 		case 'c':
 			lpszCfg = optarg;
+			exp_config = true;
 			break;
 		case 'F':
 			g_bDaemonize = false;
@@ -219,10 +220,14 @@ int main(int argc, char **argv) {
 	xmlInitParser();
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(lpszCfg) ||
+	if (!g_lpConfig->LoadSettings(lpszCfg, !exp_config) ||
 	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(1, 0, "-", false);
+		if (g_lpLogger == nullptr) {
+			hr = MAPI_E_NOT_ENOUGH_MEMORY;
+			goto exit;
+		}
 		ec_log_set(g_lpLogger);
 		LogConfigErrors(g_lpConfig);
 		goto exit;
@@ -236,8 +241,7 @@ int main(int argc, char **argv) {
 	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
-
-	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+	if (!TmpPath::instance.OverridePath(g_lpConfig))
 		ec_log_err("Ignoring invalid path-setting!");
 
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0)
@@ -289,16 +293,13 @@ int main(int argc, char **argv) {
 
 	hr = MAPIInitialize(NULL);
 	if (hr != hrSuccess) {
-		fprintf(stderr, "Messaging API could not be initialized: %s (%x)",
-		        GetMAPIErrorMessage(hr), hr);
+		kc_perror("Messaging API could not be initialized", hr);
 		goto exit;
 	}
 
 	if (g_bThreads)
 		mainthread = pthread_self();
-
-	ec_log_info("Starting kopano-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
-
+	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-ical version " PROJECT_VERSION " (pid %d)", getpid());
 	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
 	if (hr != hrSuccess)
 		goto exit2;
@@ -338,12 +339,8 @@ exit:
 
 	// Cleanup libxml2 library
 	xmlCleanupParser();
-
-#ifdef KC_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
-#endif
-
 	return hr;
 
 }
@@ -390,7 +387,7 @@ static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
 				ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 				bListenSecure = false;
 			}
-			ec_log_err("Listening on secure port %d.", ulPortICalS);
+			ec_log_info("Listening on secure port %d.", ulPortICalS);
 		} else {
 			ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 			bListenSecure = false;
@@ -418,32 +415,29 @@ static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
 static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 {
 	HRESULT hr = hrSuccess;
-	fd_set readfds = {{0}};
-	int err = 0;
+	struct pollfd pollfd[2];
 	bool bUseSSL;
-	struct timeval timeout = {0};
 	ECChannel *lpChannel = NULL;
-	int nCloseFDs = 0;
-	int pCloseFDs[2] = {0};
+	int nCloseFDs = 0, pCloseFDs[2] = {0}, pfd_normal = -1, pfd_secure = -1;
 
-	if (ulNormalSocket)
-		pCloseFDs[nCloseFDs++] = ulNormalSocket;
-	if (ulSecureSocket)
-		pCloseFDs[nCloseFDs++] = ulSecureSocket;
+	if (ulNormalSocket) {
+		pCloseFDs[nCloseFDs] = pollfd[nCloseFDs].fd = ulNormalSocket;
+		pfd_normal = nCloseFDs++;
+	}
+	if (ulSecureSocket) {
+		pCloseFDs[nCloseFDs] = pollfd[nCloseFDs].fd = ulSecureSocket;
+		pfd_secure = nCloseFDs++;
+	}
+	for (size_t i = 0; i < nCloseFDs; ++i)
+		pollfd[i].events = POLLIN | POLLRDHUP;
 
 	// main program loop
 	while (!g_bQuit) {
-		FD_ZERO(&readfds);
-		if (ulNormalSocket)
-			FD_SET(ulNormalSocket, &readfds);
-		if (ulSecureSocket)
-			FD_SET(ulSecureSocket, &readfds);
-
-		timeout.tv_sec = 10;
-		timeout.tv_usec = 0;
+		for (size_t i = 0; i < nCloseFDs; ++i)
+			pollfd[i].revents = 0;
 
 		// Check whether there are incoming connections.
-		err = select(max(ulNormalSocket, ulSecureSocket) + 1, &readfds, NULL, NULL, &timeout);
+		int err = poll(pollfd, nCloseFDs, 10 * 1000);
 		if (err < 0) {
 			if (errno != EINTR) {
 				ec_log_crit("An unknown socket error has occurred.");
@@ -461,7 +455,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		}
 
 		// Check if a normal connection is waiting.
-		if (ulNormalSocket && FD_ISSET(ulNormalSocket, &readfds)) {
+		if (pfd_normal >= 0 && pollfd[pfd_normal].revents & (POLLIN | POLLRDHUP)) {
 			ec_log_info("Connection waiting on port %d.", atoi(g_lpConfig->GetSetting("ical_port")));
 			bUseSSL = false;
 			hr = HrAccept(ulNormalSocket, &lpChannel);
@@ -470,7 +464,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 				continue;
 			}
 		// Check if a secure connection is waiting.
-		} else if (ulSecureSocket && FD_ISSET(ulSecureSocket, &readfds)) {
+		} else if (pfd_secure >= 0 && pollfd[pfd_secure].revents & (POLLIN | POLLRDHUP)) {
 			ec_log_info("Connection waiting on secure port %d.", atoi(g_lpConfig->GetSetting("icals_port")));
 			bUseSSL = true;
 			hr = HrAccept(ulSecureSocket, &lpChannel);
@@ -485,7 +479,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		hr = HrStartHandlerClient(lpChannel, bUseSSL, nCloseFDs, pCloseFDs);
 		if (hr != hrSuccess) {
 			delete lpChannel;	// destructor closes sockets
-			ec_log_err("Handling client connection failed. (0x%08X %s)", hr, GetMAPIErrorMessage(hr));
+			kc_perror("Handling client connection failed", hr);
 			continue;
 		}
 		if (g_bThreads == false)
@@ -511,7 +505,7 @@ static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL,
 	HRESULT hr = hrSuccess;
 	pthread_attr_t pThreadAttr;
 	pthread_t pThread;
-	HandlerArgs *lpHandlerArgs = new HandlerArgs;
+	auto lpHandlerArgs = new HandlerArgs;
 
 	lpHandlerArgs->lpChannel = lpChannel;
 	lpHandlerArgs->bUseSSL = bUseSSL;
@@ -548,7 +542,7 @@ exit:
 static void *HandlerClient(void *lpArg)
 {
 	HRESULT hr = hrSuccess;
-	HandlerArgs *lpHandlerArgs = reinterpret_cast<HandlerArgs *>(lpArg);
+	auto lpHandlerArgs = static_cast<HandlerArgs *>(lpArg);
 	ECChannel *lpChannel = lpHandlerArgs->lpChannel;
 	bool bUseSSL = lpHandlerArgs->bUseSSL;	
 
@@ -637,7 +631,7 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	hr = HrParseURL(strUrl, &ulFlag);
 	if (hr != hrSuccess) {
-		ec_log_err("Client request is invalid: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
+		kc_perror("Client request is invalid", hr);
 		lpRequest.HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
 		goto exit;
 	}

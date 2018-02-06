@@ -14,13 +14,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <chrono>
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <kopano/ECLogger.h>
 
 #include <sys/select.h>
-#include <sys/time.h>
 #include <iconv.h>
 #include <cstring>
 #include <cstdio>
@@ -64,12 +63,12 @@
 
 static bool rand_init_done = false;
 
-bool operator!=(const GUID &a, const GUID &b)
+bool operator!=(const GUID &a, const GUID &b) noexcept
 {
 	return memcmp(&a, &b, sizeof(GUID)) != 0;
 }
 
-bool operator==(REFIID a, const GUID &b)
+bool operator==(REFIID a, const GUID &b) noexcept
 {
 	return memcmp(&a, &b, sizeof(GUID)) == 0;
 }
@@ -105,12 +104,11 @@ HRESULT CoCreateGuid(LPGUID pNewGUID) {
 }
 
 void GetSystemTimeAsFileTime(FILETIME *ft) {
-	struct timeval now;
-	__int64_t l;
-	gettimeofday(&now,NULL); // null==timezone
-	l = ((__int64_t)now.tv_sec * 10000000) + ((__int64_t)now.tv_usec * 10) + (__int64_t)NANOSECS_BETWEEN_EPOCHS;
-	ft->dwLowDateTime = (unsigned int)(l & 0xffffffff);
-	ft->dwHighDateTime = l >> 32;
+	using namespace std::chrono;
+	using ft_ns = duration<nanoseconds::rep, std::ratio_multiply<std::hecto, std::nano>>;
+	auto now = duration_cast<ft_ns>(system_clock::now().time_since_epoch()).count() + NANOSECS_BETWEEN_EPOCHS;
+	ft->dwLowDateTime  = now & 0xffffffff;
+	ft->dwHighDateTime = now >> 32;
 }
 
 /** 
@@ -123,8 +121,7 @@ void GetSystemTimeAsFileTime(FILETIME *ft) {
  * @return length used or what would've been required if it would fit in lpBuffer
  */
 DWORD GetTempPath(DWORD inLen, char *lpBuffer) {
-	unsigned int outLen = snprintf(lpBuffer, inLen, "%s/", TmpPath::getInstance() -> getTempPath().c_str());
-
+	auto outLen = snprintf(lpBuffer, inLen, "%s/", TmpPath::instance.getTempPath().c_str());
 	if (outLen > inLen)
 		return 0;
 
@@ -180,6 +177,8 @@ void rand_get(char *p, int n)
 	}
 	
 void rand_init() {
+	if (rand_init_done)
+		return;
 	unsigned int seed = 0;
 	rand_get((char *)&seed, sizeof(seed));
 	srand(seed);
@@ -200,10 +199,6 @@ int rand_mt() {
 	// also RAND_MAX is never returned which the
 	// regular rand() does do
 	return dummy % RAND_MAX;
-}
-
-void rand_free() {
-	//Nothing to free
 }
 
 char * get_password(const char *prompt) {
@@ -239,7 +234,7 @@ std::vector<std::string> get_backtrace(void)
 		return result;
 	char **symbollist = backtrace_symbols(addrlist, addrlen);
 	for (int i = 0; i < addrlen; ++i)
-		result.push_back(symbollist[i]);
+		result.emplace_back(symbollist[i]);
 	free(symbollist);
 	return result;
 #undef BT_MAX

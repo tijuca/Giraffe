@@ -28,16 +28,14 @@
 
 #include <kopano/ECLogger.h>
 #include <kopano/ECUnknown.h>
-#include <IECExportChanges.h>
-#include <IECImportContentsChanges.h>
-
+#include <kopano/IECInterfaces.hpp>
+#include <kopano/memory.hpp>
 #include "WSMessageStreamExporter.h"
 
-class ECExchangeExportChanges _kc_final : public ECUnknown {
+class ECExchangeExportChanges _kc_final :
+    public ECUnknown, public IECExportChanges {
 protected:
 	ECExchangeExportChanges(ECMsgStore *lpStore, const std::string& strSK, const wchar_t *szDisplay, unsigned int ulSyncType);
-	virtual ~ECExchangeExportChanges();
-
 public:
 	static	HRESULT Create(ECMsgStore *lpStore, REFIID iid, const std::string& strSK, const wchar_t *szDisplay, unsigned int ulSyncType, LPEXCHANGEEXPORTCHANGES* lppExchangeExportChanges);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
@@ -53,21 +51,6 @@ public:
 
 private:
 	void LogMessageProps(int loglevel, ULONG cValues, LPSPropValue lpPropArray);
-
-	class xECExportChanges _kc_final : public IECExportChanges {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-
-		// <kopano/xclsfrag/IExchangeExportChanges.hpp>
-		virtual HRESULT __stdcall GetLastError(HRESULT, ULONG flags, LPMAPIERROR *err) _kc_override;
-		virtual HRESULT __stdcall Config(LPSTREAM, ULONG flags, LPUNKNOWN collector, LPSRestriction, LPSPropTagArray inclprop, LPSPropTagArray exclprop, ULONG bufsize) _kc_override;
-		virtual HRESULT __stdcall Synchronize(ULONG *steps, ULONG *progress) _kc_override;
-		virtual HRESULT __stdcall UpdateState(LPSTREAM) _kc_override;
-		virtual HRESULT __stdcall ConfigSelective(ULONG proptag, LPENTRYLIST entries, LPENTRYLIST parents, ULONG flags, LPUNKNOWN collector, LPSPropTagArray inclprop, LPSPropTagArray exclprop, ULONG bufsize) _kc_override;
-		virtual HRESULT __stdcall GetChangeCount(ULONG *changes) _kc_override;
-		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _kc_override;
-		virtual HRESULT __stdcall SetLogger(ECLogger *) _kc_override;
-	} m_xECExportChanges;
-	
 	HRESULT ExportMessageChanges();
 	HRESULT ExportMessageChangesSlow();
 	HRESULT ExportMessageChangesFast();
@@ -80,10 +63,8 @@ private:
 
 	unsigned long	m_ulSyncType;
 	bool m_bConfiged = false;
-	ECMsgStore*		m_lpStore;
 	std::string		m_sourcekey;
 	std::wstring	m_strDisplay;
-	IStream *m_lpStream = nullptr;
 	ULONG m_ulFlags = 0;
 	ULONG m_ulSyncId = 0, m_ulChangeId = 0;
 	ULONG m_ulStep = 0, m_ulBatchSize;
@@ -91,9 +72,6 @@ private:
 	ULONG m_ulEntryPropTag = PR_SOURCE_KEY; // This is normally the tag that is sent to exportMessageChangeAsStream()
 
 	IID				m_iidMessage;
-	IExchangeImportContentsChanges *m_lpImportContents = nullptr;
-	IECImportContentsChanges *m_lpImportStreamedContents = nullptr;
-	IExchangeImportHierarchyChanges *m_lpImportHierarchy = nullptr;
 	WSMessageStreamExporterPtr			m_ptrStreamExporter;
 	
 	std::vector<ICSCHANGE> m_lstChange;
@@ -107,15 +85,20 @@ private:
 	typedef std::set<std::pair<unsigned int, std::string> > PROCESSEDCHANGESSET;
 	
 	PROCESSEDCHANGESSET m_setProcessedChanges;
-	ICSCHANGE *m_lpChanges = nullptr;
 	ULONG m_ulChanges = 0, m_ulMaxChangeId = 0;
-	SRestriction *m_lpRestrict = nullptr;
-	ECLogger			*m_lpLogger;
 	clock_t m_clkStart = 0;
 	struct tms			m_tmsStart;
+	KCHL::object_ptr<ECLogger> m_lpLogger;
+	KCHL::memory_ptr<SRestriction> m_lpRestrict;
+	KCHL::object_ptr<IExchangeImportHierarchyChanges> m_lpImportHierarchy;
+	KCHL::object_ptr<IECImportContentsChanges> m_lpImportStreamedContents;
+	KCHL::object_ptr<IExchangeImportContentsChanges> m_lpImportContents;
+	KCHL::object_ptr<IStream> m_lpStream;
+	KCHL::object_ptr<ECMsgStore> m_lpStore;
+	KCHL::memory_ptr<ICSCHANGE> m_lpChanges;
 	
 	HRESULT AddProcessedChanges(ChangeList &lstChanges);
-	
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif // ECEXCHANGEEXPORTCHANGES_H

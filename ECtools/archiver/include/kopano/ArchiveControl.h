@@ -39,8 +39,7 @@ enum eResult {
 
 class ArchiveControl {
 public:
-	typedef std::unique_ptr<ArchiveControl> auto_ptr_type;
-	virtual ~ArchiveControl(void) _kc_impdtor;
+	virtual ~ArchiveControl(void) = default;
 	virtual eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags) = 0;
 	virtual eResult Archive(const tstring& strUser, bool bAutoAttach, unsigned int ulFlags) = 0;
 	virtual eResult CleanupAll(bool bLocalOnly) = 0;
@@ -50,7 +49,7 @@ protected:
 	ArchiveControl(void) = default;
 };
 
-typedef ArchiveControl::auto_ptr_type	ArchiveControlPtr;
+typedef std::unique_ptr<ArchiveControl> ArchiveControlPtr;
 
 } /* namespace */
 

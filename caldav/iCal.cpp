@@ -18,7 +18,8 @@
 #include <kopano/platform.h>
 #include "iCal.h"
 #include "CalDavUtil.h"
-
+#include <map>
+#include <memory>
 #include <vector>
 
 #include <kopano/CommonUtil.h>
@@ -32,7 +33,6 @@
 
 #include <kopano/mapi_ptr.h>
 
-using namespace std;
 using namespace KCHL;
 
 iCal::iCal(Http *lpRequest, IMAPISession *lpSession,
@@ -140,7 +140,6 @@ HRESULT iCal::HrHandleIcalPost()
 	SBinary sbUid = {0,0};
 	ULONG ulItemCount = 0;
 	ULONG ulProptag = 0;
-	ICalToMapi *lpICalToMapi = NULL;
 	time_t tLastMod = 0;
 	bool blCensorPrivate = false;
 
@@ -150,19 +149,19 @@ HRESULT iCal::HrHandleIcalPost()
 	eIcalType etype = VEVENT;
 	FILETIME ftModTime;
 	time_t tUnixModTime;
-	map<std::string, int> mpIcalEntries;
-	map<std::string, FILETIME> mpSrvTimes;
-	map<std::string,SBinary> mpSrvEntries;
-	
-	map<std::string, int>::const_iterator mpIterI;
-	map<std::string,SBinary>::const_iterator mpIterJ;
+	std::map<std::string, int> mpIcalEntries;
+	std::map<std::string, FILETIME> mpSrvTimes;
+	std::map<std::string, SBinary> mpSrvEntries;
+	decltype(mpIcalEntries)::const_iterator mpIterI;
+	decltype(mpSrvEntries)::const_iterator mpIterJ;
 
 	ulProptag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_GOID], PT_BINARY);
 	SizedSPropTagArray(3, proptags) = {3, {PR_ENTRYID, PR_LAST_MODIFICATION_TIME, ulProptag}};
 	//Include PR_ENTRYID,PR_LAST_MODIFICATION_TIME & Named Prop GlobalObjUid.
 	
 	//retrive entries from ical data.
-	CreateICalToMapi(m_lpActiveStore, m_lpAddrBook, false, &lpICalToMapi);
+	std::unique_ptr<ICalToMapi> lpICalToMapi;
+	CreateICalToMapi(m_lpActiveStore, m_lpAddrBook, false, &unique_tie(lpICalToMapi));
 
 	m_lpRequest->HrGetBody(&strIcal);
 	if(!strIcal.empty())
@@ -180,8 +179,7 @@ HRESULT iCal::HrHandleIcalPost()
 		hr = lpICalToMapi->GetItemInfo(i, &etype, &tLastMod, &sbEid);
 		if (hr != hrSuccess || etype != VEVENT)
 			continue;
-		
-		strUidString = bin2hex((ULONG)sbEid.cb,(LPBYTE)sbEid.lpb);
+		strUidString = bin2hex(sbEid);
 		mpIcalEntries[strUidString] = i;
 	}
 
@@ -207,20 +205,20 @@ HRESULT iCal::HrHandleIcalPost()
 			break;
 
 		for (ULONG i = 0; i < lpRows->cRows; ++i) {
-			if (lpRows->aRow[i].lpProps[0].ulPropTag != PR_ENTRYID)
+			if (lpRows[i].lpProps[0].ulPropTag != PR_ENTRYID)
 				continue;
-			if (lpRows->aRow[i].lpProps[2].ulPropTag == ulProptag)
-				sbUid = lpRows->aRow[i].lpProps[2].Value.bin;
+			if (lpRows[i].lpProps[2].ulPropTag == ulProptag)
+				sbUid = lpRows[i].lpProps[2].Value.bin;
 			else
 				continue; // skip new entries
-			sbEid.cb = lpRows->aRow[i].lpProps[0].Value.bin.cb;
+			sbEid.cb = lpRows[i].lpProps[0].Value.bin.cb;
 			if ((hr = MAPIAllocateBuffer(sbEid.cb, (void **)&sbEid.lpb)) != hrSuccess)
 				goto exit;
-			memcpy(sbEid.lpb, lpRows->aRow[i].lpProps[0].Value.bin.lpb, sbEid.cb);
-			strUidString = bin2hex((ULONG)sbUid.cb, (LPBYTE)sbUid.lpb);
+			memcpy(sbEid.lpb, lpRows[i].lpProps[0].Value.bin.lpb, sbEid.cb);
+			strUidString = bin2hex(sbUid);
 			mpSrvEntries[strUidString] = sbEid;
-			if (lpRows->aRow[i].lpProps[1].ulPropTag == PR_LAST_MODIFICATION_TIME)
-				mpSrvTimes[strUidString] = lpRows->aRow[i].lpProps[1].Value.ft;				
+			if (lpRows[i].lpProps[1].ulPropTag == PR_LAST_MODIFICATION_TIME)
+				mpSrvTimes[strUidString] = lpRows[i].lpProps[1].Value.ft;
 		}
 	}
 
@@ -241,7 +239,7 @@ HRESULT iCal::HrHandleIcalPost()
 			}
 			++mpIterJ;
 		} else if (mpIcalEntries.cend() != mpIterI && mpSrvEntries.cend() == mpIterJ) {
-			hr = HrAddMessage(lpICalToMapi, mpIterI->second);
+			hr = HrAddMessage(lpICalToMapi.get(), mpIterI->second);
 			if(hr != hrSuccess)
 			{
 				ec_log_err("Unable to Add New Message: 0x%08X", hr);
@@ -257,7 +255,7 @@ HRESULT iCal::HrHandleIcalPost()
 				FileTimeToUnixTime(ftModTime, &tUnixModTime);
 				if(tUnixModTime != tLastMod && etype == VEVENT)
 				{
-					hr = HrModify(lpICalToMapi, mpIterJ->second, mpIterI->second, blCensorPrivate);
+					hr = HrModify(lpICalToMapi.get(), mpIterJ->second, mpIterI->second, blCensorPrivate);
 					if(hr != hrSuccess)
 					{
 						ec_log_err("Unable to Modify Message: 0x%08X", hr);
@@ -269,7 +267,7 @@ HRESULT iCal::HrHandleIcalPost()
 			}
 			else if( mpIterI->first.compare(mpIterJ->first) < 0 )
 			{
-				hr = HrAddMessage(lpICalToMapi, mpIterI->second);
+				hr = HrAddMessage(lpICalToMapi.get(), mpIterI->second);
 				if(hr != hrSuccess)
 				{
 					ec_log_err("Unable to Add New Message: 0x%08X", hr);
@@ -308,8 +306,6 @@ exit:
 
 	for (mpIterJ = mpSrvEntries.cbegin(); mpIterJ != mpSrvEntries.cend(); ++mpIterJ)
 		MAPIFreeBuffer(mpIterJ->second.lpb);
-	if(lpICalToMapi)
-		delete lpICalToMapi;
 	mpSrvEntries.clear();
 	mpIcalEntries.clear();
 	mpSrvTimes.clear();
@@ -335,7 +331,7 @@ HRESULT iCal::HrModify( ICalToMapi *lpIcal2Mapi, SBinary sbSrvEid, ULONG ulPos, 
 	ulTagPrivate = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PRIVATE], PT_BOOLEAN);
 
 	HRESULT hr = m_lpUsrFld->OpenEntry(sbSrvEid.cb, reinterpret_cast<ENTRYID *>(sbSrvEid.lpb),
-	             nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	             &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 	if(hr != hrSuccess)
 		return hr;
 	if (blCensor && IsPrivate(lpMessage, ulTagPrivate))
@@ -376,7 +372,7 @@ HRESULT iCal::HrAddMessage(ICalToMapi *lpIcal2Mapi, ULONG ulPos)
  * The message is moved to wastebasket(deleted items folder)
  * 
  * @param[in]	sbEid		EntryID of the message to be deleted
- * @param[in]	blCensor	boolean to block delete of private messages
+ * @param[in]	blCensor	boolean to block deletion of private messages
  *
  * @return		HRESULT 
  */
@@ -403,7 +399,8 @@ HRESULT iCal::HrDelMessage(SBinary sbEid, bool blCensor)
 		ec_log_err("Error allocating memory, error code: 0x%08X",hr);
 		return hr;
 	}
-	hr = m_lpUsrFld->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	hr = m_lpUsrFld->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb),
+	     &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 	if(hr != hrSuccess)
 		return hr;
 	
@@ -518,19 +515,17 @@ HRESULT iCal::HrGetIcal(IMAPITable *lpTable, bool blCensorPrivate, std::string *
 		for (ULONG i = 0; i < lpRows->cRows; ++i) {
 			blCensor = blCensorPrivate; // reset censor flag for next message
 			ulFlag = 0;
-
-			if (lpRows->aRow[i].lpProps[0].ulPropTag != PR_ENTRYID)
+			if (lpRows[i].lpProps[0].ulPropTag != PR_ENTRYID)
 				continue;
-
-			sbEid = lpRows->aRow[i].lpProps[0].Value.bin;
+			sbEid = lpRows[i].lpProps[0].Value.bin;
 
 			object_ptr<IMessage> lpMessage;
 			hr = m_lpUsrFld->OpenEntry(sbEid.cb, (LPENTRYID)sbEid.lpb,
-			     nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+			     &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 			if (hr != hrSuccess)
 			{
 				ec_log_debug("Error opening message for ical conversion, error code: 0x%08X", hr);
-				ec_log_debug("%d \n %s", sbEid.cb, bin2hex(sbEid.cb,sbEid.lpb).c_str());
+				ec_log_debug("%d \n %s", sbEid.cb, bin2hex(sbEid).c_str());
 				// Ignore error, just skip the message
 				hr = hrSuccess;
 				continue;
@@ -584,7 +579,8 @@ HRESULT iCal::HrDelFolder()
 	hr = HrGetOneProp(m_lpActiveStore, PR_IPM_WASTEBASKET_ENTRYID, &~lpWstBoxEid);
 	if (hr != hrSuccess)
 		goto exit;
-	hr = m_lpActiveStore->OpenEntry(lpWstBoxEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpWstBoxEid->Value.bin.lpb), nullptr, MAPI_MODIFY, &ulObjType, &~lpWasteBoxFld);
+	hr = m_lpActiveStore->OpenEntry(lpWstBoxEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpWstBoxEid->Value.bin.lpb),
+	     &iid_of(lpWasteBoxFld), MAPI_MODIFY, &ulObjType, &~lpWasteBoxFld);
 	if (hr != hrSuccess)
 	{
 		ec_log_err("Error opening \"Deleted items\" folder, error code: 0x%08X", hr);

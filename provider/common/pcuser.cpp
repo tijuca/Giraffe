@@ -24,19 +24,6 @@
 
 namespace KC {
 
-template<int(*fnCmp)(const char*, const char*)>
-class StringComparer {
-public:
-	StringComparer(const std::string &str): m_str(str) {}
-	bool operator()(const std::string &other) const
-	{
-		return m_str.size() == other.size() && fnCmp(m_str.c_str(), other.c_str()) == 0;
-	}
-
-private:
-	const std::string &m_str;
-};
-
 objectid_t::objectid_t(const std::string &str)
 {
 	std::string objclass;
@@ -56,12 +43,12 @@ objectid_t::objectid_t(const std::string &str)
 	}
 }
 
-bool objectid_t::operator==(const objectid_t &x) const
+bool objectid_t::operator==(const objectid_t &x) const noexcept
 {
 	return this->objclass == x.objclass && this->id == x.id;
 }
 
-bool objectid_t::operator!=(const objectid_t &x) const
+bool objectid_t::operator!=(const objectid_t &x) const noexcept
 {
 	return this->objclass != x.objclass || this->id != x.id;
 }
@@ -125,19 +112,19 @@ void objectdetails_t::SetPropObject(property_key_t propname,
 
 void objectdetails_t::AddPropInt(property_key_t propname, unsigned int value)
 {
-	m_mapMVProps[propname].push_back(stringify(value));
+	m_mapMVProps[propname].emplace_back(stringify(value));
 }
 
 void objectdetails_t::AddPropString(property_key_t propname,
     const std::string &value)
 {
-	m_mapMVProps[propname].push_back(value);
+	m_mapMVProps[propname].emplace_back(value);
 }
 
 void objectdetails_t::AddPropObject(property_key_t propname,
     const objectid_t &value)
 {
-	m_mapMVProps[propname].push_back(((objectid_t)value).tostring());
+	m_mapMVProps[propname].emplace_back(value.tostring());
 }
 
 std::list<unsigned int>
@@ -148,7 +135,7 @@ objectdetails_t::GetPropListInt(property_key_t propname) const
 		return std::list<unsigned int>();
 	std::list<unsigned int> l;
 	for (const auto &i : mvitem->second)
-		l.push_back(atoui(i.c_str()));
+		l.emplace_back(atoui(i.c_str()));
 	return l;
 }
 
@@ -169,7 +156,7 @@ objectdetails_t::GetPropListObject(property_key_t propname) const
 		return std::list<objectid_t>();
 	std::list<objectid_t> l;
 	for (const auto &i : mvitem->second)
-		l.push_back(objectid_t(i));
+		l.emplace_back(i);
 	return l;
 }
 
@@ -178,7 +165,7 @@ property_map objectdetails_t::GetPropMapAnonymous() const {
 
 	for (const auto &iter : m_mapProps)
 		if (((unsigned int)iter.first) & 0xffff0000)
-			anonymous.insert(iter);
+			anonymous.emplace(iter);
 	return anonymous;
 }
 
@@ -186,7 +173,7 @@ property_mv_map objectdetails_t::GetPropMapListAnonymous() const {
 	property_mv_map anonymous;
 	for (const auto &iter : m_mapMVProps)
 		if (((unsigned int)iter.first) & 0xffff0000)
-			anonymous.insert(iter);
+			anonymous.emplace(iter);
 	return anonymous;
 }
 
@@ -200,8 +187,14 @@ bool objectdetails_t::PropListStringContains(property_key_t propname,
 {
 	const std::list<std::string> list = GetPropListString(propname);
 	if (ignoreCase)
-		return std::find_if(list.begin(), list.end(), StringComparer<strcasecmp>(value)) != list.end();
-	return std::find_if(list.begin(), list.end(), StringComparer<strcmp>(value)) != list.end();
+		return std::find_if(list.begin(), list.end(),
+			[&](const std::string &o) {
+				return value.size() == o.size() && strcasecmp(value.c_str(), o.c_str()) == 0;
+			}) != list.end();
+	return std::find_if(list.begin(), list.end(),
+		[&](const std::string &o) {
+			return value.size() == o.size() && strcmp(value.c_str(), o.c_str()) == 0;
+		}) != list.end();
 }
 
 void objectdetails_t::ClearPropList(property_key_t propname)

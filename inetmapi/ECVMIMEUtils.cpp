@@ -19,7 +19,7 @@
 #include <exception>
 #include <memory>
 #include <iostream>
-
+#include <string>
 #include "ECVMIMEUtils.h"
 #include "MAPISMTPTransport.h"
 #include <kopano/CommonUtil.h>
@@ -41,19 +41,18 @@
 #include <kopano/mapi_ptr.h>
 #include <vmime/base.hpp>
 
-using namespace std;
 using namespace KCHL;
 
 namespace KC {
 
 class mapiTimeoutHandler : public vmime::net::timeoutHandler {
 public:
-	virtual ~mapiTimeoutHandler(void) _kc_impdtor;
+	virtual ~mapiTimeoutHandler(void) = default;
 
 	// @todo add logging
-	virtual bool isTimeOut() { return getTime() >= (m_last + 5*60); };
-	virtual void resetTimeOut() { m_last = getTime(); };
-	virtual bool handleTimeOut() { return false; };
+	virtual bool isTimeOut() _kc_override { return getTime() >= (m_last + 5*60); };
+	virtual void resetTimeOut() _kc_override { m_last = getTime(); };
+	virtual bool handleTimeOut() _kc_override { return false; };
 
 	const unsigned int getTime() const {
 		return vmime::platform::getHandler()->getUnixTime();
@@ -65,7 +64,7 @@ private:
 
 class mapiTimeoutHandlerFactory : public vmime::net::timeoutHandlerFactory {
 public:
-	vmime::shared_ptr<vmime::net::timeoutHandler> create(void)
+	vmime::shared_ptr<vmime::net::timeoutHandler> create(void) override
 	{
 		return vmime::make_shared<mapiTimeoutHandler>();
 	};
@@ -99,18 +98,17 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 
 	// Get all recipients from the group
 	for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
-		auto lpPropObjectType = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_OBJECT_TYPE);
+		auto lpPropObjectType = lpRowSet[i].cfind(PR_OBJECT_TYPE);
 
 		// see if there's an e-mail address associated with the list
 		// if that's the case, then we send to that address and not all individual recipients in that list
-		bool bAddrFetchSuccess = HrGetAddress(lpAdrBook, lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail) == hrSuccess && !strEmail.empty();
-
+		bool bAddrFetchSuccess = HrGetAddress(lpAdrBook, lpRowSet[i].lpProps, lpRowSet[i].cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail) == hrSuccess && !strEmail.empty();
 		bool bItemIsAUser = lpPropObjectType == NULL || lpPropObjectType->Value.ul == MAPI_MAILUSER;
 
 		if (bAddrFetchSuccess && bItemIsAUser) {
 			if (setRecips.find(strEmail) == setRecips.end()) {
-				recipients.appendMailbox(vmime::make_shared<vmime::mailbox>(convert_to<string>(strEmail)));
-				setRecips.insert(strEmail);
+				recipients.appendMailbox(vmime::make_shared<vmime::mailbox>(convert_to<std::string>(strEmail)));
+				setRecips.emplace(strEmail);
 				ec_log_debug("RCPT TO: %ls", strEmail.c_str());	
 			}
 			continue;
@@ -120,8 +118,8 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 			continue;
 
 		// Group
-		auto lpGroupName = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EMAIL_ADDRESS_W);
-		auto lpGroupEntryID = PCpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_ENTRYID);
+		auto lpGroupName = lpRowSet[i].cfind(PR_EMAIL_ADDRESS_W);
+		auto lpGroupEntryID = lpRowSet[i].cfind(PR_ENTRYID);
 		if (lpGroupName == nullptr || lpGroupEntryID == nullptr)
 			return MAPI_E_NOT_FOUND;
 	
@@ -140,17 +138,17 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 			hr = HrExpandGroup(lpAdrBook, lpGroupName, lpGroupEntryID, recipients, setGroups, setRecips, bAllowEveryone);
 
 			if (hr == MAPI_E_TOO_COMPLEX || hr == MAPI_E_INVALID_PARAMETER) {
-				// ignore group nesting loop and non user/group types (eg. companies)
+				// ignore group nesting loop and non user/group types (e.g. companies)
 				hr = hrSuccess;
 			} else if (hr != hrSuccess) {
-				// eg. MAPI_E_NOT_FOUND
+				// e.g. MAPI_E_NOT_FOUND
 				ec_log_err("Error while expanding group. Group: %ls, error: 0x%08x", lpGroupName->Value.lpszW, hr);
 				error = std::wstring(L"Error in group '") + lpGroupName->Value.lpszW + L"', unable to send e-mail";
 				return hr;
 			}
 		} else if (setRecips.find(strEmail) == setRecips.end()) {
-			recipients.appendMailbox(vmime::make_shared<vmime::mailbox>(convert_to<string>(strEmail)));
-			setRecips.insert(strEmail);
+			recipients.appendMailbox(vmime::make_shared<vmime::mailbox>(convert_to<std::string>(strEmail)));
+			setRecips.emplace(strEmail);
 			ec_log_debug("Sending to group-address %s instead of expanded list",
 				convert_to<std::string>(strEmail).c_str());
 		}
@@ -179,47 +177,46 @@ HRESULT ECVMIMESender::HrExpandGroup(LPADRBOOK lpAdrBook,
     vmime::mailboxList &recipients, std::set<std::wstring> &setGroups,
     std::set<std::wstring> &setRecips, bool bAllowEveryone)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<IDistList> lpGroup;
 	ULONG ulType = 0;
 	object_ptr<IMAPITable> lpTable;
 	memory_ptr<SPropValue> lpEmailAddress;
 
-	if (lpGroupEntryID == nullptr || lpAdrBook->OpenEntry(lpGroupEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpGroupEntryID->Value.bin.lpb), nullptr, 0, &ulType, &~lpGroup) != hrSuccess || ulType != MAPI_DISTLIST) {
+	if (lpGroupEntryID == nullptr || lpAdrBook->OpenEntry(lpGroupEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpGroupEntryID->Value.bin.lpb), &iid_of(lpGroup), 0, &ulType, &~lpGroup) != hrSuccess || ulType != MAPI_DISTLIST) {
 		// Entry id for group was not given, or the group could not be opened, or the entryid was not a group (eg one-off entryid)
 		// Therefore resolve group name, and open that instead.
 		if (lpGroupName == nullptr)
 			return MAPI_E_NOT_FOUND;
 
 		rowset_ptr lpRows;
-		hr = MAPIAllocateBuffer(CbNewSRowSet(1), &~lpRows);
+		auto hr = MAPIAllocateBuffer(CbNewSRowSet(1), &~lpRows);
 		if (hr != hrSuccess)
 			return hr;
-		lpRows->cRows = 1;
+		lpRows->cRows = 0;
 		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpRows->aRow[0].lpProps)) != hrSuccess)
 			return hr;
+		++lpRows->cRows;
 		lpRows->aRow[0].cValues = 1;
-		
 		lpRows->aRow[0].lpProps[0].ulPropTag = PR_DISPLAY_NAME_W;
-		lpRows->aRow[0].lpProps[0].Value.lpszW = lpGroupName->Value.lpszW;
+		lpRows[0].lpProps[0].Value.lpszW = lpGroupName->Value.lpszW;
 		hr = lpAdrBook->ResolveName(0, MAPI_UNICODE | EMS_AB_ADDRESS_LOOKUP, NULL, reinterpret_cast<ADRLIST *>(lpRows.get()));
 		if(hr != hrSuccess)
 			return hr;
-		lpGroupEntryID = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ENTRYID);
+		lpGroupEntryID = lpRows[0].cfind(PR_ENTRYID);
 		if (lpGroupEntryID == nullptr)
 			return MAPI_E_NOT_FOUND;
 
 		// Open resolved entry
-		hr = lpAdrBook->OpenEntry(lpGroupEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpGroupEntryID->Value.bin.lpb), nullptr, 0, &ulType, &~lpGroup);
-		if(hr != hrSuccess)
-			return hr;
-			
-		if(ulType != MAPI_DISTLIST) {
+		hr = lpAdrBook->OpenEntry(lpGroupEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpGroupEntryID->Value.bin.lpb), &iid_of(lpGroup), 0, &ulType, &~lpGroup);
+		if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED ||
+		    (hr == hrSuccess && ulType != MAPI_DISTLIST)) {
 			ec_log_debug("Expected group, but opened type %d", ulType);
 			return MAPI_E_INVALID_PARAMETER;
 		}
+		if (hr != hrSuccess)
+			return hr;
 	}
-	hr = HrGetOneProp(lpGroup, PR_EMAIL_ADDRESS_W, &~lpEmailAddress);
+	auto hr = HrGetOneProp(lpGroup, PR_EMAIL_ADDRESS_W, &~lpEmailAddress);
 	if(hr != hrSuccess)
 		return hr;
 	if (setGroups.find(lpEmailAddress->Value.lpszW) != setGroups.end())
@@ -227,7 +224,7 @@ HRESULT ECVMIMESender::HrExpandGroup(LPADRBOOK lpAdrBook,
 		return MAPI_E_TOO_COMPLEX;
 	
 	// Add group name to list of processed groups
-	setGroups.insert(lpEmailAddress->Value.lpszW);
+	setGroups.emplace(lpEmailAddress->Value.lpszW);
 	hr = lpGroup->GetContentsTable(MAPI_UNICODE, &~lpTable);
 	if(hr != hrSuccess)
 		return hr;
@@ -240,14 +237,13 @@ HRESULT ECVMIMESender::HrMakeRecipientsList(LPADRBOOK lpAdrBook,
     vmime::mailboxList &recipients, bool bAllowEveryone,
     bool bAlwaysExpandDistrList)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<IMAPITable> lpRTable;
 	bool bResend = false;
 	std::set<std::wstring> setGroups; // Set of groups to make sure we don't get into an expansion-loop
-	std::set<std::wstring> setRecips; // Set of recipients to make sure we don't send two identical RCPT TO's
+	std::set<std::wstring> setRecips; // Set of recipients to make sure we don't send two identical RCPT TOs
 	memory_ptr<SPropValue> lpMessageFlags;
 	
-	hr = HrGetOneProp(lpMessage, PR_MESSAGE_FLAGS, &~lpMessageFlags);
+	auto hr = HrGetOneProp(lpMessage, PR_MESSAGE_FLAGS, &~lpMessageFlags);
 	if (hr != hrSuccess)
 		return hr;
 	if(lpMessageFlags->Value.ul & MSGFLAG_RESEND)
@@ -282,9 +278,6 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 	HRESULT hr = hrSuccess;
 	vmime::mailbox expeditor;
 	vmime::mailboxList recipients;
-	vmime::shared_ptr<vmime::messaging::session> vmSession;
-	vmime::shared_ptr<vmime::messaging::transport> vmTransport;
-	vmime::shared_ptr<vmime::net::smtp::MAPISMTPTransport> mapiTransport;
 
 	if (lpMessage == NULL || vmMessage == NULL)
 		return MAPI_E_INVALID_PARAMETER;
@@ -294,16 +287,16 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 
 	try {
 		// Session initialization (global properties)
-		vmSession = vmime::net::session::create();
+		auto vmSession = vmime::net::session::create();
 
 		// set the server address and port, plus type of service by use of url
 		// and get our special mapismtp mailer
 		vmime::utility::url url("mapismtp", smtphost, smtpport);
-		vmTransport = vmSession->getTransport(url);
+		auto vmTransport = vmSession->getTransport(url);
 		vmTransport->setTimeoutHandlerFactory(vmime::make_shared<mapiTimeoutHandlerFactory>());
 
-		// cast to access interface extra's
-		mapiTransport = vmime::dynamicCast<vmime::net::smtp::MAPISMTPTransport>(vmTransport);
+		/* cast to access interface extras */
+		auto mapiTransport = vmime::dynamicCast<vmime::net::smtp::MAPISMTPTransport>(vmTransport);
 
 		// get expeditor for 'mail from:' smtp command
 		if (vmMessage->getHeader()->hasField(vmime::fields::FROM))
@@ -347,7 +340,11 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 
 		vmMessage->generate(ossAdapter);
 
-		const string& str(oss.str()); // copy?
+		/*
+		 * This would be the place for spooler's
+		 * log_raw_message_stage2, but this so deep in inetmapi…
+		 */
+		const std::string &str(oss.str()); // copy?
 		vmime::utility::inputStreamStringAdapter isAdapter(str); // direct oss.str() ?
 		
 		// send the email already!
@@ -372,7 +369,7 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 			}
 			ec_log_err("SMTP: %s Response: %s", e.what(), e.response().c_str());
 			smtpresult = atoi(e.response().substr(0, e.response().find_first_of(" ")).c_str());
-			error = convert_to<wstring>(e.response());
+			error = convert_to<std::wstring>(e.response());
 			// message should be cancelled, unsendable, test by smtp result code.
 			return MAPI_W_CANCEL_MESSAGE;
 		} 
@@ -383,7 +380,7 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 			}
 			ec_log_err("SMTP: %s Name: %s", e.what(), e.name());
 			//smtpresult = atoi(e.response().substr(0, e.response().find_first_of(" ")).c_str());
-			//error = convert_to<wstring>(e.response());
+			//error = convert_to<std::wstring>(e.response());
 			// message should be cancelled, unsendable, test by smtp result code.
 			return MAPI_W_CANCEL_MESSAGE;
 		} 
@@ -418,12 +415,12 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 	catch (vmime::exception& e) {
 		// connection_greeting_error, ...?
 		ec_log_err("%s", e.what());
-		error = convert_to<wstring>(e.what());
+		error = convert_to<std::wstring>(e.what());
 		return MAPI_E_NETWORK_ERROR;
 	}
 	catch (std::exception& e) {
 		ec_log_err("%s", e.what());
-		error = convert_to<wstring>(e.what());
+		error = convert_to<std::wstring>(e.what());
 		return MAPI_E_NETWORK_ERROR;
 	}
 	return hr;

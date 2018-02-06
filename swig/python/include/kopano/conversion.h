@@ -34,11 +34,8 @@ typedef ECUSER *LPECUSER;
 
 typedef int(*TypeCheckFunc)(PyObject*);
 
-int				Object_is_list_of(PyObject *object, TypeCheckFunc fnTypeCheck); 
-
 FILETIME		Object_to_FILETIME(PyObject *object);
 PyObject *		Object_from_FILETIME(FILETIME ft);
-int				Object_is_FILETIME(PyObject *object);
 
 extern SPropValue *Object_to_p_SPropValue(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
 extern SPropValue *Object_to_LPSPropValue(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
@@ -49,16 +46,16 @@ extern PyObject *List_from_LPSPropValue(const SPropValue *, ULONG n);
 extern SPropValue *List_to_p_SPropValue(PyObject *, ULONG *nvals, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
 extern SPropValue *List_to_LPSPropValue(PyObject *, ULONG *nvals, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
 
-PyObject *		List_from_LPTSTRPtr(LPTSTR *lpStrings, ULONG cValues);
-
 SPropTagArray *List_to_p_SPropTagArray(PyObject *sv, ULONG ulFlags = CONV_COPY_SHALLOW);
 PyObject *List_from_SPropTagArray(const SPropTagArray *lpPropTagArray);
 SPropTagArray *List_to_LPSPropTagArray(PyObject *sv, ULONG ulFlags = CONV_COPY_SHALLOW);
 PyObject *List_from_LPSPropTagArray(const SPropTagArray *lpPropTagArray);
 
-LPSRestriction	Object_to_LPSRestriction(PyObject *sv, void *lpBase = NULL);
+extern SRestriction *Object_to_p_SRestriction(PyObject *, void *base = nullptr);
+extern SRestriction *Object_to_LPSRestriction(PyObject *, void *base = nullptr);
 void			Object_to_LPSRestriction(PyObject *sv, LPSRestriction lpsRestriction, void *lpBase = NULL);
-PyObject *		Object_from_LPSRestriction(LPSRestriction lpRestriction);
+extern PyObject *Object_from_SRestriction(const SRestriction *);
+extern PyObject *Object_from_LPSRestriction(const SRestriction *);
 
 PyObject *		Object_from_LPACTION(LPACTION lpAction);
 PyObject *		Object_from_LPACTIONS(ACTIONS *lpsActions);
@@ -70,16 +67,12 @@ PyObject *Object_from_SSortOrderSet(const SSortOrderSet *lpSortOrderSet);
 
 extern PyObject *List_from_SRowSet(const SRowSet *);
 extern PyObject *List_from_LPSRowSet(const SRowSet *);
-extern SRowSet *List_to_p_SRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
-extern SRowSet *List_to_LPSRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
-extern ADRLIST *List_to_p_ADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
-extern ADRLIST *List_to_LPADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
+extern SRowSet *List_to_p_SRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *lpBase = nullptr);
+extern SRowSet *List_to_LPSRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *lpBase = nullptr);
+extern ADRLIST *List_to_p_ADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *lpBase = nullptr);
+extern ADRLIST *List_to_LPADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *lpBase = nullptr);
 extern PyObject *List_from_ADRLIST(const ADRLIST *);
 extern PyObject *List_from_LPADRLIST(const ADRLIST *);
-
-LPADRPARM		Object_to_LPADRPARM(PyObject *av);
-
-LPADRENTRY		Object_to_LPADRENTRY(PyObject *av);
 
 PyObject *		List_from_LPSPropProblemArray(LPSPropProblemArray lpProblemArray);
 LPSPropProblemArray List_to_LPSPropProblemArray(PyObject *, ULONG ulFlags = CONV_COPY_SHALLOW);
@@ -134,8 +127,6 @@ ECSVRNAMELIST *List_to_LPECSVRNAMELIST(PyObject *object);
 PyObject *Object_from_LPECSERVER(ECSERVER *lpServer);
 PyObject *List_from_LPECSERVERLIST(ECSERVERLIST *lpServerList);
 
-PyObject *		List_from_wchar_t(wchar_t **, ULONG cElements);
-
 void			Init();
 
 void			DoException(HRESULT hr);
@@ -143,8 +134,5 @@ int				GetExceptionError(PyObject *, HRESULT *);
 
 void			Object_to_STATSTG(PyObject *, STATSTG *);
 PyObject *		Object_from_STATSTG(STATSTG *);
-
-PyObject *		Object_from_SYSTEMTIME(const SYSTEMTIME &time);
-SYSTEMTIME		Object_to_SYSTEMTIME(PyObject *);
 
 #endif // ndef CONVERSION_H

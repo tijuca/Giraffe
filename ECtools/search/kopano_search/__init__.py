@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from .version import __version__
+
+import collections
 from contextlib import closing
 import codecs
 import fcntl
@@ -8,13 +11,12 @@ from multiprocessing import Queue, Value
 import time
 import sys
 
-# Upgrading from Python 2 to Python 3 is not supported
-try:
-    import dbhash
-    from Queue import Empty
-except ImportError:
-    import dbm as dbhash
+if sys.hexversion >= 0x03000000:
+    import bsddb3 as bsddb
     from queue import Empty
+else:
+    import bsddb
+    from Queue import Empty
 
 from kopano_search import plaintext
 import kopano
@@ -27,7 +29,7 @@ kopano-search v3 - a process-based indexer and query handler built on python-kop
 initial indexing is performed in parallel using N instances of class IndexWorker, fed with a queue containing folder-ids.
 
 incremental indexing is later performed in the same fashion. when there is no pending work, we
-check if there are reindex requests and handle one of these (again parallellized). so incremental syncing is currently paused 
+check if there are reindex requests and handle one of these (again parallellized). so incremental syncing is currently paused
 during reindexing.
 
 search queries from outlook/webapp are dealt with by a single instance of class SearchWorker.
@@ -39,7 +41,7 @@ after initial indexing folder states are not updated anymore.
 
 the used search engine is pluggable, but by default we use xapian (plugin_xapian.py).
 
-a tricky bit is that outlook/exchange perform 'prefix' searches by default and we want to be compatible with this, so terms get an 
+a tricky bit is that outlook/exchange perform 'prefix' searches by default and we want to be compatible with this, so terms get an
 implicit '*' at the end. not every search engine may perform well for this, but we could make this configurable perhaps.
 
 """
@@ -72,30 +74,24 @@ CONFIG = {
     'search_engine': Config.string(default='xapian'),
     'suggestions': Config.boolean(default=True),
     'index_junk': Config.boolean(default=True),
+    'index_drafts': Config.boolean(default=True),
     'server_bind_name': Config.string(default='file:///var/run/kopano/search.sock'),
     'ssl_private_key_file': Config.path(default=None, check=False), # XXX don't check when default=None?
     'ssl_certificate_file': Config.path(default=None, check=False),
     'term_cache_size': Config.size(default=64000000),
 }
 
-def db_get(db_path, key):
-    """ get value from db file """
-    with closing(dbhash.open(db_path, 'c')) as db:
-        return db.get(key)
-
-def db_put(db_path, key, value):
-    """ store key, value in db file """
-    with open(db_path+'.lock', 'w') as lockfile:
-        fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
-        with closing(dbhash.open(db_path, 'c')) as db:
-            db[key] = value
-
 if sys.hexversion >= 0x03000000:
+    unicode = str
+
     def _is_unicode(s):
         return isinstance(s, str)
 
     def _decode(s):
         return s
+
+    def _decode_ascii(s):
+        return s.decode('ascii')
 
     def _encode(s):
         return s.encode()
@@ -103,11 +99,32 @@ else:
     def _is_unicode(s):
         return isinstance(s, unicode)
 
+    def _decode_ascii(s):
+        return s
+
     def _decode(s):
         return s.decode(getattr(sys.stdin, 'encoding', 'utf8') or 'utf8')
 
     def _encode(s):
         return s.encode(getattr(sys.stdin, 'encoding', 'utf8') or 'utf8')
+
+def db_get(db_path, key):
+    """ get value from db file """
+    if not isinstance(key, bytes): # python3
+        key = key.encode('ascii')
+    with closing(bsddb.hashopen(db_path, 'c')) as db:
+        value = db.get(key)
+        if value is not None:
+            return _decode_ascii(db.get(key))
+
+def db_put(db_path, key, value):
+    """ store key, value in db file """
+    if not isinstance(key, bytes): # python3
+        key = key.encode('ascii')
+    with open(db_path+'.lock', 'w') as lockfile:
+        fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
+        with closing(bsddb.hashopen(db_path, 'c')) as db:
+            db[key] = value
 
 class SearchWorker(kopano.Worker):
     """ process which handles search requests coming from outlook/webapp, according to our internal protocol """
@@ -140,7 +157,7 @@ class SearchWorker(kopano.Worker):
                         response(conn, 'OK:')
                     elif cmd == 'FIND':
                         pos = data.find(':')
-                        fields = map(int, data[:pos].split()[1:])
+                        fields = [int(x) for x in data[:pos].split()[1:]]
                         orig = data[pos+1:].lower()
                         # Limit number of terms (32) so people do not
                         # inadvertently DoS it if they paste prose.
@@ -167,8 +184,7 @@ class SearchWorker(kopano.Worker):
                             else:
                                 restrictions.append('('+' AND '.join('%s*' % term for term in terms)+')')
                         query = ' AND '.join(restrictions) # plugin doesn't have to use this relatively standard query format
-                        docids = plugin.search(server_guid, store_guid, folder_ids, fields_terms, query, self.log)
-                        docids = docids[:config['limit_results'] or len(docids)]
+                        docids = plugin.search(server_guid, store_guid, folder_ids, fields_terms, query, config['limit_results'], self.log)
                         response(conn, 'OK: '+' '.join(map(str, docids)))
                         self.log.info('found %d results in %.2f seconds', len(docids), time.time()-t0)
                         break
@@ -177,24 +193,30 @@ class SearchWorker(kopano.Worker):
                         response(conn, 'OK:')
                         self.log.info("queued store %s for reindexing", args[0])
                         break
+                    else:
+                        self.log.error("unknown command: %s", cmd)
+                        break
                 conn.close()
 
 class IndexWorker(kopano.Worker):
     """ process which gets folders from input queue and indexes them, putting the nr of changes in output queue """
 
     def main(self):
-        config, server, plugin = self.service.config, self.service.server, self.service.plugin
+        config, server, plugin = self.service.config, self.server, self.service.plugin
         state_db = os.path.join(config['index_path'], server.guid+'_state')
         while True:
             changes = 0
             with log_exc(self.log):
                 (_, storeguid, folderid, reindex) = self.iqueue.get()
                 store = server.store(storeguid)
-                folder = kopano.Folder(store, codecs.decode(folderid, 'hex'))
-                if (folder not in (store.root, store.outbox, store.drafts)) and \
-                   (folder != store.junk or config['index_junk']):
+                folder = kopano.Folder(store, folderid)
+                path = folder.path
+                if path and \
+                   (folder != store.outbox) and \
+                   (folder != store.junk or config['index_junk']) and \
+                   (folder != store.drafts or config['index_drafts']):
                     suggestions = config['suggestions'] and folder != store.junk
-                    self.log.info('syncing folder: %s %s', storeguid, folder.name)
+                    self.log.info('syncing folder: "%s" "%s"', store.name, path)
                     importer = FolderImporter(server.guid, config, plugin, suggestions, self.log)
                     state = db_get(state_db, folder.entryid) if not reindex else None
                     if state:
@@ -206,7 +228,7 @@ class IndexWorker(kopano.Worker):
                         db_put(state_db, folder.entryid, new_state)
                         self.log.info('saved folder sync state: %s', new_state)
                         changes = importer.changes + importer.deletes 
-                        self.log.info('syncing folder %s %s took %.2f seconds (%d changes, %d attachments)', storeguid, folder.name, time.time()-t0, changes, importer.attachments)
+                        self.log.info('syncing folder "%s" took %.2f seconds (%d changes, %d attachments)', path, time.time()-t0, changes, importer.attachments)
             self.oqueue.put(changes)
 
 class FolderImporter:
@@ -224,29 +246,38 @@ class FolderImporter:
 
         with log_exc(self.log):
             self.changes += 1
-            storeid, folderid, entryid, sourcekey, docid = item.storeid, item.folderid, item.entryid, item.sourcekey, item.docid
+            storeid, folderid, entryid, sourcekey, docid = item.storeid, item.folder.hierarchyid, item.entryid, item.sourcekey, item.docid
             self.log.debug('store %s, folder %d: new/updated document with entryid %s, sourcekey %s, docid %d', storeid, folderid, entryid, sourcekey, docid)
-            doc = {'serverid': self.serverid, 'storeid': storeid, 'folderid': folderid, 'docid': docid, 'sourcekey': item.sourcekey}
-            for prop in item.props():
-                if prop.id_ not in self.excludes:
-                    if _is_unicode(prop.value):
-                        if prop.value:
-                            doc['mapi%d' % prop.id_] = prop.value
-                    elif isinstance(prop.value, list):
-                        doc['mapi%d' % prop.id_] = u' '.join(x for x in prop.value if _is_unicode(x))
+
+            doc = collections.defaultdict(unicode)
+            doc.update({'serverid': self.serverid, 'storeid': storeid, 'folderid': folderid, 'docid': docid, 'sourcekey': item.sourcekey})
             attach_text = []
-            if self.config['index_attachments']:
-                for a in item.attachments():
-                    self.log.debug('checking attachment (filename=%s, size=%d, mimetag=%s)', a.filename, len(a), a.mimetype)
-                    if 0 < len(a) < self.config['index_attachment_max_size'] and a.filename != 'inline.txt': # XXX inline attachment check
+
+            for subitem in [item] + list(item.items()):
+                for prop in subitem.props():
+                    if prop.id_ not in self.excludes:
+                        if _is_unicode(prop.value):
+                            if prop.value:
+                                doc['mapi%d' % prop.id_] += u' ' + prop.value
+                        elif isinstance(prop.value, list):
+                            doc['mapi%d' % prop.id_] += u' ' + u' '.join(x for x in prop.value if _is_unicode(x))
+
+                for attachment in subitem.attachments():
+                    if self.config['index_attachments'] and \
+                       0 < len(attachment) < self.config['index_attachment_max_size'] and \
+                       attachment.filename != 'inline.txt': # XXX inline attachment check
+                        self.log.debug('indexing attachment (filename=%s, size=%d, mimetag=%s)',
+                            attachment.filename, len(attachment), attachment.mimetype)
                         self.attachments += 1
-                        attach_text.append(plaintext.get(a, mimetype=a.mimetype, log=self.log))
-                    attach_text.append(u' '+(a.filename or u''))
-            doc['mapi4096'] = item.body.text + u' ' + u' '.join(attach_text) # PR_BODY
-            doc['mapi3098'] = u' '.join([item.sender.name, item.sender.email, item.from_.name, item.from_.email]) # PR_SENDER_NAME
-            doc['mapi3588'] = u' '.join([a.name + u' ' + a.email for a in item.to]) # PR_DISPLAY_TO
-            doc['mapi3587'] = u' '.join([a.name + u' ' + a.email for a in item.cc]) # PR_DISPLAY_CC
-            doc['mapi3586'] = u' '.join([a.name + u' ' + a.email for a in item.bcc]) # PR_DISPLAY_BCC
+                        attach_text.append(plaintext.get(attachment, mimetype=attachment.mimetype, log=self.log))
+                    attach_text.append(attachment.filename or u'')
+
+                doc['mapi4096'] += u' ' + subitem.text + u' ' + u' '.join(attach_text) # PR_BODY
+                doc['mapi3098'] += u' ' + u' '.join([subitem.sender.name, subitem.sender.email, subitem.from_.name, subitem.from_.email]) # PR_SENDER_NAME
+                doc['mapi3588'] += u' ' + u' '.join([a.name + u' ' + a.email for a in subitem.to]) # PR_DISPLAY_TO
+                doc['mapi3587'] += u' ' + u' '.join([a.name + u' ' + a.email for a in subitem.cc]) # PR_DISPLAY_CC
+                doc['mapi3586'] += u' ' + u' '.join([a.name + u' ' + a.email for a in subitem.bcc]) # PR_DISPLAY_BCC
+
             doc['data'] = 'subject: %s\n' % item.subject
             db_put(self.mapping_db, item.sourcekey, '%s %s' % (storeid, item.folder.entryid)) # ICS doesn't remember which store a change belongs to..
             self.plugin.update(doc)
@@ -256,7 +287,7 @@ class FolderImporter:
                 self.term_cache_size = 0
 
     def delete(self, item, flags):
-        """ for a deleted item, determine store and ask indexing plugin to delete """ 
+        """ for a deleted item, determine store and ask indexing plugin to delete """
 
         with log_exc(self.log):
             self.deletes += 1
@@ -266,7 +297,7 @@ class FolderImporter:
                 doc = {'serverid': self.serverid, 'storeid': storeid, 'sourcekey': item.sourcekey}
                 self.log.debug('store %s: deleted document with sourcekey %s', doc['storeid'], item.sourcekey)
                 self.plugin.delete(doc)
-        
+
 class ServerImporter:
     """ tracks changes for a server node; queues encountered folders for updating """ # XXX improve ICS to track changed folders?
 
@@ -340,15 +371,15 @@ class Service(kopano.Service):
             with log_exc(self.log):
                 try:
                     storeid = self.reindex_queue.get(block=False)
-                    self.log.info('handling reindex request for store %s', storeid)
                     store = self.server.store(storeid)
+                    self.log.info('handling reindex request for "%s"', store.name)
                     self.plugin.reindex(self.server.guid, store.guid)
                     self.initial_sync([store], reindex=True)
                 except Empty:
                     pass
                 importer = ServerImporter(self.server.guid, self.config, self.iqueue, self.log)
                 t0 = time.time()
-                new_state = self.server.sync(importer, self.state, log=self.log) 
+                new_state = self.server.sync(importer, self.state, log=self.log)
                 if new_state != self.state:
                     changes = sum([self.oqueue.get() for i in range(len(importer.queued))]) # blocking
                     for f in importer.queued:
@@ -380,7 +411,7 @@ class Service(kopano.Service):
                 sys.exit(1)
 
 def main():
-    parser = kopano.parser('ckpsFl') # select common cmd-line options
+    parser = kopano.parser('ckpsFlV') # select common cmd-line options
     parser.add_option('-r', '--reindex', dest='reindex', action='append', default=[], help='Reindex user/store', metavar='USER')
     options, args = parser.parse_args()
     service = Service('search', config=CONFIG, options=options)
@@ -388,6 +419,6 @@ def main():
         service.reindex()
     else:
         service.start()
-    
+
 if __name__ == '__main__':
     main()

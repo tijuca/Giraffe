@@ -16,14 +16,14 @@
  */
 
 #include <kopano/platform.h>
+#include <string>
 #include <utility>
+#include <vector>
 #include "Http.h"
 #include <kopano/mapi_ptr.h>
 #include <kopano/stringutil.h>
 
 #include <kopano/ECConfig.h>
-
-using namespace std;
 
 /** 
  * Parse the incoming URL into known pieces:
@@ -46,8 +46,8 @@ HRESULT HrParseURL(const std::string &strUrl, ULONG *lpulFlag, std::string *lpst
 	std::string strService;
 	std::string strFolder;
 	std::string strUrlUser;
-	vector<std::string> vcUrlTokens;
-	vector<std::string>::const_iterator iterToken;
+	std::vector<std::string> vcUrlTokens;
+	decltype(vcUrlTokens)::const_iterator iterToken;
 	ULONG ulFlag = 0;
 
 	vcUrlTokens = tokenize(strUrl, L'/', true);
@@ -55,7 +55,7 @@ HRESULT HrParseURL(const std::string &strUrl, ULONG *lpulFlag, std::string *lpst
 		// root should be present, no flags are set. mostly used on OPTIONS command
 		goto exit;
 
-	if (vcUrlTokens.back().rfind(".ics") != string::npos)
+	if (vcUrlTokens.back().rfind(".ics") != std::string::npos)
 		// Guid is retrieved using StripGuid().
 		vcUrlTokens.pop_back();
 	else
@@ -105,11 +105,9 @@ exit:
 		*lpulFlag = ulFlag;
 
 	if (lpstrUrlUser)
-		lpstrUrlUser->swap(strUrlUser);
-
+		*lpstrUrlUser = std::move(strUrlUser);
 	if (lpstrFolder)
-		lpstrFolder->swap(strFolder);
-
+		*lpstrFolder = std::move(strFolder);
 	return hr;
 }
 
@@ -160,12 +158,12 @@ HRESULT Http::HrReadHeaders()
 				iHeader->second += strBuffer.substr(start);
 			} else {
 				// new header
-				auto r = mapHeaders.insert(make_pair<string,string>(strBuffer.substr(0,pos), strBuffer.substr(pos+2)));
+				auto r = mapHeaders.emplace(strBuffer.substr(0, pos), strBuffer.substr(pos + 2));
 				iHeader = r.first;
 			}
 		}
 
-		if (strBuffer.find("Authorization") != string::npos)
+		if (strBuffer.find("Authorization") != std::string::npos)
 			ec_log_debug("< Authorization: <value hidden>");
 		else
 			ec_log_debug("< "+strBuffer);
@@ -309,7 +307,7 @@ HRESULT Http::HrGetRequestUrl(std::string *strURL)
 
 /**
  * Returns the full decoded path of request(e.g. /caldav/user name/folder)
- * (eg. %20 is converted to ' ')
+ * (e.g. %20 is converted to ' ')
  * @param[out]	strReqPath		Return string for path
  * @return		HRESULT
  * @retval		MAPI_E_NOT_FOUND	Empty path in request
@@ -352,7 +350,7 @@ HRESULT Http::HrGetDepth(ULONG *ulDepth)
 	 */
 	hr = HrGetHeaderValue("Depth", &strDepth);
 	if (hr != hrSuccess)
-		*ulDepth = 0;		// default is no subfolders. default should become a parameter .. is action dependant
+		*ulDepth = 0; /* Default is no subfolders. Default should become a parameter. It is action dependent. */
 	else if (strDepth.compare("infinity") == 0)
 		*ulDepth = 2;
 	else {
@@ -377,9 +375,8 @@ bool Http::CheckIfMatch(LPMAPIPROP lpProp)
 {
 	bool ret = false;
 	bool invert = false;
-	string strIf;
+	std::string strIf, strValue;
 	SPropValuePtr ptrLastModTime;
-	string strValue;
 
 	if (lpProp != nullptr &&
 	    HrGetOneProp(lpProp, PR_LAST_MODIFICATION_TIME, &~ptrLastModTime) == hrSuccess) {
@@ -437,7 +434,7 @@ HRESULT Http::HrGetCharSet(std::string *strCharset)
  * 
  * Specifies the destination of entry in MOVE request,
  * to move mapi message from one folder to another
- * for eg.
+ * for e.g.
  *
  * Destination: https://kopano.com:8080/caldav/USER/FOLDER-ID/ENTRY-GUID.ics
  *
@@ -451,7 +448,7 @@ HRESULT Http::HrGetDestination(std::string *strDestination)
 	HRESULT hr;
 	std::string strHost;
 	std::string strDest;
-	string::size_type pos;
+	size_t pos;
 
 	// example:  Host: server:port
 	hr = HrGetHeaderValue("Host", &strHost);
@@ -468,7 +465,7 @@ HRESULT Http::HrGetDestination(std::string *strDestination)
 	}
 
 	pos = strDest.find(strHost);
-	if (pos == string::npos) {
+	if (pos == std::string::npos) {
 		ec_log_err("Refusing to move calendar item from %s to different host on url %s", strHost.c_str(), strDest.c_str());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -592,7 +589,8 @@ HRESULT Http::HrFinalize()
 		hr = HrFlushHeaders();
 		if (hr != hrSuccess && hr != MAPI_E_END_OF_SESSION) {
 			ec_log_debug("Http::HrFinalize flush fail %d", hr);
-			goto exit;
+			m_ulRetCode = 0;
+			return hr;
 		}
 
 		if (!m_strRespBody.empty()) {
@@ -613,7 +611,8 @@ HRESULT Http::HrFinalize()
 		hr = HrFlushHeaders();
 		if (hr != hrSuccess && hr != MAPI_E_END_OF_SESSION) {
 			ec_log_debug("Http::HrFinalize flush fail(2) %d", hr);
-			goto exit;
+			m_ulRetCode = 0;
+			return hr;
 		}
 
 		while (szBodyWritten < szBodyLen)
@@ -638,19 +637,16 @@ HRESULT Http::HrFinalize()
 	}
 
 	// if http_log_enable?
-	{
-		char szTime[32];
-		time_t now = time(NULL);
-		tm local;
-		string strAgent;
-		localtime_r(&now, &local);
-		// @todo we're in C LC_TIME locale to get the correct (month) format, but the timezone will be GMT, which is not wanted.
-		strftime(szTime, arraySize(szTime), "%d/%b/%Y:%H:%M:%S %z", &local);
-		HrGetHeaderValue("User-Agent", &strAgent);
-		ec_log_debug("%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->peer_addr(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
-	}
+	char szTime[32];
+	time_t now = time(NULL);
+	tm local;
+	std::string strAgent;
+	localtime_r(&now, &local);
+	// @todo we're in C LC_TIME locale to get the correct (month) format, but the timezone will be GMT, which is not wanted.
+	strftime(szTime, ARRAY_SIZE(szTime), "%d/%b/%Y:%H:%M:%S %z", &local);
+	HrGetHeaderValue("User-Agent", &strAgent);
+	ec_log_notice("%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->peer_addr(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
 
-exit:
 	m_ulRetCode = 0;
 	return hr;
 }
@@ -683,7 +679,7 @@ HRESULT Http::HrToHTTPCode(HRESULT hr)
  * @retval		MAPI_E_CALL_FAILED	The status is already set
  * 
  */
-HRESULT Http::HrResponseHeader(unsigned int ulCode, std::string strResponse)
+HRESULT Http::HrResponseHeader(unsigned int ulCode, const std::string &strResponse)
 {
 	m_ulRetCode = ulCode;
 	// do not set headers if once set
@@ -695,13 +691,13 @@ HRESULT Http::HrResponseHeader(unsigned int ulCode, std::string strResponse)
 
 /**
  * Adds response header to the list of headers
- * @param[in]	strHeader	Name of the header eg. Connection, Host, Date
+ * @param[in]	strHeader	Name of the header e.g. Connection, Host, Date
  * @param[in]	strValue	Value of the header to be set
  * @return		HRESULT		Always set to hrSuccess
  */
-HRESULT Http::HrResponseHeader(std::string strHeader, std::string strValue)
+HRESULT Http::HrResponseHeader(const std::string &strHeader, const std::string &strValue)
 {
-	m_lstHeaders.push_back(strHeader + ": " + strValue);
+	m_lstHeaders.emplace_back(strHeader + ": " + strValue);
 	return hrSuccess;
 }
 
@@ -710,7 +706,7 @@ HRESULT Http::HrResponseHeader(std::string strHeader, std::string strValue)
  * @param[in]	strResponse		The string to be added to http response body
  * return		HRESULT			Always set to hrSuccess
  */
-HRESULT Http::HrResponseBody(std::string strResponse)
+HRESULT Http::HrResponseBody(const std::string &strResponse)
 {
 	m_strRespBody += strResponse;
 	// data send in HrFinalize()
@@ -723,18 +719,12 @@ HRESULT Http::HrResponseBody(std::string strResponse)
  * @param[in]	strMsg	Message to be shown to the client
  * @return		HRESULT 
  */
-HRESULT Http::HrRequestAuth(std::string strMsg)
+HRESULT Http::HrRequestAuth(const std::string &strMsg)
 {
 	HRESULT hr = HrResponseHeader(401, "Unauthorized");
 	if (hr != hrSuccess)
 		return hr;
-
-	strMsg = "Basic realm=\"" + strMsg + "\"";
-	hr = HrResponseHeader("WWW-Authenticate", strMsg);
-	if (hr != hrSuccess)
-		return hr;
-
-	return hrSuccess;
+	return HrResponseHeader("WWW-Authenticate", "Basic realm=\"" + strMsg + "\"");
 }
 
 /**

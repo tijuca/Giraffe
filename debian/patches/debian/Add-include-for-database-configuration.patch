@@ -7,10 +7,10 @@ Subject: Add include for database configuration
  1 file changed, 2 insertions(+)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 5999013..10efd3e 100644
+index 9e69861..719bdce 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -485,3 +485,5 @@ proxy_header =
+@@ -461,3 +461,5 @@ proxy_header =
  
  # Enable/disable reminders for shared stores
  shared_reminders = yes

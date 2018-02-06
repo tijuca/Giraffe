@@ -7,11 +7,8 @@
 #include <inetmapi/inetmapi.h>
 %}
 
-%include "std_string.i"
-%include "cstring.i"
+%include <std_string.i>
 %include <kopano/typemap.i>
-
-%cstring_output_allocate(char** lppchardelete, delete []*$1);
 
 /* Finalize output parameters */
 %typemap(in,numinputs=0) (std::string *) (std::string temp) {
@@ -22,6 +19,29 @@
 	%append_output(SWIG_FromCharPtrAndSize($1->c_str(), $1->length()));
 }
 
+%typemap(in) (const std::string &input) (std::string temp, char *buf=NULL, Py_ssize_t size)
+{
+    if(PyBytes_AsStringAndSize($input, &buf, &size) == -1)
+        %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
+
+    temp = std::string(buf, size);
+    $1 = &temp;
+}
+
+%typemap(freearg) (const std::string &input) {
+}
+
+%typemap(in,numinputs=0) (char** lppchardelete) (char *temp) {
+	$1 = &temp;
+}
+%typemap(argout) (char** lppchardelete)
+{
+  if (*$1) {
+    %append_output(PyBytes_FromString(*$1));
+    delete[](*$1);
+  }
+}
+
 struct sending_options {
         char *alternate_boundary;               // Specifies a specific boundary prefix to use when creating MIME boundaries
         bool no_recipients_workaround;  // Specified that we wish to accepts messages with no recipients (for example, when converting an attached email with no recipients)
@@ -29,13 +49,12 @@ struct sending_options {
         bool headers_only;
         bool add_received_date;
         int use_tnef;
-        bool force_utf8;
         char *charset_upgrade;
         bool allow_send_to_everyone;
         bool enable_dsn;
         %extend {
 			sending_options() {
-				sending_options *sopt = new sending_options;
+				auto sopt = new sending_options;
 				imopt_default_sending_options(sopt);
 				char *temp = sopt->charset_upgrade;
 				sopt->charset_upgrade = new char[strlen(temp)+1]; /* avoid free problems */
@@ -60,7 +79,7 @@ struct delivery_options {
 
         %extend {
             delivery_options() {
-				delivery_options *dopt = new delivery_options;
+				auto dopt = new delivery_options;
 				imopt_default_delivery_options(dopt);
 				return dopt;
 			}

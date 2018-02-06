@@ -16,8 +16,6 @@
  *
  */
 
-?>
-<?php
 /* Resource types as defined in main.h of the mapi extension */ 
 define('RESOURCE_SESSION'                        ,'MAPI Session');
 define('RESOURCE_TABLE'                          ,'MAPI Table');
@@ -415,6 +413,11 @@ define('olMeetingTentative'                      ,2);
 define('olMeetingAccepted'                       ,3);
 define('olMeetingDeclined'                       ,4);
 
+/* OL Attendee type */
+define('olAttendeeRequired'                      ,1);
+define('olAttendeeOptional'                      ,2);
+define('olAttendeeResource'                      ,3);
+
 /* task status */
 define('olTaskNotStarted'                        ,0);
 define('olTaskInProgress'                        ,1);
@@ -578,6 +581,8 @@ define('fbFree'                                  ,0);
 define('fbTentative'                             ,1);
 define('fbBusy'                                  ,2);
 define('fbOutOfOffice'                           ,3);
+define('fbWorkingElsewhere'                      ,4);
+define('fbNoData'                                ,4);
 
 /* ICS flags */
 
@@ -601,6 +606,7 @@ define('SYNC_PROGRESS_MODE',                    0x8000);  // AirMapi progress mo
 define('SYNC_FXRECOVERMODE',                    0x10000);
 define('SYNC_DEFER_CONFIG',                     0x20000);
 define('SYNC_FORCE_UNICODE',                    0x40000); // Forces server to return Unicode properties
+define('SYNC_STATE_READONLY',                   0x80000); // Server will not update the states in the DB, setting up exporter with this flag states are read only
 
 define('EMS_AB_ADDRESS_LOOKUP',					0x00000001); // Flag for resolvename to resolve only exact matches
 
@@ -639,4 +645,21 @@ define('fnevStatusObjectModified',    0x00000200);
 define('fnevReservedForMapi',         0x40000000);
 define('fnevExtended',                0x80000000);
 
-?>
+define('STGM_DIRECT', 0x00000000);
+define('STGM_TRANSACTED', 0x00010000);
+define('STGM_SIMPLE', 0x08000000);
+define('STGM_READ', 0x00000000);
+define('STGM_WRITE', 0x00000001);
+define('STGM_READWRITE', 0x00000002);
+define('STGM_SHARE_DENY_NONE', 0x00000040);
+define('STGM_SHARE_DENY_READ', 0x00000030);
+define('STGM_SHARE_DENY_WRITE', 0x00000020);
+define('STGM_SHARE_EXCLUSIVE', 0x00000010);
+define('STGM_PRIORITY', 0x00040000);
+define('STGM_DELETEONRELEASE', 0x04000000);
+define('STGM_NOSCRATCH', 0x00100000);
+define('STGM_CREATE', 0x00001000);
+define('STGM_CONVERT', 0x00020000);
+define('STGM_FAILIFTHERE', 0x00000000);
+define('STGM_NOSNAPSHOT', 0x00200000);
+define('STGM_DIRECT_SWMR', 0x00400000);

@@ -1,18 +1,17 @@
 usr/lib/@DEB_HOST_MULTIARCH@/libkcarchiver.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcarchivercore.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcfreebusy.so.*
-usr/lib/@DEB_HOST_MULTIARCH@/libkchl.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcicalmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcinetmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcmapi.so.*
-usr/lib/@DEB_HOST_MULTIARCH@/libkcpyconv.so.*
-usr/lib/@DEB_HOST_MULTIARCH@/libkcpydirector.so.*
+usr/lib/@DEB_HOST_MULTIARCH@/libkcpyconv-2.7.so
+usr/lib/@DEB_HOST_MULTIARCH@/libkcpydirector-2.7.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcserver.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcsoap.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcssl.so.*
+usr/lib/@DEB_HOST_MULTIARCH@/libkcsync.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcutil.so.*
 # From libkopano-client
-etc/mapi/kopano.inf
+usr/lib/mapi.d/kopano.inf
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcclient.so
-usr/lib/@DEB_HOST_MULTIARCH@/libkcsync.so.*

@@ -1,8 +1,8 @@
 """
 Part of the high-level python bindings for Kopano
 
-Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
-Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
+Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
+Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
 import contextlib
@@ -41,7 +41,8 @@ def logger(service, options=None, stdout=False, config=None, name=''):
     logger = logging.getLogger(name or service)
     if logger.handlers:
         return logger
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(fmt)
     log_method = 'file'
     log_file = '/var/log/kopano/%s.log' % service
     if config:
@@ -71,7 +72,8 @@ def logger(service, options=None, stdout=False, config=None, name=''):
     logger.setLevel(log_level)
     return logger
 
-@contextlib.contextmanager # it logs errors, that's all you need to know :-)
+# it logs errors, that's all you need to know :-)
+@contextlib.contextmanager
 def log_exc(log, stats=None):
     """
 Context-manager to log any exception in sub-block to given logger instance
@@ -115,57 +117,37 @@ class QueueHandler(logging.Handler):
 
 # log-to-queue listener copied from Vinay Sajip
 class QueueListener(object):
-    _sentinel = None
-
     def __init__(self, queue, *handlers):
         self.queue = queue
         self.handlers = handlers
         self._stop = threading.Event()
         self._thread = None
 
-    def dequeue(self, block):
-        return self.queue.get(block)
-
     def start(self):
         self._thread = t = threading.Thread(target=self._monitor)
         t.setDaemon(True)
         t.start()
 
-    def prepare(self, record):
-        return record
-
     def handle(self, record):
-        record = self.prepare(record)
         for handler in self.handlers:
             handler.handle(record)
 
     def _monitor(self):
         q = self.queue
         has_task_done = hasattr(q, 'task_done')
-        while not self._stop.isSet():
-            try:
-                record = self.dequeue(True)
-                if record is self._sentinel:
-                    break
-                self.handle(record)
-                if has_task_done:
-                    q.task_done()
-            except (Empty, EOFError):
-                pass
-        # There might still be records in the queue.
+
         while True:
             try:
-                record = self.dequeue(False)
-                if record is self._sentinel:
-                    break
+                record = self.queue.get(True, 0.01) # block, timeout 0.01 sec
                 self.handle(record)
                 if has_task_done:
                     q.task_done()
+
             except (Empty, EOFError):
-                break
+                if self._stop.isSet():
+                    break
 
     def stop(self):
         self._stop.set()
-        self.queue.put_nowait(self._sentinel)
         self._thread.join()
         self._thread = None

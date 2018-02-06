@@ -20,6 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 
 namespace KC {
 
@@ -51,18 +52,19 @@ private:
 	char *lpCurrent = nullptr, *lpOriginal = nullptr;
 	ULONG cbCurrent = 0, cbOriginal = 0, cbTotal = 0;
 	ULONG	ulFlags;
+	ALLOC_WRAP_FRIEND;
 };
 
 /* 
  * This is an IStream-compatible wrapper for ECMemBlock
  */
-class _kc_export ECMemStream _kc_final : public ECUnknown {
+class _kc_export ECMemStream _kc_final : public ECUnknown, public IStream {
 public:
 	typedef HRESULT (*CommitFunc)(IStream *lpStream, void *lpParam);
 	typedef HRESULT (*DeleteFunc)(void *lpParam); /* Caller's function to remove lpParam data from memory */
 
 private:
-	_kc_hidden ECMemStream(char *buffer, ULONG data_len, ULONG flags, CommitFunc, DeleteFunc, void *param);
+	_kc_hidden ECMemStream(const char *buffer, ULONG data_len, ULONG flags, CommitFunc, DeleteFunc, void *param);
 	_kc_hidden ECMemStream(ECMemBlock *, ULONG flags, CommitFunc, DeleteFunc, void *param);
 	_kc_hidden ~ECMemStream(void);
 
@@ -85,20 +87,15 @@ public:
 	virtual ULONG GetSize();
 	virtual char* GetBuffer();
 
-	class _kc_hidden xStream _kc_final : public IStream {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/ISequentialStream.hpp>
-		#include <kopano/xclsfrag/IStream.hpp>
-	} m_xStream;
-
 private:
-	ULARGE_INTEGER	liPos;
-	ECMemBlock		*lpMemBlock;
+	ULARGE_INTEGER liPos = {{0}};
+	ECMemBlock *lpMemBlock = nullptr;
 	CommitFunc		lpCommitFunc;
 	DeleteFunc		lpDeleteFunc;
 	void *			lpParam;
 	BOOL fDirty = false;
 	ULONG			ulFlags;
+	ALLOC_WRAP_FRIEND;
 };
 
 } /* namespace */

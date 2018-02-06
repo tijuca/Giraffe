@@ -19,22 +19,20 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+#include <cstdint>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include "ECSyncContext.h"
 #include "ECSyncUtil.h"
 #include "ECSyncSettings.h"
-#include <IECExportAddressbookChanges.h>
-#include <IECExportChanges.h>
-#include <IECChangeAdvisor.h>
-
 #include <kopano/ECUnknown.h>
 #include <kopano/ECGuid.h>
 #include <kopano/ECTags.h>
 #include <kopano/ECLogger.h>
+#include <kopano/IECInterfaces.hpp>
 #include <kopano/stringutil.h>
-
+#include <kopano/Util.h>
 #include <mapix.h>
 #include <kopano/mapiext.h>
 #include <mapiutil.h>
@@ -45,15 +43,14 @@
 
 using namespace KCHL;
 
-typedef object_ptr<IECChangeAdvisor, IID_IECChangeAdvisor> ECChangeAdvisorPtr;
+typedef object_ptr<IECChangeAdvisor> ECChangeAdvisorPtr;
 //DEFINEMAPIPTR(ECChangeAdvisor);
-typedef object_ptr<IECChangeAdviseSink, IID_IECChangeAdviseSink> ECChangeAdviseSinkPtr;
-//DEFINEMAPIPTR(ECChangeAdviseSink);
 
 #define EC_SYNC_STATUS_VERSION			1
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-class ECChangeAdviseSink _kc_final : public ECUnknown {
+class ECChangeAdviseSink _kc_final :
+    public ECUnknown, public IECChangeAdviseSink {
 public:
 	typedef ULONG(ECSyncContext::*NOTIFYCALLBACK)(ULONG,LPENTRYLIST);
 
@@ -63,19 +60,12 @@ public:
 	{ }
 
 	// IUnknown
-	HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override
+	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override
 	{
-		if (refiid == IID_ECUnknown || refiid == IID_ECChangeAdviseSink) {
-			AddRef();
-			*lpvoid = (void *)this;
-			return hrSuccess;
-		}
-		if (refiid == IID_IUnknown || refiid == IID_IECChangeAdviseSink) {
-			AddRef();
-			*lpvoid = (void *)&this->m_xECChangeAdviseSink;
-			return hrSuccess;
-		}
-
+		REGISTER_INTERFACE2(ECChangeAdviseSink, this);
+		REGISTER_INTERFACE2(ECUnknown, this);
+		REGISTER_INTERFACE2(IECChangeAdviseSink, this);
+		REGISTER_INTERFACE2(IUnknown, this);
 		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 	}
 
@@ -85,35 +75,6 @@ public:
 	}
 
 private:
-	class xECChangeAdviseSink _kc_final : public IECChangeAdviseSink {
-	public:
-		// <kopano/xclsfrag/IUnknown.hpp>
-		virtual ULONG __stdcall AddRef(void) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->AddRef();
-		}
-
-		virtual ULONG __stdcall Release(void) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->Release();
-		}
-
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->QueryInterface(refiid, pInterface);
-		}
-
-		// <kopano/xclsfrag/IExchangeChangeAdviseSink.hpp>
-		virtual ULONG __stdcall OnNotify(ULONG ulFlags, LPENTRYLIST lpEntryList) _kc_override
-		{
-			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
-			return pThis->OnNotify(ulFlags, lpEntryList);
-		}
-	} m_xECChangeAdviseSink;
-
 	ECSyncContext	*m_lpsSyncContext;
 	NOTIFYCALLBACK	m_fnCallback;
 };
@@ -122,40 +83,16 @@ static HRESULT HrCreateECChangeAdviseSink(ECSyncContext *lpsSyncContext,
     ECChangeAdviseSink::NOTIFYCALLBACK fnCallback,
     IECChangeAdviseSink **lppAdviseSink)
 {
-	object_ptr<ECChangeAdviseSink> lpAdviseSink(new(std::nothrow) ECChangeAdviseSink(lpsSyncContext, fnCallback));
-	if (lpAdviseSink == NULL)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	HRESULT hr = lpAdviseSink->QueryInterface(IID_IECChangeAdviseSink,
-		reinterpret_cast<void **>(lppAdviseSink));
-	if (hr == hrSuccess)
-		lpAdviseSink.release();
-	return hr;
+	return alloc_wrap<ECChangeAdviseSink>(lpsSyncContext, fnCallback)
+	       .as(IID_IECChangeAdviseSink, lppAdviseSink);
 }
 
-ECSyncContext::ECSyncContext(LPMDB lpStore, ECLogger *lpLogger)
-	: m_lpStore(lpStore)
-	, m_lpLogger(lpLogger)
-	, m_lpSettings(ECSyncSettings::GetInstance())
+ECSyncContext::ECSyncContext(IMsgStore *lpStore, ECLogger *lpLogger) :
+	m_lpLogger(lpLogger), m_lpStore(lpStore),
+	m_lpSettings(&ECSyncSettings::instance)
 {
-	m_lpLogger->AddRef();
-	m_lpStore->AddRef();
-
 	if (m_lpSettings->ChangeNotificationsEnabled())
-		HrCreateECChangeAdviseSink(this, &ECSyncContext::OnChange, &m_lpChangeAdviseSink);
-}
-
-ECSyncContext::~ECSyncContext()
-{
-	if (m_lpChangeAdvisor)
-		m_lpChangeAdvisor->Release();
-
-	if (m_lpChangeAdviseSink)
-		m_lpChangeAdviseSink->Release();
-
-	if (m_lpStore)
-		m_lpStore->Release();
-
-	m_lpLogger->Release();
+		HrCreateECChangeAdviseSink(this, &ECSyncContext::OnChange, &~m_lpChangeAdviseSink);
 }
 
 HRESULT ECSyncContext::HrGetMsgStore(LPMDB *lppMsgStore)
@@ -170,13 +107,12 @@ HRESULT ECSyncContext::HrGetMsgStore(LPMDB *lppMsgStore)
 
 HRESULT ECSyncContext::HrGetReceiveFolder(LPMAPIFOLDER *lppInboxFolder)
 {
-	HRESULT			hr = hrSuccess;
 	ULONG			cbEntryID = 0;
 	memory_ptr<ENTRYID> lpEntryID;
 	ULONG			ulObjType = 0;
 	object_ptr<IMAPIFolder> lpInboxFolder;
 
-	hr = m_lpStore->GetReceiveFolder((LPTSTR)"IPM", 0, &cbEntryID, &~lpEntryID, NULL);
+	auto hr = m_lpStore->GetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0, &cbEntryID, &~lpEntryID, nullptr);
 	if (hr != hrSuccess)
 		return hr;
 	hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpInboxFolder);
@@ -193,8 +129,7 @@ HRESULT ECSyncContext::HrGetChangeAdvisor(IECChangeAdvisor **lppChangeAdvisor)
 		return MAPI_E_NO_SUPPORT;
 	if (m_lpChangeAdvisor == NULL) {
 		HRESULT hr = m_lpStore->OpenProperty(PR_EC_CHANGE_ADVISOR,
-			&IID_IECChangeAdvisor, 0, 0,
-			reinterpret_cast<LPUNKNOWN *>(&m_lpChangeAdvisor));
+			&IID_IECChangeAdvisor, 0, 0, &~m_lpChangeAdvisor);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -216,13 +151,10 @@ HRESULT ECSyncContext::HrReleaseChangeAdvisor()
 	if (!m_lpSettings->ChangeNotificationsEnabled())
 		return MAPI_E_NO_SUPPORT;
 
-	if (m_lpChangeAdvisor) {
+	if (m_lpChangeAdvisor)
 		// Don't release while holding the lock as that might
 		// cause a deadlock if a notification is being delivered.
-		ptrReleaseMe.reset(m_lpChangeAdvisor);
-		m_lpChangeAdvisor = NULL;
-	}
-
+		ptrReleaseMe.reset(m_lpChangeAdvisor.release());
 	m_mapNotifiedSyncIds.clear();
 	return hrSuccess;
 }
@@ -230,7 +162,7 @@ HRESULT ECSyncContext::HrReleaseChangeAdvisor()
 HRESULT ECSyncContext::HrResetChangeAdvisor()
 {
 	ECChangeAdvisorPtr ptrChangeAdvisor;
-	ECChangeAdviseSinkPtr ptrChangeAdviseSink;
+	object_ptr<IECChangeAdviseSink> ptrChangeAdviseSink;
 
 	HRESULT hr = HrReleaseChangeAdvisor();
 	if (hr != hrSuccess)
@@ -252,13 +184,12 @@ HRESULT ECSyncContext::HrGetChangeAdviseSink(IECChangeAdviseSink **lppChangeAdvi
 
 HRESULT ECSyncContext::HrQueryHierarchyTable(LPSPropTagArray lpsPropTags, LPSRowSet *lppRows)
 {
-	HRESULT			hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpRootFolder;
 	ULONG			ulType = 0;
 	object_ptr<IMAPITable> lpTable;
 
 	assert(lppRows != NULL);
-	hr = m_lpStore->OpenEntry(0, nullptr, &IID_IMAPIFolder, MAPI_DEFERRED_ERRORS, &ulType, &~lpRootFolder);
+	auto hr = m_lpStore->OpenEntry(0, nullptr, &IID_IMAPIFolder, MAPI_DEFERRED_ERRORS, &ulType, &~lpRootFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpRootFolder->GetHierarchyTable(CONVENIENT_DEPTH, &~lpTable);
@@ -269,12 +200,11 @@ HRESULT ECSyncContext::HrQueryHierarchyTable(LPSPropTagArray lpsPropTags, LPSRow
 
 HRESULT ECSyncContext::HrOpenRootFolder(LPMAPIFOLDER *lppRootFolder, LPMDB *lppMsgStore)
 {
-	HRESULT			hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpRootFolder;
 	SBinary			sEntryID = {0};
 
 	assert(lppRootFolder != NULL);
-	hr = HrOpenFolder(&sEntryID, &~lpRootFolder);
+	auto hr = HrOpenFolder(&sEntryID, &~lpRootFolder);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -289,13 +219,12 @@ HRESULT ECSyncContext::HrOpenRootFolder(LPMAPIFOLDER *lppRootFolder, LPMDB *lppM
 
 HRESULT ECSyncContext::HrOpenFolder(SBinary *lpsEntryID, LPMAPIFOLDER *lppFolder)
 {
-	HRESULT			hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpFolder;
 	ULONG			ulType = 0;
 
 	assert(lpsEntryID != NULL);
 	assert(lppFolder != NULL);
-	hr = m_lpStore->OpenEntry(lpsEntryID->cb, reinterpret_cast<ENTRYID *>(lpsEntryID->lpb), &IID_IMAPIFolder, MAPI_DEFERRED_ERRORS | MAPI_MODIFY, &ulType, &~lpFolder);
+	auto hr = m_lpStore->OpenEntry(lpsEntryID->cb, reinterpret_cast<ENTRYID *>(lpsEntryID->lpb), &IID_IMAPIFolder, MAPI_DEFERRED_ERRORS | MAPI_MODIFY, &ulType, &~lpFolder);
 	if (hr != hrSuccess)
 		return hr;
 	*lppFolder = lpFolder.release();
@@ -345,7 +274,7 @@ HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULON
 		auto iterNotifiedSyncId = m_mapNotifiedSyncIds.find(sSyncState.ulSyncId);
 		if (iterNotifiedSyncId == m_mapNotifiedSyncIds.cend()) {
 			*lpulSteps = 0;
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=yes, steps=0 (unsignalled)", bin2hex(lpSourceKey->cb, lpSourceKey->lpb).c_str(), sSyncState.ulSyncId);
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=yes, steps=0 (unsignalled)", bin2hex(*lpSourceKey).c_str(), sSyncState.ulSyncId);
 			lk.unlock();
 			return hr;
 		}
@@ -364,7 +293,8 @@ HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULON
 
 fallback:
 	// The current folder is not being monitored, so get steps the old fashioned way.
-	hr = m_lpStore->OpenEntry(lpEntryID->cb, reinterpret_cast<ENTRYID *>(lpEntryID->lpb), 0, MAPI_DEFERRED_ERRORS, &ulType, &~lpFolder);
+	hr = m_lpStore->OpenEntry(lpEntryID->cb, reinterpret_cast<ENTRYID *>(lpEntryID->lpb),
+	     &iid_of(lpFolder), MAPI_DEFERRED_ERRORS, &ulType, &~lpFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrGetSyncStatusStream(lpSourceKey, &~lpStream);
@@ -393,7 +323,9 @@ fallback:
 	}
 
 	*lpulSteps = ulChangeCount;
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=%s, steps=%u", bin2hex(lpSourceKey->cb, lpSourceKey->lpb).c_str(), sSyncState.ulSyncId, (bNotified ? "yes" : "no"), *lpulSteps);
+	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=%s, steps=%u",
+		bin2hex(*lpSourceKey).c_str(), sSyncState.ulSyncId,
+		(bNotified ? "yes" : "no"), *lpulSteps);
 	return hrSuccess;
 }
 
@@ -414,22 +346,21 @@ HRESULT ECSyncContext::HrUpdateChangeId(LPSTREAM lpStream)
 			m_mapNotifiedSyncIds.erase(ulSyncId);
 	}
 
-	if(m_lpChangeAdvisor) {
-		// Now inform the change advisor of our accomplishment
-		hr = m_lpChangeAdvisor->QueryInterface(ptrECA.iid(), &~ptrECA);
-		if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED)
-			return hr;
-		hr = ptrECA->UpdateSyncState(ulSyncId, ulChangeId);
-		if (hr == MAPI_E_INVALID_PARAMETER)
-			// We're apparently not tracking this syncid.
-			return hrSuccess;
-	}
+	if (m_lpChangeAdvisor == nullptr)
+		return hrSuccess;
+	// Now inform the change advisor of our accomplishment
+	hr = m_lpChangeAdvisor->QueryInterface(iid_of(ptrECA), &~ptrECA);
+	if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED)
+		return hr;
+	hr = ptrECA->UpdateSyncState(ulSyncId, ulChangeId);
+	if (hr == MAPI_E_INVALID_PARAMETER)
+		// We're apparently not tracking this syncid.
+		return hrSuccess;
 	return hrSuccess;
 }
 
 HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncState *lpsSyncState)
 {
-	HRESULT							hr = hrSuccess;
 	std::string						strSourceKey((char*)lpSourceKey->lpb, lpSourceKey->cb);
 	object_ptr<IStream> lpStream;
 	SSyncState						sSyncState = {0};
@@ -439,11 +370,11 @@ HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncSt
 	if (iterSyncState != m_mapStates.cend()) {
 		assert(iterSyncState->second.ulSyncId != 0);
 		*lpsSyncState = iterSyncState->second;
-		return hr;
+		return hrSuccess;
 	}
 
 	// Try to get the information from the status stream.
-	hr = HrGetSyncStatusStream(lpSourceKey, &~lpStream);
+	auto hr = HrGetSyncStatusStream(lpSourceKey, &~lpStream);
 	if (FAILED(hr))
 		return hr;
 	hr = HrDecodeSyncStateStream(lpStream, &sSyncState.ulSyncId, &sSyncState.ulChangeId, NULL);
@@ -453,14 +384,9 @@ HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncSt
 		return MAPI_E_NOT_FOUND;
 
 	// update the sourcekey to syncid map.
-	m_mapStates.insert(SyncStateMap::value_type(strSourceKey, sSyncState));
+	m_mapStates.emplace(strSourceKey, sSyncState);
 	*lpsSyncState = std::move(sSyncState);
 	return hrSuccess;
-}
-
-bool ECSyncContext::SyncStatusLoaded() const
-{
-	return !m_mapSyncStatus.empty();
 }
 
 HRESULT ECSyncContext::HrClearSyncStatus()
@@ -474,27 +400,27 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 	ULONG ulStatusCount = 0;
 	ULONG ulStatusNumber = 0;
 	ULONG ulVersion = 0;
-	ULONG ulSize = 0;
-	ULONG ulPos = 0;
 	std::string strSourceKey;
-	LPSTREAM lpStream = NULL;
 
 	assert(lpsSyncState != NULL);
 	if (lpsSyncState->cb < 8)
 		return MAPI_E_CORRUPT_DATA;
 	HrClearSyncStatus();
 
-	ulVersion = *((ULONG*)(lpsSyncState->lpb));
+	memcpy(&ulVersion, lpsSyncState->lpb, sizeof(ulVersion));
+	ulVersion = le32_to_cpu(ulVersion);
 	if (ulVersion != EC_SYNC_STATUS_VERSION)
 		return hrSuccess;
 
-	ulStatusCount = *((ULONG*)(lpsSyncState->lpb+4));
-
+	memcpy(&ulStatusCount, lpsSyncState->lpb + 4, sizeof(ulStatusCount));
+	ulStatusCount = le32_to_cpu(ulStatusCount);
 	ZLOG_DEBUG(m_lpLogger, "Loading sync status stream: version=%u, items=%u", ulVersion, ulStatusCount);
 
-	ulPos = 8;
+	ULONG ulPos = 8;
 	for (ulStatusNumber = 0; ulStatusNumber < ulStatusCount; ++ulStatusNumber) {
-		ulSize = *((ULONG*)(lpsSyncState->lpb + ulPos));
+		uint32_t ulSize;
+		memcpy(&ulSize, lpsSyncState->lpb + ulPos, sizeof(ulSize));
+		ulSize = le32_to_cpu(ulSize);
 		ulPos += 4;
 
 		if (ulSize <= 16 || ulPos + ulSize + 4 > lpsSyncState->cb)
@@ -502,23 +428,23 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 
 		strSourceKey.assign((char*)(lpsSyncState->lpb + ulPos), ulSize);
 		ulPos += ulSize;
-		ulSize = *((ULONG*)(lpsSyncState->lpb + ulPos));
+		memcpy(&ulSize, lpsSyncState->lpb + ulPos, sizeof(ulSize));
+		ulSize = le32_to_cpu(ulSize);
 		ulPos += 4;
 
 		if (ulSize < 8 || ulPos + ulSize > lpsSyncState->cb)
 			return MAPI_E_CORRUPT_DATA;
 
-		ZLOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s", ulStatusNumber, ulSize, bin2hex(strSourceKey.size(), (unsigned char*)strSourceKey.data()).c_str());
-
-		HRESULT hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, ulSize), true, &lpStream);
+		ZLOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s",
+			ulStatusNumber, ulSize, bin2hex(strSourceKey).c_str());
+		object_ptr<IStream> lpStream;
+		auto hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, ulSize), true, &~lpStream);
 		if (hr != hrSuccess)
 			return hr;
 		hr = lpStream->Write(lpsSyncState->lpb + ulPos, ulSize, &ulSize);
 		if (hr != hrSuccess)
 			return hr;
-		m_mapSyncStatus[std::move(strSourceKey)] = lpStream;
-		lpStream = NULL;
-
+		m_mapSyncStatus[std::move(strSourceKey)].reset(lpStream);
 		ulPos += ulSize;
 	}
 	return hrSuccess;
@@ -526,18 +452,17 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 
 HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 {
-	HRESULT hr = hrSuccess;
-	std::string strSyncStatus;
-	ULONG ulSize = 0;
 	ULONG ulVersion = EC_SYNC_STATUS_VERSION;
 	LARGE_INTEGER liPos = {{0, 0}};
 	STATSTG sStat;
 	memory_ptr<SPropValue> lpSyncStatusProp;
 
 	assert(lppSyncStatusProp != NULL);
-	strSyncStatus.assign((char*)&ulVersion, 4);
-	ulSize = m_mapSyncStatus.size();
-	strSyncStatus.append((char*)&ulSize, 4);
+	uint32_t tmp4 = cpu_to_le32(ulVersion);
+	std::string strSyncStatus{reinterpret_cast<const char *>(&tmp4), 4};
+	ULONG ulSize = m_mapSyncStatus.size();
+	tmp4 = cpu_to_le32(ulSize);
+	strSyncStatus.append(reinterpret_cast<const char *>(&tmp4), 4);
 
 	ZLOG_DEBUG(m_lpLogger, "Saving sync status stream: items=%u", ulSize);
 
@@ -545,16 +470,18 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 		std::unique_ptr<char[]> lpszStream;
 
 		ulSize = ssp.first.size();
-		strSyncStatus.append((char*)&ulSize, 4);
+		tmp4 = cpu_to_le32(ulSize);
+		strSyncStatus.append(reinterpret_cast<const char *>(&tmp4), 4);
 		strSyncStatus.append(ssp.first);
 
-		hr = ssp.second->Stat(&sStat, STATFLAG_NONAME);
+		auto hr = ssp.second->Stat(&sStat, STATFLAG_NONAME);
 		if (hr != hrSuccess)
 			return hr;
 		ulSize = sStat.cbSize.LowPart;
-		strSyncStatus.append((char*)&ulSize, 4);
+		tmp4 = cpu_to_le32(ulSize);
+		strSyncStatus.append(reinterpret_cast<const char *>(&tmp4), 4);
 		ZLOG_DEBUG(m_lpLogger, "  Stream: size=%u, sourcekey=%s", ulSize,
-			bin2hex(ssp.first.size(), reinterpret_cast<const unsigned char *>(ssp.first.data())).c_str());
+			bin2hex(ssp.first.size(), ssp.first.data()).c_str());
 		hr = ssp.second->Seek(liPos, STREAM_SEEK_SET, NULL);
 		if (hr != hrSuccess)
 			return hr;
@@ -565,7 +492,7 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 		strSyncStatus.append(lpszStream.get(), sStat.cbSize.LowPart);
 	}
 
-	hr = MAPIAllocateBuffer(sizeof *lpSyncStatusProp, &~lpSyncStatusProp);
+	auto hr = MAPIAllocateBuffer(sizeof *lpSyncStatusProp, &~lpSyncStatusProp);
 	if (hr != hrSuccess)
 		return hr;
 	memset(lpSyncStatusProp, 0, sizeof *lpSyncStatusProp);
@@ -581,10 +508,8 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 
 HRESULT ECSyncContext::HrGetSyncStatusStream(LPMAPIFOLDER lpFolder, LPSTREAM *lppStream)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropVal;
-
-	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpPropVal);
+	auto hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpPropVal);
 	if(hr != hrSuccess)
 		return hr;
 	return HrGetSyncStatusStream(&lpPropVal->Value.bin, lppStream);
@@ -605,8 +530,7 @@ HRESULT ECSyncContext::HrGetSyncStatusStream(SBinary *lpsSourceKey, LPSTREAM *lp
 		if (hr != hrSuccess)
 			return hr;
 		hr = MAPI_W_POSITION_CHANGED;
-		m_mapSyncStatus[std::move(strSourceKey)] = lpStream;
-		lpStream->AddRef();
+		m_mapSyncStatus[std::move(strSourceKey)].reset(lpStream);
 		*lppStream = lpStream;
 	}
 	(*lppStream)->AddRef();
@@ -704,8 +628,6 @@ HRESULT ECSyncContext::GetServerUid(LPGUID lpServerUid)
 
 ULONG ECSyncContext::OnChange(ULONG ulFlags, LPENTRYLIST lpEntryList)
 {
-	ULONG ulSyncId = 0;
-	ULONG ulChangeId = 0;
 	std::lock_guard<std::mutex> lock(m_hMutex);
 
 	for (unsigned i = 0; i < lpEntryList->cValues; ++i) {
@@ -713,9 +635,8 @@ ULONG ECSyncContext::OnChange(ULONG ulFlags, LPENTRYLIST lpEntryList)
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change notification: [Invalid]");
 			continue;
 		}
-
-		ulSyncId = SYNCID(lpEntryList->lpbin[i].lpb);
-		ulChangeId = CHANGEID(lpEntryList->lpbin[i].lpb);
+		ULONG ulSyncId = SYNCID(lpEntryList->lpbin[i].lpb);
+		ULONG ulChangeId = CHANGEID(lpEntryList->lpbin[i].lpb);
 		m_mapNotifiedSyncIds[ulSyncId] = ulChangeId;
 
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "change notification: syncid=%u, changeid=%u", ulSyncId, ulChangeId);

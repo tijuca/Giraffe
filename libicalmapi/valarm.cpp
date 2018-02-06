@@ -30,6 +30,7 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/Util.h>
 #include <kopano/stringutil.h>
+#include "icalcompat.hpp"
 
 namespace KC {
 
@@ -46,7 +47,6 @@ namespace KC {
  */
 HRESULT HrParseReminder(LONG lRemindBefore, time_t ttReminderTime, bool bTask, icalcomponent **lppAlarm)
 {
-	icalcomponent *lpVAlarm = NULL;
 	icaltriggertype sittTrigger;
 
 	if (lppAlarm == NULL)
@@ -57,12 +57,12 @@ HRESULT HrParseReminder(LONG lRemindBefore, time_t ttReminderTime, bool bTask, i
 	memset(&sittTrigger, 0, sizeof(icaltriggertype));
 
 	if (ttReminderTime && bTask) {
-		sittTrigger.time = icaltime_from_timet(ttReminderTime, false);			// given in UTC
-		sittTrigger.time.is_utc = 1;
+		sittTrigger.time = icaltime_from_timet_with_zone(ttReminderTime, false, nullptr);			// given in UTC
+		kc_ical_utc(sittTrigger.time, true);
 	} else
 		sittTrigger.duration = icaldurationtype_from_int(-1 * lRemindBefore * 60);	// set seconds
 
-	lpVAlarm = icalcomponent_new_valarm();
+	auto lpVAlarm = icalcomponent_new_valarm();
 	icalcomponent_add_property(lpVAlarm, icalproperty_new_trigger(sittTrigger));
 	icalcomponent_add_property(lpVAlarm, icalproperty_new_action(ICAL_ACTION_DISPLAY));
 	icalcomponent_add_property(lpVAlarm, icalproperty_new_description("Reminder"));
@@ -82,22 +82,14 @@ HRESULT HrParseReminder(LONG lRemindBefore, time_t ttReminderTime, bool bTask, i
  * @return		MAPI error code
  */
 HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *lpttReminderTime, bool *lpbReminderSet) {
-	HRESULT hr = hrSuccess;
-	icalproperty *lpTrigger = NULL;
-	icalproperty *lpAction = NULL;
-	icaltriggertype sittTrigger;
-	icalproperty_action eipaAction;
-	std::string strValue;
-
 	LONG lRemindBefore = 0;
 	time_t ttReminderTime = 0;
 	bool bReminderSet = false;
-
-	lpTrigger = icalcomponent_get_first_property(lpicAlarm, ICAL_TRIGGER_PROPERTY);
-	lpAction = icalcomponent_get_first_property(lpicAlarm, ICAL_ACTION_PROPERTY);
+	auto lpTrigger = icalcomponent_get_first_property(lpicAlarm, ICAL_TRIGGER_PROPERTY);
+	auto lpAction = icalcomponent_get_first_property(lpicAlarm, ICAL_ACTION_PROPERTY);
 
 	if (lpTrigger != NULL) {
-		sittTrigger = icalproperty_get_trigger(lpTrigger);
+		auto sittTrigger = icalproperty_get_trigger(lpTrigger);
 
 		ttReminderTime = icaltime_as_timet(sittTrigger.time); // is in utc
 
@@ -112,8 +104,7 @@ HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *l
 	}
 
 	if (lpAction != NULL) {
-		eipaAction = icalproperty_get_action(lpAction);
-
+		auto eipaAction = icalproperty_get_action(lpAction);
 		// iMac Calendar 6.0 sends ACTION:NONE, which libical doesn't parse correcty to the ICAL_ACTION_NONE enum value
 		if (eipaAction > ICAL_ACTION_X && eipaAction < ICAL_ACTION_NONE)
 			bReminderSet = true;
@@ -127,8 +118,7 @@ HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *l
 
 	if (lpbReminderSet)
 		*lpbReminderSet = bReminderSet;
-
-	return hr;
+	return hrSuccess;
 }
 
 } /* namespace */

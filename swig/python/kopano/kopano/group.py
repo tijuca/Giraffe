@@ -14,20 +14,25 @@ from MAPI.Struct import (
 )
 from MAPI.Defs import bin2hex
 
+from .properties import Properties
 from .errors import NotFoundError, DuplicateError
-from .compat import repr as _repr, fake_unicode as _unicode
+from .compat import fake_unicode as _unicode
 
 if sys.hexversion >= 0x03000000:
-    from . import utils as _utils
-    from . import server as _server
-    from . import user as _user
+    try:
+        from . import server as _server
+    except ImportError:
+        _server = sys.modules[__package__+'.server']
+    try:
+        from . import user as _user
+    except ImportError:
+        _user = sys.modules[__package__+'.user']
 else:
-    import utils as _utils
     import server as _server
     import user as _user
 
-class Group(object):
-    """Group class"""
+class Group(Properties):
+    """Group class."""
 
     def __init__(self, name, server=None):
         self.server = server or _server.Server()
@@ -47,20 +52,22 @@ class Group(object):
 
     @property
     def groupid(self):
+        """Group identifier."""
+
         return bin2hex(self._ecgroup.GroupID)
 
-    def users(self):
-        """Users in group"""
+    def users(self): # XXX recurse?
+        """Return all :class:`users <User>` in group."""
 
         return self.members(groups=False)
 
-    def groups(self):
-        """Groups in group"""
+    def groups(self): # XXX recurse?
+        """Return all :class:`groups <Group>` in group."""
 
         return self.members(users=False)
 
-    def members(self, groups=True, users=True):
-        """All members in group, users or groups"""
+    def members(self, groups=True, users=True): # XXX recurse?
+        """Return all members in group (:class:`users <User>` or :class:`groups <Group>`)."""
 
         for ecuser in self.server.sa.GetUserListOfGroup(self._ecgroup.GroupID, MAPI_UNICODE):
             if ecuser.Username == 'SYSTEM':
@@ -80,6 +87,7 @@ class Group(object):
 
     @property
     def name(self):
+        """Group name."""
         return self._name
 
     @name.setter
@@ -88,6 +96,7 @@ class Group(object):
 
     @property
     def email(self):
+        """Group email address."""
         return self._ecgroup.Email
 
     @email.setter
@@ -95,7 +104,7 @@ class Group(object):
         self._update(email=_unicode(value))
 
     @property
-    def fullname(self):
+    def fullname(self): # currently identical to name (may change later?)
         return self._ecgroup.Fullname
 
     @fullname.setter
@@ -104,29 +113,33 @@ class Group(object):
 
     @property
     def hidden(self):
-        return self._ecgroup.IsHidden
+        """The group is hidden from the addressbook."""
+        return bool(self._ecgroup.IsHidden)
 
     @hidden.setter
     def hidden(self, value):
         self._update(hidden=value)
 
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def props(self):
-        return _utils.props(self.mapiobj)
-
     def send_as(self):
+        """Return :class:`users <User>` in send-as list."""
         for u in self.server.sa.GetSendAsList(self._ecgroup.GroupID, MAPI_UNICODE):
             yield self.server.user(u.Username)
 
     def add_send_as(self, user):
+        """Add :class:`user <User>` to send-as list.
+
+        :param user: user to add
+        """
         try:
             self.server.sa.AddSendAsUser(self._ecgroup.GroupID, user._ecuser.UserID)
         except MAPIErrorCollision:
             raise DuplicateError("user '%s' already in send-as for group '%s'" % (user.name, self.name))
 
     def remove_send_as(self, user):
+        """Remove :class:`user <User>` from send-as list.
+
+        :param user: user to remove
+        """
         try:
             self.server.sa.DelSendAsUser(self._ecgroup.GroupID, user._ecuser.UserID)
         except MAPIErrorNotFound:
@@ -134,6 +147,10 @@ class Group(object):
 
     # XXX: also does groups..
     def add_user(self, user):
+        """Add :class:`user <User>` to group.
+
+        :param user: user to add
+        """
         if isinstance(user, Group):
             self.server.sa.AddGroupUser(self._ecgroup.GroupID, user._ecgroup.GroupID)
         else:
@@ -143,6 +160,10 @@ class Group(object):
                 raise DuplicateError("group '%s' already contains user '%s'" % (self.name, user.name))
 
     def remove_user(self, user):
+        """Remove :class:`user <User>` from group.
+
+        :param user: user to remove
+        """
         try:
             self.server.sa.DeleteGroupUser(self._ecgroup.GroupID, user._ecuser.UserID)
         except MAPIErrorNotFound:
@@ -171,6 +192,3 @@ class Group(object):
 
     def __unicode__(self):
         return u"Group('%s')" % self.name
-
-    def __repr__(self):
-        return _repr(self)

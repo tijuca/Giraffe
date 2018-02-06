@@ -29,8 +29,6 @@
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
 
-using namespace std;
-
 // we cannot patch http_post now (see external/gsoap/*.diff), so we redefine it
 static int
 #if GSOAP_VERSION >= 20850
@@ -102,7 +100,8 @@ static int gsoap_connect_pipe(struct soap *soap, const char *endpoint,
 	// chances of this happening are, of course, small, but also very real.
 
 	soap->status = SOAP_POST;
-
+	/* Do like gsoap's tcp_connect would */
+	soap->keep_alive = -((soap->omode & SOAP_IO_KEEPALIVE) != 0);
    	return SOAP_OK;
 }
 

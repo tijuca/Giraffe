@@ -39,7 +39,6 @@ private:	// types
 	struct STaskInfo {
 		ECTask			*lpTask;
 		bool			bDelete;
-		struct timeval	tvQueueTime;
 	};
 
 	typedef std::set<pthread_t> ThreadSet;
@@ -57,7 +56,6 @@ private:	// methods
 	_kc_hidden virtual bool getNextTask(STaskInfo *, std::unique_lock<std::mutex> &);
 	_kc_hidden void joinTerminated(std::unique_lock<std::mutex> &);
 	_kc_hidden static void *threadFunc(void *);
-	_kc_hidden static bool isCurrentThread(const pthread_t &);
 	
 	ThreadSet	m_setThreads;
 	ThreadSet	m_setTerminated;
@@ -91,7 +89,7 @@ inline unsigned ECThreadPool::threadCount() const {
  */
 class _kc_export ECTask {
 public:
-	_kc_hidden virtual ~ECTask(void) _kc_impdtor;
+	_kc_hidden virtual ~ECTask(void) = default;
 	_kc_hidden virtual void execute(void);
 	_kc_hidden bool dispatchOn(ECThreadPool *, bool transfer_ownership = false);
 	
@@ -109,7 +107,7 @@ private:
  * Dispatch a task object on a particular threadpool.
  *
  * @param[in]	lpThreadPool		The threadpool on which to dispatch the task.
- * @param[in]	bTransferOwnership	Boolean parameter specifying wether the threadpool
+ * @param[in]	bTransferOwnership	Boolean parameter specifying whether the threadpool
  *                                  should take ownership of the task object, and thus
  *                                  is responsible for deleting the object when done.
  * @retval true if the task was successfully queued, false otherwise.
@@ -163,7 +161,7 @@ inline bool ECWaitableTask::done() const {
  * an ECThreadPool or derived class.
  * To call a function with more than one argument boost::bind can be used.
  */
-template<typename _Rt, typename _Fn, typename _At>
+template<typename Rt, typename Fn, typename At>
 class ECDeferredFunc _kc_final : public ECWaitableTask {
 public:
 	/**
@@ -171,7 +169,7 @@ public:
 	 * @param[in]	fn		The function to execute
 	 * @param[in]	arg		The argument to pass to fn.
 	 */
-	ECDeferredFunc(_Fn fn, const _At &arg) : m_fn(fn), m_arg(arg)
+	ECDeferredFunc(Fn fn, const At &arg) : m_fn(fn), m_arg(arg)
 	{ }
 	
 	virtual void run(void) _kc_override
@@ -183,15 +181,16 @@ public:
 	 * Get the result of the asynchronous function. This method will
 	 * block until the method has been executed.
 	 */
-	_Rt result() const {
+	Rt result() const
+	{
 		wait();
 		return m_result;
 	}
 	
 private:
-	_Rt m_result = 0;
-	_Fn m_fn;
-	_At m_arg;
+	Rt m_result = 0;
+	Fn m_fn;
+	At m_arg;
 };
 
 } /* namespace */

@@ -19,6 +19,7 @@
 #define ECAB_OBJECTTABLE_H
 
 #include <kopano/zcdefs.h>
+#include <kopano/Util.h>
 #include "soapH.h"
 #include "ECGenericObjectTable.h"
 #include "ECUserManagement.h"
@@ -47,34 +48,28 @@ public:
 	static ECRESULT Create(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale, ECABObjectTable **lppTable);
 
 	//Overrides
-	ECRESULT GetColumnsAll(ECListInt* lplstProps);
-	ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData,bool bTableLimit);
+	virtual ECRESULT GetColumnsAll(ECListInt *props) override;
+	virtual ECRESULT Load() override;
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool table_data, bool table_limit);
 
 protected:
 	/* Load hierarchy objects */
-	ECRESULT LoadHierarchyAddressList(unsigned int ulObjectId, unsigned int ulFlags,
-									  list<localobjectdetails_t> **lppObjects);
-	ECRESULT LoadHierarchyCompany(unsigned int ulObjectId, unsigned int ulFlags,
-								  list<localobjectdetails_t> **lppObjects);
-	ECRESULT LoadHierarchyContainer(unsigned int ulObjectId, unsigned int ulFlags,
-									list<localobjectdetails_t> **lppObjects);
+	ECRESULT LoadHierarchyAddressList(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
+	ECRESULT LoadHierarchyCompany(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
+	ECRESULT LoadHierarchyContainer(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
 
 	/* Load contents objects */
-	ECRESULT LoadContentsAddressList(unsigned int ulObjectId, unsigned int ulFlags,
-									 list<localobjectdetails_t> **lppObjects);
-	ECRESULT LoadContentsCompany(unsigned int ulObjectId, unsigned int ulFlags,
-								 list<localobjectdetails_t> **lppObjects);
-	ECRESULT LoadContentsDistlist(unsigned int ulObjectId, unsigned int ulFlags,
-								  list<localobjectdetails_t> **lppObjects);
+	ECRESULT LoadContentsAddressList(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
+	ECRESULT LoadContentsCompany(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
+	ECRESULT LoadContentsDistlist(unsigned int obj_id, unsigned int flags, std::list<localobjectdetails_t> **objects);
 
 private:
-	virtual ECRESULT GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount);
-	ECRESULT ReloadTableMVData(ECObjectTableList* lplistRows, ECListInt* lplistMVPropTag);
+	virtual ECRESULT GetMVRowCount(std::list<unsigned int> &&obj_ids, std::map<unsigned int, unsigned int> &count) override;
+	virtual ECRESULT ReloadTableMVData(ECObjectTableList *rows, ECListInt *mvproptags) override;
 
 protected:
 	unsigned int m_ulUserManagementFlags;
+	ALLOC_WRAP_FRIEND;
 };
 
 } /* namespace */

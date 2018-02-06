@@ -20,6 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include <stdexcept>
+#include <utility>
 #include "ECICS.h"
 #include "SOAPUtils.h"
 
@@ -62,14 +63,18 @@ public:
         m_data = data;
         updateStruct();
     }
-    ~EntryId() { 
-    }
-    
     EntryId&  operator= (const EntryId &s) { 
         m_data = s.m_data;
         updateStruct();
         return *this;
     }
+
+	EntryId &operator=(EntryId &&s)
+	{
+		m_data = std::move(s.m_data);
+		updateStruct();
+		return *this;
+	}
 
 	/* EID_V0 is marked packed, so direct-access w/o memcpy is ok */
 
@@ -79,7 +84,7 @@ public:
 			return d->usType;
 		ec_log_err("K-1570: %s: entryid has size %zu; not enough for EID_V0.usType (%zu)",
 			__func__, m_data.size(), offsetof(EID_V0, usType) + sizeof(d->usType));
-		throw runtime_error("K-1570: entryid is not of type EID_V0");
+		throw std::runtime_error("K-1570: entryid is not of type EID_V0");
     }
 
     void setFlags(unsigned int ulFlags) {
@@ -87,21 +92,16 @@ public:
 		if (m_data.size() < offsetof(EID_V0, usFlags) + sizeof(d->usFlags)) {
 			ec_log_err("K-1571: %s: entryid has size %zu; not enough for EID_V0.usFlags (%zu)",
 				__func__, m_data.size(), offsetof(EID_V0, usFlags) + sizeof(d->usFlags));
-			throw runtime_error("K-1571: entryid is not of type EID_V0");
+			throw std::runtime_error("K-1571: entryid is not of type EID_V0");
 		}
 		d->usFlags = ulFlags;
     }
 
-    bool operator == (const EntryId &s) const {
-        return m_data == s.m_data;
-    }
-	
-	bool operator < (const EntryId &s) const {
-	    return m_data < s.m_data;
-	}
-
+	bool operator==(const EntryId &s) const noexcept { return m_data == s.m_data; }
+	bool operator<(const EntryId &s) const noexcept { return m_data < s.m_data; }
     operator const std::string& () const { return m_data; }    
     operator unsigned char *() const { return (unsigned char *)m_data.data(); }
+	operator void *() { return const_cast<char *>(m_data.data()); }
     operator entryId *() { return &m_sEntryId; }
     
     unsigned int 	size() const { return m_data.size(); }
@@ -137,7 +137,10 @@ struct DELETEITEM {
 // Used to group notify flags and object type.
 struct TABLECHANGENOTIFICATION {
 	TABLECHANGENOTIFICATION(unsigned int t, unsigned int f): ulFlags(f), ulType(t) {}
-	bool operator<(const TABLECHANGENOTIFICATION &rhs) const { return ulFlags < rhs.ulFlags || (ulFlags == rhs.ulFlags && ulType < rhs.ulType); }
+	bool operator<(const TABLECHANGENOTIFICATION &rhs) const noexcept
+	{
+		return ulFlags < rhs.ulFlags || (ulFlags == rhs.ulFlags && ulType < rhs.ulType);
+	}
 
 	unsigned int ulFlags;
 	unsigned int ulType;

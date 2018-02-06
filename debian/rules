@@ -39,6 +39,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --disable-static \
     --enable-epoll \
     --enable-unicode \
+    --with-distro=debian \
     $(CONFFLAG) \
     $(NULL)
 
@@ -79,8 +80,9 @@ override_dh_install:
 	# add php:Depends
 	echo "php:Depends=phpapi-$(shell php-config$(PHPVERSION) --phpapi)" > debian/php$(PHPVERSION)-mapi.substvars
 
-	# adjust server.cfg to multi-arch behavior
-	sed -i 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/' $(INSTDIR)/etc/kopano/server.cfg
+	mv debian/tmp/usr/share/doc/kopano-server/example-config/*.cfg \
+	   debian/tmp/usr/share/doc/kopano-server/example-config/autorespond \
+           debian/tmp/etc/kopano/
 	dh_install
 
 	for p in server dagent search; do \
@@ -94,6 +96,7 @@ override_dh_installinit:
 	dh_installinit --name kopano-gateway
 	dh_installinit --name kopano-monitor
 	dh_installinit --name kopano-ical
+	dh_installinit --name kopano-presence
 	dh_installinit --name kopano-search
 
 override_dh_compress:
@@ -106,11 +109,6 @@ override_dh_makeshlibs:
 		-Xlibkcclient \
 		-Xlibkccontacts \
 		-Xunixplugin
-
-override_dh_fixperms-arch:
-	# don't ship zcontacts.inf in kopano-server, it's provided by kopano-contacts already
-	rm debian/kopano-server/usr/share/doc/kopano-server/example-config/zcontacts.inf
-	dh_fixperms
 
 override_dh_shlibdeps:
 	dh_shlibdeps -a -l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/kopano \

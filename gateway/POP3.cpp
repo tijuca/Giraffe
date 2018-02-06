@@ -17,7 +17,9 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -40,11 +42,10 @@
 #include <kopano/charset/convert.h>
 #include <kopano/ecversion.h>
 #include <kopano/charset/utf8string.h>
-#include "ECFeatures.h"
-
+#include <kopano/ECFeatures.hpp>
 #include "POP3.h"
-using namespace std;
 using namespace KCHL;
+using std::string;
 
 /**
  * @ingroup gateway_pop3
@@ -60,29 +61,6 @@ POP3::POP3(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, E
 POP3::~POP3() {
 	for (auto &m : lstMails)
 		delete[] m.sbEntryID.lpb;
-	if (lpInbox)
-		lpInbox->Release();
-
-	if (lpStore)
-		lpStore->Release();
-
-	if (lpSession)
-		lpSession->Release();
-
-	if (lpAddrBook)
-		lpAddrBook->Release();
-}
-
-/** 
- * Returns number of minutes to keep connection alive
- * 
- * @return user logged in (true) or not (false)
- */
-int POP3::getTimeoutMinutes() {
-	if (lpStore != NULL)
-		return 5;				// 5 minutes when logged in
-	else
-		return 1;				// 1 minute when not logged in
 }
 
 HRESULT POP3::HrSendGreeting(const std::string &strHostString) {
@@ -117,7 +95,7 @@ HRESULT POP3::HrCloseConnection(const std::string &strQuitMsg)
 HRESULT POP3::HrProcessCommand(const std::string &strInput)
 {
 	HRESULT hr = hrSuccess;
-	vector<string> vWords;
+	std::vector<std::string> vWords;
 	string strCommand;
 
 	vWords = tokenize(strInput, ' ');
@@ -601,8 +579,7 @@ HRESULT POP3::HrCmdUidl() {
 	for (size_t i = 0; i < lstMails.size(); ++i) {
 		snprintf(szResponse, POP3_MAX_RESPONSE_LENGTH, "%u ", (ULONG)i + 1);
 		strResponse = szResponse;
-		strResponse += bin2hex(lstMails[i].sbEntryID.cb, lstMails[i].sbEntryID.lpb);
-
+		strResponse += bin2hex(lstMails[i].sbEntryID);
 		hr = lpChannel->HrWriteLine(strResponse);
 		if (hr != hrSuccess)
 			return hr;
@@ -634,7 +611,7 @@ HRESULT POP3::HrCmdUidl(unsigned int ulMailNr) {
 
 	snprintf(szResponse, POP3_MAX_RESPONSE_LENGTH, "%u ", ulMailNr);
 	strResponse = szResponse;
-	strResponse += bin2hex(lstMails[ulMailNr - 1].sbEntryID.cb, lstMails[ulMailNr - 1].sbEntryID.lpb);
+	strResponse += bin2hex(lstMails[ulMailNr-1].sbEntryID);
 	return HrResponse(POP3_RESP_OK, strResponse);
 }
 
@@ -715,8 +692,7 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 	ULONG cbEntryID = 0;
 	memory_ptr<ENTRYID> lpEntryID;
 	ULONG ulObjType = 0;
-	wstring strwUsername;
-	wstring strwPassword;
+	std::wstring strwUsername, strwPassword;
 	unsigned int flags;
 
 	hr = TryConvert(strUsername, rawsize(strUsername), "windows-1252", strwUsername);
@@ -734,8 +710,7 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 
 	if (!parseBool(lpConfig->GetSetting("bypass_auth")))
 		flags |= EC_PROFILE_FLAGS_NO_UID_AUTH;
-
-	hr = HrOpenECSession(&lpSession, "gateway/pop3", PROJECT_SVN_REV_STR,
+	hr = HrOpenECSession(&~lpSession, "gateway/pop3", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), m_strPath.c_str(),
 	     flags, NULL, NULL);
 	if (hr != hrSuccess) {
@@ -748,31 +723,31 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 		goto exit;
 	}
 
-	hr = HrOpenDefaultStore(lpSession, &lpStore);
+	hr = HrOpenDefaultStore(lpSession, &~lpStore);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open default store");
 		goto exit;
 	}
 
-	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAddrBook);
+	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAddrBook);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open addressbook");
 		goto exit;
 	}
 
 	// check if pop3 access is disabled
-	if (isFeatureDisabled("pop3", lpAddrBook, lpStore)) {
+	if (checkFeature("pop3", lpAddrBook, lpStore, PR_EC_DISABLED_FEATURES_A)) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "POP3 not enabled for user '%s'", strUsername.c_str());
 		hr = MAPI_E_LOGON_FAILED;
 		goto exit;
 	}
-	hr = lpStore->GetReceiveFolder((LPTSTR)"IPM", 0, &cbEntryID, &~lpEntryID, NULL);
+	hr = lpStore->GetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0, &cbEntryID, &~lpEntryID, nullptr);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to find receive folder of store");
 		goto exit;
 	}
 
-	hr = lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN *) &lpInbox);
+	hr = lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpInbox);
 	if (ulObjType != MAPI_FOLDER)
 		hr = MAPI_E_NOT_FOUND;
 
@@ -785,14 +760,8 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 
 exit:
 	if (hr != hrSuccess) {
-		if (lpInbox) {
-			lpInbox->Release();
-			lpInbox = NULL;
-		}
-		if (lpStore) {
-			lpStore->Release();
-			lpStore = NULL;
-		}
+		lpInbox.reset();
+		lpStore.reset();
 	}
 
 	return hr;
@@ -829,23 +798,22 @@ HRESULT POP3::HrMakeMailList() {
 
 	lstMails.clear();
 	for (ULONG i = 0; i < lpRows->cRows; ++i) {
-		if (PROP_TYPE(lpRows->aRow[i].lpProps[EID].ulPropTag) == PT_ERROR) {
+		if (PROP_TYPE(lpRows[i].lpProps[EID].ulPropTag) == PT_ERROR) {
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Missing EntryID in message table for message %d", i);
 			continue;
 		}
-
-		if (PROP_TYPE(lpRows->aRow[i].lpProps[SIZE].ulPropTag) == PT_ERROR) {
+		if (PROP_TYPE(lpRows[i].lpProps[SIZE].ulPropTag) == PT_ERROR) {
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Missing size in message table for message %d", i);
 			continue;
 		}
 
 		MailListItem sMailListItem;
-		sMailListItem.sbEntryID.cb = lpRows->aRow[i].lpProps[EID].Value.bin.cb;
-		sMailListItem.sbEntryID.lpb = new BYTE[lpRows->aRow[i].lpProps[EID].Value.bin.cb];
-		memcpy(sMailListItem.sbEntryID.lpb, lpRows->aRow[i].lpProps[EID].Value.bin.lpb, lpRows->aRow[i].lpProps[EID].Value.bin.cb);
+		sMailListItem.sbEntryID.cb = lpRows[i].lpProps[EID].Value.bin.cb;
+		sMailListItem.sbEntryID.lpb = new BYTE[lpRows[i].lpProps[EID].Value.bin.cb];
+		memcpy(sMailListItem.sbEntryID.lpb, lpRows[i].lpProps[EID].Value.bin.lpb, lpRows[i].lpProps[EID].Value.bin.cb);
 		sMailListItem.bDeleted = false;
-		sMailListItem.ulSize = lpRows->aRow[i].lpProps[SIZE].Value.l;
-		lstMails.push_back(std::move(sMailListItem));
+		sMailListItem.ulSize = lpRows[i].lpProps[SIZE].Value.l;
+		lstMails.emplace_back(std::move(sMailListItem));
 	}
 	return hrSuccess;
 }

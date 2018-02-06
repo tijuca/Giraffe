@@ -15,35 +15,17 @@ dist_pkgdata_DATA = ldap.active-directory.cfg ldap.openldap.cfg ldap.propmap.cfg
 config_files = \
 	server.cfg unix.cfg presence.cfg \
 	spooler.cfg gateway.cfg monitor.cfg dagent.cfg ical.cfg search.cfg \
-	autorespond archiver.cfg backup.cfg migration-pst.cfg
+	autorespond archiver.cfg backup.cfg migration-pst.cfg \
+	autorespond.cfg
 
 rhel_initscript_files = \
 	kopano-server.init.rhel kopano-spooler.init.rhel \
 	kopano-gateway.init.rhel kopano-monitor.init.rhel \
 	kopano-ical.init.rhel kopano-dagent.init.rhel kopano-search.init.rhel \
 	kopano-presence.init.rhel
-suse_initscript_files = \
-	kopano-server.init.suse kopano-spooler.init.suse \
-	kopano-gateway.init.suse kopano-monitor.init.suse \
-	kopano-ical.init.suse kopano-dagent.init.suse kopano-search.init.suse \
-	kopano-presence.init.suse
-sles_initscript_files = $(suse_initscript_files)
-cbs4_initscript_files = \
-	kopano-server.init.cbs4 kopano-spooler.init.cbs4 \
-	kopano-gateway.init.cbs4 kopano-monitor.init.cbs4 \
-	kopano-ical.init.cbs4 kopano-dagent.init.cbs4 kopano-search.init.cbs4 \
-	kopano-presence.init.cbs4
-debian_initscript_files = \
-	kopano-server.init.debi kopano-spooler.init.debi \
-	kopano-gateway.init.debi kopano-monitor.init.debi \
-	kopano-ical.init.debi kopano-dagent.init.debi kopano-search.init.debi \
-	kopano-presence.init.debi
 
 data_configdir = ${docdir}/example-config
 dist_data_config_DATA = ${config_files} ldap.cfg
-
-sysconf_configdir = ${sysconfdir}/kopano
-dist_sysconf_config_DATA = ${config_files}
 
 sysconf_initdir=${sysconfdir}/init.d
 sysconf_init_SCRIPTS = ${@DISTRO@_initscript_files}
@@ -62,6 +44,12 @@ dist_doc_DATA = \
 kgwdocdir = ${docdir}/../kopano-gateway
 dist_kgwdoc_DATA = ${top_srcdir}/tools/python-scripts/optimize-imap.py
 
+sysconf_apparmordir = ${docdir}/example-config/apparmor.d
+dist_sysconf_apparmor_DATA = \
+	usr.sbin.kopano-dagent \
+	usr.sbin.kopano-search \
+	usr.sbin.kopano-server
+
 BUILT_SOURCES = ldap.openldap.cfg ldap.active-directory.cfg
 
 ldap.openldap.cfg: ldap.m4
@@ -70,7 +58,7 @@ ldap.openldap.cfg: ldap.m4
 ldap.active-directory.cfg: ldap.m4
 	m4 -DTYPE=ADS ${top_srcdir}/installer/linux/ldap.m4 > $@
 
-dist_sbin_SCRIPTS = kopano-autorespond kopano-mr-accept kopano-mr-process
+dist_sbin_SCRIPTS = kopano-autorespond kopano-mr-accept kopano-mr-process kopano-mr-accept.py kopano-mr-process.py kopano-autorespond.py
 
 sysconf_rotatedir = ${sysconfdir}/logrotate.d
 dist_sysconf_rotate_DATA = kopano.logrotate
@@ -81,15 +69,11 @@ dist_sysconf_cron_SCRIPTS = kopano-client-update.cron
 sysconf_bcdir = ${sysconfdir}/bash_completion.d
 dist_sysconf_bc_DATA = kopano-bash-completion.sh
 
-sysconf_certdir = ${sysconfdir}/kopano/report-ca
-
 EXTRA_DIST = ${BUILT_SOURCES} ldap.m4 \
-	$(rhel_initscript_files) $(suse_initscript_files) $(cbs4_initscript_files) \
-	${debian_initscript_files} sysconfig.txt
+	$(rhel_initscript_files) sysconfig.txt
 
 install-data-hook:
-	install -d -m 755 ${DESTDIR}/${sysconf_configdir}/license
-	install -d -m 755 ${DESTDIR}/${localstatedir}/lib/kopano/report
+	install -d -m 755 ${DESTDIR}/${sysconfdir}/kopano/license
 	mv -v ${DESTDIR}${sysconf_rotatedir}/kopano.logrotate ${DESTDIR}${sysconf_rotatedir}/kopano
 	mv -v ${DESTDIR}${sysconf_crondir}/kopano-client-update.cron ${DESTDIR}${sysconf_crondir}/kopano-client-update
 	if test ${DISTRO} = "sles" -o ${DISTRO} = "suse"; then \

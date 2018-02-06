@@ -14,8 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#define _GNU_SOURCE 1
 #include <kopano/platform.h>
+#include <memory>
 #include <cerrno>
 #include <cstdlib>
 #include <fcntl.h>
@@ -26,8 +27,9 @@
 #include <unistd.h>
 
 #include <sys/stat.h>
-#include <sys/time.h> /* gettimeofday */
+#include <sys/syscall.h>
 #include <kopano/ECLogger.h>
+#include <kopano/memory.hpp>
 #include "TmpPath.h"
 
 namespace KC {
@@ -53,12 +55,10 @@ HRESULT FileTimeToUnixTime(const FILETIME &ft, time_t *t)
 	
 	if(sizeof(time_t) < 8) {
 		// On 32-bit systems, we cap the values at MAXINT and MININT
-		if(l < (__int64)INT_MIN) {
+		if (l < static_cast<__int64>(INT_MIN))
 			l = INT_MIN;
-		}
-		if(l > (__int64)INT_MAX) {
+		if (l > static_cast<__int64>(INT_MAX))
 			l = INT_MAX;
-		}
 	}
 
 	*t = (time_t)l;
@@ -143,32 +143,31 @@ HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
  *
  * For dates, everything is 1-index (1st January is 1-1) and year is full (2008)
  */
- 
-bool operator ==(const FILETIME &a, const FILETIME &b)
+bool operator==(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a.dwLowDateTime == b.dwLowDateTime && a.dwHighDateTime == b.dwHighDateTime;
 }
 
-bool operator >(const FILETIME &a, const FILETIME &b)
+bool operator>(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return ((a.dwHighDateTime > b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime > b.dwLowDateTime)));
 }
 
-bool operator >=(const FILETIME &a, const FILETIME &b)
+bool operator>=(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a > b || a == b;
 }
 
-bool operator <(const FILETIME &a, const FILETIME &b)
+bool operator<(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return ((a.dwHighDateTime < b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime < b.dwLowDateTime)));
 }
 
-bool operator <=(const FILETIME &a, const FILETIME &b)
+bool operator<=(const FILETIME &a, const FILETIME &b) noexcept
 {
 	return a < b || a == b;
 }
@@ -225,70 +224,35 @@ double timespec2dbl(const struct timespec &t)
     return (double)t.tv_sec + t.tv_nsec/1000000000.0;
 }
 
-struct timespec GetDeadline(unsigned int ulTimeoutMs)
-{
-	struct timespec	deadline;
-	struct timeval	now;
-	gettimeofday(&now, NULL);
-
-	now.tv_sec += ulTimeoutMs / 1000;
-	now.tv_usec += 1000 * (ulTimeoutMs % 1000);
-	if (now.tv_usec >= 1000000) {
-		++now.tv_sec;
-		now.tv_usec -= 1000000;
-	}
-
-	deadline.tv_sec = now.tv_sec;
-	deadline.tv_nsec = now.tv_usec * 1000;
-
-	return deadline;
-}
-
 // Does mkdir -p <path>
 int CreatePath(const char *createpath)
 {
 	struct stat s;
-	char *path = strdup(createpath);
+	std::unique_ptr<char[], KCHL::cstdlib_deleter> path(strdup(createpath));
 
 	// Remove trailing slashes
-	size_t len = strlen(path);
+	size_t len = strlen(path.get());
 	while (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
 		path[--len] = 0;
 
-	if (stat(path, &s) == 0) {
-		free(path);
+	if (stat(path.get(), &s) == 0) {
 		if (s.st_mode & S_IFDIR)
 			return 0; // Directory is already there
 		return -1; // Item is not a directory
 	}
 	// We need to create the directory
 	// First, create parent directories
-	char *trail = strrchr(path, '/') > strrchr(path, '\\') ?
-	              strrchr(path, '/') : strrchr(path, '\\');
-	if (trail == NULL) {
+	char *trail = strrchr(path.get(), '/') > strrchr(path.get(), '\\') ?
+	              strrchr(path.get(), '/') : strrchr(path.get(), '\\');
+	if (trail == NULL)
 		// Should only happen if you are trying to create /path/to/dir
 		// in win32 or \path\to\dir in linux
-		free(path);
 		return -1;
-	}
 	*trail = '\0';
-	if (CreatePath(path) != 0) {
-		free(path);
+	if (CreatePath(path.get()) != 0)
 		return -1;
-	}
 	// Create the actual directory
-	int ret = mkdir(createpath, 0700);
-	free(path);
-	return ret;
-}
-
-double GetTimeOfDay()
-{
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-
-	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000); // usec = microsec = 1 millionth of a second
+	return mkdir(createpath, 0700);
 }
 
 void set_thread_name(pthread_t tid, const std::string & name)
@@ -303,7 +267,7 @@ void set_thread_name(pthread_t tid, const std::string & name)
 
 ssize_t read_retry(int fd, void *data, size_t len)
 {
-	char *buf = static_cast<char *>(data);
+	auto buf = static_cast<char *>(data);
 	size_t tread = 0;
 
 	while (len > 0) {
@@ -323,7 +287,7 @@ ssize_t read_retry(int fd, void *data, size_t len)
 
 ssize_t write_retry(int fd, const void *data, size_t len)
 {
-	const char *buf = static_cast<const char *>(data);
+	auto buf = static_cast<const char *>(data);
 	size_t twrote = 0;
 
 	while (len > 0) {
@@ -343,29 +307,31 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 
 bool force_buffers_to_disk(const int fd)
 {
-	if (fsync(fd) == -1)
-	    return false;
-	return true;
+	return fsync(fd) != -1;
 }
 
-void my_readahead(const int fd)
+void kcsrv_blocksigs(void)
 {
-#ifdef LINUX
-	struct stat st;
-
-	if (fstat(fd, &st) == 0)
-		(void)readahead(fd, 0, st.st_size);
-#endif
+	sigset_t m;
+	sigemptyset(&m);
+	sigaddset(&m, SIGINT);
+	sigaddset(&m, SIGHUP);
+	sigaddset(&m, SIGTERM);
+	pthread_sigmask(SIG_BLOCK, &m, nullptr);
 }
 
-void give_filesize_hint(const int fd, const off_t len)
+/*
+ * Used for logging only. Can return anything as long as it is unique
+ * per thread.
+ */
+unsigned long kc_threadid(void)
 {
-#ifdef LINUX
-	// this helps preventing filesystem fragmentation as the
-	// kernel can now look for the best disk allocation
-	// pattern as it knows how much date is going to be
-	// inserted
-	posix_fallocate(fd, 0, len);
+#if defined(LINUX)
+	return syscall(SYS_gettid);
+#elif defined(OPENBSD)
+	return getthrid();
+#else
+	return pthread_self();
 #endif
 }
 

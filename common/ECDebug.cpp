@@ -40,8 +40,6 @@
 #include <sstream>
 #include <kopano/mapi_ptr.h>
 
-using namespace std;
-
 namespace KC {
 
 #define RETURN_ERROR_CASE(x) \
@@ -185,7 +183,6 @@ static const INFOGUID sGuidList[] = {
 	{1, (GUID*)&IID_IOlkAccountManager, "IID_IOlkAccountManager"},
 	{1, (GUID*)&IID_IOlkAccount, "IID_IOlkAccount"},
 	{1, (GUID*)&IID_IAttachmentSecurity, "IID_IAttachmentSecurity"}, //Outlook 2007
-	{1, (GUID*)&IID_ISelectUnicode, "IID_ISelectUnicode"},
 	{1, (GUID*)&IID_IMAPIClientShutdown, "IID_IMAPIClientShutdown"},
 	{1, (GUID*)&IID_IMAPIProviderShutdown, "IID_IMAPIProviderShutdown"},
 	{1, (GUID*)&GUID_Dilkie, "GUID_Dilkie"},
@@ -203,12 +200,8 @@ static const INFOGUID sGuidList[] = {
 	// Kopano
 	{3, (GUID*)&IID_IECSpooler, "IID_IECSpooler"},
 	{3, (GUID*)&IID_IECServiceAdmin , "IID_IECServiceAdmin"},
-	{3, (GUID*)&IID_ECMSProvider , "IID_ECMSProvider"},
-	{3, (GUID*)&IID_ECXPProvider , "IID_ECXPProvider"},
-	{3, (GUID*)&IID_ECABProvider , "IID_ECABProvider"},
 	{3, (GUID*)&IID_ECMsgStore , "IID_ECMsgStore"},
 	{3, (GUID*)&IID_ECMSLogon , "IID_ECMSLogon"},
-	{3, (GUID*)&IID_ECXPLogon , "IID_ECXPLogon"},
 	{3, (GUID*)&IID_ECABLogon , "IID_ECABLogon"},
 	{3, (GUID*)&IID_ECMAPIFolder , "IID_ECMAPIFolder"},
 	{3, (GUID*)&IID_ECMessage , "IID_ECMessage"},
@@ -1598,7 +1591,7 @@ std::string PropValueToString(const SPropValue *lpPropValue)
 		return "PT_STRING8: " + (lpPropValue->Value.lpszA ? (std::string)lpPropValue->Value.lpszA : std::string("NULL"));
 	case PT_BINARY:
 		return "PT_BINARY: cb=" + stringify(lpPropValue->Value.bin.cb) +
-			" Data=" + (lpPropValue->Value.bin.lpb ? bin2hex(lpPropValue->Value.bin.cb, lpPropValue->Value.bin.lpb) : std::string("NULL"));
+		       " Data=" + (lpPropValue->Value.bin.lpb ? bin2hex(lpPropValue->Value.bin) : std::string("NULL"));
 	case PT_CLSID:
 		return "PT_CLSID: (Skip)";
 	case PT_NULL:
@@ -1648,414 +1641,6 @@ std::string PropValueToString(const SPropValue *lpPropValue)
 	}
 }
 
-std::string RowToString(const SRow *lpRow)
-{
-	std::string strResult;
-
-	if(lpRow == NULL)
-		return "NULL";
-
-	for (unsigned int i = 0; i < lpRow->cValues; ++i)
-		strResult += PropNameFromPropTag(lpRow->lpProps[i].ulPropTag)+" : "+PropValueToString(&lpRow->lpProps[i]) + "\n";
-
-	return strResult;
-}
-
-static const char *ABFlags(ULONG ulFlag)
-{
-	switch(ulFlag) {
-	case MAPI_UNRESOLVED:
-		return "MAPI_UNRESOLVED";
-	case MAPI_AMBIGUOUS:
-		return "MAPI_AMBIGUOUS";
-	case MAPI_RESOLVED:
-		return "MAPI_RESOLVED";
-	default:
-		return "UNKNOWN";
-	}
-	return NULL;
-}
-
-std::string AdrRowSetToString(const ADRLIST *lpAdrList,
-    const FlagList *lpFlagList)
-{
-	std::string strResult;
-
-	if(lpAdrList == NULL)
-		return "NULL";
-
-	for (unsigned int i = 0; i < lpAdrList->cEntries; ++i) {
-		strResult += "row " + stringify(i) + " : " +
-			 RowToString((LPSRow)&lpAdrList->aEntries[i]) + "\n";
-		if (lpFlagList != NULL) {
-			strResult += " flag=";
-			strResult += ABFlags(lpFlagList->ulFlag[i]);
-			strResult += "\n";
-		}
-	}
-
-	return strResult;
-}
-
-std::string RowSetToString(const SRowSet *lpRows)
-{
-// 	return "DEBUG OFF";
-
-	std::string strResult;
-
-	if(lpRows == NULL)
-		return "NULL";
-
-	for (unsigned int i = 0; i < lpRows->cRows; ++i)
-		strResult+= "row "+stringify(i) + " : " + RowToString(&lpRows->aRow[i]) + "\n";
-
-	return strResult;
-}
-
-std::string RowEntryToString(const ROWENTRY *lpRowEntry)
-{
-	std::string strResult;
-	if(lpRowEntry == NULL)
-		return "NULL";
-
-	strResult = "rowflags: "+ stringify(lpRowEntry->ulRowFlags, true) + "\n";
-	for (unsigned int i = 0; i < lpRowEntry->cValues; ++i)
-		strResult += PropNameFromPropTag(lpRowEntry->rgPropVals[i].ulPropTag)+" : "+PropValueToString(&lpRowEntry->rgPropVals[i]) + "\n";
-
-	return strResult;
-}
-
-std::string RowListToString(const ROWLIST *lpRowList)
-{
-	std::string strResult;
-
-	if(lpRowList == NULL)
-		return "NULL";
-
-	for (unsigned int i = 0; i < lpRowList->cEntries; ++i)
-		strResult+= "row "+stringify(i) + " : " + RowEntryToString(&lpRowList->aEntries[i]) + "\n";
-
-	return strResult;
-}
-
-const char *ActionToString(const ACTION *lpAction)
-{
-	return "Action struct: NOT IMPLEMENTED";
-}
-
-std::string SortOrderToString(const SSortOrder *lpSort)
-{
-	std::string strResult;
-
-	if(lpSort == NULL)
-		return "NULL";
-
-	strResult = PropNameFromPropTag(lpSort->ulPropTag);
-	strResult += ", Order: ";
-	switch(lpSort->ulOrder)
-	{
-	case TABLE_SORT_ASCEND:
-		return strResult + "TABLE_SORT_ASCEND";
-	case TABLE_SORT_COMBINE:
-		return strResult + "TABLE_SORT_COMBINE";
-	case TABLE_SORT_DESCEND:
-		return strResult + "TABLE_SORT_DESCEND";
-	default:
-		return strResult + "<UNKNOWN> " + stringify(lpSort->ulOrder);
-	}
-}
-
-std::string SortOrderSetToString(const SSortOrderSet *lpSortCriteria)
-{
-
-	std::string strResult;
-
-	if(lpSortCriteria == NULL)
-		return "NULL";
-
-	strResult = "cCategories="+stringify(lpSortCriteria->cCategories)+" cExpanded="+stringify(lpSortCriteria->cExpanded)+"\n";
-
-	for (unsigned int i = 0; i < lpSortCriteria->cSorts; ++i)
-		strResult+= "row "+stringify(i) + " : " + SortOrderToString(&lpSortCriteria->aSort[i]) + "\n";
-
-	return strResult;
-}
-
-static const std::string
-Notification_ErrorToString(const ERROR_NOTIFICATION *lpErr)
-{
-	std::string str;
-
-	str = "( \n";
-	str += "\tDebug not implement\n";
-	str += ")\n";
-
-	return str;
-}
-
-/**
- * Convert NEWMAIL_NOTIFICATION struct to a string
- *
- * @param[in]	lpNewmail	newmail struct of a notification to convert to string
- * @return		std::string	string with hex representations of binary data
- */
-static std::string
-Notification_NewMailToString(const NEWMAIL_NOTIFICATION *lpNewmail)
-{
-	std::string str;
-
-	str = "( \n";
-
-	if(lpNewmail == NULL) {
-		str += "NULL";
-		goto exit;
-	}
-	str = "Entryid: cb="+stringify(lpNewmail->cbEntryID);
-	str+= " "+((lpNewmail->lpEntryID) ? bin2hex(lpNewmail->cbEntryID, (LPBYTE)lpNewmail->lpEntryID) : std::string("NULL")) + "\n";
-	str+= "Parentid: cb="+stringify(lpNewmail->cbParentID);
-	str+= " "+((lpNewmail->lpParentID) ? bin2hex(lpNewmail->cbParentID, (LPBYTE)lpNewmail->lpParentID) : std::string("NULL")) + "\n";
-	str+= "MessageClass:" + ((lpNewmail->lpszMessageClass) ? (std::string((char*)lpNewmail->lpszMessageClass)) : std::string("NULL")) + "\n";
-	str+= "MessageFlags:" + stringify(lpNewmail->ulMessageFlags, true) + "\n";
-	str+= "Flags:" + stringify(lpNewmail->ulFlags, true) + "\n";
-	
-exit:
-	str += ")\n";
-
-	return str;
-}
-
-static std::string
-Notification_ObjectToString(const OBJECT_NOTIFICATION *lpObj)
-{
-	std::string str;
-
-	str = "( \n";
-
-	if(lpObj == NULL) {
-		str += "NULL";
-		goto exit;
-	}
-
-	str+= "ObjType:" + stringify(lpObj->ulObjType, true) + "\n";
-	str+= "Entryid: cb="+stringify(lpObj->cbEntryID);
-	str+= " "+((lpObj->lpEntryID)?bin2hex(lpObj->cbEntryID, (LPBYTE)lpObj->lpEntryID) : std::string("NULL")) + "\n";
-	str+= "Parentid: cb="+stringify(lpObj->cbParentID);
-	str+= " "+((lpObj->lpParentID)?bin2hex(lpObj->cbParentID, (LPBYTE)lpObj->lpParentID) : std::string("NULL")) + "\n";
-
-	if(lpObj->cbOldID) {
-		str+= "Oldentryid: cb="+stringify(lpObj->cbOldID);
-		str+= " "+((lpObj->lpOldID)?bin2hex(lpObj->cbOldID, (LPBYTE)lpObj->lpOldID) : std::string("NULL")) + "\n";
-	}
-	if(lpObj->cbOldParentID) {
-		str+= "Oldparentid: cb="+stringify(lpObj->cbOldParentID);
-		str+= " "+((lpObj->lpOldParentID)?bin2hex(lpObj->cbOldParentID, (LPBYTE)lpObj->lpOldParentID) : std::string("NULL")) + "\n";
-	}
-
-	if(lpObj->lpPropTagArray)
-		str+= "PropTagArray="+PropNameFromPropTagArray(lpObj->lpPropTagArray)+"\n";
-
-exit:
-	str += ")\n";
-
-	return str;
-}
-
-static const char *TableEventToString(ULONG ulTableEvent)
-{
-	switch(ulTableEvent) 
-	{
-	case TABLE_CHANGED:
-		return "TABLE_CHANGED";
-	case TABLE_ERROR:
-		return "TABLE_ERROR";
-	case TABLE_ROW_ADDED:
-		return "TABLE_ROW_ADDED";
-	case TABLE_ROW_DELETED:
-		return "TABLE_ROW_DELETED";
-	case TABLE_ROW_MODIFIED:
-		return "TABLE_ROW_MODIFIED";
-	case TABLE_SORT_DONE:
-		return "TABLE_SORT_DONE";
-	case TABLE_RESTRICT_DONE:
-		return "TABLE_RESTRICT_DONE";
-	case TABLE_SETCOL_DONE:
-		return "TABLE_SETCOL_DONE";
-	case TABLE_RELOAD:
-		return "TABLE_RELOAD";
-	default:
-		return "<invalidate TYPE>";
-	}
-	return NULL;
-}
-
-static std::string Notification_TableToString(const TABLE_NOTIFICATION *lpTab)
-{
-	std::string str;
-
-	str = "( \n";
-
-	if(lpTab == NULL) {
-		str += "NULL";
-		goto exit;
-	}
-
-	str += "\tTableEvent: (";
-	str += TableEventToString(lpTab->ulTableEvent);
-	str += " )\n";
-	
-	str += "\tPropIndex: (";
-	str += PropValueToString(&lpTab->propIndex);
-	str += " )\n";;
-	str += "\tPropPrior: (";
-	str += PropValueToString(&lpTab->propPrior);
-	str += " )\n";
-	str += "\tRow: (" + RowToString(&lpTab->row) + " )\n";
-	
-exit:
-	str += ")\n";
-
-	return str;
-}
-
-static std::string
-Notification_StatusObjToString(const STATUS_OBJECT_NOTIFICATION *lpStatobj)
-{
-	std::string str;
-
-	str = "( \n";
-	str += "\tDebug not implement\n";
-	str += ")\n";
-
-	return str;
-}
-
-static std::string
-Notification_ExtendedToString(const EXTENDED_NOTIFICATION *lpExt)
-{
-	std::string str;
-
-	str = "( \n";
-
-	if(lpExt == NULL) {
-		str += "NULL";
-		return str;
-	}
-
-	str += "\tEvent: (0x" + stringify(lpExt->ulEvent, true) + " )\n";
-	str += "\tcb: (0x" + stringify(lpExt->cb, true) + " )\n";
-	str += "\tdata: (0x" + bin2hex(lpExt->cb, lpExt->pbEventParameters) + " )\n";
-
-	str += ")\n";
-	return str;
-}
-
-static const char *EventTypeToString(ULONG ulEventType)
-{
-	switch(ulEventType)
-	{
-	case fnevCriticalError: // ERROR_NOTIFICATION err;
-		return "CriticalError";
-	case fnevNewMail:
-		return "NewMail";
-	case fnevObjectCreated:
-		return "ObjectCreated";
-	case fnevObjectDeleted:
-		return "ObjectDeleted";
-	case fnevObjectModified:
-		return "ObjectModified";
-	case fnevObjectMoved:
-		return "ObjectMoved";
-	case fnevObjectCopied:
-		return "ObjectCopied";
-	case fnevSearchComplete:
-		return "SearchComplete";
-	case fnevTableModified:
-		return "TableModified";
-	case fnevStatusObjectModified:// STATUS_OBJECT_NOTIFICATION statobj;
-		return "StatusObjectModified";
-	case fnevExtended:// EXTENDED_NOTIFICATION ext;
-		return "Extended";
-	case fnevReservedForMapi:
-	default:
-		return "Unknown";
-	}
-	return NULL;
-}
-
-std::string NotificationToString(ULONG cNotification,
-    const NOTIFICATION *lpNotification)
-{
-	std::string str;
-
-	if(lpNotification == NULL)
-		return "NULL";
-	
-	for (ULONG i = 0; i < cNotification; ++i) {
-		if (cNotification > 1)
-			str += "item " + stringify(i) + " (\n";
-
-		str += "Eventtype: ( ";
-		str += EventTypeToString(lpNotification[i].ulEventType);
-		str += " )\n";
-		switch(lpNotification[i].ulEventType)
-		{
-		case fnevCriticalError: // ERROR_NOTIFICATION err;
-			str += Notification_ErrorToString(&lpNotification[i].info.err);
-			break;
-		case fnevNewMail: // NEWMAIL_NOTIFICATION newmail;
-			str += Notification_NewMailToString(&lpNotification[i].info.newmail);
-			break;
-		case fnevObjectCreated: //OBJECT_NOTIFICATION obj;
-		case fnevObjectDeleted:
-		case fnevObjectModified:
-		case fnevObjectMoved:
-		case fnevObjectCopied:
-		case fnevSearchComplete:
-			str += Notification_ObjectToString(&lpNotification[i].info.obj);
-			break;
-		case fnevTableModified:// TABLE_NOTIFICATION tab;
-			str += Notification_TableToString(&lpNotification[i].info.tab);
-			break;
-		case fnevStatusObjectModified:// STATUS_OBJECT_NOTIFICATION statobj;
-			str += Notification_StatusObjToString(&lpNotification[i].info.statobj);
-			break;
-		case fnevExtended:// EXTENDED_NOTIFICATION ext;
-			str += Notification_ExtendedToString(&lpNotification[i].info.ext);
-			break;
-		case fnevReservedForMapi:
-		default:
-			str += "Unknown";
-			break;
-		}
-
-		if (cNotification > 1)
-			str += ")\n";
-
-	}
-
-	return str;
-}
-
-std::string ProblemArrayToString(const SPropProblemArray *lpProblemArray)
-{
-	std::string str;
-	ULONG i;
-
-	if (lpProblemArray == NULL)
-		return "NULL";
-
-	str = "Problems: ( " + stringify(lpProblemArray->cProblem) + "\n";
-
-	for (i = 0; i < lpProblemArray->cProblem; ++i) {
-		const SPropProblem *p = &lpProblemArray->aProblem[i];
-		str += "  ( ulIndex: " + stringify(p->ulIndex, true) + " ulPropTag: " + stringify(p->ulPropTag, true) + " scode: " + stringify(p->scode, true) + "),\n";
-	}
-
-	str += ")\n";
-
-	return str;
-}
-
 std::string DBGGUIDToString(REFIID iid)
 {
 	std::string guidIDD;
@@ -2072,7 +1657,11 @@ std::string DBGGUIDToString(REFIID iid)
 	}
 
 	if (guidIDD.empty()) {
-		snprintf(szGuidId, DEBUGBUFSIZE, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", iid.Data1, iid.Data2, iid.Data3, iid.Data4[0], iid.Data4[1], iid.Data4[2], iid.Data4[3], iid.Data4[4], iid.Data4[5], iid.Data4[6], iid.Data4[7]);
+		snprintf(szGuidId, DEBUGBUFSIZE, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
+			le32_to_cpu(iid.Data1), le16_to_cpu(iid.Data2),
+			le16_to_cpu(iid.Data3), iid.Data4[0], iid.Data4[1],
+			iid.Data4[2], iid.Data4[3], iid.Data4[4], iid.Data4[5],
+			iid.Data4[6], iid.Data4[7]);
 		guidIDD = "Unknown ";
 		guidIDD+=szGuidId;
 	}
@@ -2091,62 +1680,8 @@ std::string MapiNameIdToString(const MAPINAMEID *pNameId)
 	if (pNameId->ulKind == MNID_ID)
 		return str += "ID    = " + stringify(pNameId->Kind.lID);
 	else if (pNameId->ulKind == MNID_STRING)
-		return str += "String= " + bin2hex(wcslen(pNameId->Kind.lpwstrName) * sizeof(WCHAR), (BYTE *)pNameId->Kind.lpwstrName);
+		return str += "String= " + bin2hex(wcslen(pNameId->Kind.lpwstrName) * sizeof(WCHAR), pNameId->Kind.lpwstrName);
 	return str += "Unknown kind";
-}
-
-std::string MapiNameIdListToString(ULONG cNames,
-    const MAPINAMEID *const *ppNames, const SPropTagArray *pptaga)
-{
-	std::string str;
-	ULONG i;
-
-	if(ppNames == NULL)
-		return "NULL";
-
-	str = "NameIds: (" + stringify(cNames) + ")\n";
-
-	for (i = 0; i < cNames; ++i) {
-		str += MapiNameIdToString(ppNames[i]);
-		if(pptaga && pptaga->cValues == cNames) {
-			str += " -> ";
-			str += stringify(pptaga->aulPropTag[i], true);
-		}
-		str += "\n";
-	}
-
-	return str;
-}
-
-const char *ResourceTypeToString(ULONG ulResourceType)
-{
-	switch (ulResourceType) {
-		RETURN_CASE(MAPI_STORE_PROVIDER);
-		RETURN_CASE(MAPI_AB);
-		RETURN_CASE(MAPI_AB_PROVIDER);
-		RETURN_CASE(MAPI_TRANSPORT_PROVIDER);
-		RETURN_CASE(MAPI_SPOOLER);
-		RETURN_CASE(MAPI_PROFILE_PROVIDER);
-		RETURN_CASE(MAPI_SUBSYSTEM);
-		RETURN_CASE(MAPI_HOOK_PROVIDER);
-	}
-
-	return "<Unknown type>";
-}
-
-const char *MsgServiceContextToString(ULONG ulContext)
-{
-	switch(ulContext) {
-		RETURN_CASE(MSG_SERVICE_INSTALL);
-		RETURN_CASE(MSG_SERVICE_UNINSTALL);
-		RETURN_CASE(MSG_SERVICE_DELETE);
-		RETURN_CASE(MSG_SERVICE_PROVIDER_CREATE);
-		RETURN_CASE(MSG_SERVICE_PROVIDER_DELETE);
-		RETURN_CASE(MSG_SERVICE_CONFIGURE);
-		RETURN_CASE(MSG_SERVICE_CREATE);
-	}
-
-	return "<UNKNOWN>";
 }
 
 } /* namespace */

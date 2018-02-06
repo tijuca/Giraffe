@@ -28,6 +28,8 @@
 #include <kopano/platform.h>
 #include <openssl/md5.h>
 
+struct SBinary;
+
 namespace KC {
 
 /*
@@ -77,10 +79,9 @@ extern _kc_export std::wstring wstringify(unsigned int x, bool usehex = false, b
 	#define tstringify			stringify
 #endif
 
-inline unsigned int	atoui(const char *szString) { return strtoul(szString, NULL, 10); }
-extern _kc_export unsigned int xtoi(const char *);
+static inline unsigned int atoui(const char *s) { return strtoul(s, nullptr, 10); }
+static inline unsigned int xtoi(const char *s) { return strtoul(s, nullptr, 16); }
 extern _kc_export int memsubstr(const void *haystack, size_t hsize, const void *needle, size_t nsize);
-std::string striconv(const std::string &strinput, const char *lpszFromCharset, const char *lpszToCharset);
 extern _kc_export std::string str_storage(uint64_t bytes, bool unlimited = true);
 extern _kc_export std::string GetServerNameFromPath(const char *);
 extern _kc_export std::string GetServerPortFromPath(const char *);
@@ -91,8 +92,6 @@ static inline bool parseBool(const char *s)
 	       strcmp(s, "false") != 0 && strcmp(s, "no") != 0);
 }
 
-extern _kc_export std::string shell_escape(const std::string &);
-extern _kc_export std::string shell_escape(const std::wstring &);
 extern _kc_export std::vector<std::wstring> tokenize(const std::wstring &, const wchar_t sep, bool filter_empty = false);
 extern _kc_export std::vector<std::string> tokenize(const std::string &, const char sep, bool filter_empty = false);
 extern _kc_export std::string trim(const std::string &input, const std::string &trim = " ");
@@ -100,16 +99,8 @@ extern _kc_export unsigned char x2b(char);
 extern _kc_export std::string hex2bin(const std::string &);
 extern _kc_export std::string hex2bin(const std::wstring &);
 extern _kc_export std::string bin2hex(const std::string &);
-std::wstring bin2hexw(const std::string &input);
-extern _kc_export std::string bin2hex(unsigned int len, const unsigned char *input);
-std::wstring bin2hexw(unsigned int inLength, const unsigned char *input);
-
-#ifdef UNICODE
-#define bin2hext bin2hexw
-#else
-#define bin2hext bin2hex
-#endif
-
+extern _kc_export std::string bin2hex(size_t len, const void *input);
+extern _kc_export std::string bin2hex(const SBinary &);
 extern _kc_export std::string urlEncode(const std::string &);
 extern _kc_export std::string urlEncode(const std::wstring &, const char *charset);
 extern _kc_export std::string urlEncode(const wchar_t *input, const char *charset);
@@ -134,7 +125,7 @@ std::vector<T> tokenize(const T &str, const T &delimiters)
    	while (std::string::npos != pos || std::string::npos != lastPos)
    	{
        	// found a token, add it to the std::vector.
-       	tokens.push_back(str.substr(lastPos, pos - lastPos));
+		tokens.emplace_back(str.substr(lastPos, pos - lastPos));
 
        	// skip delimiters.  Note the "not_of"
        	lastPos = str.find_first_not_of(delimiters, pos);
@@ -158,10 +149,10 @@ std::vector<std::basic_string<T> > tokenize(const T* str, const T* delimiters)
 	return tokenize(std::basic_string<T>(str), std::basic_string<T>(delimiters));
 }
 
-template<typename _InputIterator, typename _Tp>
-_Tp join(_InputIterator __first, _InputIterator __last, _Tp __sep)
+template<typename InputIterator, typename Tp>
+Tp join(InputIterator __first, InputIterator __last, Tp __sep)
 {
-    _Tp s;
+	Tp s;
     for (; __first != __last; ++__first) {
         if(!s.empty())
             s += __sep;
@@ -170,7 +161,7 @@ _Tp join(_InputIterator __first, _InputIterator __last, _Tp __sep)
     return s;
 }
 
-extern _kc_export std::string format(const char *fmt, ...) __LIKE_PRINTF(1, 2);
+extern _kc_export std::string format(const char *fmt, ...) KC_LIKE_PRINTF(1, 2);
 extern _kc_export char *kc_strlcpy(char *dst, const char *src, size_t n);
 extern _kc_export bool kc_starts_with(const std::string &, const std::string &);
 extern _kc_export bool kc_istarts_with(const std::string &, const std::string &);
@@ -194,10 +185,9 @@ template<typename T> std::string kc_join(const T &v, const char *sep)
 	return s;
 }
 
-extern _kc_export std::string base64_encode(const unsigned char *, unsigned int);
+extern _kc_export std::string base64_encode(const void *, unsigned int);
 extern _kc_export std::string base64_decode(const std::string &);
 extern _kc_export std::string zcp_md5_final_hex(MD5_CTX *);
-extern _kc_export std::string string_strip_nuls(const std::string &);
 extern _kc_export std::wstring string_strip_nuls(const std::wstring &);
 extern _kc_export std::string string_strip_crlf(const char *);
 

@@ -29,9 +29,9 @@
 #include <kopano/zcdefs.h>
 #include "freebusy.h"
 #include <kopano/ECUnknown.h>
-#include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
 #include <kopano/ECGuid.h>
+#include <kopano/Util.h>
 #include "freebusyguid.h"
 
 #include "ECFBBlockList.h"
@@ -41,31 +41,20 @@ namespace KC {
 /**
  * Implementatie of the IEnumFBBlock interface
  */
-class ECEnumFBBlock _kc_final : public ECUnknown {
+class ECEnumFBBlock _kc_final : public ECUnknown, public IEnumFBBlock {
 private:
 	ECEnumFBBlock(ECFBBlockList* lpFBBlock);
 public:
 	static HRESULT Create(ECFBBlockList* lpFBBlock, ECEnumFBBlock **lppECEnumFBBlock);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT Next(LONG celt, FBBlock_1 *pblk, LONG *pcfetch);
-	virtual HRESULT Skip(LONG celt);
-	virtual HRESULT Reset();
+	virtual HRESULT Skip(LONG celt) { return m_FBBlock.Skip(celt); }
+	virtual HRESULT Reset() { return m_FBBlock.Reset(); }
 	virtual HRESULT Clone(IEnumFBBlock **) { return E_NOTIMPL; }
 	virtual HRESULT Restrict(FILETIME ftmStart, FILETIME ftmEnd);
 
-	/* IEnumFBBlock wrapper class */
-	class xEnumFBBlock _kc_final : public IEnumFBBlock {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-
-			// <kopano/xclsfrag/IEnumFBBlock.hpp>
-			virtual HRESULT __stdcall Next(LONG celt, FBBlock_1 *pblk, LONG *pcfetch) _kc_override;
-			virtual HRESULT __stdcall Skip(LONG celt) _kc_override;
-			virtual HRESULT __stdcall Reset(void) _kc_override;
-			virtual HRESULT __stdcall Clone(IEnumFBBlock **ppclone) _kc_override;
-			virtual HRESULT __stdcall Restrict(FILETIME start, FILETIME end) _kc_override;
-	} m_xEnumFBBlock;
-
 	ECFBBlockList	m_FBBlock; /**< Freebusy time blocks */
+	ALLOC_WRAP_FRIEND;
 };
 
 } /* namespace */

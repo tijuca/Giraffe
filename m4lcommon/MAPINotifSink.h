@@ -26,17 +26,19 @@
 #include <mapix.h>
 #include <mapidefs.h>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
+#include <kopano/memory.hpp>
 
 namespace KC {
 
 class _kc_export MAPINotifSink _kc_final : public IMAPIAdviseSink {
 public:
     static HRESULT Create(MAPINotifSink **lppSink);
-	_kc_hidden virtual ULONG __stdcall AddRef(void) _kc_override;
-	virtual ULONG __stdcall Release(void) _kc_override;
-	_kc_hidden virtual HRESULT __stdcall QueryInterface(REFIID iid, void **iface) _kc_override;
-	_kc_hidden virtual ULONG __stdcall OnNotify(ULONG n, LPNOTIFICATION notif) _kc_override;
-	virtual HRESULT __stdcall GetNotifications(ULONG *n, LPNOTIFICATION *notif, BOOL fNonBlock, ULONG timeout);
+	_kc_hidden virtual ULONG AddRef(void) _kc_override;
+	virtual ULONG Release(void) _kc_override;
+	_kc_hidden virtual HRESULT QueryInterface(REFIID iid, void **iface) _kc_override;
+	_kc_hidden virtual ULONG OnNotify(ULONG n, LPNOTIFICATION notif) _kc_override;
+	virtual HRESULT GetNotifications(ULONG *n, LPNOTIFICATION *notif, BOOL fNonBlock, ULONG timeout);
 
 private:
 	_kc_hidden MAPINotifSink(void) = default;
@@ -44,14 +46,11 @@ private:
 
 	std::mutex m_hMutex;
 	std::condition_variable m_hCond;
-    std::list<NOTIFICATION *> m_lstNotifs;
+	std::list<KCHL::memory_ptr<NOTIFICATION>> m_lstNotifs;
 	bool m_bExit = false;
 	unsigned int m_cRef = 0;
+	ALLOC_WRAP_FRIEND;
 };
-
-
-HRESULT MAPICopyUnicode(WCHAR *lpSrc, void *lpBase, WCHAR **lpDst);
-HRESULT MAPICopyString(char *lpSrc, void *lpBase, char **lpDst);
 
 } /* namespace */
 

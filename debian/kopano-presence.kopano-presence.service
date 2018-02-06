@@ -1,0 +1,13 @@
+[Unit]
+Description=Kopano Core Presence Daemon
+# FIXME: remove this hint and the comment once we have a man page for kopano-presence
+#Documentation=man:kopano-presence(8)
+
+[Service]
+Type=simple
+Environment=LC_ALL=C LANG=C
+ExecStart=/usr/sbin/kopano-presence -F
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

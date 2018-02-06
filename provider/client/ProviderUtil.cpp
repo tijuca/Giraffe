@@ -35,13 +35,11 @@
 #include "ECArchiveAwareMsgStore.h"
 #include "ECMsgStorePublic.h"
 #include <kopano/charset/convstring.h>
-#include "DLLGlobal.h"
 #include "EntryPoint.h"
 #include "ProviderUtil.h"
 
 #include <kopano/charset/convert.h>
 
-using namespace std;
 using namespace KCHL;
 
 HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
@@ -141,16 +139,13 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 	//Init only the firsttime the flags
 	sProviderInfo.ulProfileFlags = sProfileProps.ulProfileFlags;
 	sProviderInfo.ulConnectType = CT_ONLINE;
-	hr = lpECMSProvider->QueryInterface(IID_IMSProvider, (void **)&sProviderInfo.lpMSProviderOnline);
+	hr = lpECMSProvider->QueryInterface(IID_IMSProvider, &~sProviderInfo.lpMSProviderOnline);
 	if(hr != hrSuccess)
 		return hr;
-	hr = lpECABProvider->QueryInterface(IID_IABProvider, (void **)&sProviderInfo.lpABProviderOnline);
+	hr = lpECABProvider->QueryInterface(IID_IABProvider, &~sProviderInfo.lpABProviderOnline);
 	if(hr != hrSuccess)
 		return hr;
-
-	//Add provider in map
-	lpmapProvider->insert(std::map<string, PROVIDER_INFO>::value_type(lpszProfileName, sProviderInfo));
-
+	lpmapProvider->insert({lpszProfileName, sProviderInfo});
 	*lpsProviderInfo = std::move(sProviderInfo);
 	return hrSuccess;
 }
@@ -162,9 +157,10 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 //  object is released, so we have to make sure that when the users has released
 //  all the msgstore objects, we also release the support object.
 //
-HRESULT CreateMsgStoreObject(char * lpszProfname, LPMAPISUP lpMAPISup, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags, WSTransport* lpTransport,
-							MAPIUID* lpguidMDBProvider, BOOL bSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore,
-							ECMsgStore** lppECMsgStore)
+HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
+    ULONG cbEntryID, ENTRYID *lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags,
+    WSTransport *lpTransport, const MAPIUID *lpguidMDBProvider, BOOL bSpooler,
+    BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
 {
 	HRESULT	hr = hrSuccess;
 	

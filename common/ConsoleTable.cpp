@@ -19,9 +19,13 @@
 #include "ConsoleTable.h"
 #include <algorithm>
 #include <iostream>
-using namespace std;
+#include <string>
+#include <vector>
 
 namespace KC {
+
+using std::cout;
+using std::endl;
 
 /** 
  * Creates a static string table in set sizes
@@ -29,15 +33,14 @@ namespace KC {
  * @param[in] rows number of rows in the table (if exceeding, table will be printed and cleared)
  * @param[in] columns exact number of columns
  */
-ConsoleTable::ConsoleTable(size_t rows, size_t columns) : m_iRows(rows), m_iColumns(columns)
+ConsoleTable::ConsoleTable(size_t rows, size_t columns) :
+	m_iRows(rows), m_iColumns(columns)
 {
-	m_nRow = 0;
 	m_vTable.resize(rows);
 	for (size_t i = 0; i < rows; ++i)
 		m_vTable[i].resize(columns);
 	m_vMaxLengths.resize(m_iColumns);
 	m_vHeader.resize(m_iColumns);
-	bHaveHeader = false;
 }
 
 /**
@@ -84,14 +87,13 @@ void ConsoleTable::Resize(size_t rows, size_t columns)
  * @param[in] entry name of the header
  * @retval		true on success, false if offsets are out of range
  */
-bool ConsoleTable::SetHeader(size_t col, const string& entry)
+bool ConsoleTable::SetHeader(size_t col, const std::string &entry)
 {
 	size_t len;
 
 	if (col >= m_iColumns)
 		return false;
-
-	m_vHeader[col] = m_converter.convert_to<wstring>(CHARSET_WCHAR, entry, entry.length(), CHARSET_CHAR);
+	m_vHeader[col] = m_converter.convert_to<std::wstring>(CHARSET_WCHAR, entry, entry.length(), CHARSET_CHAR);
 	len = entry.length();
 	if (len > m_vMaxLengths[col])
 		m_vMaxLengths[col] = len;
@@ -109,7 +111,7 @@ bool ConsoleTable::SetHeader(size_t col, const string& entry)
  * @param[in]	entry	utf-8 string to set in the table in current terminal charset
  * @retval		true on success, false if offsets are out of range
  */
-bool ConsoleTable::AddColumn(size_t col, const string& entry)
+bool ConsoleTable::AddColumn(size_t col, const std::string &entry)
 {
 	if (col >= m_iColumns)
 		return false;
@@ -132,7 +134,7 @@ bool ConsoleTable::AddColumn(size_t col, const string& entry)
  * @param[in]	entry	utf-8 string to set in the table in current terminal charset
  * @retval		true on success, false if offsets are out of range
  */
-bool ConsoleTable::SetColumn(size_t row, size_t col, const string& entry)
+bool ConsoleTable::SetColumn(size_t row, size_t col, const std::string &entry)
 {
 	size_t len;
 
@@ -140,7 +142,7 @@ bool ConsoleTable::SetColumn(size_t row, size_t col, const string& entry)
 		return false;
 
 	// we want to count number of printable characters, which is not possible using UTF-8
-	m_vTable[row][col] = m_converter.convert_to<wstring>(CHARSET_WCHAR, entry, entry.length(), CHARSET_CHAR);
+	m_vTable[row][col] = m_converter.convert_to<std::wstring>(CHARSET_WCHAR, entry, entry.length(), CHARSET_CHAR);
 	len = m_vTable[row][col].length();
 	if (len > m_vMaxLengths[col])
 		m_vMaxLengths[col] = len;
@@ -157,7 +159,7 @@ bool ConsoleTable::SetColumn(size_t row, size_t col, const string& entry)
  * 
  * @param[in] vRow reference to the row wanted on the screen
  */
-void ConsoleTable::PrintRow(const vector<wstring>& vRow)
+void ConsoleTable::PrintRow(const std::vector<std::wstring> &vRow)
 {
 	size_t nCol = 0;
 	size_t longest, ntabs;
@@ -169,7 +171,7 @@ void ConsoleTable::PrintRow(const vector<wstring>& vRow)
 		if (nCol+1 < m_iColumns) {
 			longest = ((m_vMaxLengths[nCol] /8) +1);
 			ntabs = longest - ((col.length() / 8) + 1);
-			cout << string(ntabs, '\t');
+			cout << std::string(ntabs, '\t');
 		}
 		++nCol;
 	}
@@ -181,7 +183,7 @@ void ConsoleTable::PrintRow(const vector<wstring>& vRow)
  * 
  * @param[in] vRow reference to the row wanted on the screen
  */
-void ConsoleTable::DumpRow(const vector<wstring>& vRow)
+void ConsoleTable::DumpRow(const std::vector<std::wstring> &vRow)
 {
 	size_t nCol = 0;
 	for (const auto &col : vRow) {
@@ -209,7 +211,7 @@ void ConsoleTable::PrintTable()
 			total += m_vMaxLengths[nCol];
 
 		total += (m_iColumns -1) * 8;
-		cout << "\t" << string(total, '-') << endl;
+		cout << "\t" << std::string(total, '-') << endl;
 	}
 
 	for (size_t nRow = 0; nRow < m_nRow; ++nRow)

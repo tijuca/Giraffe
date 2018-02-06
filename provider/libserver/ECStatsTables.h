@@ -19,6 +19,7 @@
 #define EC_STATS_TABLES_H
 
 #include <kopano/zcdefs.h>
+#include <kopano/Util.h>
 #include "ECGenericObjectTable.h"
 #include "ECSession.h"
 
@@ -42,13 +43,14 @@ public:
 	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
 	void load_tcmalloc(void);
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
 
 private:
 	static void GetStatsCollectorData(const std::string &name, const std::string &description, const std::string &value, void *obj);
 
 	std::map<unsigned int, statstrings> m_mapStatData;
 	unsigned int id;
+	ALLOC_WRAP_FRIEND;
 };
 
 
@@ -79,14 +81,14 @@ protected:
 public:
 	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
 
 private:
 	static void GetSessionData(ECSession *lpSession, void *obj);
 
 	std::map<unsigned int, sessiondata> m_mapSessionData;
 	unsigned int id;
+	ALLOC_WRAP_FRIEND;
 };
 
 class ECUserStatsTable _kc_final : public ECGenericObjectTable {
@@ -96,11 +98,11 @@ protected:
 public:
 	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
 
 private:
 	ECRESULT LoadCompanyUsers(ULONG ulCompanyId);
+	ALLOC_WRAP_FRIEND;
 };
 
 class ECCompanyStatsTable _kc_final : public ECGenericObjectTable {
@@ -110,10 +112,8 @@ protected:
 public:
 	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
-
-private:
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
+	ALLOC_WRAP_FRIEND;
 };
 
 class ECServerStatsTable _kc_final : public ECGenericObjectTable {
@@ -123,11 +123,11 @@ protected:
 public:
 	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
 
 private:
 	std::map<unsigned int, std::string> m_mapServers;
+	ALLOC_WRAP_FRIEND;
 };
 
 // Link to provider/server

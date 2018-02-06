@@ -13,17 +13,75 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include "resource.h"
 #include <mapiutil.h>
 #include "kcore.hpp"
 #include <kopano/CommonUtil.h>
 #include "ECMailUser.h"
-
+#include "ECMAPITable.h"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
 #include <kopano/ECDebug.h>
+
+ECDistList::ECDistList(void *lpProvider, BOOL fModify) :
+	ECABContainer(lpProvider, MAPI_DISTLIST, fModify, "IDistList")
+{
+	// since we have no OpenProperty / abLoadProp, remove the 8k prop limit
+	this->m_ulMaxPropSize = 0;
+}
+
+HRESULT ECDistList::QueryInterface(REFIID refiid, void **lppInterface)
+{
+	REGISTER_INTERFACE2(ECDistList, this);
+	REGISTER_INTERFACE2(ECABContainer, this);
+	REGISTER_INTERFACE2(ECABProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IDistList, this);
+	REGISTER_INTERFACE2(IABContainer, this);
+	REGISTER_INTERFACE2(IMAPIProp, this);
+	REGISTER_INTERFACE2(IUnknown, this);
+	return MAPI_E_INTERFACE_NOT_SUPPORTED;
+}
+
+HRESULT ECDistList::Create(void *lpProvider, BOOL fModify,
+    ECDistList **lppDistList)
+{
+	return alloc_wrap<ECDistList>(lpProvider, fModify).put(lppDistList);
+}
+
+HRESULT ECDistList::TableRowGetProp(void *provider, struct propVal *src,
+    SPropValue *dst, void **base, ULONG type)
+{
+	return MAPI_E_NOT_FOUND;
+}
+
+HRESULT ECDistList::OpenProperty(ULONG ulPropTag, LPCIID lpiid,
+    ULONG ulInterfaceOptions, ULONG ulFlags, IUnknown **lppUnk)
+{
+	if (lpiid == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	return ECABProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions,
+	       ulFlags, lppUnk);
+}
+
+HRESULT ECDistList::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
+{
+	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IDistList, static_cast<IDistList *>(this), ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+}
+
+HRESULT ECDistList::CopyProps(const SPropTagArray *lpIncludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
+{
+	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IDistList,
+	       static_cast<IDistList *>(this), lpIncludeProps, ulUIParam,
+	       lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+}
 
 ECMailUser::ECMailUser(void* lpProvider, BOOL fModify) : ECABProp(lpProvider, MAPI_MAILUSER, fModify, "IMailUser")
 {
@@ -33,18 +91,7 @@ ECMailUser::ECMailUser(void* lpProvider, BOOL fModify) : ECABProp(lpProvider, MA
 
 HRESULT ECMailUser::Create(void* lpProvider, BOOL fModify, ECMailUser** lppMailUser)
 {
-
-	HRESULT hr = hrSuccess;
-	ECMailUser *lpMailUser = NULL;
-
-	lpMailUser = new ECMailUser(lpProvider, fModify);
-
-	hr = lpMailUser->QueryInterface(IID_ECMailUser, (void **)lppMailUser);
-
-	if(hr != hrSuccess)
-		delete lpMailUser;
-
-	return hr;
+	return alloc_wrap<ECMailUser>(lpProvider, fModify).put(lppMailUser);
 }
 
 HRESULT	ECMailUser::QueryInterface(REFIID refiid, void **lppInterface) 
@@ -52,9 +99,9 @@ HRESULT	ECMailUser::QueryInterface(REFIID refiid, void **lppInterface)
 	REGISTER_INTERFACE2(ECMailUser, this);
 	REGISTER_INTERFACE2(ECABProp, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IMailUser, &this->m_xMailUser);
-	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMailUser);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xMailUser);
+	REGISTER_INTERFACE2(IMailUser, this);
+	REGISTER_INTERFACE2(IMAPIProp, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -79,28 +126,12 @@ HRESULT ECMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
     LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
     ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, &this->m_xMailUser, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, static_cast<IMailUser *>(this), ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 HRESULT ECMailUser::CopyProps(const SPropTagArray *lpIncludeProps,
     ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
     void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, &this->m_xMailUser, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, static_cast<IMailUser *>(this), lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
-
-// IMailUser
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMailUser, MailUser, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMailUser, MailUser, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, SaveChanges, (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
-DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

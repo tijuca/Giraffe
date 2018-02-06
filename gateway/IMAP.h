@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 #include <list>
 #include <set>
@@ -28,9 +29,9 @@
 #include <kopano/ECIConv.h>
 #include <kopano/ECChannel.h>
 #include <kopano/memory.hpp>
+#include <kopano/hl.hpp>
 #include "ClientProto.h"
 
-using namespace std;
 namespace KC {
 class ECRestriction;
 }
@@ -54,59 +55,46 @@ class ECRestriction;
 #define RESP_TAGGED_NO " NO "
 #define RESP_TAGGED_BAD " BAD "
 
-class BinaryArray _kc_final {
+/**
+ * An ownership-indicating wrapper atop SBinary.
+ */
+class BinaryArray _kc_final : public SBinary {
 public:
-	BinaryArray(void) : lpb(NULL), cb(0), bcheap(false) {}
-	BinaryArray(BYTE *lpData, ULONG cbData, bool bcheap = false)
+	BinaryArray() : SBinary() {}
+	BinaryArray(const void *lpData, ULONG cbData, bool b = false) :
+		SBinary{cbData, nullptr}, bcheap(b)
 	{
-		this->bcheap = bcheap;
-		if (cbData == 0) {
-			cb = 0;
-			lpb = NULL;
+		if (cbData == 0)
 			return;
-		}
 		if (!bcheap) {
 			lpb = new BYTE[cbData];
 			memcpy(lpb, lpData, cbData);
 		} else {
-			lpb = lpData;
+			lpb = static_cast<BYTE *>(const_cast<void *>(lpData));
 		}
-		cb = cbData;
 	}
-	BinaryArray(const BinaryArray &old) {
-		bcheap = false;
-		if (old.cb == 0) {
-			cb = 0;
-			lpb = NULL;
+	BinaryArray(const BinaryArray &old) :
+		SBinary{old.cb, nullptr}, bcheap(false)
+	{
+		if (cb == 0)
 			return;
-		}
-		cb = old.cb;
 		lpb = new BYTE[cb];
 		memcpy(lpb, old.lpb, cb);
 	}
 	BinaryArray(BinaryArray &&o) :
-	    lpb(o.lpb), cb(o.cb), bcheap(o.bcheap)
+		SBinary{o.cb, o.lpb}, bcheap(o.bcheap)
 	{
 		o.lpb = nullptr;
 		o.cb = 0;
 		o.bcheap = false;
 	}
-	BinaryArray(const SBinary &bin) {
-		bcheap = false;
-		if (bin.cb == 0) {
-			cb = 0;
-			lpb = NULL;
+	BinaryArray(const SBinary &bin) :
+		SBinary{bin.cb, nullptr}, bcheap(false)
+	{
+		if (cb == 0)
 			return;
-		}
 		lpb = new BYTE[bin.cb];
 		memcpy(lpb, bin.lpb, bin.cb);
-		cb = bin.cb;
-	}
-	BinaryArray(SBinary &&o) :
-	    lpb(o.lpb), cb(o.cb), bcheap(false)
-	{
-		o.lpb = nullptr;
-		o.cb = 0;
 	}
 	~BinaryArray(void)
 	{
@@ -114,17 +102,7 @@ public:
 			delete[] lpb;
 	}
 
-	bool operator==(const BinaryArray &b) const
-	{
-		if (b.cb == 0 && this->cb == 0)
-			return true;
-		if (b.cb != this->cb)
-			return false;
-		else
-			return memcmp(lpb, b.lpb, cb) == 0;
-	}
-
-	BinaryArray &operator=(const BinaryArray &b)
+	BinaryArray &operator=(const SBinary &b)
 	{
 		BYTE *lpbPrev = lpb;
 		if (b.cb == 0) {
@@ -140,19 +118,26 @@ public:
 		bcheap = false;
 		return *this;
 	}
-    
-	BYTE *lpb;
-	ULONG cb;
-	bool bcheap;
-};
 
-struct lessBinaryArray {
-	bool operator()(const BinaryArray& a, const BinaryArray& b) const
+	BinaryArray &operator=(BinaryArray &&b)
 	{
-		if (a.cb < b.cb || (a.cb == b.cb && memcmp(a.lpb, b.lpb, a.cb) < 0) )
-			return true;
-		return false;
+		cb = b.cb;
+		bcheap = false;
+		if (b.cb == 0) {
+			lpb = nullptr;
+		} else if (!b.bcheap) {
+			lpb = b.lpb;
+			b.lpb = nullptr;
+			b.cb = 0;
+			b.bcheap = false;
+		} else {
+			lpb = new BYTE[cb];
+			memcpy(lpb, b.lpb, cb);
+		}
+		return *this;
 	}
+
+	bool bcheap = false;
 };
 
 // FLAGS: \Seen \Answered \Flagged \Deleted \Draft \Recent
@@ -161,9 +146,10 @@ public:
 	IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig);
 	~IMAP();
 
-	int getTimeoutMinutes();
-	bool isIdle();
-	bool isContinue();
+	// getTimeoutMinutes: 30 min when logged in otherwise 1 min
+	int getTimeoutMinutes() const { return lpStore == nullptr ? 1 : 30; }
+	bool isIdle() const { return m_bIdleMode; }
+	bool isContinue() const { return m_bContinue; }
 
 	HRESULT HrSendGreeting(const std::string &strHostString);
 	HRESULT HrCloseConnection(const std::string &strQuitMsg);
@@ -176,46 +162,52 @@ private:
 	void ReleaseContentsCache();
 
 	std::string GetCapabilityString(bool bAllFlags);
-
-	HRESULT HrSplitInput(const string &strInput, vector<string> &lstWords);
-	HRESULT HrSplitPath(const wstring &strInput, vector<wstring> &lstFolders);
-	HRESULT HrUnsplitPath(const vector<wstring> &lstFolders, wstring &strPath);
+	HRESULT HrSplitInput(const std::string &input, std::vector<std::string> &words);
+	HRESULT HrSplitPath(const std::wstring &input, std::vector<std::wstring> &folders);
+	HRESULT HrUnsplitPath(const std::vector<std::wstring> &folders, std::wstring &path);
 
 	// All IMAP4rev1 commands
-	HRESULT HrCmdCapability(const string &strTag);
-	HRESULT HrCmdNoop(const string &strTag);
-	HRESULT HrCmdLogout(const string &strTag);
-	HRESULT HrCmdStarttls(const string &strTag);
-	HRESULT HrCmdAuthenticate(const string &strTag, string strAuthMethod, const string &strAuthData);
-	HRESULT HrCmdLogin(const string &strTag, const string &strUser, const string &strPass);
-	HRESULT HrCmdSelect(const string &strTag, const string &strFolder, bool bReadOnly);
-	HRESULT HrCmdCreate(const string &strTag, const string &strFolder);
-	HRESULT HrCmdDelete(const string &strTag, const string &strFolder);
-	HRESULT HrCmdRename(const string &strTag, const string &strExistingFolder, const string &strNewFolder);
-	HRESULT HrCmdSubscribe(const string &strTag, const string &strFolder, bool bSubscribe);
-	HRESULT HrCmdList(const string &strTag, string strReferenceFolder, const string &strFolder, bool bSubscribedOnly);
-	HRESULT get_uid_next(IMAPIFolder *status_folder, const std::string &tag, ULONG &uid_next);
-	HRESULT HrCmdStatus(const string &strTag, const string &strFolder, string strStatusData);
-	HRESULT HrCmdAppend(const string &strTag, const string &strFolder, const string &strData, string strFlags=string(), const string &strTime=string());
-	HRESULT HrCmdCheck(const string &strTag);
-	HRESULT HrCmdClose(const string &strTag);
-	HRESULT HrCmdExpunge(const string &strTag, const string &strSeqSet);
-	HRESULT HrCmdSearch(const string &strTag, vector<string> &lstSearchCriteria, bool bUidMode);
-	HRESULT HrCmdFetch(const string &strTag, const string &strSeqSet, const string &strMsgDataItemNames, bool bUidMode);
-	HRESULT HrCmdStore(const string &strTag, const string &strSeqSet, const string &strMsgDataItemName, const string &strMsgDataItemValue, bool bUidMode);
-	HRESULT HrCmdCopy(const string &strTag, const string &strSeqSet, const string &strFolder, bool bUidMode);
-	HRESULT HrCmdUidXaolMove(const string &strTag, const string &strSeqSet, const string &strFolder);
-	HRESULT HrCmdIdle(const string &strTag);
-	HRESULT HrCmdNamespace(const string &strTag);
-	HRESULT HrCmdGetQuotaRoot(const string &strTag, const string &strFolder);
-	HRESULT HrCmdGetQuota(const string &strTag, const string &strQuotaRoot);
-	HRESULT HrCmdSetQuota(const string &strTag, const string &strQuotaRoot, const string &strQuotaList);
+	HRESULT HrCmdCapability(const std::string &tag);
+	template<bool> HRESULT HrCmdNoop(const std::string &tag);
+	HRESULT HrCmdNoop(const std::string &tag, bool check);
+	HRESULT HrCmdLogout(const std::string &tag);
+	HRESULT HrCmdStarttls(const std::string &tag);
+	HRESULT HrCmdAuthenticate(const std::string &tag, std::string auth_method, const std::string &auth_data);
+	HRESULT HrCmdLogin(const std::string &tag, const std::vector<std::string> &args);
+	template<bool> HRESULT HrCmdSelect(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdSelect(const std::string &tag, const std::vector<std::string> &args, bool read_only);
+	HRESULT HrCmdCreate(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdDelete(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdRename(const std::string &tag, const std::vector<std::string> &args);
+	template<bool> HRESULT HrCmdSubscribe(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdSubscribe(const std::string &tag, const std::vector<std::string> &args, bool subscribe);
+	template<bool> HRESULT HrCmdList(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdList(const std::string &tag, const std::vector<std::string> &args, bool sub_only);
+	HRESULT get_recent_uidnext2(IMAPIFolder *folder, ULONG &recent, ULONG &uidnext, const ULONG &messages);
+	HRESULT get_recent_uidnext(IMAPIFolder *folder, const std::string &tag, ULONG &recent, ULONG &uidnext, const ULONG &messages);
+	HRESULT HrCmdStatus(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdAppend(const std::string &tag, const std::string &folder, const std::string &data, std::string flags = {}, const std::string &time = {});
+	HRESULT HrCmdClose(const std::string &tag);
+	HRESULT HrCmdExpunge(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdSearch(const std::string &tag, std::vector<std::string> &search_crit, bool uid_mode);
+	HRESULT HrCmdFetch(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
+	template <bool uid> HRESULT HrCmdFetch(const std::string &strTag, const std::vector<std::string> &args);
+	HRESULT HrCmdStore(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
+	template <bool uid> HRESULT HrCmdStore(const std::string &strTag, const std::vector<std::string> &args);
+	HRESULT HrCmdCopy(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
+	template <bool uid> HRESULT HrCmdCopy(const std::string &strTag, const std::vector<std::string> &args);
+	HRESULT HrCmdUidXaolMove(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdIdle(const std::string &tag);
+	HRESULT HrCmdNamespace(const std::string &tag);
+	HRESULT HrCmdGetQuotaRoot(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdGetQuota(const std::string &tag, const std::vector<std::string> &args);
+	HRESULT HrCmdSetQuota(const std::string &tag, const std::vector<std::string> &args);
 
 	/* Untagged response, * or + */
-	HRESULT HrResponse(const string &strUntag, const string& strResponse);
+	void HrResponse(const std::string &untag, const std::string &resp);
 	/* Tagged response with result OK, NO or BAD */
-	HRESULT HrResponse(const string &strResult, const string &strTag, const string& strResponse);
-	static LONG __stdcall IdleAdviseCallback(void *ctx, ULONG numnotif, LPNOTIFICATION);
+	void HrResponse(const std::string &result, const std::string &tag, const std::string &resp);
+	static LONG IdleAdviseCallback(void *ctx, ULONG numnotif, LPNOTIFICATION);
 
 	bool bOnlyMailFolders;
 	bool bShowPublicFolder;
@@ -223,12 +215,13 @@ private:
 	// All data per folder for the folderlist
 	struct SFolder {
 		BinaryArray sEntryID;	// EntryID of folder
-		wstring strFolderName;	// Folder name
+		std::wstring strFolderName;
 		bool bActive;			// Subscribed folder
 		bool bMailFolder;		// E-mail type folder
 		bool bSpecialFolder;	// 'special' folder (eg inbox)
+		ULONG ulSpecialFolderType;
 		bool bHasSubfolders;	// Has child folders
-		list<SFolder>::const_iterator lpParentFolder;
+		std::list<SFolder>::const_iterator lpParentFolder;
 	};
 
 	// All data to be mapped per mail in the current folder
@@ -241,152 +234,113 @@ private:
 		bool bRecent;				// \Recent flag
 		std::string strFlags;		// String of all flags, including \Recent
 
-		bool operator < (SMail sMail) const {
-			return this->ulUid < sMail.ulUid;
-		}
-		bool operator < (ULONG ulUid) const {
-			return this->ulUid < ulUid;
-		}
-		operator ULONG() const {
-			return this->ulUid;
-		}
-		bool operator == (ULONG ulUid) const {
-		    return this->ulUid == ulUid;
-		}
+		bool operator<(const SMail &sMail) const noexcept { return this->ulUid < sMail.ulUid; }
+		bool operator<(ULONG ulUid) const noexcept { return this->ulUid < ulUid; }
+		operator ULONG() const noexcept { return this->ulUid; }
+		bool operator==(ULONG ulUid) const noexcept { return this->ulUid == ulUid; }
 	};
 
-	IMAPISession *lpSession = nullptr;
-	IAddrBook *lpAddrBook = nullptr;
+	KCHL::object_ptr<IMAPISession> lpSession;
+	KCHL::object_ptr<IAddrBook> lpAddrBook;
 	KCHL::memory_ptr<SPropTagArray> m_lpsIMAPTags;
 
 	// current folder name
-	wstring strCurrentFolder;
-	IMAPITable *m_lpTable = nullptr; /* current contents table */
-	vector<string> m_vTableDataColumns; /* current dataitems that caused the setcolumns on the table */
+	KCHL::object_ptr<IMAPIFolder> current_folder;
+	std::pair<std::wstring, bool> current_folder_state;
+	std::wstring strCurrentFolder;
+	KCHL::object_ptr<IMAPITable> m_lpTable; /* current contents table */
+	std::vector<std::string> m_vTableDataColumns; /* current dataitems that caused the setcolumns on the table */
 
 	// true if folder is opened with examine
 	bool bCurrentFolderReadOnly = false;
 
 	// vector of mails in the current folder. The index is used for mail number.
-	vector<SMail> lstFolderMailEIDs;
-	IMsgStore *lpStore = nullptr, *lpPublicStore = nullptr;
+	std::vector<SMail> lstFolderMailEIDs;
+	KCHL::object_ptr<IMsgStore> lpStore, lpPublicStore;
 
+	enum { PR_IPM_FAKEJUNK_ENTRYID = PR_ADDITIONAL_REN_ENTRYIDS };
 	// special folder entryids (not able to move/delete inbox and such ...)
-	set<BinaryArray, lessBinaryArray> lstSpecialEntryIDs;
+	std::map<BinaryArray, ULONG> lstSpecialEntryIDs;
 
 	// Message cache
-	string m_strCache;
+	std::string m_strCache;
 	ULONG m_ulCacheUID = 0;
 
-	// Folder cache
-	unsigned int cache_folders_time_limit = 0;
-	time_t cache_folders_last_used = 0;
-
-	std::list<SFolder> cached_folders;
-
-	// HrResponseContinuation state, used for HrCmdAuthenticate
+	/* A command has sent a continuation response, and requires more
+	 * data from the client. This is currently only used in the
+	 * AUTHENTICATE command, other continuations are already handled
+	 * in the main loop. m_bContinue marks this. */
 	bool m_bContinue = false;
-	string m_strContinueTag;
-	
+	std::string m_strContinueTag;
+
 	// Idle mode variables
 	bool m_bIdleMode = false;
-	IMAPIAdviseSink *m_lpIdleAdviseSink = nullptr;
+	KCHL::object_ptr<IMAPIAdviseSink> m_lpIdleAdviseSink;
 	ULONG m_ulIdleAdviseConnection = 0;
-	string m_strIdleTag;
-	IMAPITable *m_lpIdleTable = nullptr;
+	std::string m_strIdleTag;
+	KCHL::object_ptr<IMAPITable> m_lpIdleTable;
 	std::mutex m_mIdleLock;
 	ULONG m_ulLastUid = 0, m_ulErrors = 0;
-	wstring m_strwUsername;
-
+	std::wstring m_strwUsername;
 	delivery_options dopt;
 
-	HRESULT HrPrintQuotaRoot(const string& strTag);
-
-	HRESULT HrFindFolder(const wstring& strFolder, bool bReadOnly, IMAPIFolder **lppFolder);
-	HRESULT HrFindFolderEntryID(const wstring& strFolder, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-	HRESULT HrFindFolderPartial(const wstring& strFolder, IMAPIFolder **lppFolder, wstring *strNotFound);
-	HRESULT HrFindSubFolder(IMAPIFolder *lpFolder, const wstring& strFolder, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-	
-	bool IsSpecialFolder(IMAPIFolder *lpFolder);
-	bool IsSpecialFolder(ULONG cbEntryID, LPENTRYID lpEntryID);
-	bool IsMailFolder(IMAPIFolder *lpFolder);
-	bool IsSentItemFolder(IMAPIFolder *lpFolder);
-	HRESULT HrOpenParentFolder(ULONG cbEntryID, LPENTRYID lpEntryID, IMAPIFolder **lppFolder);
+	HRESULT HrPrintQuotaRoot(const std::string &tag);
+	HRESULT HrFindFolder(const std::wstring &folder, bool readonly, IMAPIFolder **, ULONG * = nullptr, ENTRYID ** = nullptr);
+	HRESULT HrFindFolderPartial(const std::wstring &folder, IMAPIFolder **, std::wstring *notfound);
+	HRESULT HrFindSubFolder(IMAPIFolder *lpFolder, const std::wstring &folder, ULONG *eid_size, LPENTRYID *eid);
+	bool IsSpecialFolder(ULONG eid_size, ENTRYID *, ULONG * = nullptr) const;
+	bool IsMailFolder(IMAPIFolder *) const;
 	HRESULT HrOpenParentFolder(IMAPIFolder *lpFolder, IMAPIFolder **lppFolder);
-	HRESULT HrGetFolderList(list<SFolder> &lstFolders);
+	HRESULT HrGetFolderList(std::list<SFolder> &);
 
 	/* subscribed folders */
-	vector<BinaryArray> m_vSubscriptions;
+	std::vector<BinaryArray> m_vSubscriptions;
 	HRESULT HrGetSubscribedList();
 	HRESULT HrSetSubscribedList();
-	HRESULT ChangeSubscribeList(bool bSubscribe, ULONG cbEntryID, LPENTRYID lpEntryID);
-
+	HRESULT ChangeSubscribeList(bool bSubscribe, ULONG eid_size, const ENTRYID *);
 	HRESULT HrMakeSpecialsList();
 
-	HRESULT HrRefreshFolderMails(bool bInitialLoad, bool bResetRecent, bool bShowUID, unsigned int *lpulUnseen, ULONG *lpulUIDValidity = NULL);
+	HRESULT HrRefreshFolderMails(bool bInitialLoad, bool bResetRecent, unsigned int *lpulUnseen, ULONG *lpulUIDValidity = NULL);
+	HRESULT HrGetSubTree(std::list<SFolder> &folders, bool public_folders, std::list<SFolder>::const_iterator parent_folder);
+	HRESULT HrGetFolderPath(std::list<SFolder>::const_iterator lpFolder, const std::list<SFolder> &lstFolder, std::wstring &path);
+	HRESULT HrGetDataItems(std::string msgdata_itemnames, std::vector<std::string> &data_items);
 
-	HRESULT HrGetSubTree(list<SFolder> &folders, const SBinary &in_entry_id, const wstring &in_folder_name, list<SFolder>::const_iterator parent_folder);
-	HRESULT HrGetFolderPath(list<SFolder>::const_iterator lpFolder, const list<SFolder> &lstFolder, wstring &strPath);
-	HRESULT HrGetDataItems(string strMsgDataItemNames, vector<string> &lstDataItems);
-	HRESULT HrSemicolonToComma(string &strData);
-
-	// fetch calls an other fetch depending on the data items requested
-	HRESULT HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItems);
-	HRESULT HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &strResponse, ULONG ulMailnr, bool bForceFlags, const vector<string> &lstDataItems);
-
-	std::string HrEnvelopeRecipients(LPSRowSet lpRows, ULONG ulType, std::string& strCharset, bool bIgnore);
-	std::string HrEnvelopeSender(LPMESSAGE lpMessage, ULONG ulTagName, ULONG ulTagEmail, std::string& strCharset, bool bIgnore);
-	HRESULT HrGetMessageEnvelope(string &strResponse, LPMESSAGE lpMessage);
-	HRESULT HrGetMessageFlags(string &strResponse, LPMESSAGE lpMessage, bool bRecent);
-
-	HRESULT HrGetMessagePart(string &strMessagePart, string &strMessage, string strPartName);
-
+	// fetch calls another fetch depending on the data items requested
+	HRESULT HrPropertyFetch(std::list<ULONG> &mails, std::vector<std::string> &data_items);
+	HRESULT save_generated_properties(const std::string &text, IMessage *message);
+	HRESULT HrPropertyFetchRow(LPSPropValue props, ULONG nprops, std::string &response, ULONG mail_nr, bool bounce_flags, const std::vector<std::string> &data_items);
+	HRESULT HrGetMessageFlags(std::string &response, LPMESSAGE msg, bool recent);
+	HRESULT HrGetMessagePart(std::string &message_part, std::string &msg, std::string part_name);
 	ULONG LastOrNumber(const char *szNr, bool bUID);
-	HRESULT HrParseSeqSet(const string &strSeqSet, list<ULONG> &lstMails);
-	HRESULT HrParseSeqUidSet(const string &strSeqSet, list<ULONG> &lstMails);
-	HRESULT HrSeqUidSetToRestriction(const string &strSeqSet, std::unique_ptr<ECRestriction> &);
-
-	HRESULT HrStore(const list<ULONG> &lstMails, string strMsgDataItemName, string strMsgDataItemValue, bool *lpbDoDelete);
-	HRESULT HrCopy(const list<ULONG> &lstMails, const string &strFolder, bool bMove);
+	HRESULT HrParseSeqSet(const std::string &seq, std::list<ULONG> &mails);
+	HRESULT HrParseSeqUidSet(const std::string &seq, std::list<ULONG> &mails);
+	HRESULT HrSeqUidSetToRestriction(const std::string &seq, std::unique_ptr<ECRestriction> &);
+	HRESULT HrStore(const std::list<ULONG> &mails, std::string msgdata_itemname, std::string msgdata_itemvalue, bool *do_del);
+	HRESULT HrCopy(const std::list<ULONG> &mails, const std::string &folder, bool move);
 	HRESULT HrSearchNU(const std::vector<std::string> &cond, ULONG startcond, std::list<ULONG> &mailnr);
 	HRESULT HrSearch(std::vector<std::string> &&cond, ULONG startcond, std::list<ULONG> &mailnr);
-	string GetHeaderValue(const string &strMessage, const string &strHeader, const string &strDefault);
-	HRESULT HrGetBodyStructure(bool bExtended, string &strBodyStructure, const string& strMessage);
-
-	HRESULT HrGetEmailAddress(LPSPropValue lpPropValues, ULONG ulAddrType, ULONG ulEntryID, ULONG ulName, ULONG ulEmail, string strHeaderName, string *strHeaders);
-
-	// Make the string uppercase
-	void ToUpper(string &strString);
-	void ToUpper(wstring &strString);
-	bool CaseCompare(const string& strA, const string& strB);
+	HRESULT HrGetBodyStructure(bool ext, std::string &body_structure, const std::string &msg);
+	HRESULT HrGetEmailAddress(LPSPropValue props, ULONG addr_type, ULONG eid, ULONG name, ULONG email, std::string header_name, std::string *hdrs);
 
 	// IMAP4rev1 date format: 01-Jan-2000 00:00 +0000
-	string FileTimeToString(FILETIME sFiletime);
-	FILETIME StringToFileTime(string strTime, bool bDateOnly = false);
+	std::string FileTimeToString(FILETIME sFiletime);
+	FILETIME StringToFileTime(std::string t, bool date_only = false);
 	// add 24 hour to the time to be able to check if a time is on a date
 	FILETIME AddDay(FILETIME sFileTime);
 
-	// escape (quote) a unicode string to a specific charset in quoted-printable header format
-	string EscapeString(WCHAR *input, std::string& charset, bool bIgnore = false);
-
-	// escape (quote) a string for a quoted-text (between "")
-	string EscapeStringQT(const string &str);
-
 	// Folder names are in a *modified* utf-7 form. See RFC2060, chapter 5.1.3
-	HRESULT MAPI2IMAPCharset(const wstring& input, string& output);
-	HRESULT IMAP2MAPICharset(const string& input, wstring& output);
+	HRESULT MAPI2IMAPCharset(const std::wstring &input, std::string &output);
+	HRESULT IMAP2MAPICharset(const std::string &input, std::wstring &output);
 	
 	// Match a folder path
-	bool MatchFolderPath(wstring strFolder, const wstring& strPattern);
+	bool MatchFolderPath(std::wstring folder, const std::wstring &pattern);
 
 	// Various conversion functions
-	string PropsToFlags(LPSPropValue lpProps, unsigned int cValues, bool bRecent, bool bRead);
-
+	std::string PropsToFlags(LPSPropValue props, unsigned int nprops, bool recent, bool read);
 	void HrParseHeaders(const std::string &, std::list<std::pair<std::string, std::string> > &);
-	void HrGetSubString(string &strOutput, const std::string &strInput, const std::string &strBegin, const std::string &strEnd);
-	void HrTokenize(std::set<std::string> &setTokens, const std::string &strInput);
-
-	HRESULT HrExpungeDeleted(const string &strTag, const string &strCommand, std::unique_ptr<ECRestriction> &&);
+	void HrGetSubString(std::string &output, const std::string &input, const std::string &begin, const std::string &end);
+	HRESULT HrExpungeDeleted(const std::string &tag, const std::string &cmd, std::unique_ptr<ECRestriction> &&);
+	HRESULT HrGetCurrentFolder(KCHL::object_ptr<IMAPIFolder> &);
 };
 
 /** @} */

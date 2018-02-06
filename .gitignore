@@ -42,18 +42,29 @@ stamp-h2
 /kopano-spooler
 /kopano-stats
 /mapitime
+/rosie-test
+/rtfcomp
 /mapi4linux/src/libmapi.sym
-/mapi4linux/src/libkchl.sym
 /provider/plugin.sym
 /provider/provider.sym
 /provider/soap/
 /ECtools/backup/kopano-backup
 /ECtools/backup/build/
+/ECtools/backup/staging/
+/ECtools/cli/kopano-cli
 /ECtools/presence/kopano-presence
 /ECtools/presence/build/
+/ECtools/presence/staging/
 /ECtools/search/kopano-search
 /ECtools/search/build/
+/ECtools/search/staging/
 /ECtools/migration-pst/kopano-migration-pst
+/ECtools/spamd/kopano-spamd
+/ECtools/search/kopano_search/version.py
+/ECtools/backup/kopano_backup/version.py
+/ECtools/cli/kopano_cli/version.py
+/ECtools/spamd/kopano_spamd/version.py
+/swig/python/kopano/kopano/version.py
 
 # /autoconf/
 /autoconf/ltsugar.m4
@@ -75,7 +86,6 @@ stamp-h2
 /common/cov-scope
 /common/ecversion.h
 /common/include/kopano/ecversion.h
-/common/include/kopano/zconfig.h
 /common/kopano.pc
 /common/libkcmapi.sym
 /common/libkcutil.sym
@@ -92,6 +102,9 @@ stamp-h2
 /installer/linux/ldap.active-directory.cfg
 /installer/linux/ldapms.openldap.cfg
 /installer/linux/ldapms.active-directory.cfg
+/installer/linux/kopano-mr-accept.py
+/installer/linux/kopano-mr-process.py
+/installer/linux/kopano-autorespond.py
 
 # /installer/userscripts/
 /installer/userscripts/creategroup
@@ -106,6 +119,7 @@ stamp-h2
 
 # /swig/python/
 /swig/python/build/
+/swig/python/staging/
 /swig/python/MAPICore.py
 /swig/python/mapi_wrap.cxx
 /swig/python/mapi_wrap.h

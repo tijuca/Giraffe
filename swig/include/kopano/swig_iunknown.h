@@ -40,14 +40,15 @@ public:
 	virtual ~IUnknownImplementor() { 
 	}
 
-	ULONG __stdcall AddRef() {
+	ULONG AddRef()
+	{
 		PyGILState_STATE gstate;
 		gstate = PyGILState_Ensure();
 		
-		Swig::Director *director = dynamic_cast<Swig::Director *>(this);
+		auto director = dynamic_cast<Swig::Director *>(this);
 		if (director == nullptr)
 			throw std::runtime_error("dynamic_cast<> yielded a nullptr");
-		PyObject *o = director->swig_get_self();
+		auto o = director->swig_get_self();
 		if (o == nullptr)
 			throw std::runtime_error("swig_get_self yielded a nullptr");
 		Py_INCREF(o);
@@ -56,14 +57,15 @@ public:
 		return o->ob_refcnt;
 	}
 
-	ULONG __stdcall Release() {
+	ULONG Release()
+	{
 		PyGILState_STATE gstate;
 		gstate = PyGILState_Ensure();
 		
-		Swig::Director *director = dynamic_cast<Swig::Director *>(this);
+		auto director = dynamic_cast<Swig::Director *>(this);
 		if (director == nullptr)
 			throw std::runtime_error("dynamic_cast<> yielded a nullptr");
-		PyObject *o = director->swig_get_self();
+		auto o = director->swig_get_self();
 		if (o == nullptr)
 			throw std::runtime_error("swig_get_self yielded a nullptr");
 		ULONG cnt = o->ob_refcnt;
@@ -73,7 +75,8 @@ public:
 		return cnt-1;
 	}
 
-	HRESULT __stdcall QueryInterface(REFIID iid , void** ppvObject) {
+	HRESULT QueryInterface(REFIID iid , void **ppvObject)
+	{
 		if (m_interfaces.find(iid) == m_interfaces.end())
 			return MAPI_E_INTERFACE_NOT_SUPPORTED;
 			

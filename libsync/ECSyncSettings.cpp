@@ -23,19 +23,10 @@
 
 #include <kopano/ECLogger.h>
 
-ECSyncSettings* ECSyncSettings::GetInstance()
-{
-	scoped_lock lock(s_hMutex);
-
-	if (s_lpInstance == NULL)
-		s_lpInstance = new ECSyncSettings;
-	return s_lpInstance;
-}
-
 ECSyncSettings::ECSyncSettings(void) :
 	m_ulSyncLogLevel(EC_LOGLEVEL_INFO)
 {
-	char *env = getenv("KOPANO_SYNC_LOGLEVEL");
+	const char *env = getenv("KOPANO_SYNC_LOGLEVEL");
 	if (env && env[0] != '\0') {
 		unsigned loglevel = strtoul(env, NULL, 10);
 		if (loglevel > 0) {
@@ -57,40 +48,8 @@ ECSyncSettings::ECSyncSettings(void) :
 		m_ulStreamBatchSize = strtoul(env, NULL, 10);
 }
 
-bool ECSyncSettings::SyncLogEnabled() const {
-	return ContinuousLogging() ? true : m_ulSyncLog != 0;
-}
-
 ULONG ECSyncSettings::SyncLogLevel() const {
 	return ContinuousLogging() ? EC_LOGLEVEL_DEBUG : m_ulSyncLogLevel;
-}
-
-bool ECSyncSettings::ContinuousLogging() const {
-	return m_ulSyncOpts & EC_SYNC_OPT_CONTINUOUS;
-}
-
-bool ECSyncSettings::SyncStreamEnabled() const {
-	return m_ulSyncOpts & EC_SYNC_OPT_STREAM;
-}
-
-bool ECSyncSettings::ChangeNotificationsEnabled() const {
-	return m_ulSyncOpts & EC_SYNC_OPT_CHANGENOTIF;
-}
-
-bool ECSyncSettings::StateCollectorEnabled() const {
-	return m_ulSyncOpts & EC_SYNC_OPT_STATECOLLECT;
-}
-
-ULONG ECSyncSettings::StreamTimeout() const {
-	return m_ulStreamTimeout;
-}
-
-ULONG ECSyncSettings::StreamBufferSize() const {
-	return m_ulStreamBufferSize;
-}
-
-ULONG ECSyncSettings::StreamBatchSize() const {
-	return m_ulStreamBatchSize;
 }
 
 /**
@@ -177,10 +136,4 @@ ULONG ECSyncSettings::SetStreamBatchSize(ULONG ulBatchSize) {
 }
 
 std::mutex ECSyncSettings::s_hMutex;
-ECSyncSettings* ECSyncSettings::s_lpInstance = NULL;
-
-ECSyncSettings::__initializer::~__initializer() {
-	delete ECSyncSettings::s_lpInstance;
-}
-
-ECSyncSettings::__initializer ECSyncSettings::__i;
+ECSyncSettings ECSyncSettings::instance;

@@ -33,6 +33,9 @@
 #endif
 
 #include <kopano/platform.h>
+#include "pymem.hpp"
+
+using KCHL::pyobj_ptr;
 
 // Get Py_ssize_t for older versions of python
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
@@ -71,22 +74,23 @@ namespace priv {
 	void conv_out<LPTSTR>(PyObject* value, LPVOID lpBase, ULONG ulFlags, LPTSTR *lppResult) {
 		if(value == Py_None) {
 			*lppResult = NULL;
-		} else {
-			// FIXME: General helper function as improvement
-			if ((ulFlags & MAPI_UNICODE) == 0)
-				*(LPSTR*)lppResult = PyString_AsString(value);
-			else {
-				int len = PyUnicode_GetSize(value);
-				MAPIAllocateMore((len + 1) * sizeof(WCHAR), lpBase, (LPVOID*)lppResult);
-				// FIXME: Required for the PyUnicodeObject cast
-				#if PY_MAJOR_VERSION >= 3
-					len = PyUnicode_AsWideChar(value, *(LPWSTR*)lppResult, len);
-				#else
-					len = PyUnicode_AsWideChar((PyUnicodeObject*)value, *(LPWSTR*)lppResult, len);
-				#endif
-				(*(LPWSTR*)lppResult)[len] = L'\0';
-			}
+			return;
 		}
+		// FIXME: General helper function as improvement
+		if ((ulFlags & MAPI_UNICODE) == 0) {
+			*(LPSTR*)lppResult = PyString_AsString(value);
+			return;
+		}
+		int len = PyUnicode_GetSize(value);
+		if (MAPIAllocateMore((len + 1) * sizeof(wchar_t), lpBase, reinterpret_cast<void **>(lppResult)) != hrSuccess)
+			throw std::bad_alloc();
+		// FIXME: Required for the PyUnicodeObject cast
+		#if PY_MAJOR_VERSION >= 3
+			len = PyUnicode_AsWideChar(value, *(LPWSTR*)lppResult, len);
+		#else
+			len = PyUnicode_AsWideChar((PyUnicodeObject*)value, *(LPWSTR*)lppResult, len);
+		#endif
+		(*(LPWSTR*)lppResult)[len] = L'\0';
 	}
 
 	/**
@@ -151,12 +155,13 @@ namespace priv {
 		if(value == Py_None) {
 			lpResult->cb = 0;
 			lpResult->lpb = NULL;
-		} else {
-			PyString_AsStringAndSize(value, &data, &size);
-			lpResult->cb = size;
-			MAPIAllocateMore(size, lpBase, (LPVOID*)&lpResult->lpb);
-			memcpy(lpResult->lpb, data, size);
+			return;
 		}
+		PyString_AsStringAndSize(value, &data, &size);
+		lpResult->cb = size;
+		if (MAPIAllocateMore(size, lpBase, reinterpret_cast<void **>(&lpResult->lpb)) != hrSuccess)
+			throw std::bad_alloc();
+		memcpy(lpResult->lpb, data, size);
 	}
 
 	/**
@@ -178,11 +183,11 @@ namespace priv {
  * a native value that's part of a struct (on both sides). The actual conversion
  * is delegated to a specialization of the private::conv_out template.
  *
- * @tparam			_ObjType	The type of the structure containing the values that
+ * @tparam	ObjType	The type of the structure containing the values that
  * 								are to be converted.
- * @tparam			_MemType	The type of the member for which this particular instantiation
+ * @tparam	MemType	The type of the member for which this particular instantiation
  * 								is intended.
- * @tparam			_Member		The data member pointer that points to the actual field
+ * @tparam	Member	The data member pointer that points to the actual field
  * 								for which this particula instantiation is intended.
  * @param[in,out]	lpObj		The native object whos members will be populated with
  * 								values converted from the scripted object.
@@ -192,24 +197,23 @@ namespace priv {
  * @param[in]		flags		Allowed values:
  *								@remark @c MAPI_UNICODE If the data is a string, it's a wide character string
  */
-template <typename _ObjType, typename _MemType, _MemType(_ObjType::*_Member)>
-void conv_out_default(_ObjType *lpObj, PyObject *elem, const char *lpszMember, LPVOID lpBase, ULONG ulFlags) {
-	PyObject *value = PyObject_GetAttrString(elem, const_cast<char*>(lpszMember));	// Older versions of python might expect a non-const char pointer.
+template<typename ObjType, typename MemType, MemType(ObjType::*Member)>
+void conv_out_default(ObjType *lpObj, PyObject *elem, const char *lpszMember,
+    void *lpBase, ULONG ulFlags)
+{
+	// Older versions of python might expect a non-const char pointer.
+	pyobj_ptr value(PyObject_GetAttrString(elem, const_cast<char *>(lpszMember)));
 	if (PyErr_Occurred())
 		return;
-
-	priv::conv_out(value, lpBase, ulFlags, &(lpObj->*_Member));
-	Py_DECREF(value);
+	priv::conv_out(value, lpBase, ulFlags, &(lpObj->*Member));
 }
 
 /**
  * This structure is used to create a list of items that need to be converted from
  * their scripted representation to their native representation.
  */
-template <typename _ObjType>
-struct conv_out_info {
-	typedef void(*conv_out_func_t)(_ObjType*, PyObject*, const char*, LPVOID lpBase, ULONG ulFlags);
-	
+template<typename ObjType> struct conv_out_info {
+	typedef void (*conv_out_func_t)(ObjType *, PyObject *, const char *, void *lpBase, ULONG ulFlags);
 	conv_out_func_t		conv_out_func;
 	const char*			membername;
 };
@@ -226,8 +230,10 @@ struct conv_out_info {
  * @param[in]		flags		Allowed values:
  *								@remark @c MAPI_UNICODE If the data is a string, it's a wide character string
  */
-template <typename _ObjType, size_t N>
-void process_conv_out_array(_ObjType *lpObj, PyObject *elem, const conv_out_info<_ObjType> (&array)[N], LPVOID lpBase, ULONG ulFlags) {
+template<typename ObjType, size_t N>
+void process_conv_out_array(ObjType *lpObj, PyObject *elem,
+    const conv_out_info<ObjType> (&array)[N], void *lpBase, ULONG ulFlags)
+{
 	for (size_t n = 0; !PyErr_Occurred() && n < N; ++n)
 		array[n].conv_out_func(lpObj, elem, array[n].membername, lpBase, ulFlags);
 }

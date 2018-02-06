@@ -20,7 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include <map>
-
+#include <memory>
 #include "ECDatabase.h"
 #include "ECGenericObjectTable.h"
 #include <kopano/kcodes.h>
@@ -51,13 +51,13 @@ struct TABLE_ENTRY {
 		   
     TABLE_TYPE ulTableType;
     
-	union __sTable {
-		struct __sGeneric {
+	union {
+		struct {
 			unsigned int ulParentId;
 			unsigned int ulObjectType;
 			unsigned int ulObjectFlags;
 		} sGeneric ;
-		struct __sOutgoingQueue {
+		struct {
 			unsigned int ulStoreId;
 			unsigned int ulFlags;
 		} sOutgoingQueue;
@@ -65,8 +65,6 @@ struct TABLE_ENTRY {
 	ECGenericObjectTable *lpTable; // Actual table object
 	unsigned int ulSubscriptionId; // Subscription ID for table event subscription on session manager
 };
-
-typedef std::map<unsigned int, TABLE_ENTRY *> TABLEENTRYMAP;
 
 class ECTableManager _kc_final {
 public:
@@ -91,10 +89,10 @@ public:
 
 private:
 	static	void *	SearchThread(void *lpParam);
-
-	void		AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTableId);
+	void AddTableEntry(std::unique_ptr<TABLE_ENTRY> &&, unsigned int *id);
 
 	ECSession								*lpSession;
+	typedef std::map<unsigned int, std::unique_ptr<TABLE_ENTRY>> TABLEENTRYMAP;
 	TABLEENTRYMAP							mapTable;
 	unsigned int ulNextTableId = 1;
 	std::recursive_mutex hListMutex;

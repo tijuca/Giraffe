@@ -18,61 +18,16 @@
 #ifndef ustringutil_INCLUDED
 #define ustringutil_INCLUDED
 
-#include <kopano/zconfig.h>
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
 #include <string>
 
-#ifdef KC_USES_ICU
 #include <unicode/coll.h>
 #include <unicode/sortkey.h>
+#include <unicode/unistr.h>
+
 namespace KC {
 typedef Locale ECLocale;
-typedef CollationKey ECSortKey;
-}
-#else
-
-namespace KC {
-
-//typedef locale_t ECLocale;
-class ECLocale _kc_final {
-public:
-	ECLocale();
-	ECLocale(int category, const char *locale);
-	ECLocale(const ECLocale &other);
-	~ECLocale();
-
-	ECLocale &operator=(const ECLocale &other);
-	void swap(ECLocale &other);
-
-	operator const locale_t&() const { return m_locale; }
-
-private:
-	locale_t	m_locale;
-
-	int			m_category;
-	std::string	m_localeid;
-};
-
-class ECSortKey _kc_final {
-public:
-	ECSortKey(const unsigned char *lpSortData, unsigned int cbSortData);
-	ECSortKey(const ECSortKey &other);
-	~ECSortKey();
-
-	ECSortKey& operator=(const ECSortKey &other);
-	int compareTo(const ECSortKey &other) const;
-
-private:
-	const unsigned char *m_lpSortData;
-	unsigned int m_cbSortData;
-};
-
-} /* namespace */
-
-#endif
-
-namespace KC {
 
 // us-ascii strings
 extern _kc_export const char *str_ifind(const char *haystack, const char *needle);
@@ -111,13 +66,10 @@ extern _kc_export unsigned int u8_len(const char *);
 extern _kc_export ECLocale createLocaleFromName(const char *);
 extern _kc_export ECRESULT LocaleIdToLCID(const char *locale, ULONG *id);
 extern _kc_export ECRESULT LCIDToLocaleId(ULONG id, const char **locale);
-
-extern _kc_export void createSortKeyDataFromUTF8(const char *s, int ncap, const ECLocale &, unsigned int *keysize, unsigned char **key);
-extern _kc_export ECSortKey createSortKeyFromUTF8(const char *s, int ncap, const ECLocale &);
-extern _kc_export int compareSortKeys(unsigned int nkey1, const unsigned char *key1, unsigned int nkey2, const unsigned char *key2);
-
-extern _kc_export void createSortKeyData(const char *s, int ncap, const ECLocale &, unsigned int *keysize, unsigned char **key);
-extern _kc_export void createSortKeyData(const wchar_t *s, int ncap, const ECLocale &, unsigned int *keysize, unsigned char **key);
+extern _kc_export std::string createSortKeyDataFromUTF8(const char *s, int ncap, const ECLocale &);
+extern _kc_export int compareSortKeys(const std::string &, const std::string &);
+extern _kc_export std::string createSortKeyData(const char *s, int ncap, const ECLocale &);
+extern _kc_export std::string createSortKeyData(const wchar_t *s, int ncap, const ECLocale &);
 
 } /* namespace */
 

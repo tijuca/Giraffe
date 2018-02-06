@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+#
+import sys
+import kopano
+from MAPI.Tags import PR_IPM_SUBTREE_ENTRYID
+
+server = kopano.Server(auth_user='SYSTEM', auth_pass='')
+
+if not len(server.options.users):
+    sys.exit('Usage: %s -u username' % sys.argv[0])
+
+user = kopano.User(server.options.users[0])
+if user.store.subtree:
+    sys.exit()
+
+subtree = user.store.root.folder('IPM_SUBTREE')
+if not subtree:
+    sys.exit("Result: IPM_SUBTREE folder not found")
+
+print('Result: FIXED - Setting PR_IPM_SUBTREE_ENTRYID to IPM_SUBTREE')
+print('PR_IPM_SUBTREE_ENTRYID current value: ' + user.store.prop(PR_IPM_SUBTREE_ENTRYID).strval)
+user.store.prop(PR_IPM_SUBTREE_ENTRYID).value = subtree.entryid.decode('hex')
+print('PR_IPM_SUBTREE_ENTRYID set to: ' + subtree.entryid)
