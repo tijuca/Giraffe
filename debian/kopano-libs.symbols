@@ -1,47 +1,54 @@
 libkcarchiver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcarchivercore.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcfreebusy.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcicalmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcinetmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcpyconv-2.7.so kopano-libs #MINVER#
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+ *@KC_8.5 8.5.0
  _Z11DoExceptioni@Base 8.5.0~8.4.99
  _Z13CopyPyUnicodePPwP7_objectPv@Base 8.5.0~8.4.99
  _Z16conv_out_defaultIN2KC6ECUSERENS0_13objectclass_tEXadL_ZNS1_10ulObjClassEEEEvPT_P7_objectPKcPvj@Base 8.5.0~8.4.99
@@ -88,7 +95,8 @@ libkcpyconv-2.7.so kopano-libs #MINVER#
  _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
 
 libkcpydirector-2.7.so kopano-libs #MINVER#
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
  _Z21mark_call_from_pythonv@Base 8.5.0~8.4.99
  _Z22check_call_from_pythonv@Base 8.5.0~8.4.99
  _Z23unmark_call_from_pythonv@Base 8.5.0~8.4.99
@@ -96,48 +104,38 @@ libkcpydirector-2.7.so kopano-libs #MINVER#
 libkcserver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcsoap.so.0 kopano-libs #MINVER#
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcssl.so.0 kopano-libs #MINVER#
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcsync.so.0 kopano-libs #MINVER#
-#MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)EC_8.1.0 8.0.1
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- KC_8.4.90@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings13EnableSyncLogEb@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings14SetSyncOptionsEj@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings15SetSyncLogLevelEj@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings16SetStreamTimeoutEj@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings18SetStreamBatchSizeEj@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings19SetStreamBufferSizeEj@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings8instanceE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC14ECSyncSettings8s_hMutexE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC23HrDecodeSyncStateStreamEP7IStreamPjS2_PSt3setISt4pairIjNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEESt4lessISB_ESaISB_EE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC9ECSyncLog10s_lpLoggerE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC9ECSyncLog5xinitE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC9ECSyncLog8s_hMutexE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC9ECSyncLog9GetLoggerEPPNS_8ECLoggerE@KC_8.4.90 8.5.0~8.4.99
- _ZN2KC9ECSyncLog9SetLoggerEPNS_8ECLoggerE@KC_8.4.90 8.5.0~8.4.99
- _ZNK2KC14ECSyncSettings12SyncLogLevelEv@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# KC_8.4.90@KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
 
 libkcutil.so.0 kopano-libs #MINVER#
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
  *@OLE32_1 8.3.2
  *@KERNEL32_1 8.3.2
 
 libmapi.so.1 kopano-libs #MINVER#
-#MISSING: 8.5.0~8.4.99-1# (symver|optional)KC_8.3 8.3.2
- *@KC_8.4.90 8.5.0~8.4.99
+#MISSING: 8.5.0-1# (symver|optional)KC_8.3 8.3.2
+#MISSING: 8.5.0-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
+ *@KC_8.5 8.5.0
  *@MAPI32_1 8.0.1
  *@MAPI32_1 8.3.2
  *@OLE32_1 8.0.1
