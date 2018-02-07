@@ -15,7 +15,8 @@ include /usr/share/dpkg/pkg-info.mk
 DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
-PHPVERSION=7.0
+PHP_VERSION=7.2
+PHP_API_DATE=$(shell php-config$(PHPVERSION) --phpapi)
 PREPROCESS_FILES := $(wildcard debian/*.in)
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
@@ -43,8 +44,11 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     $(CONFFLAG) \
     $(NULL)
 
+
 $(PREPROCESS_FILES:.in=): %: %.in
-	sed 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' $< > $@
+	sed -e 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' \
+	-e 's,/@PHP_VERSION@,$(PHP_VERSION:%=/%),g' \
+	-e 's,/@PHP_API_DATE@,$(PHP_API_DATE:%=/%),g' $< > $@
 
 %:
 	dh $@ --builddirectory=$(DEB_BUILD_DIR) --parallel --with systemd,autoreconf,php
@@ -78,7 +82,7 @@ override_dh_install:
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
 
 	# add php:Depends
-	echo "php:Depends=phpapi-$(shell php-config$(PHPVERSION) --phpapi)" > debian/php$(PHPVERSION)-mapi.substvars
+	echo "php:Depends=phpapi-$(PHP_API_DATE)" > debian/php$(PHP_VERSION)-mapi.substvars
 
 	mv debian/tmp/usr/share/doc/kopano-server/example-config/*.cfg \
 	   debian/tmp/usr/share/doc/kopano-server/example-config/autorespond \
