@@ -32,6 +32,10 @@ Comment: Upstream licensed the work under the MIT license which is also
  Upstream source can be found on  https://github.com/ahupp/python-magic
  Note the upstream license information in
  https://github.com/ahupp/python-magic/blob/master/LICENSE
+ .
+ Note, we remove this file before preparing the package kopano-search,
+ which is using the functions from magic.py, and use the package
+ python-magic instead.
 
 Files: ECtools/migration-pst/kopano_migration_pst/pst.py
 Copyright: 2016, Dionach Ltd.
