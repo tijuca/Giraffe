@@ -1,3 +1,46 @@
+kopanocore (8.5.0-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [46d25ff] New upstream version 8.5.0
+    Upstream version 8.5.0 has changes to getting successful built with
+    libical3. (Closes: #883957)
+  * [0006cb3] kopano-libs.symbols: update symbols to 8.5.0
+  * [5df0116] Build-Depends: use php-dev instead of php7.0-dev
+    We previously wanted to use PHP7.0, now that PHP7.2 has entered unstable
+    and the kopanocore source is able to work also with PHP7.2 we can switch
+    to virtual package php-dev. (Closes: #881010)
+  * [309dc85] debian/rules: tuning the build rules a bit for using PHP7.2
+    Make the build environment more flexible so we don't need to change PHP
+    related versions later in various places and use instead variables for that.
+  * [64f8cfb] php-mapi.php: use the provided strings from d/rules
+    Make that sequencer file use the variables from above commit.
+
+  <cherry-picked from Ubuntu>
+  [ Steve Langasek ]
+  * [dcddfd7] apparmor: make .so includes follow multiarch paths
+  * [3acae51] debian/kopano-server.dirs: create /var/lib/kopano/attachments,
+    not just /var/lib/kopano
+  * [279055d] debian/kopano-server.kopano-server.service: chown the subdirectory
+
+  <cherry-picked from Ubuntu>
+  [ Christian Ehrhardt ]
+  * [138b4b4] allow kopano_userscripts to reach mysql.sock (follow disconnects)
+  * [2f66b8e] allow dagent to follow disconnect for mysql
+  * [0f4c12a] allow search to follow disconnect for mysql
+  * [b61b5b5] apparmor: allow kopano-dagent
+  * [f7cbdcd] allow dagent to reach kopano server socket (Closes: #882496)
+
+  [ Carsten Schoenert ]
+  * [48c34c7] kopano-search: remove magic.py before install
+    Do not include magic.py in kopano-search and use package python-magic that
+    is providing this file now. (Closes: #889835)
+  * [4b47ee7] debian/control: keep Depends fields alphabetical
+    Just cosmetic and no functional changes.
+  * [7e8b810] Add .travis.yml from <http://travis.debian.net>
+    (cherry picked from debian/experimental)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Thu, 08 Feb 2018 18:50:56 +0100
+
 kopanocore (8.5.0~8.4.99-1) experimental; urgency=medium
 
   [ Guido Günther ]
