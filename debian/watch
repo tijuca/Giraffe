@@ -13,6 +13,6 @@
 # ...
 
 version=3
-opts="uversionmangle=s/-beta/~beta/;s/\.-beta\d//" \
+opts="uversionmangle=s/-beta/~beta/;s/\.-beta\d//;s/\.+$//" \
   https://github.com/Kopano-dev/kopano-core/tags .*/kopanocore-(\d\.\d\.\d(-beta\d)?)\.tar\.[gx]z
 
