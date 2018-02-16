@@ -1,3 +1,19 @@
+Release notes for 8.5.2 (2018-02-16)
+====================================
+Fixes:
+* spooler: avoid deadlock due to double mutex acquisition within
+  one thread [KC-815]
+* php: mapi_icaltomapi did not copy the iCal recipients to the MAPI object
+* archiver erroneously forgot to create its SQL tables on first use
+* server: stop complaining about server_tcp_port when that is not specified [KC-1038]
+
+
+Release notes for 8.5.1 (2018-02-13)
+====================================
+Enhancements:
+* server: emit log message when LDAP is missing server info objects [KC-1021]
+
+
 Release notes for 8.5.0 (2018-02-05)
 ====================================
 Enhancements:
@@ -39,6 +55,12 @@ Changes:
 * client: MAPI provider configuration moved from /etc/mapi to /usr/lib/mapi.d
 Packager notes:
 * libical 3.x support [KC-920]
+
+
+Release notes for 8.4.7
+=======================
+Fixes:
+* php: do return true when AbortSubmit succeeded [KW-2087]
 
 
 Release notes for 8.4.6 (2018-02-02)
