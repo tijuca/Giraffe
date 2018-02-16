@@ -1,3 +1,20 @@
+kopanocore (8.5.2-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [dc2050f] d/watch: mangle also trailing dot sign
+    A small needed adjustment to the watch files, without this the version gets
+    a trailing dot appended and uscan will find always a (faked) higher
+    version.
+  * [2b6b5a1] New upstream version 8.5.2
+  * [9cb0fb6] debian/rules: remove '--parallel' on dh $@
+    No need to add '--parallel' into the main default target since we are
+    using debhelper 10.
+  * [ecd2b00] kopano-libs.symbols: update symbols to 8.5.2
+  * [17f530c] lintian: adding additional override for kopano-libs
+    Ignore the warning about the not matching soname for the package name.
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Fri, 16 Feb 2018 20:20:35 +0100
+
 kopanocore (8.5.0-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
