@@ -32,6 +32,10 @@
 
   /etc/kopano/userscripts/* Cxr -> kopano_userscripts,
 
+  # New features in 8.5.2 need this, and read-only on those is safe
+  @{PROC}/sys/kernel/core_pattern r,
+  @{PROC}/sys/fs/suid_dumpable r,
+
   # There's little we can do if the server is allowed to run
   # arbitrary scripts
   profile kopano_userscripts flags=(attach_disconnected) {
