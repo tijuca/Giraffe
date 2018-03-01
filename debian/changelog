@@ -1,3 +1,12 @@
+kopanocore (8.5.3-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [23de50a] New upstream version 8.5.3
+  * [6dfed86] rebuild patch queue from patch-queue branch
+  * [794ad2e] kopano-libs.symbols: update symbols to 8.5.3
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Thu, 01 Mar 2018 20:39:10 +0100
+
 kopanocore (8.5.2-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
