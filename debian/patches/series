@@ -1,4 +1,3 @@
 debian/Add-include-for-database-configuration.patch
 debian/Run-deamons-as-user-group-kopano.patch
 debian/add-debian-to-with-distro-switch.patch
-build-guard-against-external-version-bumps-2.patch
