@@ -22,5 +22,6 @@ usr/share/man/man8/kopano-admin.8
 usr/share/man/man8/kopano-archiver-aclset.8
 usr/share/man/man8/kopano-archiver-aclsync.8
 usr/share/man/man8/kopano-archiver-restore.8
+usr/share/man/man8/kopano-cachestat.8
 usr/share/man/man8/kopano-mailbox-permissions.8
 usr/share/man/man8/kopano-migration-pst.8
