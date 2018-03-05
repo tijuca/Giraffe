@@ -1,3 +1,22 @@
+kopanocore (8.5.4-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [820314e] New upstream version 8.5.4
+  * [7b74a9a] rebuild patch queue from patch-queue branch
+    Removing a patch which was needed after importing of 8.5.3 t get the
+    binaries built from the source.
+
+  [ Christian Ehrhardt ]
+  * [b3994d1] fix apparmor deny on mprotect
+  * [f228f92] fix apparmor deny due to disconnected path
+  * [2d9e11b] allow (read only) on some proc entries for new features in 8.5.2
+
+  [ Carsten Schoenert ]
+  * [2a3da23] d/kopano-utils: adding man page to the install
+  * [27fa323] kopano-libs.symbols: update symbols to 8.5.4
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Mon, 05 Mar 2018 18:10:05 +0100
+
 kopanocore (8.5.3-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
