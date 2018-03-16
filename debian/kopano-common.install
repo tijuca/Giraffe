@@ -1,3 +1,2 @@
-etc/cron.daily/kopano-client-update
 etc/logrotate.d/kopano
 etc/default/kopano
