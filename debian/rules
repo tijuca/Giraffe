@@ -28,7 +28,6 @@ endif
 DEB_CONFIGURE_EXTRA_ARGS :=      \
     --host=$(DEB_HOST_GNU_TYPE) \
     --build=$(DEB_BUILD_GNU_TYPE) \
-    --with-distro=debian \
     --prefix=/usr \
     --localstatedir=/var \
     --sysconfdir=/etc \
