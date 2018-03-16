@@ -31,8 +31,6 @@
 #include <edkmdb.h>
 #include "recurrence.h"
 
-using namespace KCHL;
-
 namespace KC {
 
 /**
@@ -293,8 +291,6 @@ static HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth,
     LPSPropValue lpEvent, ECFBBlockList *lpfbBlockList)
 {
 	struct tm	tmTmp;
-	LONG		rtmStart;
-	LONG		rtmEnd;
 	FBBlock_1	fbBlock;
 
 	// Check varibales
@@ -318,17 +314,14 @@ static HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth,
 			tmTmp.tm_mday = 1;
 			tmTmp.tm_min = (int)(unsigned short)lpfbEvents[j].rtmStart;
 			tmTmp.tm_isdst = -1;
-			auto tmUnix = timegm(&tmTmp);
-			UnixTimeToRTime(tmUnix, &rtmStart);
-
+			auto rtmStart = UnixTimeToRTime(timegm(&tmTmp));
 			memset(&tmTmp, 0, sizeof(struct tm));
 			tmTmp.tm_year = FB_YEAR(lpMonth->Value.MVl.lpl[i]) - 1900;
 			tmTmp.tm_mon = FB_MONTH(lpMonth->Value.MVl.lpl[i])-1;
 			tmTmp.tm_mday = 1;
 			tmTmp.tm_min = (int)(unsigned short)lpfbEvents[j].rtmEnd;
 			tmTmp.tm_isdst = -1;
-			tmUnix = timegm(&tmTmp);
-			UnixTimeToRTime(tmUnix, &rtmEnd);
+			auto rtmEnd = UnixTimeToRTime(timegm(&tmTmp));
 			
 			// Don't reset fbBlock.m_tmEnd
 			auto bMerge = fbBlock.m_tmEnd == rtmStart;
@@ -431,7 +424,6 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	sfbEvent		fbEvent;
 	FBBlock_1		fbBlk;
 	memory_ptr<SPropValue> lpPropFBDataArray;
-	time_t tmUnixStart = 0, tmUnixEnd = 0;
 
 	//Check of propertys are mv
 	if(lpfbBlockList == NULL || lppPropFBDataArray == NULL)
@@ -474,11 +466,8 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 
 		if(fbBlk.m_fbstatus == fbStatus || fbStatus == fbKopanoAllBusy)
 		{
-			RTimeToUnixTime(fbBlk.m_tmStart, &tmUnixStart);
-			RTimeToUnixTime(fbBlk.m_tmEnd, &tmUnixEnd);
-
-			gmtime_safe(&tmUnixStart, &tmStart);
-			gmtime_safe(&tmUnixEnd, &tmEnd);
+			gmtime_safe(RTimeToUnixTime(fbBlk.m_tmStart), &tmStart);
+			gmtime_safe(RTimeToUnixTime(fbBlk.m_tmEnd), &tmEnd);
 			
 			if(tmStart.tm_year > ulLastYear || tmStart.tm_mon > ulLastMonth)
 			{

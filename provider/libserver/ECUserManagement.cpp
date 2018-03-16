@@ -58,7 +58,6 @@
 #endif
 
 using namespace std;
-using namespace KCHL;
 
 namespace KC {
 
@@ -213,12 +212,10 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
 		}
 		try {
 			external = lpPlugin->resolveName(ACTIVE_USER, username, sCompany);
-		}
-		catch (objectnotfound &e) {
+		} catch (const objectnotfound &e) {
 			ec_log_warn("Authentication through PAM succeeded for \"%s\", but not found by plugin: %s", szLoginname, e.what());
 			return KCERR_LOGON_FAILED;
-		}
-		catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("Authentication through PAM succeeded for \"%s\", but plugin returned an error: %s", szLoginname, e.what());
 			return KCERR_LOGON_FAILED;
 		}
@@ -231,12 +228,10 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
 		}
 		try {
 			external = lpPlugin->resolveName(ACTIVE_USER, username, sCompany);
-		}
-		catch (objectnotfound &e) {
+		} catch (const objectnotfound &e) {
 			ec_log_warn("Authentication through Kerberos succeeded for \"%s\", but not found by plugin: %s", szLoginname, e.what());
 			return KCERR_LOGON_FAILED;
-		}
-		catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("Authentication through Kerberos succeeded for \"%s\", but plugin returned an error: %s", szLoginname, e.what());
 			return KCERR_LOGON_FAILED;
 		}
@@ -245,13 +240,13 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
 		// default method is plugin
 		try {
 			external = lpPlugin->authenticateUser(username, password, sCompany);
-		} catch (login_error &e) {
+		} catch (const login_error &e) {
 			ec_log_warn("Authentication by plugin failed for user \"%s\": %s", szLoginname, e.what());
 			return KCERR_LOGON_FAILED;
-		} catch (objectnotfound &e) {
+		} catch (const objectnotfound &e) {
 			ec_log_warn("Authentication by plugin failed for user \"%s\": %s", szLoginname, e.what());
 			return KCERR_NOT_FOUND;
-		} catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("Authentication error by plugin for user \"%s\": %s", szLoginname, e.what());
 			return KCERR_PLUGIN_ERROR;
 		}
@@ -335,11 +330,11 @@ ECRESULT ECUserManagement::GetLocalObjectListFromSignatures(const list<objectsig
 	try {
 		// Get all pending details
 		lpExternDetails = lpPlugin->getObjectDetails(lstExternIds);
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1501: Unable to retrieve details from external user source: %s", e.what());
 		return KCERR_PLUGIN_ERROR;
 	}
@@ -458,11 +453,11 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 			// Get full user list
 			lpExternSignatures = lpPlugin->getAllObjects(extcompany, objclass);
 			// TODO: check requested 'objclass'
-		} catch (notsupported &) {
+		} catch (const notsupported &) {
 			return KCERR_NO_SUPPORT;
-		} catch (objectnotfound &) {
+		} catch (const objectnotfound &) {
 			return KCERR_NOT_FOUND;
-		} catch(std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("K-1502: Unable to retrieve list from external user source: %s", e.what());
 			return KCERR_PLUGIN_ERROR;
 		}
@@ -606,12 +601,12 @@ ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t re
 			return er;
 		try {
 			lpSignatures = lpPlugin->getSubObjectsForObject(relation, objectid);
-		} catch(objectnotfound &) {
+		} catch (const objectnotfound &) {
 			MoveOrDeleteLocalObject(ulParentId, objectid.objclass);
 			return KCERR_NOT_FOUND;
-		} catch (notsupported &) {
+		} catch (const notsupported &) {
 			return KCERR_NO_SUPPORT;
-		} catch(std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("K-1503: Unable to retrieve members for %s relation %d: %s.",
 				RelationTypeToName(relation), ulParentId, e.what());
 			return KCERR_PLUGIN_ERROR;
@@ -694,12 +689,12 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 			return er;
 		try {
 			lpSignatures = lpPlugin->getParentObjectsForObject(relation, objectid);
-		} catch(objectnotfound &) {
+		} catch (const objectnotfound &) {
 			MoveOrDeleteLocalObject(ulChildId, objectid.objclass);
 			return KCERR_NOT_FOUND;
-		} catch (notsupported &) {
+		} catch (const notsupported &) {
 			return KCERR_NO_SUPPORT;
-		} catch(std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("K-1504: Unable to retrieve parents for %s relation %d: %s.",
 				RelationTypeToName(relation), ulChildId, e.what());
 			return KCERR_PLUGIN_ERROR;
@@ -777,14 +772,14 @@ ECRESULT ECUserManagement::SetObjectDetailsAndSync(unsigned int ulObjectId, cons
 
 	try {
 		lpPlugin->changeObject(objectid, sDetails, lpRemoveProps);
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		MoveOrDeleteLocalObject(ulObjectId, objectid.objclass);
 		return KCERR_NOT_FOUND;
-	} catch (notimplemented &e) {
+	} catch (const notimplemented &e) {
 		ec_log_warn("K-1505: Unable to set details for external %s %u: %s",
 			ObjectClassToName(objectid.objclass), ulObjectId, e.what());
 		return KCERR_NOT_IMPLEMENTED;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1506: Unable to set details for external %s %u: %s",
 			ObjectClassToName(objectid.objclass), ulObjectId, e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -812,15 +807,15 @@ ECRESULT ECUserManagement::CreateOrModifyObject(const objectid_t &sExternId, con
 	if (GetLocalId(sExternId, &ulObjectId, &signature.signature) == erSuccess) {
 		try {
 			lpPlugin->changeObject(sExternId, sDetails, lpRemoveProps);
-		} catch (objectnotfound &) {
+		} catch (const objectnotfound &) {
 			MoveOrDeleteLocalObject(ulObjectId, sExternId.objclass);
 			return KCERR_NOT_FOUND;
-		} catch (notimplemented &e) {
+		} catch (const notimplemented &e) {
 			ec_log_warn("K-1507: Unable to set details for external %s \"%s\": %s",
 				ObjectClassToName(sExternId.objclass),
 				sExternId.tostring().c_str(), e.what());
 			return KCERR_NOT_IMPLEMENTED;
-		} catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			ec_log_warn("K-1508: Unable to set details for external %s \"%s\": %s",
 				ObjectClassToName(sExternId.objclass),
 				sExternId.tostring().c_str(), e.what());
@@ -832,17 +827,17 @@ ECRESULT ECUserManagement::CreateOrModifyObject(const objectid_t &sExternId, con
 	// Object does not exist yet, create in external database
 	try {
 		signature = lpPlugin->createObject(sDetails);
-	} catch (notimplemented &e) {
+	} catch (const notimplemented &e) {
 		ec_log_warn("K-1509: Unable to create %s \"%s\" in external database: %s",
 			ObjectClassToName(sExternId.objclass),
 			sExternId.tostring().c_str(), e.what());
 		return KCERR_NOT_IMPLEMENTED;
-	} catch (collision_error &e) {
+	} catch (const collision_error &e) {
 		ec_log_warn("K-1510: Unable to create %s \"%s\" in external database: %s",
 			ObjectClassToName(sExternId.objclass),
 			sExternId.tostring().c_str(), e.what());
 		return KCERR_COLLISION;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1511: Unable to create %s \"%s\" in external database: %s",
 			ObjectClassToName(sExternId.objclass),
 			sExternId.tostring().c_str(), e.what());
@@ -862,7 +857,7 @@ ECRESULT ECUserManagement::CreateOrModifyObject(const objectid_t &sExternId, con
 	 */
 	try {
 		lpPlugin->deleteObject(signature.id);
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1512: Unable to delete %s \"%s\" from external database after failed (partial) creation: %s",
 			ObjectClassToName(sExternId.objclass),
 			sExternId.tostring().c_str(), e.what());
@@ -895,15 +890,15 @@ ECRESULT ECUserManagement::AddSubObjectToObjectAndSync(userobject_relation_t rel
 
 	try {
 		lpPlugin->addSubObjectRelation(relation, parentid, childid);
-	} catch(objectnotfound &) {
+	} catch (const objectnotfound &) {
 		MoveOrDeleteLocalObject(ulParentId, parentid.objclass);
 		return KCERR_NOT_FOUND;
-	} catch (notimplemented &) {
+	} catch (const notimplemented &) {
 		return KCERR_NOT_IMPLEMENTED;
-	} catch (collision_error &) {
+	} catch (const collision_error &) {
 		ec_log_crit("ECUserManagement::AddSubObjectToObjectAndSync(): addSubObjectRelation failed with a collision error");
 		return KCERR_COLLISION;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1513: Unable to add %s relation (%u,%u) to external user database: %s",
 			RelationTypeToName(relation),
 			ulParentId, ulChildId, e.what());
@@ -954,12 +949,12 @@ ECRESULT ECUserManagement::DeleteSubObjectFromObjectAndSync(userobject_relation_
 
 	try {
 		lpPlugin->deleteSubObjectRelation(relation, parentid, childid);
-	} catch(objectnotfound &) {
+	} catch (const objectnotfound &) {
 		// We can't delete the parent because we don't know whether the child or the entire parent was not found
 		return KCERR_NOT_FOUND;
-	} catch (notimplemented &) {
+	} catch (const notimplemented &) {
 		return KCERR_NOT_IMPLEMENTED;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1514: Unable to remove %s relation (%u,%u) from external user database: %s.",
 			RelationTypeToName(relation),
 			ulParentId, ulChildId, e.what());
@@ -1002,11 +997,9 @@ ECRESULT ECUserManagement::ResolveObject(objectclass_t objclass, const std::stri
 
 	try {
 		objectsignature = lpPlugin->resolveName(objclass, strName, sCompany);
-	}
-	catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	}
-	catch (std::exception &) {
+	} catch (const std::exception &) {
 		return KCERR_PLUGIN_ERROR;
 	}
 
@@ -1092,13 +1085,13 @@ ECRESULT ECUserManagement::ResolveObjectAndSync(objectclass_t objclass, const ch
 
 	try {
 		objectsignature = lpPlugin->resolveName(objclass, username, sCompany);
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch (objectnotfound &e) {
+	} catch (const objectnotfound &e) {
 		ec_log_warn("K-1515: Object not found %s \"%s\": %s",
 			ObjectClassToName(objclass), szName, e.what());
 		return KCERR_NOT_FOUND;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1516: Unable to resolve %s \"%s\": %s",
 			ObjectClassToName(objclass), szName, e.what());
 		return KCERR_NOT_FOUND;
@@ -1200,7 +1193,7 @@ ECRESULT ECUserManagement::GetExternalObjectDetails(unsigned int ulId, objectdet
 
 	try {
 		details = lpPlugin->getObjectDetails(externid);
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		/*
 		 * MoveOrDeleteLocalObject() will call this function to determine if the
 		 * object has been moved. So do _not_ call MoveOrDeleteLocalObject() from
@@ -1208,9 +1201,9 @@ ECRESULT ECUserManagement::GetExternalObjectDetails(unsigned int ulId, objectdet
 		 */
 		DeleteLocalObject(ulId, externid.objclass);
 		return KCERR_NOT_FOUND;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1517: Unable to get %s details for object id %d: %s",
 			ObjectClassToName(externid.objclass), ulId, e.what());
 		return KCERR_NOT_FOUND;
@@ -1343,15 +1336,15 @@ ECRESULT ECUserManagement::CreateObjectAndSync(const objectdetails_t &details, u
 
 	try {
 		objectsignature = lpPlugin->createObject(details);
-	} catch (notimplemented &e) {
+	} catch (const notimplemented &e) {
 		ec_log_warn("K-1518: Unable to create %s in user database: %s",
 			ObjectClassToName(details.GetClass()), e.what());
 		return KCERR_NOT_IMPLEMENTED;
-	} catch (collision_error &e) {
+	} catch (const collision_error &e) {
 		ec_log_warn("K-1519: Unable to create %s in user database: %s",
 			ObjectClassToName(details.GetClass()), e.what());
 		return KCERR_COLLISION;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1520: Unable to create %s in user database: %s",
 			ObjectClassToName(details.GetClass()), e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1368,7 +1361,7 @@ ECRESULT ECUserManagement::CreateObjectAndSync(const objectdetails_t &details, u
 	// one of those, because CreateLocalObject() failed.
 	try {
 		lpPlugin->deleteObject(objectsignature.id);
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1521: Unable to delete %s from plugin database after failed creation: %s",
 			ObjectClassToName(details.GetClass()), e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1391,13 +1384,13 @@ ECRESULT ECUserManagement::DeleteObjectAndSync(unsigned int ulId)
 
 	try {
 		lpPlugin->deleteObject(objectid);
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	} catch (notimplemented &e) {
+	} catch (const notimplemented &e) {
 		ec_log_warn("K-1522: Unable to delete %s in user database: %s",
 			ObjectClassToName(objectid.objclass), e.what());
 		return KCERR_NOT_IMPLEMENTED;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1523: Unable to delete %s in user database: %s",
 			ObjectClassToName(objectid.objclass), e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1419,14 +1412,14 @@ ECRESULT ECUserManagement::SetQuotaDetailsAndSync(unsigned int ulId, const quota
 
 	try {
 		lpPlugin->setQuota(externid, details);
-	} catch(objectnotfound &) {
+	} catch (const objectnotfound &) {
 		MoveOrDeleteLocalObject(ulId, externid.objclass);
 		return KCERR_NOT_FOUND;
-	} catch (notimplemented &e) {
+	} catch (const notimplemented &e) {
 		ec_log_warn("K-1524: Unable to set quota for %s %u: %s",
 			ObjectClassToName(externid.objclass), ulId, e.what());
 		return KCERR_NOT_IMPLEMENTED;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1525: Unable to set quota for %s %u: %s",
 			ObjectClassToName(externid.objclass), ulId, e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1476,10 +1469,10 @@ ECRESULT ECUserManagement::GetQuotaDetailsAndSync(unsigned int ulId, quotadetail
 
 	try {
 		details = lpPlugin->getQuota(userid, bGetUserDefault);
-	} catch(objectnotfound &) {
+	} catch (const objectnotfound &) {
 		MoveOrDeleteLocalObject(ulId, userid.objclass);
 		return KCERR_NOT_FOUND;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1526: Unable to get quota for %s %u: %s",
 			ObjectClassToName(userid.objclass), ulId, e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1589,13 +1582,13 @@ ECRESULT ECUserManagement::SearchObjectAndSync(const char* szSearchString, unsig
 
 	try {
 		lpObjectsignatures = lpPlugin->searchObject(szSearchString, ulFlags);
-	} catch(notimplemented &) {
+	} catch (const notimplemented &) {
 		return KCERR_NOT_FOUND;
-	} catch(objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	} catch(notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1527: Unable to perform string search for \"%s\" on user database: %s",
 			szSearchString, e.what());
 		return KCERR_PLUGIN_ERROR;
@@ -1670,7 +1663,9 @@ done:
 	return er;
 }
 
-ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTableList *lpRowList, struct propTagArray *lpPropTagArray, struct rowSet **lppRowSet)
+ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap,
+    const ECObjectTableList *lpRowList,
+    const struct propTagArray *lpPropTagArray, struct rowSet **lppRowSet)
 {
 	int i = 0;
 	struct rowSet *lpsRowSet = NULL;
@@ -1742,13 +1737,13 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 			cache->SetUserDetails(iterObjectId->second, eod.second);
 		}
 		/* We convert user and companyname to loginname later this function */
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		er = KCERR_NOT_FOUND;
 		goto exit;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		er = KCERR_NO_SUPPORT;
 		goto exit;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1528: Unable to retrieve details map from external user source: %s", e.what());
 		er = KCERR_PLUGIN_ERROR;
 		goto exit;
@@ -1815,7 +1810,9 @@ exit:
 	return er;
 }
 
-ECRESULT ECUserManagement::QueryHierarchyRowData(struct soap *soap, ECObjectTableList *lpRowList, struct propTagArray *lpPropTagArray, struct rowSet **lppRowSet)
+ECRESULT ECUserManagement::QueryHierarchyRowData(struct soap *soap,
+    const ECObjectTableList *lpRowList,
+    const struct propTagArray *lpPropTagArray, struct rowSet **lppRowSet)
 {
 	ECRESULT er = erSuccess;
 	unsigned int i = 0;
@@ -2078,6 +2075,7 @@ ECRESULT ECUserManagement::ConvertExternIDsToLocalIDs(objectdetails_t *lpDetails
 
 		for (const auto &loc_id : mapLocalIDs) {
 			if (loc_id.first.objclass != ACTIVE_USER &&
+			    loc_id.first.objclass != NONACTIVE_USER &&
 			    OBJECTCLASS_TYPE(loc_id.first.objclass) != OBJECTTYPE_DISTLIST)
 				continue;
 			lpDetails->AddPropInt(OB_PROP_LI_SENDAS, loc_id.second);
@@ -2314,11 +2312,11 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 		er = UpdateUserDetailsToClient(&details);
 		if (er != erSuccess)
 			return er;
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1535: Unable to get object data while adding new %s: %s", ObjectClassToName(signature.id.objclass), e.what());
 		return KCERR_PLUGIN_ERROR;
 	}
@@ -2440,13 +2438,13 @@ ECRESULT ECUserManagement::CreateLocalObjectSimple(const objectsignature_t &sign
 		details = lpPlugin->getObjectDetails(signature.id);
 		/* No need to convert the user and company name to login, since we are not using
 		 * the loginname in this function. */
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		er = KCERR_NOT_FOUND;
 		goto exit;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		er = KCERR_NO_SUPPORT;
 		goto exit;
-	} catch(std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1536: Unable to get details while adding new %s: %s", ObjectClassToName(signature.id.objclass), e.what());
 		er = KCERR_PLUGIN_ERROR;
 		goto exit;
@@ -2881,12 +2879,6 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 	if(er != erSuccess)
 		goto exit;
 
-	// Remove client update history
-	strQuery = "DELETE FROM clientupdatestatus where userid=" + stringify(ulObjectId);
-	er = lpDatabase->DoDelete(strQuery);
-	if(er != erSuccess)
-		goto exit;
-
 	// Object didn't exist locally, so no delete has occurred
 	if (ulDeletedRows == 0) {
 		er = lpDatabase->Commit();
@@ -3122,12 +3114,14 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
  *
  * @todo	make sure all strings in lpszA are valid UTF-8
  */
-ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsigned int ulId, objectdetails_t *lpDetails, struct propTagArray *lpPropTags, struct propValArray *lpPropValsRet)
+ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap,
+    unsigned int ulId, objectdetails_t *lpDetails,
+    const struct propTagArray *lpPropTags, struct propValArray *lpPropValsRet)
 {
 	struct propVal *lpPropVal;
 	unsigned int ulOrder = 0;
 	ECSecurity *lpSecurity = NULL;
-	struct propValArray sPropVals{__gszeroinit};
+	struct propValArray sPropVals;
 	struct propValArray *lpPropVals = &sPropVals;
 	ULONG ulMapiType = 0;
 
@@ -3651,7 +3645,9 @@ exit:
 }
 
 // Convert a userdetails_t to a set of MAPI properties
-ECRESULT ECUserManagement::ConvertContainerObjectDetailsToProps(struct soap *soap, unsigned int ulId, objectdetails_t *lpDetails, struct propTagArray *lpPropTags, struct propValArray *lpPropVals)
+ECRESULT ECUserManagement::ConvertContainerObjectDetailsToProps(struct soap *soap,
+    unsigned int ulId, objectdetails_t *lpDetails,
+    const struct propTagArray *lpPropTags, struct propValArray *lpPropVals)
 {
 	struct propVal *lpPropVal;
 	unsigned int ulOrder = 0;
@@ -3863,7 +3859,9 @@ ECRESULT ECUserManagement::ConvertContainerObjectDetailsToProps(struct soap *soa
 	return er;
 }
 
-ECRESULT ECUserManagement::ConvertABContainerToProps(struct soap *soap, unsigned int ulId, struct propTagArray *lpPropTagArray, struct propValArray *lpPropValArray)
+ECRESULT ECUserManagement::ConvertABContainerToProps(struct soap *soap,
+    unsigned int ulId, const struct propTagArray *lpPropTagArray,
+    struct propValArray *lpPropValArray)
 {
 	std::string strName;
 	ABEID abeid;
@@ -4116,11 +4114,11 @@ ECRESULT ECUserManagement::GetPublicStoreDetails(objectdetails_t *lpDetails)
 
 	try {
 		details = lpPlugin->getPublicStoreDetails();
-	} catch (objectnotfound &) {
+	} catch (const objectnotfound &) {
 		return KCERR_NOT_FOUND;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1538: Unable to get %s details for object id %d: %s", ObjectClassToName(CONTAINER_COMPANY), KOPANO_UID_EVERYONE, e.what());
 		return KCERR_NOT_FOUND;
 	}
@@ -4153,9 +4151,9 @@ ECRESULT ECUserManagement::GetServerDetails(const std::string &strServer, server
 	} catch (const objectnotfound &e) {
 		ec_log_warn("K-1543: Unable to get server details for \"%s\": %s", strServer.c_str(), e.what());
 		return KCERR_NOT_FOUND;
-	} catch (notsupported &) {
+	} catch (const notsupported &) {
 		return KCERR_NO_SUPPORT;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1539: Unable to get server details for \"%s\": %s", strServer.c_str(), e.what());
 		return KCERR_NOT_FOUND;
 	}
@@ -4185,7 +4183,7 @@ ECRESULT ECUserManagement::GetServerList(serverlist_t *lpServerList)
 
 	try {
 		*lpServerList = lpPlugin->getServers();
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_warn("K-1540: Unable to get server list: %s", e.what());
 		return KCERR_NOT_FOUND;
 	}

@@ -22,8 +22,6 @@
 
 #include "freebusyutil.h"
 
-using namespace KCHL;
-
 namespace KC {
 
 ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage *lpMessage) :
@@ -60,21 +58,17 @@ HRESULT ECFreeBusyUpdate::ResetPublishedFreeBusy()
 	return S_OK;
 }
 
-HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
+HRESULT ECFreeBusyUpdate::SaveChanges(const FILETIME &ftStart,
+    const FILETIME &ftEnd)
 {
 	HRESULT			hr = hrSuccess;
 	ULONG			cValues = 0;
 	ULONG			cProps = 0;
 	ULONG			ulMonths;
 	memory_ptr<SPropValue> lpPropArray, lpPropFBDataArray;
-	LONG			rtmStart = 0;
-	LONG			rtmEnd = 0;
 	FILETIME		ft;	
-	time_t			tmUnixStart;
-	time_t			tmUnixEnd;
 	struct tm		tmStart;
 	struct tm		tmEnd;
-
 	static constexpr const SizedSPropTagArray(8, sPropsFBDelete) = {
 		8,
 		{
@@ -88,9 +82,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 			PR_FREEBUSY_TENTATIVE_MONTHS
 		}
 	};
-
-	FileTimeToRTime(&ftStart, &rtmStart);
-	FileTimeToRTime(&ftEnd, &rtmEnd);
+	auto rtmStart = FileTimeToRTime(ftStart);
+	auto rtmEnd   = FileTimeToRTime(ftEnd);
 
 	if(m_lpMessage == NULL)
 	{
@@ -110,12 +103,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 	m_fbBlockList.Restrict(rtmStart, rtmEnd);
 
 	//Calculate months
-	RTimeToUnixTime(rtmStart, &tmUnixStart);
-	RTimeToUnixTime(rtmEnd, &tmUnixEnd);
-
-	gmtime_safe(&tmUnixStart, &tmStart);
-	gmtime_safe(&tmUnixEnd, &tmEnd);
-
+	gmtime_safe(RTimeToUnixTime(rtmStart), &tmStart);
+	gmtime_safe(RTimeToUnixTime(rtmEnd), &tmEnd);
 	ulMonths = DiffYearMonthToMonth(&tmStart, &tmEnd);
 	if(ulMonths == 0)
 		++ulMonths;

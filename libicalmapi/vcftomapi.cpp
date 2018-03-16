@@ -36,8 +36,6 @@
 #include "icaluid.h"
 #include "nameids.h"
 
-using namespace KCHL;
-
 namespace KC {
 
 class vcftomapi_impl _kc_final : public vcftomapi {
@@ -85,9 +83,7 @@ static bool date_string_to_filetime(const std::string &date_string, FILETIME &fi
 		s = strptime(date_string.c_str(), "%Y%m%d", &t);
 	if (s == nullptr || *s != '\0')
 		return false;
-
-	auto utime = timegm(&t);
-	UnixTimeToFileTime(utime, &filetime);
+	filetime = UnixTimeToFileTime(timegm(&t));
 	return true;
 }
 
@@ -291,13 +287,10 @@ HRESULT vcftomapi_impl::handle_UID(VObject *v)
 
 	SPropValue s;
 	s.ulPropTag = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_BINARY);
-
-	hr = MAPIAllocateBuffer(prop->Value.bin.cb, reinterpret_cast<void **>(&s.Value.bin.lpb));
+	s.Value.bin.cb = prop->Value.bin.cb;
+	hr = KAllocCopy(prop->Value.bin.lpb, prop->Value.bin.cb, reinterpret_cast<void **>(&s.Value.bin.lpb));
 	if (hr != hrSuccess)
 		return hr;
-
-	memcpy(s.Value.bin.lpb, prop->Value.bin.lpb, prop->Value.bin.cb);
-	s.Value.bin.cb = prop->Value.bin.cb;
 	props.emplace_back(s);
 
 	return hrSuccess;

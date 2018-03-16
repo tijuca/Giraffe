@@ -21,9 +21,13 @@ except ImportError:
     # We only need it for Python 2
     pass
 
+import base64
 import codecs
 import io
 import sys
+
+_BIN_ENCODING = 'hex'
+_MISSING_NONE = False
 
 # Python 3
 if sys.hexversion >= 0x03000000:
@@ -41,6 +45,20 @@ if sys.hexversion >= 0x03000000:
 
     def unhex(s):
         return codecs.decode(s, 'hex')
+
+    def benc(s):
+        if _BIN_ENCODING == 'hex':
+            return codecs.encode(s, _BIN_ENCODING).strip().upper().decode('ascii')
+        elif _BIN_ENCODING == 'base64':
+            return base64.urlsafe_b64encode(s).strip().decode('ascii')
+        else:
+            return codecs.encode(s, _BIN_ENCODING).strip().decode('ascii')
+
+    def bdec(s):
+        if _BIN_ENCODING == 'base64':
+            return base64.urlsafe_b64decode(s)
+        else:
+            return codecs.decode(s, _BIN_ENCODING)
 
     def is_int(i):
         return isinstance(i, int)
@@ -77,6 +95,20 @@ else:
     def unhex(s):
         return s.decode('hex')
 
+    def benc(s):
+        if _BIN_ENCODING == 'hex':
+            return s.encode(_BIN_ENCODING).strip().upper()
+        elif _BIN_ENCODING == 'base64':
+            return base64.urlsafe_b64encode(s).strip()
+        else:
+            return s.encode(_BIN_ENCODING).strip()
+
+    def bdec(s):
+        if _BIN_ENCODING == 'base64':
+            return base64.urlsafe_b64decode(s).strip()
+        else:
+            return s.decode(_BIN_ENCODING)
+
     def is_int(i):
         return isinstance(i, (int, long))
 
@@ -95,3 +127,16 @@ else:
 
     def fake_unicode(u):
         return unicode(u)
+
+def set_bin_encoding(encoding):
+    """Override encoding to use for binary identifiers (hex or base64)."""
+    global _BIN_ENCODING
+    _BIN_ENCODING = encoding
+
+def set_missing_none():
+    """When properties are missing, return *None* instead of default."""
+    global _MISSING_NONE
+    _MISSING_NONE = True
+
+def default(value):
+    return None if _MISSING_NONE else value

@@ -53,8 +53,6 @@
 
 #include "tnef.h"
 
-using namespace KCHL;
-
 namespace KC {
 
 enum {
@@ -412,9 +410,9 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 			if (hr != hrSuccess)
 				goto exit;
 			lpProp->ulPropTag = PR_ATTACH_FILENAME_A;
-			if ((hr = MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.lpszA)) != hrSuccess)
+			hr = KAllocCopy(lpBuffer, ulSize, reinterpret_cast<void **>(&lpProp->Value.lpszA), lpProp);
+			if (hr != hrSuccess)
 				goto exit;
-			memcpy(lpProp->Value.lpszA, lpBuffer, ulSize);
 			lpTnefAtt->lstProps.emplace_back(std::move(lpProp));
 			break;
 
@@ -429,10 +427,10 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 			if (hr != hrSuccess)
 				goto exit;
 			lpProp->ulPropTag = PR_ATTACH_RENDERING;
-			if ((hr = MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.bin.lpb)) != hrSuccess)
-				goto exit;
 			lpProp->Value.bin.cb = ulSize;
-			memcpy(lpProp->Value.bin.lpb, lpBuffer, ulSize);
+			hr = KAllocCopy(lpBuffer, ulSize, reinterpret_cast<void **>(&lpProp->Value.bin.lpb), lpProp);
+			if (hr != hrSuccess)
+				goto exit;
 			lpTnefAtt->lstProps.emplace_back(std::move(lpProp));
 			break;
 
@@ -443,10 +441,9 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 				goto exit;
 			}
 			lpTnefAtt->size = ulSize;
-			hr = MAPIAllocateBuffer(ulSize, &~lpTnefAtt->data);
+			hr = KAllocCopy(lpBuffer, ulSize, &~lpTnefAtt->data);
 			if (hr != hrSuccess)
 				goto exit;
-			memcpy(lpTnefAtt->data, lpBuffer, ulSize);
 			break;
 
 		case ATT_ATTACHMENT: // Attachment property stream
@@ -1223,17 +1220,15 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			if (ulSize < ulLen)
 				return MAPI_E_CORRUPT_DATA;
 			if(ulPropTag & MV_FLAG) {
-				hr = MAPIAllocateMore(ulLen, lpProp, (void **)&lpProp->Value.MVbin.lpbin[ulMVProp].lpb);
+				lpProp->Value.MVbin.lpbin[ulMVProp].cb = ulLen;
+				hr = KAllocCopy(lpBuffer, ulLen, reinterpret_cast<void **>(&lpProp->Value.MVbin.lpbin[ulMVProp].lpb), lpProp);
 				if(hr != hrSuccess)
 					return hr;
-				memcpy(lpProp->Value.MVbin.lpbin[ulMVProp].lpb, lpBuffer, ulLen);
-				lpProp->Value.MVbin.lpbin[ulMVProp].cb = ulLen;				
 			} else {
-				hr = MAPIAllocateMore(ulLen, lpProp, (void **)&lpProp->Value.bin.lpb);
+				lpProp->Value.bin.cb = ulLen;
+				hr = KAllocCopy(lpBuffer, ulLen, reinterpret_cast<void **>(&lpProp->Value.bin.lpb), lpProp);
 				if(hr != hrSuccess)
 					return hr;
-				memcpy(lpProp->Value.bin.lpb, lpBuffer, ulLen);
-				lpProp->Value.bin.cb = ulLen;
 			}
 
 			lpBuffer += ulLen;
@@ -1249,10 +1244,9 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			if(ulPropTag & MV_FLAG) {
 				memcpy(&lpProp->Value.MVguid.lpguid[ulMVProp], lpBuffer, sizeof(GUID));
 			} else {
-				hr = MAPIAllocateMore(sizeof(GUID), lpProp, (LPVOID*)&lpProp->Value.lpguid);
+				hr = KAllocCopy(lpBuffer, sizeof(GUID), reinterpret_cast<void **>(&lpProp->Value.lpguid), lpProp);
 				if (hr != hrSuccess)
 					return hr;
-				memcpy(lpProp->Value.lpguid, lpBuffer, sizeof(GUID));
 			} 
 
 			lpBuffer += sizeof(GUID);
@@ -1375,7 +1369,7 @@ HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID,
     return hrSuccess;
 }
 
-static inline bool is_embedded_msg(const std::list<KCHL::memory_ptr<SPropValue>> &proplist)
+static inline bool is_embedded_msg(const std::list<memory_ptr<SPropValue>> &proplist)
 {
 	for (const auto &pp : proplist)
 		if (pp->ulPropTag == PR_ATTACH_METHOD &&

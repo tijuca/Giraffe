@@ -55,6 +55,27 @@
         endscript
 }
 
+/var/log/kopano/backup.log {
+        weekly
+        missingok
+        rotate 52
+        compress
+        delaycompress
+        notifempty
+}
+
+/var/log/kopano/presence.log {
+        weekly
+        missingok
+        rotate 52
+        compress
+        delaycompress
+        notifempty
+        postrotate
+			killall -HUP kopano-presence 2> /dev/null || true
+        endscript
+}
+
 /var/log/kopano/monitor.log {
         weekly
         missingok
@@ -88,5 +109,17 @@
         notifempty
         postrotate
 			killall -HUP kopano-spooler 2> /dev/null || true
+        endscript
+}
+
+/var/log/kopano/spamd.log {
+        weekly
+        missingok
+        rotate 52
+        compress
+        delaycompress
+        notifempty
+        postrotate
+			killall -HUP kopano-spamd 2> /dev/null || true
         endscript
 }

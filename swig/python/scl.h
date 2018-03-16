@@ -35,7 +35,7 @@
 #include <kopano/platform.h>
 #include "pymem.hpp"
 
-using KCHL::pyobj_ptr;
+using KC::pyobj_ptr;
 
 // Get Py_ssize_t for older versions of python
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
@@ -159,9 +159,8 @@ namespace priv {
 		}
 		PyString_AsStringAndSize(value, &data, &size);
 		lpResult->cb = size;
-		if (MAPIAllocateMore(size, lpBase, reinterpret_cast<void **>(&lpResult->lpb)) != hrSuccess)
+		if (KAllocCopy(data, size, reinterpret_cast<void **>(&lpResult->lpb), lpBase) != hrSuccess)
 			throw std::bad_alloc();
-		memcpy(lpResult->lpb, data, size);
 	}
 
 	/**

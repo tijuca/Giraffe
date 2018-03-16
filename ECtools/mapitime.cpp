@@ -28,7 +28,6 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/ECLogger.h>
 #include <kopano/MAPIErrors.h>
-#include <kopano/charset/convert.h>
 #include <kopano/ECMemTable.h>
 #include <kopano/automapi.hpp>
 #include <kopano/ecversion.h>
@@ -40,12 +39,12 @@
 #endif
 #define NO_NOTIFY EC_PROFILE_FLAGS_NO_NOTIFICATIONS
 
-struct mpt_stat_entry {
-	KC::time_point start, stop;
-};
-
-using namespace KCHL;
+using namespace KC;
 using clk = std::chrono::steady_clock;
+
+struct mpt_stat_entry {
+	time_point start, stop;
+};
 
 class mpt_job {
 	public:
@@ -58,9 +57,7 @@ class mpt_job {
 static pthread_t mpt_ticker;
 static std::list<struct mpt_stat_entry> mpt_stat_list;
 static std::mutex mpt_stat_lock;
-static std::wstring mpt_userw, mpt_passw;
-static const wchar_t *mpt_user, *mpt_pass;
-static const char *mpt_socket;
+static const char *mpt_user, *mpt_pass, *mpt_socket;
 static size_t mpt_repeat = ~0U;
 static int mpt_loglevel = EC_LOGLEVEL_NOTICE;
 
@@ -377,7 +374,6 @@ static void mpt_usage(void)
 
 static int mpt_option_parse(int argc, char **argv)
 {
-	const char *user = NULL, *pass = NULL;
 	int c;
 	if (argc < 2) {
 		mpt_usage();
@@ -385,9 +381,9 @@ static int mpt_option_parse(int argc, char **argv)
 	}
 	while ((c = getopt(argc, argv, "p:s:u:vz:")) != -1) {
 		if (c == 'p') {
-			pass = optarg;
+			mpt_pass = optarg;
 		} else if (c == 'u') {
-			user = optarg;
+			mpt_user = optarg;
 		} else if (c == 's') {
 			mpt_socket = optarg;
 		} else if (c == 'v') {
@@ -401,18 +397,14 @@ static int mpt_option_parse(int argc, char **argv)
 		}
 	}
 	ec_log_get()->SetLoglevel(mpt_loglevel);
-	if (user == NULL) {
-		user = "foo";
+	if (mpt_user == nullptr) {
+		mpt_user = "foo";
 		fprintf(stderr, "Info: defaulting to username \"foo\"\n");
 	}
-	mpt_userw = convert_to<std::wstring>(user);
-	mpt_user = mpt_userw.c_str();
-	if (pass == NULL) {
-		pass = "xfoo";
+	if (mpt_pass == nullptr) {
+		mpt_pass = "xfoo";
 		fprintf(stderr, "Info: defaulting to password \"xfoo\"\n");
 	}
-	mpt_passw = convert_to<std::wstring>(pass);
-	mpt_pass = mpt_passw.c_str();
 	if (mpt_socket == NULL) {
 		mpt_socket = "http://localhost:236/";
 		fprintf(stderr, "Info: defaulting to %s\n", mpt_socket);

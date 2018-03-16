@@ -40,7 +40,7 @@
 #include <kopano/ECGetText.h>
 #include <mapiutil.h>
 
-using namespace KCHL;
+using namespace KC;
 
 ECMAPIFolderPublic::ECMAPIFolderPublic(ECMsgStore *lpMsgStore, BOOL fModify, WSMAPIFolderOps *lpFolderOps, enumPublicEntryID ePublicEntryID) : 
 	ECMAPIFolder(lpMsgStore, fModify, lpFolderOps, "IMAPIFolderPublic"),
@@ -233,12 +233,10 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 	case PROP_ID(PR_ORIGINAL_ENTRYID):
 		// entryid on the server (only used for "Public Folders" folder)
 		if (lpFolder->m_lpEntryId) {
-			if ((hr = MAPIAllocateMore(lpFolder->m_cbEntryId, lpBase, (LPVOID*)&lpsPropValue->Value.bin.lpb)) != hrSuccess)
-				return hr;
-			memcpy(lpsPropValue->Value.bin.lpb, lpFolder->m_lpEntryId, lpFolder->m_cbEntryId);
-
 			lpsPropValue->Value.bin.cb = lpFolder->m_cbEntryId;
-
+			hr = KAllocCopy(lpFolder->m_lpEntryId, lpFolder->m_cbEntryId, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
+			if (hr != hrSuccess)
+				return hr;
 			hr = hrSuccess;
 		} else {
 			hr = MAPI_E_NOT_FOUND;
@@ -382,11 +380,9 @@ HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, const ENTRYID *eid,
 {
 	unsigned int ulObjType = 0;
 	memory_ptr<ENTRYID> lpEntryID;
-	auto hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryID);
+	auto hr = KAllocCopy(eid, cbEntryID, &~lpEntryID);
 	if (hr != hrSuccess)
 		return hr;
-	if (eid != nullptr)
-		memcpy(lpEntryID, eid, cbEntryID);
 	if (cbEntryID > 0) {
 		hr = HrGetObjTypeFromEntryId(cbEntryID, reinterpret_cast<BYTE *>(lpEntryID.get()), &ulObjType);
 		if(hr != hrSuccess)
@@ -407,7 +403,10 @@ HRESULT ECMAPIFolderPublic::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId
 }
 
 // @note if you change this function please look also at ECMAPIFolder::CopyFolder
-HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
+HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, const IID *lpInterface, void *lpDestFolder,
+    const TCHAR *lpszNewFolderName, ULONG_PTR ulUIParam,
+    IMAPIProgress *lpProgress, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulResult = 0;
@@ -439,7 +438,7 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 	// Check if it's  the same store of kopano so we can copy/move fast
 	if (!IsKopanoEntryId(cbEntryID, (LPBYTE)lpEntryID) ||
 	    !IsKopanoEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) ||
-	    HrGetStoreGuidFromEntryId(cbEntryID, reinterpret_cast<BYTE *>(lpEntryID), &guidFrom) != hrSuccess ||
+	    HrGetStoreGuidFromEntryId(cbEntryID, reinterpret_cast<const BYTE *>(lpEntryID), &guidFrom) != hrSuccess ||
 	    HrGetStoreGuidFromEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb, &guidDest) != hrSuccess ||
 	    memcmp(&guidFrom, &guidDest, sizeof(GUID)) != 0 ||
 	    lpFolderOps == nullptr)

@@ -26,6 +26,8 @@
 #include <edkmdb.h>
 #include <kopano/IECInterfaces.hpp>
 
+using namespace KC;
+
 class ECExchangeModifyTable _kc_final :
     public ECUnknown, public IECExchangeModifyTable {
 public:
@@ -50,8 +52,8 @@ private:
 	ULONG	m_ulUniqueId;
 	ULONG	m_ulUniqueTag;
 	ULONG	m_ulFlags;
-	KCHL::object_ptr<ECMAPIProp> m_lpParent;
-	KCHL::object_ptr<ECMemTable> m_ecTable;
+	KC::object_ptr<ECMAPIProp> m_lpParent;
+	KC::object_ptr<ECMemTable> m_ecTable;
 	bool m_bPushToServer = true;
 };
 

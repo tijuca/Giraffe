@@ -17,6 +17,7 @@
 
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
+#include <kopano/scope.hpp>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
@@ -44,14 +45,14 @@
 
 #include <sstream>
 
-using namespace KCHL;
+using namespace KC;
 
 struct STREAMDATA {
 	ULONG ulPropTag;
 	ECMAPIProp *lpProp;
 };
 
-typedef KCHL::memory_ptr<ECPERMISSION> ECPermissionPtr;
+typedef memory_ptr<ECPERMISSION> ECPermissionPtr;
 
 static struct rights ECPermToRightsCheap(const ECPERMISSION &p)
 {
@@ -74,7 +75,7 @@ static ECPERMISSION RightsToECPermCheap(const struct rights r)
 	return p;
 }
 
-ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
+ECMAPIProp::ECMAPIProp(ECMsgStore *lpProvider, ULONG ulObjType, BOOL fModify,
     const ECMAPIProp *lpRoot, const char *szClassName) :
 	ECGenericProp(lpProvider, ulObjType, fModify, szClassName),
 	/*
@@ -112,11 +113,6 @@ HRESULT ECMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
 	REGISTER_INTERFACE2(IUnknown, this);
 	REGISTER_INTERFACE2(IECSecurity, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
-}
-
-ECMsgStore *ECMAPIProp::GetMsgStore() const
-{
-	return (ECMsgStore*)lpProvider;
 }
 
 // Loads the properties of the saved message for use
@@ -287,7 +283,9 @@ HRESULT ECMAPIProp::SetPropHandler(ULONG ulPropTag, void *lpProvider,
 	return hr;
 }
 
-HRESULT ECMAPIProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType)
+HRESULT ECMAPIProp::TableRowGetProp(void *lpProvider,
+    const struct propVal *lpsPropValSrc, SPropValue *lpsPropValDst,
+    void **lpBase, ULONG ulType)
 {
 	HRESULT hr = hrSuccess;
 	auto lpMsgStore = static_cast<ECMsgStore *>(lpProvider);
@@ -522,12 +520,17 @@ HRESULT ECMAPIProp::GetSerializedACLData(LPVOID lpBase, LPSPropValue lpsPropValu
 	struct rightsArray	rights;
 	std::string			strAclData;
 
+	auto laters = make_scope_success([&]() {
+		soap_destroy(&soap);
+		soap_end(&soap); // clean up allocated temporaries
+	});
+
 	hr = QueryInterface(IID_IECSecurity, &~ptrSecurity);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &~ptrPerms);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	rights.__size = cPerms;
 	rights.__ptr = s_alloc<struct rights>(&soap, cPerms);
@@ -544,16 +547,7 @@ HRESULT ECMAPIProp::GetSerializedACLData(LPVOID lpBase, LPSPropValue lpsPropValu
 
 	strAclData = os.str();
 	lpsPropValue->Value.bin.cb = strAclData.size();
-	hr = MAPIAllocateMore(lpsPropValue->Value.bin.cb, lpBase, (LPVOID*)&lpsPropValue->Value.bin.lpb);
-	if (hr != hrSuccess)
-		goto exit;
-	memcpy(lpsPropValue->Value.bin.lpb, strAclData.data(), lpsPropValue->Value.bin.cb);
-
-exit:
-	soap_destroy(&soap);
-	soap_end(&soap); // clean up allocated temporaries 
-	
-	return hr;
+	return KAllocCopy(strAclData.data(), lpsPropValue->Value.bin.cb, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
 }
 
 HRESULT ECMAPIProp::SetSerializedACLData(const SPropValue *lpsPropValue)
@@ -564,10 +558,13 @@ HRESULT ECMAPIProp::SetSerializedACLData(const SPropValue *lpsPropValue)
 	struct rightsArray	rights;
 	std::string			strAclData;
 
-	if (lpsPropValue == NULL || PROP_TYPE(lpsPropValue->ulPropTag) != PT_BINARY) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	auto laters = make_scope_success([&]() {
+		soap_destroy(&soap);
+		soap_end(&soap); // clean up allocated temporaries
+	});
+
+	if (lpsPropValue == NULL || PROP_TYPE(lpsPropValue->ulPropTag) != PT_BINARY)
+		return MAPI_E_INVALID_PARAMETER;
 
 	{
 		std::istringstream is(std::string((char*)lpsPropValue->Value.bin.lpb, lpsPropValue->Value.bin.cb));
@@ -575,29 +572,21 @@ HRESULT ECMAPIProp::SetSerializedACLData(const SPropValue *lpsPropValue)
 		soap.is = &is;
 		soap_set_imode(&soap, SOAP_C_UTFSTRING);
 		soap_begin(&soap);
-		if (soap_begin_recv(&soap) != 0) {
-			hr = MAPI_E_NETWORK_FAILURE;
-			goto exit;
-		}
-		if (!soap_get_rightsArray(&soap, &rights, "rights", "rightsArray")) {
-			hr = MAPI_E_CORRUPT_DATA;
-			goto exit;
-		}
-		if (soap_end_recv(&soap) != 0) {
-			hr = MAPI_E_NETWORK_ERROR;
-			goto exit;
-		}
+		if (soap_begin_recv(&soap) != 0)
+			return MAPI_E_NETWORK_FAILURE;
+
+		if (!soap_get_rightsArray(&soap, &rights, "rights", "rightsArray"))
+			return MAPI_E_CORRUPT_DATA;
+
+		if (soap_end_recv(&soap) != 0)
+			return MAPI_E_NETWORK_ERROR;
 	}
 	hr = MAPIAllocateBuffer(rights.__size * sizeof(ECPERMISSION), &~ptrPerms);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	std::transform(rights.__ptr, rights.__ptr + rights.__size, ptrPerms.get(), &RightsToECPermCheap);
 	hr = UpdateACLs(rights.__size, ptrPerms);
-
-exit:
-	soap_destroy(&soap);
-	soap_end(&soap); // clean up allocated temporaries 
 
 	return hr;
 }
@@ -811,7 +800,7 @@ HRESULT ECMAPIProp::GetPermissionRules(int ulType, ULONG *lpcPermissions,
 }
 
 HRESULT ECMAPIProp::SetPermissionRules(ULONG cPermissions,
-    ECPERMISSION *lpECPermissions)
+    const ECPERMISSION *lpECPermissions)
 {
 	if (m_lpEntryId == NULL)
 		return MAPI_E_NO_ACCESS;
@@ -828,13 +817,13 @@ HRESULT ECMAPIProp::GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner)
 	return GetMsgStore()->lpTransport->HrGetOwner(m_cbEntryId, m_lpEntryId, lpcbOwner, lppOwner);
 }
 
-HRESULT ECMAPIProp::GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+HRESULT ECMAPIProp::GetUserList(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
     ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	return GetMsgStore()->lpTransport->HrGetUserList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMAPIProp::GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+HRESULT ECMAPIProp::GetGroupList(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
     ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
 	return GetMsgStore()->lpTransport->HrGetGroupList(cbCompanyId, lpCompanyId, ulFlags, lpcGroups, lppsGroups);
@@ -846,16 +835,15 @@ HRESULT ECMAPIProp::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
 	return GetMsgStore()->lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
 }
 
-HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
+HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, const ENTRYID *lpParentID)
 {
 	assert(m_lpParentID == NULL);
 	if (lpParentID == NULL || cbParentID == 0)
 		return MAPI_E_INVALID_PARAMETER;
-	auto hr = MAPIAllocateBuffer(cbParentID, &~m_lpParentID);
+	auto hr = KAllocCopy(lpParentID, cbParentID, &~m_lpParentID);
 	if (hr != hrSuccess)
 		return hr;
 
 	m_cbParentID = cbParentID;
-	memcpy(m_lpParentID, lpParentID, cbParentID);
 	return hrSuccess;
 }

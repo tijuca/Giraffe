@@ -13,8 +13,6 @@ from MAPI import (
     MAPI_UNICODE, MAPI_MODIFY, KEEP_OPEN_READWRITE, PT_MV_BINARY,
     RELOP_EQ, TBL_BATCH, ECSTORE_TYPE_PUBLIC, FOLDER_SEARCH,
     MAPI_ASSOCIATED, MAPI_DEFERRED_ERRORS, ROW_REMOVE,
-    MAPINotifSink, fnevObjectModified, fnevObjectCreated,
-    fnevObjectMoved, fnevObjectDeleted
 )
 from MAPI.Defs import (
     bin2hex, HrGetOneProp, CHANGE_PROP_TYPE, PpropFindProp
@@ -32,7 +30,7 @@ from MAPI.Tags import (
     PR_IPM_OL2007_ENTRYIDS, PR_MESSAGE_SIZE_EXTENDED,
     PR_LAST_LOGON_TIME, PR_LAST_LOGOFF_TIME, IID_IExchangeModifyTable,
     PR_MAILBOX_OWNER_ENTRYID, PR_EC_STOREGUID, PR_EC_STORETYPE,
-    PR_EC_USERNAME_W, PR_EC_COMPANY_NAME_W, PR_MESSAGE_CLASS,
+    PR_EC_USERNAME_W, PR_EC_COMPANY_NAME_W, PR_MESSAGE_CLASS_W,
     PR_SUBJECT, PR_WLINK_FLAGS, PR_WLINK_ORDINAL,
     PR_WLINK_STORE_ENTRYID, PR_WLINK_TYPE, PR_WLINK_ENTRYID,
     PR_EXTENDED_FOLDER_FLAGS, PR_WB_SF_ID, PR_FREEBUSY_ENTRYIDS,
@@ -60,10 +58,11 @@ from .permission import Permission
 from .freebusy import FreeBusy
 from .table import Table
 from .restriction import Restriction
-from .notification import Sink, Notification
+
+from . import notification as _notification
 
 from .compat import (
-    hex as _hex, unhex as _unhex, encode as _encode, repr as _repr,
+    encode as _encode, repr as _repr, bdec as _bdec, benc as _benc
 )
 
 if sys.hexversion >= 0x03000000:
@@ -96,7 +95,7 @@ class Store(Properties):
             mapiobj = self.server._store(guid)
         elif entryid:
             try:
-                mapiobj = self.server._store2(_unhex(entryid))
+                mapiobj = self.server._store2(_bdec(entryid))
             except MAPIErrorNotFound:
                 raise NotFoundError("cannot open store with entryid '%s'" % entryid)
 
@@ -153,7 +152,7 @@ class Store(Properties):
     def root(self):
         """:class:`Folder` designated as store root."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -166,7 +165,7 @@ class Store(Properties):
             else:
                 ipmsubtreeid = HrGetOneProp(self.mapiobj, PR_IPM_SUBTREE_ENTRYID).Value
 
-            return _folder.Folder(self, _hex(ipmsubtreeid))
+            return _folder.Folder(self, _benc(ipmsubtreeid))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -174,7 +173,7 @@ class Store(Properties):
     def findroot(self):
         """:class:`Folder` designated as search-results root."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_FINDER_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self.mapiobj, PR_FINDER_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -182,7 +181,7 @@ class Store(Properties):
     def reminders(self):
         """:class:`Folder` designated as reminders."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_REM_ONLINE_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_REM_ONLINE_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -190,7 +189,7 @@ class Store(Properties):
     def inbox(self):
         """:class:`Folder` designated as inbox."""
         try:
-            return _folder.Folder(self, _hex(self.mapiobj.GetReceiveFolder(u'IPM', MAPI_UNICODE)[0]))
+            return _folder.Folder(self, _benc(self.mapiobj.GetReceiveFolder(u'IPM', MAPI_UNICODE)[0]))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -198,14 +197,14 @@ class Store(Properties):
     def inbox(self, folder):
         # XXX can we get a list of current 'filters', or override all somehow?
         for messageclass in (u'', u'IPM', u'REPORT.IPM'):
-            self.mapiobj.SetReceiveFolder(messageclass, MAPI_UNICODE, _unhex(folder.entryid))
+            self.mapiobj.SetReceiveFolder(messageclass, MAPI_UNICODE, _bdec(folder.entryid))
 
     @property
     def junk(self):
         """:class:`Folder` designated as junk."""
         # PR_ADDITIONAL_REN_ENTRYIDS is a multi-value property, 4th entry is the junk folder
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_ADDITIONAL_REN_ENTRYIDS).Value[4]))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_ADDITIONAL_REN_ENTRYIDS).Value[4]))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -213,7 +212,7 @@ class Store(Properties):
     def calendar(self):
         """:class:`Folder` designated as calendar."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_APPOINTMENT_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_APPOINTMENT_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -221,7 +220,7 @@ class Store(Properties):
     def outbox(self):
         """:class:`Folder` designated as outbox."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_OUTBOX_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self.mapiobj, PR_IPM_OUTBOX_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -229,7 +228,7 @@ class Store(Properties):
     def contacts(self):
         """:class:`Folder` designated as contacts."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_CONTACT_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_CONTACT_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -237,7 +236,7 @@ class Store(Properties):
     def common_views(self):
         """:class:`Folder` contains folders for managing views for the message store."""
         try:
-            return _folder.Folder(self, _hex(self.prop(PR_COMMON_VIEWS_ENTRYID).value))
+            return _folder.Folder(self, _benc(self.prop(PR_COMMON_VIEWS_ENTRYID).value))
         except NotFoundError:
             pass
 
@@ -245,7 +244,7 @@ class Store(Properties):
     def drafts(self):
         """:class:`Folder` designated as drafts."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_DRAFTS_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_DRAFTS_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -253,7 +252,7 @@ class Store(Properties):
     def wastebasket(self):
         """:class:`Folder` designated as wastebasket."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_WASTEBASKET_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self.mapiobj, PR_IPM_WASTEBASKET_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -261,7 +260,7 @@ class Store(Properties):
     def journal(self):
         """:class:`Folder` designated as journal."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_JOURNAL_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_JOURNAL_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -269,7 +268,7 @@ class Store(Properties):
     def notes(self):
         """:class:`Folder` designated as notes."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_NOTE_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_NOTE_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -277,7 +276,7 @@ class Store(Properties):
     def sentmail(self):
         """:class:`Folder` designated as sentmail."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self.mapiobj, PR_IPM_SENTMAIL_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self.mapiobj, PR_IPM_SENTMAIL_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -285,7 +284,7 @@ class Store(Properties):
     def tasks(self):
         """:class:`Folder` designated as tasks."""
         try:
-            return _folder.Folder(self, _hex(HrGetOneProp(self._root, PR_IPM_TASK_ENTRYID).Value))
+            return _folder.Folder(self, _benc(HrGetOneProp(self._root, PR_IPM_TASK_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -330,7 +329,7 @@ class Store(Properties):
                 pos += 2  # skip check
                 sublen = _utils.unpack_short(blob, pos)
                 pos += 2
-                return _hex(blob[pos:pos + sublen])
+                return _benc(blob[pos:pos + sublen])
             else:
                 pos += totallen
         raise NotFoundError('entryid not found')
@@ -416,6 +415,24 @@ class Store(Properties):
             for folder in self.subtree.folders(recurse=recurse, **kwargs):
                 yield folder
 
+    def mail_folders(self, **kwargs):
+        # TODO restriction
+        for folder in self.folders():
+            if folder.container_class in (None, 'IPF.Note'):
+                yield folder
+
+    def contact_folders(self, **kwargs):
+        # TODO restriction
+        for folder in self.folders():
+            if folder.container_class == 'IPF.Contact':
+                yield folder
+
+    def calendars(self, **kwargs):
+        # TODO restriction
+        for folder in self.folders():
+            if folder.container_class == 'IPF.Appointment':
+                yield folder
+
     def create_searchfolder(self, text=None): # XXX store.findroot.create_folder()?
         mapiobj = self.findroot.mapiobj.CreateFolder(FOLDER_SEARCH, _encode(str(uuid.uuid4())), _encode('comment'), None, 0)
         return _folder.Folder(self, mapiobj=mapiobj)
@@ -432,7 +449,7 @@ class Store(Properties):
             entryid = '00000000' + self.guid + '0100000005000000' + guid + '00000000'
 
         try:
-            item.mapiobj = _utils.openentry_raw(self.mapiobj, _unhex(entryid), 0) # XXX soft-deleted item?
+            item.mapiobj = _utils.openentry_raw(self.mapiobj, _bdec(entryid), 0) # XXX soft-deleted item?
         except MAPIErrorNotFound:
             raise NotFoundError("no item with entryid '%s'" % entryid)
         return item
@@ -500,7 +517,7 @@ class Store(Properties):
         except MAPIErrorNotFound:
             return
 
-        return Store(entryid=_hex(entryid), server=self.server) # XXX server?
+        return Store(entryid=_benc(entryid), server=self.server) # XXX server?
 
     @archive_store.setter
     def archive_store(self, store):
@@ -525,14 +542,14 @@ class Store(Properties):
         except MAPIErrorNotFound:
             return
 
-        return self.archive_store.folder(entryid=_hex(arch_folderid))
+        return self.archive_store.folder(entryid=_benc(arch_folderid))
 
     @property
     def company(self):
         """Store :class:`company <Company>`."""
         if self.server.multitenant:
             table = self.server.sa.OpenUserStoresTable(MAPI_UNICODE)
-            table.Restrict(SPropertyRestriction(RELOP_EQ, PR_EC_STOREGUID, SPropValue(PR_EC_STOREGUID, _unhex(self.guid))), TBL_BATCH)
+            table.Restrict(SPropertyRestriction(RELOP_EQ, PR_EC_STOREGUID, SPropValue(PR_EC_STOREGUID, _bdec(self.guid))), TBL_BATCH)
             for row in table.QueryRows(1, 0):
                 storetype = PpropFindProp(row, PR_EC_STORETYPE)
                 if storetype.Value == ECSTORE_TYPE_PUBLIC:
@@ -589,7 +606,7 @@ class Store(Properties):
             try:
                 username = self.server.sa.GetUser(entryid, MAPI_UNICODE).Username
             except MAPIErrorNotFound:
-                raise NotFoundError("no user found with userid '%s'" % _hex(entryid))
+                raise NotFoundError("no user found with userid '%s'" % _benc(entryid))
             yield Delegation(self, self.server.user(username))
 
     def delegation(self, user, create=False, see_private=False):
@@ -605,7 +622,7 @@ class Store(Properties):
         if create:
             fbmsg, (entryids, names, flags) = self._fbmsg_delgs()
 
-            entryids.Value.append(_unhex(user.userid))
+            entryids.Value.append(_bdec(user.userid))
             names.Value.append(user.name)
             flags.Value.append(1 if see_private else 0)
 
@@ -628,21 +645,25 @@ class Store(Properties):
     def favorites(self):
         """Returns all favorite folders"""
 
+        restriction = Restriction(SPropertyRestriction(
+            RELOP_EQ, PR_MESSAGE_CLASS_W,
+            SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Microsoft.WunderBar.Link')
+        ))
+
         table = Table(
             self.server,
             self.mapiobj,
             self.common_views.mapiobj.GetContentsTable(MAPI_ASSOCIATED),
-            restriction=Restriction(SPropertyRestriction(RELOP_EQ, PR_MESSAGE_CLASS,
-                                    SPropValue(PR_MESSAGE_CLASS, b"IPM.Microsoft.WunderBar.Link"))),
+            restriction=restriction,
             columns=[PR_WLINK_ENTRYID, PR_WLINK_STORE_ENTRYID],
         )
         for entryid, store_entryid in table:
             try:
                 if store_entryid == self.entryid: # XXX: Handle favorites from public stores
-                    yield self.folder(entryid=_hex(entryid.value))
+                    yield self.folder(entryid=_benc(entryid.value))
                 else:
-                    store = Store(entryid=_hex(store_entryid.value), server=self.server)
-                    yield store.folder(entryid=_hex(entryid.value))
+                    store = Store(entryid=_benc(store_entryid.value), server=self.server)
+                    yield store.folder(entryid=_benc(entryid.value))
             except NotFoundError:
                 pass
 
@@ -673,8 +694,12 @@ class Store(Properties):
         # XXX why not just use PR_WLINK_ENTRYID??
         # match common_views SFInfo records against these guids
         table = self.common_views.mapiobj.GetContentsTable(MAPI_ASSOCIATED)
-        table.SetColumns([PR_MESSAGE_CLASS, PR_WB_SF_ID], MAPI_UNICODE)
-        table.Restrict(SPropertyRestriction(RELOP_EQ, PR_MESSAGE_CLASS, SPropValue(PR_MESSAGE_CLASS, "IPM.Microsoft.WunderBar.SFInfo")), TBL_BATCH)
+
+        table.SetColumns([PR_MESSAGE_CLASS_W, PR_WB_SF_ID], MAPI_UNICODE)
+        table.Restrict(SPropertyRestriction(
+            RELOP_EQ, PR_MESSAGE_CLASS_W,
+            SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Microsoft.WunderBar.SFInfo')),
+            TBL_BATCH)
 
         for row in table.QueryRows(-1, 0):
             try:
@@ -689,7 +714,7 @@ class Store(Properties):
         else:
             try:
                 for node in self.server.nodes(): # XXX faster?
-                    if node.guid == _hex(self.prop(PR_MAPPING_SIGNATURE).value):
+                    if node.guid == _benc(self.prop(PR_MAPPING_SIGNATURE).value):
                         return node.name
             except MAPIErrorNotFound:
                 return self.server.name
@@ -704,20 +729,15 @@ class Store(Properties):
             return self.guid == s.guid
         return False
 
-    def advise(self):
-        flags = fnevObjectModified | fnevObjectCreated \
-            | fnevObjectMoved | fnevObjectDeleted
+    def subscribe(self, sink):
+        _notification.subscribe(self, None, sink)
 
-        sink = MAPINotifSink()
-        try:
-            self.mapiobj.Advise(None, flags, sink)
-        except MAPIErrorNoSupport:
-            raise NotSupportedError(
-                "No support for advise, please you use"
-                "server(notifications=True)"
-            )
+    def unsubscribe(self, sink):
+        _notification.unsubscribe(self, sink)
 
-        return Sink(self, sink)
+    def notifications(self, time=24*3600):
+        for n in _notification._notifications(self, None, time):
+            yield n
 
     def __ne__(self, s):
         return not self == s

@@ -41,7 +41,7 @@
 
 class POP3 _kc_final : public ClientProto {
 public:
-	POP3(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig);
+	POP3(const char *path, KC::ECChannel *, KC::ECLogger *, KC::ECConfig *);
 	~POP3();
 
 	// getTimeoutMinutes: 5 min when logged in otherwise 1 min
@@ -84,12 +84,11 @@ private:
 	std::string DotFilter(const char *input);
 	BOOL IsAuthorized() const { return !!lpStore; }
 
-	KCHL::object_ptr<IMAPISession> lpSession;
-	KCHL::object_ptr<IMsgStore> lpStore;
-	KCHL::object_ptr<IMAPIFolder> lpInbox;
-	KCHL::object_ptr<IAddrBook> lpAddrBook;
-	sending_options sopt;
-
+	KC::object_ptr<IMAPISession> lpSession;
+	KC::object_ptr<IMsgStore> lpStore;
+	KC::object_ptr<IMAPIFolder> lpInbox;
+	KC::object_ptr<IAddrBook> lpAddrBook;
+	KC::sending_options sopt;
 	std::string szUser;
 
 	std::vector<MailListItem> lstMails;

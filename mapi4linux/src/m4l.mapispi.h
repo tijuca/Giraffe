@@ -46,24 +46,9 @@ struct M4LSUPPORTADVISE {
 
 typedef std::map<ULONG, M4LSUPPORTADVISE> M4LSUPPORTADVISES;
 
-struct findKey {
-	LPNOTIFKEY m_lpKey;
-
-	findKey(LPNOTIFKEY lpKey) 
-	{
-		m_lpKey = lpKey;
-	}
-
-	bool operator()(const M4LSUPPORTADVISES::value_type &entry) const
-	{
-		return (entry.second.lpKey->cb == m_lpKey->cb) &&
-			   (memcmp(entry.second.lpKey->ab, m_lpKey->ab, m_lpKey->cb) == 0);
-	}
-};
-
 class M4LMAPIGetSession : public M4LUnknown, public IMAPIGetSession {
 private:
-	KCHL::object_ptr<IMAPISession> session;
+	KC::object_ptr<IMAPISession> session;
 
 public:
 	M4LMAPIGetSession(LPMAPISESSION new_session);
@@ -87,29 +72,29 @@ public:
 	virtual ~M4LMAPISupport();
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
 	virtual HRESULT GetMemAllocRoutines(LPALLOCATEBUFFER *lpAllocateBuffer, LPALLOCATEMORE *lpAllocateMore, LPFREEBUFFER *lpFreeBuffer);
-	virtual HRESULT Subscribe(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	virtual HRESULT Subscribe(const NOTIFKEY *key, ULONG evt_mask, ULONG flags, IMAPIAdviseSink *, ULONG *conn) override;
 	virtual HRESULT Unsubscribe(ULONG ulConnection);
-	virtual HRESULT Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICATION lpNotifications, ULONG *lpulFlags);
-	virtual HRESULT ModifyStatusRow(ULONG cValues, LPSPropValue lpColumnVals, ULONG ulFlags);
+	virtual HRESULT Notify(const NOTIFKEY *key, ULONG nnotifs, NOTIFICATION *, ULONG *flags) override;
+	virtual HRESULT ModifyStatusRow(ULONG nvals, const SPropValue *, ULONG flags) override;
 	virtual HRESULT OpenProfileSection(const MAPIUID *uid, ULONG flags, IProfSect **);
-	virtual HRESULT RegisterPreprocessor(LPMAPIUID lpMuid, LPTSTR lpszAdrType, LPTSTR lpszDLLName, LPSTR lpszPreprocess, LPSTR lpszRemovePreprocessInfo, ULONG ulFlags);
+	virtual HRESULT RegisterPreprocessor(const MAPIUID *, const TCHAR *addrtype, const TCHAR *dllname, const char *preprocess, const char *remove_pp_info, ULONG flags) override;
 	virtual HRESULT NewUID(LPMAPIUID lpMuid);
 	virtual HRESULT MakeInvalid(ULONG ulFlags, LPVOID lpObject, ULONG ulRefCount, ULONG cMethods);
 
 	virtual HRESULT SpoolerYield(ULONG ulFlags);
 	virtual HRESULT SpoolerNotify(ULONG ulFlags, LPVOID lpvData);
-	virtual HRESULT CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-	virtual HRESULT SetProviderUID(LPMAPIUID lpProviderID, ULONG ulFlags);
+	virtual HRESULT CreateOneOff(const TCHAR *name, const TCHAR *addrtype, const TCHAR *addr, ULONG flags, ULONG *eid_size, ENTRYID **) override;
+	virtual HRESULT SetProviderUID(const MAPIUID *, ULONG flags) override;
 	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result);
-	virtual HRESULT OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP *lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling);
+	virtual HRESULT OpenTemplateID(ULONG tpl_size, const ENTRYID *tpl_eid, ULONG tpl_flags, IMAPIProp *propdata, const IID *intf, IMAPIProp **propnew, IMAPIProp *sibling) override;
 	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	virtual HRESULT GetOneOffTable(ULONG ulFlags, LPMAPITABLE *lppTable);
 	virtual HRESULT Address(ULONG *lpulUIParam, LPADRPARM lpAdrParms, LPADRLIST *lppAdrList);
-	virtual HRESULT Details(ULONG *lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID, LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText, ULONG ulFlags);
-	virtual HRESULT NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, ENTRYID *lpEIDContainer, ULONG cbEIDNewEntryTpl, ENTRYID *lpEIDNewEntryTpl, ULONG *lpcbEIDNewEntry, ENTRYID **lppEIDNewEntry);
-	virtual HRESULT DoConfigPropsheet(ULONG ulUIParam, ULONG ulFlags, LPTSTR lpszTitle, LPMAPITABLE lpDisplayTable, LPMAPIPROP lpCOnfigData, ULONG ulTopPage);
-	virtual HRESULT CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, LPENTRYLIST lpMsgList, LPCIID lpDestInterface, LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
-	virtual HRESULT CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpDestInterface, LPVOID lpDestFolder, LPTSTR lszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
+	virtual HRESULT Details(ULONG_PTR *ui_param, DISMISSMODELESS *, void *dismiss_ctx, ULONG eid_size, const ENTRYID *, LPFNBUTTON callback, void *btn_ctx, const TCHAR *btn_text, ULONG flags) override;
+	virtual HRESULT NewEntry(ULONG_PTR ui_param, ULONG flags, ULONG eid_size, const ENTRYID *eid_cont, ULONG tpl_size, const ENTRYID *tpl, ULONG *new_size, ENTRYID **new_eid) override;
+	virtual HRESULT DoConfigPropsheet(ULONG_PTR ui_param, ULONG flags, const TCHAR *title, IMAPITable *disp_tbl, IMAPIProp *cfg_data, ULONG top_page) override;
+	virtual HRESULT CopyMessages(const IID *src_intf, void *src_fld, const ENTRYLIST *msglist, const IID *dst_intf, void *dst_fld, ULONG_PTR ui_param, IMAPIProgress *, ULONG flags) override;
+	virtual HRESULT CopyFolder(const IID *src_intf, void *src_fld, ULONG eid_size, const ENTRYID *eid, const IID *dst_intf, void *dst_fld, const TCHAR *newname, ULONG_PTR ui_param, IMAPIProgress *, ULONG flags);
 	virtual HRESULT DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT DoProgressDialog(ULONG ulUIParam, ULONG ulFlags, LPMAPIPROGRESS *lppProgress);
@@ -119,10 +104,10 @@ public:
 	virtual HRESULT UpdatePAB(ULONG ulFlags, LPMESSAGE lpMessage);
 	virtual HRESULT DoSentMail(ULONG ulFlags, LPMESSAGE lpMessage);
 	virtual HRESULT OpenAddressBook(LPCIID lpInterface, ULONG ulFlags, LPADRBOOK *lppAdrBook);
-	virtual HRESULT Preprocess(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID);
-	virtual HRESULT CompleteMsg(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID);
+	virtual HRESULT Preprocess(ULONG flags, ULONG eid_size, const ENTRYID *) override;
+	virtual HRESULT CompleteMsg(ULONG flags, ULONG eid_size, const ENTRYID *) override;
 	virtual HRESULT StoreLogoffTransports(ULONG *lpulFlags);
-	virtual HRESULT StatusRecips(LPMESSAGE lpMessage, LPADRLIST lpRecipList);
+	virtual HRESULT StatusRecips(IMessage *, const ADRLIST *recips) override;
 	virtual HRESULT WrapStoreEntryID(ULONG cbOrigEntry, const ENTRYID *lpOrigEntry, ULONG *lpcbWrappedEntry, ENTRYID **lppWrappedEntry);
 	virtual HRESULT ModifyProfile(ULONG ulFlags);
 

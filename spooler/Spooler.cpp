@@ -82,7 +82,7 @@
 
 #include <map>
 
-using namespace KCHL;
+using namespace KC;
 using std::cout;
 using std::endl;
 using std::map;
@@ -104,6 +104,7 @@ static bool sp_exp_config;
 extern ECConfig *g_lpConfig;
 ECConfig *g_lpConfig = NULL;
 static ECLogger *g_lpLogger;
+static bool g_dump_config;
 
 // notification
 static bool bMessagesWaiting = false;
@@ -231,16 +232,13 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 
 	// place pid with entryid copy in map
 	sSendData.cbStoreEntryId = cbStoreEntryId;
-	HRESULT hr = MAPIAllocateBuffer(cbStoreEntryId,
-	             reinterpret_cast<void **>(&sSendData.lpStoreEntryId));
+	auto hr = KAllocCopy(lpStoreEntryId, cbStoreEntryId, reinterpret_cast<void **>(&sSendData.lpStoreEntryId));
 	if (hr != hrSuccess)
 		return kc_perrorf("MAPIAllocateBuffer failed(1)", hr);
-	memcpy(sSendData.lpStoreEntryId, lpStoreEntryId, cbStoreEntryId);
 	sSendData.cbMessageEntryId = cbMsgEntryId;
-	hr = MAPIAllocateBuffer(cbMsgEntryId, (void**)&sSendData.lpMessageEntryId);
+	hr = KAllocCopy(lpMsgEntryId, cbMsgEntryId, reinterpret_cast<void **>(&sSendData.lpMessageEntryId));
 	if (hr != hrSuccess)
 		return kc_perror("MAPIAllocateBuffer failed(2)", hr);
-	memcpy(sSendData.lpMessageEntryId, lpMsgEntryId, cbMsgEntryId);
 	sSendData.ulFlags = ulFlags;
 	sSendData.strUsername = szUsername;
 
@@ -440,7 +438,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 			object_ptr<IMsgStore> lpUserStore;
 			object_ptr<IMessage> lpMessage;
 
-			hr = GetErrorObjects(sSendData, lpAdminSession, &~lpAddrBook, &KCHL::unique_tie(lpMailer), &~lpUserStore, &~lpMessage);
+			hr = GetErrorObjects(sSendData, lpAdminSession, &~lpAddrBook, &unique_tie(lpMailer), &~lpUserStore, &~lpMessage);
 			if (hr == hrSuccess) {
 				lpMailer->setError(_("A fatal error occurred while processing your message, and Kopano is unable to send your email."));
 				hr = SendUndeliverable(lpMailer.get(), lpUserStore, lpMessage);
@@ -453,8 +451,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 			// remove mail from queue
 			hr = lpSpooler->DeleteFromMasterOutgoingTable(sSendData.cbMessageEntryId, (LPENTRYID)sSendData.lpMessageEntryId, sSendData.ulFlags);
 			if (hr != hrSuccess)
-				ec_log_warn("Could not remove invalid message from queue, error code: 0x%08X", hr);
-
+				kc_pwarn("Could not remove invalid message from queue", hr);
 			// move mail to sent items folder
 			if (sSendData.ulFlags & EC_SUBMIT_DOSENTMAIL && lpMessage) {
 				hr = DoSentMail(lpAdminSession, lpUserStore, 0, std::move(lpMessage));
@@ -529,17 +526,11 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 
 		if (lpsRowSet->cRows == 0)		// All rows done
 			goto exit;
-		if (lpsRowSet[0].lpProps[4].ulPropTag == PR_DEFERRED_SEND_TIME) {
-			// check time
-			time_t now = time(NULL);
-			time_t sendat;
-			
-			FileTimeToUnixTime(lpsRowSet[0].lpProps[4].Value.ft, &sendat);
-			if (now < sendat) {
-				// if we ever add logging here, it should trigger just once for this mail
-				++later_mails;
-				continue;
-			}
+		if (lpsRowSet[0].lpProps[4].ulPropTag == PR_DEFERRED_SEND_TIME &&
+		    time(nullptr) < FileTimeToUnixTime(lpsRowSet[0].lpProps[4].Value.ft)) {
+			// if we ever add logging here, it should trigger just once for this mail
+			++later_mails;
+			continue;
 		}
 
 		// Check whether the row contains the entryid and store id
@@ -557,7 +548,7 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 				ec_log_warn("Removing invalid entry from OutgoingQueue");
 				hr = lpSpooler->DeleteFromMasterOutgoingTable(lpsRowSet[0].lpProps[2].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpsRowSet[0].lpProps[2].Value.bin.lpb), lpsRowSet[0].lpProps[3].Value.ul);
 				if (hr != hrSuccess) {
-					ec_log_warn("Could not remove invalid message from queue, error code: 0x%08X", hr);
+					kc_pwarn("Could not remove invalid message from queue", hr);
 					// since we have an error, we will reconnect to the server to fully reload the table
 					goto exit;
 				}
@@ -609,20 +600,13 @@ exit:
 static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
     IECSpooler **lppSpooler)
 {
-	object_ptr<IECSpooler> lpSpooler;
 	object_ptr<IMsgStore> lpMDB;
-	memory_ptr<SPropValue> lpsProp;
-
 	auto hr = HrOpenDefaultStore(lpAdminSession, &~lpMDB);
 	if (hr != hrSuccess)
 		return kc_perror("Unable to open default store for system account", hr);
-	hr = HrGetOneProp(lpMDB, PR_EC_OBJECT, &~lpsProp);
+	hr = GetECObject(lpMDB, iid_of(*lppSpooler), reinterpret_cast<void **>(lppSpooler));
 	if (hr != hrSuccess)
 		return kc_perror("Unable to get Kopano internal object", hr);
-	hr = reinterpret_cast<IUnknown *>(lpsProp->Value.lpszA)->QueryInterface(IID_IECSpooler, &~lpSpooler);
-	if (hr != hrSuccess)
-		return kc_perror("Spooler interface not supported", hr);
-	*lppSpooler = lpSpooler.release();
 	return hr;
 }
 
@@ -903,7 +887,8 @@ int main(int argc, char *argv[]) {
 		OPT_SEND_USERNAME,
 		OPT_LOGFD,
 		OPT_DO_SENTMAIL,
-		OPT_PORT
+		OPT_PORT,
+		OPT_DUMP_CONFIG,
 	};
 	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },		// help text
@@ -917,6 +902,7 @@ int main(int argc, char *argv[]) {
 		{ "do-sentmail", 0, NULL, OPT_DO_SENTMAIL },
 		{ "port", 1, NULL, OPT_PORT },
 		{ "ignore-unknown-config-options", 0, NULL, OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS },
+		{"dump-config", 0, nullptr, OPT_DUMP_CONFIG},
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -1012,6 +998,9 @@ int main(int argc, char *argv[]) {
 		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
 			bIgnoreUnknownConfigOptions = true;
 			break;
+		case OPT_DUMP_CONFIG:
+			g_dump_config = true;
+			break;
 		case 'V':
 			cout << "kopano-spooler " PROJECT_VERSION << endl;
 			return 1;
@@ -1066,6 +1055,8 @@ int main(int argc, char *argv[]) {
 	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
+	if (g_dump_config)
+		return g_lpConfig->dump_config(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 	if (!TmpPath::instance.OverridePath(g_lpConfig))
 		ec_log_err("Ignoring invalid path setting!");
 

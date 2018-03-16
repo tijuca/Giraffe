@@ -42,7 +42,7 @@ public:
 	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 
 	// Our table-row getprop handler (handles client-side generation of table columns)
-	static HRESULT TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType);
+	static HRESULT TableRowGetProp(void *prov, const struct propVal *src, SPropValue *dst, void **base, ULONG type);
 	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk);
 
@@ -63,7 +63,7 @@ public:
 	virtual HRESULT CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
 	virtual HRESULT DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
 	virtual HRESULT CreateFolder(ULONG folder_type, const TCHAR *name, const TCHAR *comment, const IID *intf, ULONG flags, IMAPIFolder **) override;
-	virtual HRESULT CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
+	virtual HRESULT CopyFolder(ULONG eid_size, const ENTRYID *eid, const IID *intf, void *dst_fld, const TCHAR *newname, ULONG_PTR ui_param, IMAPIProgress *, ULONG flags);
 	virtual HRESULT DeleteFolder(ULONG eid_size, const ENTRYID *, ULONG ui_param, IMAPIProgress *, ULONG flags) override;
 	virtual HRESULT SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
 	virtual HRESULT GetMessageStatus(ULONG eid_size, const ENTRYID *, ULONG flags, ULONG *status) override;
@@ -84,8 +84,8 @@ public:
 	virtual HRESULT UpdateMessageFromStream(ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, LPSPropValue lpConflictItems, WSMessageStreamImporter **lppsStreamImporter);
 
 protected:
-	KCHL::object_ptr<IMAPIAdviseSink> m_lpFolderAdviseSink;
-	KCHL::object_ptr<WSMAPIFolderOps> lpFolderOps;
+	KC::object_ptr<IMAPIAdviseSink> m_lpFolderAdviseSink;
+	KC::object_ptr<WSMAPIFolderOps> lpFolderOps;
 	ULONG m_ulConnection = 0;
 
 	friend class		ECExchangeImportHierarchyChanges;	// Allowed access to lpFolderOps

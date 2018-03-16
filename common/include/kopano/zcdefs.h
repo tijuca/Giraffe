@@ -42,8 +42,7 @@
 
 /* Minimum requirement for KC is g++ 4.7, g++0x mode. */
 /* Swig is not bright enough to grok all C++11. */
-#if defined(SWIG) || defined(__GNUG__) && __GNUG__ == 4 && \
-    defined(__GNUC_MINOR__) && __GNUC_MINOR__ < 7
+#if defined(SWIG)
 #	define _kc_final
 #	define _kc_override
 #else
@@ -55,12 +54,6 @@
 /* Mark classes which explicitly must not be final in the C++ side… for SWIG */
 #define _no_final
 
-/*
- * This is a marker for structs where we expect gsoap 2.8.30 or ourselves to
- * actually zero it.
- */
-#define __gszeroinit
-
 #if defined(__GNUG__) && __GNUG__ < 5
 	/* std::set::insert(it, it) has a problem with move_iterators */
 #	define gcc5_make_move_iterator(x) (x)
@@ -68,8 +61,6 @@
 #	define gcc5_make_move_iterator(x) std::make_move_iterator(x)
 #endif
 
-/* Don't like touching all cpp files just yet... */
 namespace KC {}
-using namespace KC;
 
 #endif /* ZCOMMON_DEFS_H */

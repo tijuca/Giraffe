@@ -56,8 +56,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-using namespace KCHL;
-
 namespace KC {
 
 #define PROFILEPREFIX		"ec-adm-"
@@ -145,46 +143,34 @@ static HRESULT CreateProfileTemp(const wchar_t *username,
 
 //-- create profile
 	hr = MAPIAdminProfiles(0, &~lpProfAdmin);
-	if (hr != hrSuccess) {
-		ec_log_crit("CreateProfileTemp(): MAPIAdminProfiles failed %x: %s", hr, GetMAPIErrorMessage(hr));
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perrorf("MAPIAdminProfiles failed", hr);
 	lpProfAdmin->DeleteProfile(reinterpret_cast<const TCHAR *>(szProfName), 0);
 	hr = lpProfAdmin->CreateProfile(reinterpret_cast<const TCHAR *>(szProfName), reinterpret_cast<const TCHAR *>(""), 0, 0);
-	if (hr != hrSuccess) {
-		ec_log_crit("CreateProfileTemp(): CreateProfile failed %x: %s", hr, GetMAPIErrorMessage(hr));
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perrorf("CreateProfile failed", hr);
 	hr = lpProfAdmin->AdminServices(reinterpret_cast<const TCHAR *>(szProfName), reinterpret_cast<const TCHAR *>(""), 0, 0, &~lpServiceAdmin1);
-	if (hr != hrSuccess) {
-		ec_log_crit("CreateProfileTemp(): AdminServices failed %x: %s", hr, GetMAPIErrorMessage(hr));
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perrorf("AdminServices failed", hr);
 	hr = lpServiceAdmin1->QueryInterface(IID_IMsgServiceAdmin2, &~lpServiceAdmin);
-	if (hr != hrSuccess) {
-		ec_log_crit("CreateProfileTemp(): QueryInterface failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perrorf("QueryInterface failed", hr);
 	hr = lpServiceAdmin->CreateMsgServiceEx("ZARAFA6", "", 0, 0, &service_uid);
-	if (hr != hrSuccess) {
-		ec_log_crit("CreateProfileTemp(): CreateMsgService ZARAFA6 failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perrorf("CreateMsgService ZARAFA6 failed", hr);
 	// Get the PR_SERVICE_UID from the row
 	i = 0;
 	sProps[i].ulPropTag = PR_EC_PATH;
 	sProps[i].Value.lpszA = const_cast<char *>(path != NULL && *path != '\0' ? path : "default:");
 	++i;
-
-	sProps[i].ulPropTag = PR_EC_USERNAME_W;
-	sProps[i].Value.lpszW = (WCHAR*)username;
-	++i;
-
-	sProps[i].ulPropTag = PR_EC_USERPASSWORD_W;
-	sProps[i].Value.lpszW = (WCHAR*)password;
-	++i;
-
+	if (username != nullptr) {
+		sProps[i].ulPropTag = PR_EC_USERNAME_W;
+		sProps[i++].Value.lpszW = const_cast<wchar_t *>(username);
+	}
+	if (password != nullptr) {
+		sProps[i].ulPropTag = PR_EC_USERPASSWORD_W;
+		sProps[i++].Value.lpszW = const_cast<wchar_t *>(password);
+	}
 	sProps[i].ulPropTag = PR_EC_FLAGS;
 	sProps[i].Value.ul = ulProfileFlags;
 	++i;
@@ -219,7 +205,7 @@ static HRESULT CreateProfileTemp(const wchar_t *username,
 	}
 	hr = lpServiceAdmin->ConfigureMsgService(&service_uid, 0, 0, i, sProps);
 	if (hr != hrSuccess)
-		ec_log_crit("CreateProfileTemp(): ConfigureMsgService failed %x: %s", hr, GetMAPIErrorMessage(hr));
+		return kc_perrorf("ConfigureMsgService failed", hr);
 	return hr;
 }
 
@@ -250,6 +236,28 @@ HRESULT HrOpenECAdminSession(IMAPISession **lppSession,
 	return HrOpenECSession(lppSession, app_version, app_misc, KOPANO_SYSTEM_USER_W, KOPANO_SYSTEM_USER_W, szPath, ulProfileFlags, sslkey_file, sslkey_password);
 }
 
+HRESULT HrOpenECSession(IMAPISession **ses, const char *appver,
+    const char *appmisc, const char *user, const char *pass, const char *path,
+    ULONG flags, const char *sslkey, const char *sslpass, const char *profname)
+{
+	const wchar_t *u = nullptr, *p = nullptr;
+	std::wstring wu, wp;
+	try {
+		if (user != nullptr) {
+			wu = convert_to<std::wstring>(user);
+			u = wu.c_str();
+		}
+		if (pass != nullptr) {
+			wp = convert_to<std::wstring>(pass);
+			p = wp.c_str();
+		}
+	} catch (const convert_exception &) {
+		return MAPI_E_BAD_CHARWIDTH;
+	}
+	return HrOpenECSession(ses, appver, appmisc, u, p, path, flags,
+	       sslkey, sslpass, profname);
+}
+
 HRESULT HrOpenECSession(IMAPISession **lppSession,
     const char *const app_version, const char *const app_misc,
     const wchar_t *szUsername, const wchar_t *szPassword, const char *szPath,
@@ -272,7 +280,7 @@ HRESULT HrOpenECSession(IMAPISession **lppSession,
 	if (sslkey_file != NULL) {
 		FILE *ssltest = fopen(sslkey_file, "r");
 		if (!ssltest) {
-			ec_log_crit("Cannot access %s: %s", sslkey_file, strerror(errno));
+			ec_log_crit("Cannot access SSL key file \"%s\": %s", sslkey_file, strerror(errno));
 
 			// do not pass sslkey if the file does not exist
 			// otherwise normal connections do not work either
@@ -287,14 +295,14 @@ HRESULT HrOpenECSession(IMAPISession **lppSession,
 
 	hr = CreateProfileTemp(szUsername, szPassword, szPath, szProfName.get(), ulProfileFlags, sslkey_file, sslkey_password, app_version, app_misc);
 	if (hr != hrSuccess) {
-		ec_log_warn("CreateProfileTemp failed: %x: %s", hr, GetMAPIErrorMessage(hr));
+		kc_perror("CreateProfileTemp failed", hr);
 		goto exit;
 	}
 
 	// Log on the the profile
 	hr = MAPILogonEx(0, (LPTSTR)szProfName.get(), (LPTSTR)"", MAPI_EXTENDED | MAPI_NEW_SESSION | MAPI_NO_MAIL, &lpMAPISession);
 	if (hr != hrSuccess) {
-		ec_log_warn("MAPILogonEx failed: %x: %s", hr, GetMAPIErrorMessage(hr));
+		kc_perror("MAPILogonEx failed", hr);
 		goto exit;
 	}
 
@@ -479,12 +487,9 @@ HRESULT ECCreateOneOff(const TCHAR *lpszName, const TCHAR *lpszAdrType,
 		strOneOff.append(addr, strlen(addr) + 1);
 	}
 
-	HRESULT hr = MAPIAllocateBuffer(strOneOff.size(),
-	             reinterpret_cast<void **>(lppEntryID));
+	auto hr = KAllocCopy(strOneOff.c_str(), strOneOff.size(), reinterpret_cast<void **>(lppEntryID));
 	if(hr != hrSuccess)
 		return hr;
-
-	memcpy(*lppEntryID, strOneOff.c_str(), strOneOff.size());
 	*lpcbEntryID = strOneOff.size();
 	return hrSuccess;
 }
@@ -1553,27 +1558,20 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const wchar_t *folder, wchar_t psep,
 	if(bIsPublic)
 	{
 		hr = HrGetOneProp(lpMDB, PR_IPM_PUBLIC_FOLDERS_ENTRYID, &~lpPropIPMSubtree);
-		if (hr != hrSuccess) {
-			ec_log_crit("Unable to find PR_IPM_PUBLIC_FOLDERS_ENTRYID object, error code: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Unable to find PR_IPM_PUBLIC_FOLDERS_ENTRYID object", hr);
 	}
 	else
 	{
 		hr = HrGetOneProp(lpMDB, PR_IPM_SUBTREE_ENTRYID, &~lpPropIPMSubtree);
-		if (hr != hrSuccess) {
-			ec_log_crit("Unable to find IPM_SUBTREE object, error code: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Unable to find IPM_SUBTREE object", hr);
 	}
 
 	hr = lpMDB->OpenEntry(lpPropIPMSubtree->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropIPMSubtree->Value.bin.lpb),
 	     &IID_IMAPIFolder, 0, &ulObjType, &~lpFoundFolder);
-	if (hr != hrSuccess || ulObjType != MAPI_FOLDER) {
-		ec_log_crit("Unable to open IPM_SUBTREE object, error code: 0x%08X", hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess || ulObjType != MAPI_FOLDER)
+		return kc_perror("Unable to open IPM_SUBTREE object", hr);
 	// correctly return IPM subtree as found folder
 	if (!folder)
 		goto found;
@@ -1590,16 +1588,14 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const wchar_t *folder, wchar_t psep,
 			subfld = folder;
 		folder = ptr ? ptr+1 : NULL;
 		hr = lpFoundFolder->GetHierarchyTable(0, &~lpTable);
-		if (hr != hrSuccess) {
-			ec_log_crit("Unable to view folder, error code: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Unable to view folder", hr);
 		hr = FindFolder(lpTable, subfld.c_str(), &~lpPropFolder);
 		if (hr == MAPI_E_NOT_FOUND && bCreateFolder) {
 			hr = lpFoundFolder->CreateFolder(FOLDER_GENERIC, (LPTSTR)subfld.c_str(), (LPTSTR)L"Auto-created by Kopano", &IID_IMAPIFolder, MAPI_UNICODE | OPEN_IF_EXISTS, &lpNewFolder);
 			if (hr != hrSuccess) {
-				ec_log_crit("Unable to create folder \"%ls\", error code: 0x%08X", subfld.c_str(), hr);
+				ec_log_err("Unable to create folder \"%ls\": %s (%x)",
+					subfld.c_str(), GetMAPIErrorMessage(hr), hr);
 				return hr;
 			}
 		} else if (hr != hrSuccess)
@@ -1612,7 +1608,8 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const wchar_t *folder, wchar_t psep,
 			hr = lpMDB->OpenEntry(lpPropFolder->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropFolder->Value.bin.lpb),
 			     &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFoundFolder);
 			if (hr != hrSuccess) {
-				ec_log_crit("Unable to open folder \"%ls\", error code: 0x%08X", subfld.c_str(), hr);
+				ec_log_err("Unable to open folder \"%ls\": %s (%x)",
+					subfld.c_str(), GetMAPIErrorMessage(hr), hr);
 				return hr;
 			}
 		}
@@ -1790,27 +1787,16 @@ HRESULT HrOpenDefaultCalendar(LPMDB lpMsgStore, LPMAPIFOLDER *lppFolder)
 	//open Root Container.
 	hr = lpMsgStore->OpenEntry(0, nullptr, &iid_of(lpRootFld), 0, &ulType, &~lpRootFld);
 	if (hr != hrSuccess || ulType != MAPI_FOLDER) 
-	{
-		ec_log_crit("Unable to open Root Container, error code: 0x%08X", hr);
-		return hr;
-	}
-
+		return kc_perror("Unable to open root container", hr);
 	//retrive Entryid of Default Calendar Folder.
 	hr = HrGetOneProp(lpRootFld, PR_IPM_APPOINTMENT_ENTRYID, &~lpPropDefFld);
 	if (hr != hrSuccess) 
-	{
-		ec_log_crit("Unable to find PR_IPM_APPOINTMENT_ENTRYID, error code: 0x%08X", hr);
-		return hr;
-	}
+		return kc_perror("Unable to find PR_IPM_APPOINTMENT_ENTRYID", hr);
 	hr = lpMsgStore->OpenEntry(lpPropDefFld->Value.bin.cb,
 	     reinterpret_cast<ENTRYID *>(lpPropDefFld->Value.bin.lpb),
 	     &iid_of(lpDefaultFolder), MAPI_MODIFY, &ulType, &~lpDefaultFolder);
 	if (hr != hrSuccess || ulType != MAPI_FOLDER) 
-	{
-		ec_log_crit("Unable to open IPM_SUBTREE object, error code: 0x%08X", hr);
-		return hr;
-	}
-
+		return kc_perror("Unable to open IPM_SUBTREE object", hr);
 	*lppFolder = lpDefaultFolder.release();
 	return hrSuccess;
 }
@@ -2185,11 +2171,11 @@ HRESULT SetAutoAcceptSettings(IMsgStore *lpMsgStore, bool bAutoAccept, bool bDec
 	SPropValue FBProps[6];
 
 	// Meaning of these values are unknown, but are always TRUE in cases seen until now
-	FBProps[0].ulPropTag = PROP_TAG(PT_BOOLEAN, 0x6842); // PR_SCHDINFO_BOSS_WANTS_COPY
+	FBProps[0].ulPropTag = PR_SCHDINFO_BOSS_WANTS_COPY;
 	FBProps[0].Value.b = TRUE;
-	FBProps[1].ulPropTag = PROP_TAG(PT_BOOLEAN, 0x6843); //PR_SCHDINFO_DONT_MAIL_DELEGATES
+	FBProps[1].ulPropTag = PR_SCHDINFO_DONT_MAIL_DELEGATES;
 	FBProps[1].Value.b = TRUE;
-	FBProps[2].ulPropTag = PROP_TAG(PT_BOOLEAN, 0x684B); // PR_SCHDINFO_BOSS_WANTS_INFO
+	FBProps[2].ulPropTag = PR_SCHDINFO_BOSS_WANTS_INFO;
 	FBProps[2].Value.b = TRUE;
 
 	FBProps[3].ulPropTag = PR_PROCESS_MEETING_REQUESTS;
@@ -2380,6 +2366,41 @@ HRESULT GetConfigMessage(LPMDB lpStore, const char* szMessageName, IMessage **lp
 	}
 
 	*lppMessage = ptrMessage.release();
+	return hrSuccess;
+}
+
+HRESULT GetECObject(IMAPIProp *obj, const IID &intf, void **iup)
+{
+	memory_ptr<SPropValue> pv;
+	auto ret = HrGetOneProp(obj, PR_EC_OBJECT, &~pv);
+	if (ret != hrSuccess)
+		return ret;
+	auto ecobj = reinterpret_cast<IUnknown *>(pv->Value.lpszA);
+	return ecobj->QueryInterface(intf, iup);
+}
+
+HRESULT KServerContext::logon(const char *user, const char *pass)
+{
+	auto ret = m_mapi.Initialize();
+	if (ret != hrSuccess)
+		return kc_perror("MAPIInitialize", ret);
+	if (user == nullptr)
+		user = pass = KOPANO_SYSTEM_USER;
+	ret = HrOpenECSession(&~m_session, "storeadm", PROJECT_VERSION,
+	      user, pass, m_host, m_ses_flags, m_ssl_keyfile, m_ssl_keypass);
+	if (ret != hrSuccess)
+		return kc_perror("OpenECSession", ret);
+	ret = HrOpenDefaultStore(m_session, &~m_admstore);
+	if (ret != hrSuccess)
+		return kc_perror("HrOpenDefaultStore", ret);
+	memory_ptr<SPropValue> props;
+	ret = HrGetOneProp(m_admstore, PR_EC_OBJECT, &~props);
+	if (ret != hrSuccess)
+		return kc_perror("HrGetOneProp PR_EC_OBJECT", ret);
+	m_ecobject.reset(reinterpret_cast<IUnknown *>(props->Value.lpszA));
+	ret = m_ecobject->QueryInterface(IID_IECServiceAdmin, &~m_svcadm);
+	if (ret != hrSuccess)
+		return kc_perror("QueryInterface IECServiceAdmin", ret);
 	return hrSuccess;
 }
 

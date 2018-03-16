@@ -122,7 +122,7 @@ MAPINAMEID mnNamedProps[SIZE_NAMEDPROPS] = {
  */
 HRESULT HrLookupNames(IMAPIProp *lpPropObj, LPSPropTagArray *lppNamedProps)
 {
-	KCHL::memory_ptr<MAPINAMEID *> lppNameIds;
+	memory_ptr<MAPINAMEID *> lppNameIds;
 	LPSPropTagArray lpNamedProps = NULL;
 
 	auto hr = MAPIAllocateBuffer(sizeof(MAPINAMEID *) * SIZE_NAMEDPROPS, &~lppNameIds);
@@ -130,10 +130,9 @@ HRESULT HrLookupNames(IMAPIProp *lpPropObj, LPSPropTagArray *lppNamedProps)
 		return hr;
 
 	for (int i = 0; i < SIZE_NAMEDPROPS; ++i) {
-		hr = MAPIAllocateMore(sizeof(MAPINAMEID), lppNameIds, (void**)&lppNameIds[i] );
+		hr = KAllocCopy(&mnNamedProps[i], sizeof(MAPINAMEID), reinterpret_cast<void **>(&lppNameIds[i]), lppNameIds);
 		if (hr != hrSuccess)
 			return hr;
-		memcpy(lppNameIds[i], &mnNamedProps[i], sizeof(MAPINAMEID) );
 		if (mnNamedProps[i].ulKind == MNID_STRING && nmStringNames[i])
 			lppNameIds[i]->Kind.lpwstrName = (WCHAR*)nmStringNames[i];
 	}

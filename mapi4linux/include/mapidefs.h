@@ -66,12 +66,7 @@
  */
 #define MAPI_UNICODE            ((ULONG) 0x80000000)
 
-#ifdef UNICODE
 #define fMapiUnicode            MAPI_UNICODE
-#else
-#define fMapiUnicode            0
-#endif
-
 
 #define hrSuccess		0
 
@@ -186,19 +181,11 @@ typedef struct MAPIUID *LPMAPIUID;
  *  dereferenced to obtain the string pointer.
  */
 
-#ifdef  UNICODE
 #define PT_TSTRING          PT_UNICODE
 #define PT_MV_TSTRING       (MV_FLAG|PT_UNICODE)
 #define LPSZ                lpszW
 #define LPPSZ               lppszW
 #define MVSZ                MVszW
-#else
-#define PT_TSTRING          PT_STRING8
-#define PT_MV_TSTRING       (MV_FLAG|PT_STRING8)
-#define LPSZ                lpszA
-#define LPPSZ               lppszA
-#define MVSZ                MVszA
-#endif
 
 
     /* Property Tags */
@@ -1044,8 +1031,7 @@ public:
 				 LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
 	virtual HRESULT CreateFolder(ULONG folder_type, const TCHAR *name, const TCHAR *comment, const IID *intf, ULONG flags, IMAPIFolder **) = 0;
-    virtual HRESULT CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName,
-			       ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
+	virtual HRESULT CopyFolder(ULONG eid_size, const ENTRYID *eid, const IID *intf, void *dest_fld, const TCHAR *newname, ULONG_PTR ui_param, IMAPIProgress *, ULONG flags) = 0;
 	virtual HRESULT DeleteFolder(ULONG eid_size, const ENTRYID *, ULONG ui_param, IMAPIProgress *, ULONG flags) = 0;
     virtual HRESULT SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) = 0;
 	virtual HRESULT GetMessageStatus(ULONG eid_size, const ENTRYID *, ULONG flags, ULONG *status) = 0;

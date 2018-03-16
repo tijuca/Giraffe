@@ -21,6 +21,7 @@
 #include <new>
 #include <type_traits>
 #include <climits>
+#include <cstdlib>
 #include <poll.h>
 #include "mapidefs.h"
 #include <mapix.h>
@@ -50,14 +51,15 @@
 #include <unicode/uclean.h>
 #include <openssl/ssl.h>
 
+using namespace KC;
+
 struct HandlerArgs {
     ECChannel *lpChannel;
 	bool bUseSSL;
 };
 
 static bool g_bDaemonize = true;
-static bool g_bQuit = false;
-static bool g_bThreads = false;
+static bool g_bQuit, g_bThreads, g_dump_config;
 static ECLogger *g_lpLogger = NULL;
 static ECConfig *g_lpConfig = NULL;
 static pthread_t mainthread;
@@ -176,6 +178,7 @@ int main(int argc, char **argv) {
 	};
 	enum {
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS = UCHAR_MAX + 1,
+		OPT_DUMP_CONFIG,
 	};
 
 	static const struct option long_options[] = {
@@ -184,6 +187,7 @@ int main(int argc, char **argv) {
 		{"version", no_argument, NULL, 'v'},
 		{"foreground", no_argument, NULL, 'F'},
 		{"ignore-unknown-config-options", 0, NULL, OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS },
+		{"dump-config", no_argument, nullptr, OPT_DUMP_CONFIG},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -205,6 +209,9 @@ int main(int argc, char **argv) {
 			break;
 		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
 			bIgnoreUnknownConfigOptions = true;
+			break;
+		case OPT_DUMP_CONFIG:
+			g_dump_config = true;
 			break;
 		case 'V':
 			PrintVersion();
@@ -232,6 +239,8 @@ int main(int argc, char **argv) {
 		LogConfigErrors(g_lpConfig);
 		goto exit;
 	}
+	if (g_dump_config)
+		return g_lpConfig->dump_config(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoICal");
 	if (!g_lpLogger) {
@@ -586,7 +595,7 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 	std::string strCharset;
 	std::string strUserAgent, strUserAgentVersion;
 	std::unique_ptr<ProtocolBase> lpBase;
-	KCHL::object_ptr<IMAPISession> lpSession;
+	KC::object_ptr<IMAPISession> lpSession;
 	Http lpRequest(lpChannel, g_lpConfig);
 	ULONG ulFlag = 0;
 

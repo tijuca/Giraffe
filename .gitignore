@@ -36,11 +36,14 @@ stamp-h2
 /kopano-gateway
 /kopano-ical
 /kopano-monitor
+/kopano-oof
 /kopano-passwd
 /kopano-pst-import
 /kopano-server
 /kopano-spooler
+/kopano-srvadm
 /kopano-stats
+/kopano-storeadm
 /mapitime
 /rosie-test
 /rtfcomp
@@ -52,6 +55,8 @@ stamp-h2
 /ECtools/backup/build/
 /ECtools/backup/staging/
 /ECtools/cli/kopano-cli
+/ECtools/cli/build/
+/ECtools/cli/staging/
 /ECtools/presence/kopano-presence
 /ECtools/presence/build/
 /ECtools/presence/staging/
@@ -60,10 +65,15 @@ stamp-h2
 /ECtools/search/staging/
 /ECtools/migration-pst/kopano-migration-pst
 /ECtools/spamd/kopano-spamd
+/ECtools/utils/kopano-mr-accept.py
+/ECtools/utils/kopano-mr-process.py
+/ECtools/utils/kopano-autorespond.py
 /ECtools/search/kopano_search/version.py
 /ECtools/backup/kopano_backup/version.py
+/ECtools/rest/kopano_rest/version.py
 /ECtools/cli/kopano_cli/version.py
 /ECtools/spamd/kopano_spamd/version.py
+/ECtools/utils/kopano_utils/version.py
 /swig/python/kopano/kopano/version.py
 
 # /autoconf/
@@ -102,9 +112,6 @@ stamp-h2
 /installer/linux/ldap.active-directory.cfg
 /installer/linux/ldapms.openldap.cfg
 /installer/linux/ldapms.active-directory.cfg
-/installer/linux/kopano-mr-accept.py
-/installer/linux/kopano-mr-process.py
-/installer/linux/kopano-autorespond.py
 
 # /installer/userscripts/
 /installer/userscripts/creategroup

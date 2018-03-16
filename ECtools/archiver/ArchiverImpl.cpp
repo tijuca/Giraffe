@@ -49,7 +49,7 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 			return FileNotFound;
 	} else if (m_lpsConfig->HasErrors()) {
 		if (!(ulFlags & InhibitErrorLogging)) {
-			KCHL::object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
+			object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
 			ec_log_set(lpLogger);
 			LogConfigErrors(m_lpsConfig.get());
 		}
@@ -70,9 +70,9 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 		// as that would give duplicate messages
 		auto lpFileLogger = dynamic_cast<ECLogger_File *>(m_lpLogLogger.get());
 		if (lpFileLogger == NULL || !lpFileLogger->IsStdErr()) {
-			KCHL::object_ptr<ECLogger_Tee> lpTeeLogger(new ECLogger_Tee, false);
+			object_ptr<ECLogger_Tee> lpTeeLogger(new ECLogger_Tee, false);
 			lpTeeLogger->AddLogger(m_lpLogLogger);
-			KCHL::object_ptr<ECLogger_File> lpConsoleLogger(new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false), false);
+			object_ptr<ECLogger_File> lpConsoleLogger(new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false), false);
 			lpTeeLogger->AddLogger(lpConsoleLogger);
 			m_lpLogger.reset(lpTeeLogger);
 		} else {
@@ -85,6 +85,8 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 	ec_log_set(m_lpLogger);
 	if (m_lpsConfig->HasWarnings())
 		LogConfigErrors(m_lpsConfig.get());
+	if (ulFlags & DumpConfig)
+		return m_lpsConfig->dump_config(stdout) == 0 ? Success : Failure;
 	if (m_MAPI.Initialize(&sMapiInit) != hrSuccess)
 		return Failure;
 	if (ArchiverSession::Create(m_lpsConfig.get(), m_lpLogger, &m_ptrSession) != hrSuccess)

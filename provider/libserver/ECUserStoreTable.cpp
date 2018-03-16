@@ -45,8 +45,8 @@ ECRESULT ECUserStoreTable::Create(ECSession *lpSession, unsigned int ulFlags, co
 }
 
 ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis,
-    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
-    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct soap *soap, ECSession *lpSession, const ECObjectTableList *lpRowList,
+    const struct propTagArray *lpsPropTagArray, const void *lpObjectData,
     struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
 	auto pThis = dynamic_cast<ECUserStoreTable *>(lpThis);
@@ -154,7 +154,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis,
 			case PROP_ID(PR_LAST_MODIFICATION_TIME):
 				if (pThis->m_mapUserStoreData[row.ulObjId].tModTime != 0) {
 					FILETIME ftTmp;
-					UnixTimeToFileTime(pThis->m_mapUserStoreData[row.ulObjId].tModTime, &ftTmp);
+					ftTmp = UnixTimeToFileTime(pThis->m_mapUserStoreData[row.ulObjId].tModTime);
 
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_hilo;
@@ -293,14 +293,8 @@ ECRESULT ECUserStoreTable::Load() {
 			sUserStore.ulObjId = 0;
 
 		sUserStore.tModTime = 0;
-		if(lpDBRow[MODTIME_HI] && lpDBRow[MODTIME_LO]) {
-			FILETIME ft;
-			ft.dwHighDateTime = atoui(lpDBRow[MODTIME_HI]);
-			ft.dwLowDateTime =  atoui(lpDBRow[MODTIME_LO]);
-			sUserStore.tModTime = 0;
-			FileTimeToUnixTime(ft, &sUserStore.tModTime);
-		}
-
+		if (lpDBRow[MODTIME_HI] != nullptr && lpDBRow[MODTIME_LO] != nullptr)
+			sUserStore.tModTime = FileTimeToUnixTime({atoui(lpDBRow[MODTIME_LO]), atoui(lpDBRow[MODTIME_HI])});
 		if(lpDBRow[STORESIZE])
 			sUserStore.ullStoreSize = atoll(lpDBRow[STORESIZE]);
 		else

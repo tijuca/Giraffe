@@ -25,7 +25,6 @@
 #include "IECPropStorage.h"
 
 #include <kopano/kcodes.h>
-#include "soapKCmdProxy.h"
 #include "WSTransport.h"
 
 #include <mapi.h>
@@ -35,13 +34,15 @@ namespace KC {
 class convert_context;
 }
 
+class KCmdProxy;
+
 class WSMAPIPropStorage _kc_final : public ECUnknown, public IECPropStorage {
 protected:
-	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *);
+	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmdProxy *, std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *);
 	virtual ~WSMAPIPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmd * , std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *, WSMAPIPropStorage **);
+	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmdProxy * , std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *, WSMAPIPropStorage **);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	// For ICS
@@ -58,23 +59,20 @@ private:
 	virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
 
 	// Save complete object to server
-	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
+	virtual HRESULT HrSaveObject(ULONG flags, MAPIOBJECT *lpSavedObjects);
 
 	// Load complete object from server
 	virtual HRESULT HrLoadObject(MAPIOBJECT **lppsMapiObject);
-
-	virtual IECPropStorage* GetServerStorage();
+	virtual IECPropStorage *GetServerStorage() override { return this; }
 
 	/* very private */
-	virtual ECRESULT EcFillPropTags(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj);
-	virtual ECRESULT EcFillPropValues(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj);
-	virtual HRESULT HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, struct saveObject *lpSaveObj, convert_context *lpConverter);
-	virtual HRESULT HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct saveObject *lpsSaveObj, convert_context *lpConverter);
+	virtual ECRESULT EcFillPropTags(const struct saveObject *, MAPIOBJECT *);
+	virtual ECRESULT EcFillPropValues(const struct saveObject *, MAPIOBJECT *);
+	virtual HRESULT HrMapiObjectToSoapObject(const MAPIOBJECT *, struct saveObject *, convert_context *);
+	virtual HRESULT HrUpdateSoapObject(const MAPIOBJECT *, struct saveObject *, convert_context *);
 	virtual void    DeleteSoapObject(struct saveObject *lpSaveObj);
-	virtual HRESULT HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct saveObject *lpsServerObj);
-
-	virtual ECRESULT ECSoapObjectToMapiObject(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObject);
-
+	virtual HRESULT HrUpdateMapiObject(MAPIOBJECT *, const struct saveObject *);
+	virtual ECRESULT ECSoapObjectToMapiObject(const struct saveObject *, MAPIOBJECT *);
 	virtual HRESULT LockSoap();
 	virtual HRESULT UnLockSoap();
 
@@ -86,7 +84,7 @@ private:
 private:
 	entryId			m_sEntryId;
 	entryId			m_sParentEntryId;
-	KCmd*		lpCmd;
+	KCmdProxy *lpCmd;
 	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;
 	unsigned int	ulServerCapabilities;

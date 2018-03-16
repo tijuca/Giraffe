@@ -30,6 +30,8 @@
 #define LOG_SQL_DEBUG(_msg, ...) \
 	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_SQL, _msg, ##__VA_ARGS__)
 
+namespace KC {
+
 DB_RESULT::~DB_RESULT(void)
 {
 	if (m_res == nullptr)
@@ -189,7 +191,7 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 		return KCERR_DATABASE_ERROR;
 	}
 	ec_log_notice("Create database %s", dbname);
-	er = IsInnoDBSupported();
+	er = IsEngineSupported(cfg->GetSetting("mysql_engine"));
 	if (er != erSuccess)
 		return er;
 
@@ -209,9 +211,12 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 	return erSuccess;
 }
 
-ECRESULT KDatabase::CreateTables(void)
+ECRESULT KDatabase::CreateTables(ECConfig *cfg)
 {
 	auto tables = GetDatabaseDefs();
+	auto engine = cfg->GetSetting("mysql_engine");
+	if (engine == nullptr)
+		engine = "InnoDB";
 
 	for (size_t i = 0; tables[i].lpSQL != nullptr; ++i) {
 		DB_RESULT result;
@@ -228,8 +233,7 @@ ECRESULT KDatabase::CreateTables(void)
 		}
 
 		ec_log_info("Create table: %s", tables[i].lpComment);
-
-		er = DoInsert(tables[i].lpSQL);
+		er = DoInsert(format(tables[i].lpSQL, engine));
 		if (er != erSuccess)
 			return er;
 	}
@@ -456,10 +460,12 @@ ECRESULT KDatabase::InitEngine(bool reconnect)
 	return erSuccess;
 }
 
-ECRESULT KDatabase::IsInnoDBSupported(void)
+ECRESULT KDatabase::IsEngineSupported(const char *engine)
 {
 	DB_RESULT res;
 	DB_ROW row = nullptr;
+	if (engine == nullptr)
+		engine = "InnoDB";
 
 	auto er = DoSelect("SHOW ENGINES", &res);
 	if (er != erSuccess) {
@@ -468,21 +474,23 @@ ECRESULT KDatabase::IsInnoDBSupported(void)
 	}
 
 	while ((row = res.fetch_row()) != nullptr) {
-		if (strcasecmp(row[0], "InnoDB") != 0)
+		if (strcasecmp(row[0], engine) != 0)
 			continue;
 		if (strcasecmp(row[1], "DISABLED") == 0) {
 			// mysql has run with innodb enabled once, but disabled this.. so check your log.
-			ec_log_crit("INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
+			ec_log_crit("The \"%s\" engine is disabled in MySQL and needs to be reactivated. "
+				"Check your MySQL log for more information, and, if applicable, "
+				"drop \"skip-innodb\" from the MySQL configuration file.", engine);
 			return KCERR_DATABASE_ERROR;
 		} else if (strcasecmp(row[1], "YES") != 0 && strcasecmp(row[1], "DEFAULT") != 0) {
 			// mysql is incorrectly configured or compiled.
-			ec_log_crit("INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
+			ec_log_crit("The \"%s\" engine is not supported and needs to be enabled in the MySQL configuration file.", engine);
 			return KCERR_DATABASE_ERROR;
 		}
 		break;
 	}
 	if (row == nullptr) {
-		ec_log_crit("Unable to find 'InnoDB' engine from the mysql server. Probably INNODB is not supported.");
+		ec_log_crit("Unable to find the \"%s\" engine in the MySQL server. It probably is not supported at all.", engine);
 		return KCERR_DATABASE_ERROR;
 	}
 	return erSuccess;
@@ -577,3 +585,5 @@ ECRESULT kd_trans::rollback()
 	m_done = true;
 	return ret;
 }
+
+} /* namespace */

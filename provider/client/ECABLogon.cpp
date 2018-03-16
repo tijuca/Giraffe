@@ -33,7 +33,7 @@
 #include <kopano/stringutil.h>
 #include "pcutil.hpp"
 
-using namespace KCHL;
+using namespace KC;
 
 ECABLogon::ECABLogon(LPMAPISUP lpMAPISup, WSTransport *lpTransport,
     ULONG ulProfileFlags, const GUID *lpGUID) :
@@ -126,11 +126,9 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 	} else {
 		if (cbEntryID == 0 || lpEntryID == nullptr || cbEntryID < sizeof(ABEID))
 			return MAPI_E_UNKNOWN_ENTRYID;
-		hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryIDServer);
+		hr = KAllocCopy(lpEntryID, cbEntryID, &~lpEntryIDServer);
 		if(hr != hrSuccess)
 			return hr;
-
-		memcpy(lpEntryIDServer, lpEntryID, cbEntryID);
 		lpEntryID = lpEntryIDServer;
 		memcpy(&lpABeid, lpEntryID, sizeof(ABEID));
 
@@ -231,7 +229,8 @@ HRESULT ECABLogon::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
 	return hrSuccess;
 }
 
-HRESULT ECABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
+HRESULT ECABLogon::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
 {
 	HRESULT hr = hrSuccess;
 
@@ -259,7 +258,9 @@ HRESULT ECABLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpu
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECABLogon::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling)
+HRESULT ECABLogon::OpenTemplateID(ULONG tpl_size, const ENTRYID *tpl_eid,
+    ULONG tpl_flags, IMAPIProp *propdata, const IID *intf, IMAPIProp **propnew,
+    IMAPIProp *sibling)
 {
 	return MAPI_E_NO_SUPPORT;
 }

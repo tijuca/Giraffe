@@ -18,7 +18,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <kopano/charset/convert.h>
 #include <climits>
 #include <cmath>
 #include <getopt.h>
@@ -37,7 +36,7 @@
 #include <kopano/MAPIErrors.h>
 #include <kopano/ECLogger.h>
 
-using namespace KCHL;
+using namespace KC;
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -83,13 +82,10 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 	memory_ptr<ENTRYID> lpUserId;
 	memory_ptr<SPropValue> lpPropValue;
 	memory_ptr<ECUSER> lpECUser;
-	convert_context converter;
-	auto strwUsername = converter.convert_to<std::wstring>(lpUsername);
-	auto strwPassword = converter.convert_to<std::wstring>(lpPassword);
 	if (!verbose)
 		ec_log_get()->SetLoglevel(0);
 	auto hr = HrOpenECSession(&~lpSession, PROJECT_VERSION, "passwd",
-	          strwUsername.c_str(), strwPassword.c_str(), lpPath,
+	          lpUsername, lpPassword, lpPath,
 	          EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
 	          nullptr, nullptr);
 	if(hr != hrSuccess) {

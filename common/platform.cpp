@@ -34,18 +34,13 @@
 
 namespace KC {
 
-HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
+FILETIME UnixTimeToFileTime(time_t t)
 {
-    __int64 l;
-
-    l = (__int64)t * 10000000 + NANOSECS_BETWEEN_EPOCHS;
-    ft->dwLowDateTime = (unsigned int)l;
-    ft->dwHighDateTime = (unsigned int)(l >> 32);
-
-	return hrSuccess;
+	auto l = static_cast<int64_t>(t) * 10000000 + NANOSECS_BETWEEN_EPOCHS;
+	return {static_cast<DWORD>(l), static_cast<DWORD>(l >> 32)};
 }
 
-HRESULT FileTimeToUnixTime(const FILETIME &ft, time_t *t)
+time_t FileTimeToUnixTime(const FILETIME &ft)
 {
 	__int64 l;
 
@@ -60,10 +55,7 @@ HRESULT FileTimeToUnixTime(const FILETIME &ft, time_t *t)
 		if (l > static_cast<__int64>(INT_MAX))
 			l = INT_MAX;
 	}
-
-	*t = (time_t)l;
-
-	return hrSuccess;
+	return l;
 }
 
 void UnixTimeToFileTime(time_t t, int *hi, unsigned int *lo)
@@ -75,64 +67,46 @@ void UnixTimeToFileTime(time_t t, int *hi, unsigned int *lo)
 	*hi = (unsigned int)(ll >> 32);
 }
 
-time_t FileTimeToUnixTime(unsigned int hi, unsigned int lo)
+/* Convert from FILETIME to time_t *and* string repr */
+int FileTimeToTimestamp(const FILETIME &ft, time_t &ts, char *buf, size_t size)
 {
-	time_t t = 0;
-	FILETIME ft;
-	ft.dwHighDateTime = hi;
-	ft.dwLowDateTime = lo;
-	
-	if(FileTimeToUnixTime(ft, &t) != hrSuccess)
-		return 0;
-	
-	return t;
+	ts = FileTimeToUnixTime(ft);
+	auto tm = localtime(&ts);
+	if (tm == nullptr)
+		return -1;
+	strftime(buf, size, "%F %T", tm);
+	return 0;
 }
 
 static const LONGLONG UnitsPerMinute = 600000000;
 static const LONGLONG UnitsPerHalfMinute = 300000000;
 
-void RTimeToFileTime(LONG rtime, FILETIME *pft)
+static FILETIME RTimeToFileTime(LONG rtime)
 {
-	// assert(pft != NULL);
-	ULONGLONG q = rtime;
-	q *= UnitsPerMinute;
-	pft->dwLowDateTime  = q & 0xFFFFFFFF;
-	pft->dwHighDateTime = q >> 32;
+	auto q = static_cast<ULONGLONG>(rtime) * UnitsPerMinute;
+	return {static_cast<DWORD>(q & 0xFFFFFFFF), static_cast<DWORD>(q >> 32)};
 }
  
-void FileTimeToRTime(const FILETIME *pft, LONG *prtime)
+LONG FileTimeToRTime(const FILETIME &pft)
 {
-	// assert(pft != NULL);
-	// assert(prtime != NULL);
-	ULONGLONG q = pft->dwHighDateTime;
+	ULONGLONG q = pft.dwHighDateTime;
 	q <<= 32;
-	q |= pft->dwLowDateTime;
-
+	q |= pft.dwLowDateTime;
 	q += UnitsPerHalfMinute;
 	q /= UnitsPerMinute;
-	*prtime = q & 0x7FFFFFFF;
+	return q & 0x7FFFFFFF;
 }
 
-HRESULT RTimeToUnixTime(LONG rtime, time_t *unixtime)
+time_t RTimeToUnixTime(LONG rtime)
 {
-	FILETIME ft;
-
-	if (unixtime == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-	RTimeToFileTime(rtime, &ft);
-	FileTimeToUnixTime(ft, unixtime);
-	return hrSuccess;
+	return FileTimeToUnixTime(RTimeToFileTime(rtime));
 }
 
-HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
+LONG UnixTimeToRTime(time_t unixtime)
 {
 	FILETIME ft;
-
-	if (rtime == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-	UnixTimeToFileTime(unixtime, &ft);
-	FileTimeToRTime(&ft, rtime);
-	return hrSuccess;
+	ft = UnixTimeToFileTime(unixtime);
+	return FileTimeToRTime(ft);
 }
 
 /* The 'IntDate' and 'IntTime' date and time encoding are used for some CDO calculations. They
@@ -174,12 +148,7 @@ bool operator<=(const FILETIME &a, const FILETIME &b) noexcept
 
 time_t operator -(const FILETIME &a, const FILETIME &b)
 {
-	time_t aa, bb;
-
-	FileTimeToUnixTime(a, &aa);
-	FileTimeToUnixTime(b, &bb);
-
-	return aa - bb;
+	return FileTimeToUnixTime(a) - FileTimeToUnixTime(b);
 }
 
 #ifndef HAVE_TIMEGM
@@ -209,10 +178,9 @@ time_t timegm(struct tm *t) {
 }
 #endif
 
-struct tm* gmtime_safe(const time_t* timer, struct tm *result)
+struct tm *gmtime_safe(time_t t, struct tm *result)
 {
-	struct tm *tmp = NULL;
-	tmp = gmtime_r(timer, result);
+	auto tmp = gmtime_r(&t, result);
 	if(tmp == NULL)
 		memset(result, 0, sizeof(struct tm));
 
@@ -228,7 +196,7 @@ double timespec2dbl(const struct timespec &t)
 int CreatePath(const char *createpath)
 {
 	struct stat s;
-	std::unique_ptr<char[], KCHL::cstdlib_deleter> path(strdup(createpath));
+	std::unique_ptr<char[], cstdlib_deleter> path(strdup(createpath));
 
 	// Remove trailing slashes
 	size_t len = strlen(path.get());

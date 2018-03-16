@@ -54,6 +54,8 @@
  */
 #define PWBUFSIZE 16384
 
+using namespace KC;
+
 extern "C" {
 
 UserPlugin *getUserPluginInstance(std::mutex &pluginlock,
@@ -68,14 +70,15 @@ UserPlugin *getUserPluginInstance(std::mutex &pluginlock,
 
 unsigned long getUserPluginVersion()
 {
-	return PROJECT_VERSION_REVISION;
+	return 1;
 }
+
+const char kcsrv_plugin_version[] = PROJECT_VERSION;
 
 } /* extern "C" */
 
 using std::runtime_error;
 using std::string;
-//using std::vector;
 
 UnixUserPlugin::UnixUserPlugin(std::mutex &pluginlock,
     ECPluginSharedData *shareddata) :
@@ -239,13 +242,13 @@ objectsignature_t UnixUserPlugin::resolveName(objectclass_t objclass, const stri
 		// we have a duplicate entry.
 		try {
 			user = resolveUserName(name);
-		} catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			// object is not a user
 		}
 
 		try {
 			group = resolveGroupName(name);
-		} catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			// object is not a group
 		}
 
@@ -471,7 +474,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 		return objectlist;
 	}
 
-	// check if we have obsolute objects
+	/* check if we have obsolete objects */
 	ulRows = lpResult.get_num_rows();
 	if (!ulRows)
 		return objectlist;
@@ -513,7 +516,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 		strSubQuery += "(o.externid IN (" + iterStrings->second + ") AND o.objectclass = " + stringify(iterStrings->first) + ")";
 	}
 
-	// remove obsolute object properties
+	/* remove obsolete object properties */
 	strQuery =
 		"DELETE FROM " + (string)DB_OBJECTPROPERTY_TABLE + " "
 		"WHERE objectid IN (" + strSubQuery + ")";
@@ -648,7 +651,7 @@ UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation,
 	try {
 		findGroupID(tostring(pws.pw_gid), &grs, buffer);
 		objectlist.emplace_back(objectid_t(tostring(grs.gr_gid), DISTLIST_SECURITY), grs.gr_name);
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		// Ignore error
 	}	
 
@@ -711,7 +714,7 @@ UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
 	for (unsigned int i = 0; grp.gr_mem[i] != NULL; ++i)
 		try {
 			objectlist.emplace_back(resolveUserName(grp.gr_mem[i]));
-		} catch (std::exception &e) {
+		} catch (const std::exception &e) {
 			// Ignore error
 		}
 
@@ -772,8 +775,8 @@ UnixUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 	LOG_PLUGIN_DEBUG("%s %s flags:%x", __FUNCTION__, match.c_str(), ulFlags);
 
 	ulock_normal biglock(m_plugin_lock);
-	objectlist.merge(getAllUserObjects());
-	objectlist.merge(getAllGroupObjects());
+	objectlist.merge(getAllUserObjects(match, ulFlags));
+	objectlist.merge(getAllGroupObjects(match, ulFlags));
 	biglock.unlock();
 
 	// See if we get matches based on database details as well
@@ -788,7 +791,7 @@ UnixUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 				continue;
 			objectlist.emplace_back(sig.id, sig.signature + pw->pw_gecos + pw->pw_name);
 		}
-	} catch (objectnotfound &e) {
+	} catch (const objectnotfound &e) {
 			// Ignore exception, we will check lObjects.empty() later.
 	} // All other exceptions should be thrown further up the chain.
 
@@ -826,8 +829,7 @@ UnixUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 	for (const auto &id : objectids) {
 		try {
 			mapdetails[id] = this->getObjectDetails(id);
-		}
-		catch (objectnotfound &e) {
+		} catch (const objectnotfound &e) {
 			// ignore not found error
 		}
 	}
@@ -938,4 +940,3 @@ void UnixUserPlugin::errnoCheck(const std::string &user, int e) const
 		throw runtime_error(string("unable to query for user ") + user + string(". Error: ") + retbuf);
 	};
 }
-

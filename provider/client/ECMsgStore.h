@@ -41,6 +41,7 @@ class convstring;
 class utf8string;
 }
 
+using namespace KC;
 class ECMessage;
 class ECMAPIFolder;
 
@@ -98,18 +99,16 @@ public:
 	virtual HRESULT DeleteFromMasterOutgoingTable(ULONG cbEntryId, const ENTRYID *lpEntryId, ULONG ulFlags);
 
 	// IECServiceAdmin
-	virtual HRESULT CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG* lpcbStoreId, LPENTRYID* lppStoreId, ULONG* lpcbRootId, LPENTRYID *lppRootId);
-	virtual HRESULT CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG* lpcbStoreId, LPENTRYID* lppStoreId, ULONG* lpcbRootId, LPENTRYID* lppRootId);
-	virtual HRESULT HookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, LPGUID lpGuid);
-	virtual HRESULT UnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId);
-	virtual HRESULT RemoveStore(LPGUID lpGuid);
-	virtual HRESULT ResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
+	virtual HRESULT CreateStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG *newstore_size, ENTRYID **newstore_eid, ULONG *root_size, ENTRYID **root_eid) override;
+	virtual HRESULT CreateEmptyStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG flags, ULONG *newstore_size, ENTRYID **newstore_eid, ULONG *root_size, ENTRYID **root_eid) override;
+	virtual HRESULT ResolveStore(const GUID *, ULONG *user_id, ULONG *store_size, ENTRYID **store_eid) override;
+	virtual HRESULT HookStore(ULONG store_type, ULONG eid_size, const ENTRYID *eid, const GUID *guid) override;
+	virtual HRESULT UnhookStore(ULONG store_type, ULONG eid_size, const ENTRYID *eid) override;
+	virtual HRESULT RemoveStore(const GUID *) override;
 	virtual HRESULT CreateUser(ECUSER *lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId);
 	virtual HRESULT DeleteUser(ULONG cbUserId, LPENTRYID lpUserId);
-	virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers) _kc_override;
-	virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups) _kc_override;
 	virtual HRESULT SetUser(ECUSER *lpECUser, ULONG ulFlags);
-	virtual HRESULT GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ECUSER **lppECUser);
+	virtual HRESULT GetUser(ULONG eid_size, const ENTRYID *user_eid, ULONG flags, ECUSER **) override;
 	virtual HRESULT ResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId);
 	virtual HRESULT GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders);
 	virtual HRESULT AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId);
@@ -119,7 +118,7 @@ public:
 	virtual HRESULT CreateGroup(ECGROUP *lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId);
 	virtual HRESULT DeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId);
 	virtual HRESULT SetGroup(ECGROUP *lpECGroup, ULONG ulFlags);
-	virtual HRESULT GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ECGROUP **lppECGroup);
+	virtual HRESULT GetGroup(ULONG grp_size, const ENTRYID *grp_eid, ULONG flags, ECGROUP **) override;
 	virtual HRESULT ResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId);
 	virtual HRESULT DeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId);
 	virtual HRESULT AddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId);
@@ -128,9 +127,8 @@ public:
 	virtual HRESULT CreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId);
 	virtual HRESULT DeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId);
 	virtual HRESULT SetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags);
-	virtual HRESULT GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ECCOMPANY **lppECCompany);
+	virtual HRESULT GetCompany(ULONG cmp_size, const ENTRYID *cmp_eid, ULONG flags, ECCOMPANY **) override;
 	virtual HRESULT ResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId);
-	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies);
 	virtual HRESULT AddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId);
 	virtual HRESULT DelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId);
 	virtual HRESULT GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies);
@@ -156,7 +154,7 @@ public:
 	virtual HRESULT UnwrapNoRef(LPVOID *ppvObject);
 
 	// ECMultiStoreTable
-	virtual HRESULT OpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, LPMAPITABLE *lppTable);
+	virtual HRESULT OpenMultiStoreTable(const ENTRYLIST *msglist, ULONG flags, IMAPITable **);
 
     // ECTestProtocol
 	virtual HRESULT TestPerform(const char *cmd, unsigned int argc, char **argv);
@@ -166,7 +164,7 @@ public:
 	// Called when session is reloaded
 	static HRESULT Reload(void *lpParam, ECSESSIONID sessionid);
 
-	static HRESULT TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType);
+	static HRESULT TableRowGetProp(void *prov, const struct propVal *src, SPropValue *dst, void **base, ULONG type);
 
 	// ICS Streaming
 	virtual HRESULT ExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag, const std::vector<ICSCHANGE> &sChanges, ULONG ulStart, ULONG ulCount, const SPropTagArray *lpsProps, WSMessageStreamExporter **lppsStreamExporter);
@@ -186,8 +184,7 @@ public:
 	HRESULT GetWrappedStoreEntryID(ULONG* lpcbWrapped, LPENTRYID* lppWrapped);
 	//Special wrapper for the spooler vs outgoing queue
 	HRESULT GetWrappedServerStoreEntryID(ULONG cbEntryId, LPBYTE lpEntryId, ULONG* lpcbWrapped, LPENTRYID* lppWrapped);
-
-	HRESULT InternalAdvise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	HRESULT InternalAdvise(ULONG eid_size, const ENTRYID *, ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn);
 private:
 	HRESULT CreateSpecialFolder(LPMAPIFOLDER lpFolderParent, ECMAPIProp *lpFolderPropSet, const TCHAR *lpszFolderName, const TCHAR *lpszFolderComment, unsigned int ulPropTag, unsigned int ulMVPos, const TCHAR *lpszContainerClass, LPMAPIFOLDER *lppMAPIFolder);
 	HRESULT SetSpecialEntryIdOnFolder(LPMAPIFOLDER lpFolder, ECMAPIProp *lpFolderPropSet, unsigned int ulPropTag, unsigned int ulMVPos);
@@ -229,17 +226,17 @@ public:
 		virtual HRESULT CopyProps(const SPropTagArray *inclprop, ULONG ui_param, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG flags, LPSPropProblemArray *lppProblems) _kc_override;
 		virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
 		virtual HRESULT GetIDsFromNames(ULONG cNames, LPMAPINAMEID *ppNames, ULONG flags, LPSPropTagArray *pptaga) _kc_override;
-		virtual HRESULT OpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG flags, LPMAPITABLE *lppTable) _kc_override;
+		virtual HRESULT OpenMultiStoreTable(const ENTRYLIST *msglist, ULONG flags, IMAPITable **table) override;
 		virtual HRESULT TestPerform(const char *cmd, unsigned int argc, char **args) _kc_override;
 		virtual HRESULT TestSet(const char *name, const char *value) _kc_override;
 		virtual HRESULT TestGet(const char *name, char **value) _kc_override;
 	} m_xMsgStoreProxy;
 	
 public:
-	KCHL::object_ptr<IMAPISupport> lpSupport;
-	KCHL::object_ptr<WSTransport> lpTransport;
+	KC::object_ptr<IMAPISupport> lpSupport;
+	KC::object_ptr<WSTransport> lpTransport;
 	ECNamedProp lpNamedProp;
-	KCHL::object_ptr<ECNotifyClient> m_lpNotifyClient;
+	KC::object_ptr<ECNotifyClient> m_lpNotifyClient;
 	ULONG				m_ulProfileFlags;
 	MAPIUID				m_guidMDB_Provider;
 	unsigned int m_ulClientVersion = 0;
@@ -266,7 +263,7 @@ public:
 	HRESULT Logoff(ULONG *lpulFlags);
 	HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result);
-	HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	HRESULT Advise(ULONG eid_size, const ENTRYID *, ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn) override;
 	HRESULT Unadvise(ULONG ulConnection);
 	HRESULT OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPVOID *lppEntry);
 	ALLOC_WRAP_FRIEND;

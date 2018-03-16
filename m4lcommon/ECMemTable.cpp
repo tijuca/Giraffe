@@ -42,8 +42,6 @@
 // needed for htons()
 #include <netdb.h>
 
-using namespace KCHL;
-
 namespace KC {
 
 static constexpr const SizedSSortOrderSet(1, sSortDefault) = { 0, 0, 0, {} } ;
@@ -942,13 +940,9 @@ HRESULT ECMemTableView::ModifyRowKey(sObjectTableKey *lpsRowItem, sObjectTableKe
 HRESULT ECMemTableView::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 {
 	LPSSortOrderSet lpSortCriteria = NULL;
-
-	HRESULT hr = MAPIAllocateBuffer(CbSSortOrderSet(lpsSortOrderSet),
-	             reinterpret_cast<void **>(&lpSortCriteria));
+	auto hr = KAllocCopy(lpsSortOrderSet, CbSSortOrderSet(lpsSortOrderSet), reinterpret_cast<void **>(&lpSortCriteria));
 	if(hr != hrSuccess)
 		return hr;
-
-	memcpy(lpSortCriteria, lpsSortOrderSet, CbSSortOrderSet(lpsSortOrderSet));
 	*lppSortCriteria = lpSortCriteria;
 	return hrSuccess;
 }
@@ -993,7 +987,8 @@ HRESULT ECMemTableView::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppR
 	return QueryRowData(&sRowList, lppRows);
 }
 
-HRESULT ECMemTableView::QueryRowData(ECObjectTableList *lpsRowList, LPSRowSet *lppRows)
+HRESULT ECMemTableView::QueryRowData(const ECObjectTableList *lpsRowList,
+    SRowSet **lppRows)
 {
 	HRESULT hr = hrSuccess;
 	unsigned int i=0,j=0;
@@ -1064,20 +1059,17 @@ HRESULT ECMemTableView::QueryRowData(ECObjectTableList *lpsRowList, LPSRowSet *l
 				// PT_UNICODE requested, and PT_STRING8 provided. Do conversion.
 				prop.ulPropTag = PROP_TAG(PT_UNICODE, PROP_ID(lpsPropTags->aulPropTag[j]));
 				const auto strTmp = converter.convert_to<std::wstring>(lpsProp->Value.lpszA);
-				hr = MAPIAllocateMore((strTmp.size() + 1) * sizeof(std::wstring::value_type),
-				     lpRows[i].lpProps, reinterpret_cast<void **>(&prop.Value.lpszW));
+				hr = KAllocCopy(strTmp.c_str(), (strTmp.size() + 1) * sizeof(std::wstring::value_type), reinterpret_cast<void **>(&prop.Value.lpszW), lpRows[i].lpProps);
 				if (hr != hrSuccess)
 					return hr;
-				memcpy(prop.Value.lpszW, strTmp.c_str(), (strTmp.size() + 1) * sizeof(std::wstring::value_type));
 				continue; // Finished with this property
 			} else if (PROP_TYPE(lpsPropTags->aulPropTag[j]) == PT_STRING8 && PROP_TYPE(lpsProp->ulPropTag) == PT_UNICODE) {
 				// PT_STRING8 requested, and PT_UNICODE provided. Do conversion.
 				prop.ulPropTag = PROP_TAG(PT_STRING8, PROP_ID(lpsPropTags->aulPropTag[j]));
 				const auto strTmp = converter.convert_to<std::string>(lpsProp->Value.lpszW);
-				hr = MAPIAllocateMore(strTmp.size() + 1, lpRows[i].lpProps, reinterpret_cast<void **>(&prop.Value.lpszA));
+				hr = KAllocCopy(strTmp.c_str(), strTmp.size() + 1, reinterpret_cast<void **>(&prop.Value.lpszA), lpRows[i].lpProps);
 				if (hr != hrSuccess)
 					return hr;
-				memcpy(prop.Value.lpszA, strTmp.c_str(), strTmp.size() + 1);
 				continue; // Finished with this property
 			} else if (lpsPropTags->aulPropTag[j] == lpsProp->ulPropTag) {
 				// Exact property requested that we have

@@ -152,36 +152,39 @@ class IECImportHierarchyChanges : public IExchangeImportHierarchyChanges {
 class IECMultiStoreTable : public virtual IUnknown {
 	public:
 	/* ulFlags is currently unused */
-	virtual HRESULT OpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, LPMAPITABLE *lppTable) = 0;
+	virtual HRESULT OpenMultiStoreTable(const ENTRYLIST *msglist, ULONG flags, IMAPITable **) = 0;
 };
 
-class IECSecurity : public virtual IUnknown {
+class IECSecSvcAdm_base : public virtual IUnknown {
+	public:
+	virtual HRESULT GetUserList(ULONG cbCompanyId, const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers) = 0;
+	virtual HRESULT GetGroupList(ULONG cbCompanyId, const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups) = 0;
+	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies) = 0;
+};
+
+class IECSecurity : public virtual IECSecSvcAdm_base {
 	public:
 	virtual HRESULT GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner) = 0;
-	virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers) = 0;
-	virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups) = 0;
-	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies) = 0;
 	virtual HRESULT GetPermissionRules(int ulType, ULONG* lpcPermissions, ECPERMISSION **lppECPermissions) = 0;
-	virtual HRESULT SetPermissionRules(ULONG cPermissions, ECPERMISSION *lpECPermissions) = 0;
+	virtual HRESULT SetPermissionRules(ULONG nperm, const ECPERMISSION *) = 0;
 };
 
-class IECServiceAdmin : public virtual IUnknown {
+class IECServiceAdmin : public virtual IECSecSvcAdm_base {
 	public:
 	/* Create/Delete stores */
-	virtual HRESULT CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG *lpcbStoreId, LPENTRYID *lppStoreId, ULONG *lpcbRootId, LPENTRYID *lppRootId) = 0;
-	virtual HRESULT CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcbStoreId, LPENTRYID *lppStoreId, ULONG *lpcbRootId, LPENTRYID *lppRootId) = 0;
-	virtual HRESULT ResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG *lpcbStoreID, LPENTRYID *lppStoreID) = 0;
-	virtual HRESULT HookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, LPGUID lpGuid) = 0;
-	virtual HRESULT UnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId) = 0;
-	virtual HRESULT RemoveStore(LPGUID lpGuid) = 0;
+	virtual HRESULT CreateStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG *newstore_size, ENTRYID **newstore_eid, ULONG *root_size, ENTRYID **root_eid) = 0;
+	virtual HRESULT CreateEmptyStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG flags, ULONG *newstore_size, ENTRYID **newstore_eid, ULONG *root_size, ENTRYID **root_eid) = 0;
+	virtual HRESULT ResolveStore(const GUID *, ULONG *user_id, ULONG *store_size, ENTRYID **store_eid) = 0;
+	virtual HRESULT HookStore(ULONG store_type, ULONG eid_size, const ENTRYID *eid, const GUID *guid) = 0;
+	virtual HRESULT UnhookStore(ULONG store_type, ULONG eid_size, const ENTRYID *eid) = 0;
+	virtual HRESULT RemoveStore(const GUID *) = 0;
 
 	/* User functions */
 	virtual HRESULT CreateUser(ECUSER *lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId) = 0;
 	virtual HRESULT DeleteUser(ULONG cbUserId, LPENTRYID lpUserId) = 0;
 	virtual HRESULT SetUser(ECUSER *lpECUser, ULONG ulFlags) = 0;
-	virtual HRESULT GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ECUSER **lppECUser) = 0;
+	virtual HRESULT GetUser(ULONG eid_size, const ENTRYID *user_eid, ULONG flags, ECUSER **) = 0;
 	virtual HRESULT ResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId) = 0;
-	virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers) = 0;
 	virtual HRESULT GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders) = 0;
 	virtual HRESULT AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
 	virtual HRESULT DelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
@@ -194,9 +197,8 @@ class IECServiceAdmin : public virtual IUnknown {
 	virtual HRESULT CreateGroup(ECGROUP *lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId) = 0;
 	virtual HRESULT DeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId) = 0;
 	virtual HRESULT SetGroup(ECGROUP *lpECGroup, ULONG ulFlags) = 0;
-	virtual HRESULT GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ECGROUP **lppECGroup) = 0;
+	virtual HRESULT GetGroup(ULONG grp_size, const ENTRYID *grp_eid, ULONG flags, ECGROUP **) = 0;
 	virtual HRESULT ResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId) = 0;
-	virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups) = 0;
 	virtual HRESULT DeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId) = 0;
 	virtual HRESULT AddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId) = 0;
 	virtual HRESULT GetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers) = 0;
@@ -206,9 +208,8 @@ class IECServiceAdmin : public virtual IUnknown {
 	virtual HRESULT CreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId) = 0;
 	virtual HRESULT DeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId) = 0;
 	virtual HRESULT SetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags) = 0;
-	virtual HRESULT GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ECCOMPANY **lppECCompany) = 0;
+	virtual HRESULT GetCompany(ULONG cmp_size, const ENTRYID *cmp_eid, ULONG flags, ECCOMPANY **) = 0;
 	virtual HRESULT ResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId) = 0;
-	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies) = 0;
 	virtual HRESULT AddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId) = 0;
 	virtual HRESULT DelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId) = 0;
 	virtual HRESULT GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies) = 0;
@@ -241,7 +242,7 @@ class IECServiceAdmin : public virtual IUnknown {
 class IECSingleInstance : public virtual IUnknown {
 	public:
 	virtual HRESULT GetSingleInstanceId(ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID) = 0;
-	virtual HRESULT SetSingleInstanceId(ULONG cbInstanceID, LPENTRYID lpInstanceID) = 0;
+	virtual HRESULT SetSingleInstanceId(ULONG eid_size, const ENTRYID *eid) = 0;
 };
 
 // This is our special spooler interface
@@ -264,7 +265,10 @@ class IECTestProtocol : public virtual IUnknown {
 } /* namespace */
 
 IID_OF2(KC::IECChangeAdvisor, IECChangeAdvisor)
+IID_OF2(KC::IECMultiStoreTable, IECMultiStoreTable)
+IID_OF2(KC::IECSecurity, IECSecurity)
 IID_OF2(KC::IECServiceAdmin, IECServiceAdmin)
 IID_OF2(KC::IECSingleInstance, IECSingleInstance)
+IID_OF2(KC::IECSpooler, IECSpooler)
 
 #endif /* IECINTERFACES_HPP */

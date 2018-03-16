@@ -41,20 +41,20 @@ class SessionRestorer;
 struct providerEntry {
 	MAPIUID uid;
 	std::string servicename; // this provider belongs to service 'servicename'
-	KCHL::object_ptr<M4LProfSect> profilesection;
+	KC::object_ptr<M4LProfSect> profilesection;
 };
 
 struct serviceEntry {
     MAPIUID muid;
 	std::string servicename, displayname;
-	KCHL::object_ptr<M4LProviderAdmin> provideradmin;
+	KC::object_ptr<M4LProviderAdmin> provideradmin;
 	bool bInitialize;
 	SVCService* service;
 };
 
 struct profEntry {
 	std::string profname, password;
-	KCHL::object_ptr<M4LMsgServiceAdmin> serviceadmin;
+	KC::object_ptr<M4LMsgServiceAdmin> serviceadmin;
 };
 
 class M4LProfAdmin _kc_final : public M4LUnknown, public IProfAdmin {
@@ -85,7 +85,7 @@ class M4LMsgServiceAdmin _kc_final : public M4LUnknown, public IMsgServiceAdmin2
 private:
 	std::list<std::unique_ptr<providerEntry> > providers;
 	std::list<std::unique_ptr<serviceEntry> > services;
-	KCHL::object_ptr<M4LProfSect> profilesection; // Global Profile Section
+	KC::object_ptr<M4LProfSect> profilesection; // Global Profile Section
 	/* guards content in service (and provider) list */
 	std::recursive_mutex m_mutexserviceadmin;
 
@@ -126,7 +126,7 @@ class M4LMAPISession _kc_final : public M4LUnknown, public IMAPISession {
 private:
 	// variables
 	std::string profileName;
-	KCHL::object_ptr<M4LMsgServiceAdmin> serviceAdmin;
+	KC::object_ptr<M4LMsgServiceAdmin> serviceAdmin;
 
 public:
 	M4LMAPISession(const TCHAR *profname, M4LMsgServiceAdmin *);
@@ -138,28 +138,28 @@ public:
 	virtual HRESULT GetStatusTable(ULONG ulFlags, LPMAPITABLE *lppTable);
 	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result);
-	virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	virtual HRESULT Advise(ULONG eid_size, const ENTRYID *eid, ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn_id) override;
 	virtual HRESULT Unadvise(ULONG ulConnection);
-	virtual HRESULT MessageOptions(ULONG_PTR ulUIParam, ULONG ulFlags, LPTSTR lpszAdrType, LPMESSAGE lpMessage);
-	virtual HRESULT QueryDefaultMessageOpt(LPTSTR lpszAdrType, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppOptions);
-	virtual HRESULT EnumAdrTypes(ULONG ulFlags, ULONG *lpcAdrTypes, LPTSTR **lpppszAdrTypes);
+	virtual HRESULT MessageOptions(ULONG_PTR ui_param, ULONG flags, const TCHAR *addrtype, IMessage *) override;
+	virtual HRESULT QueryDefaultMessageOpt(const TCHAR *addrtype, ULONG flags, ULONG *nvals, SPropValue **opts) override;
+	virtual HRESULT EnumAdrTypes(ULONG flags, ULONG *ntyps, TCHAR ***) override;
 	virtual HRESULT QueryIdentity(ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
 	virtual HRESULT Logoff(ULONG_PTR ulUIParam, ULONG ulFlags, ULONG ulReserved);
-	virtual HRESULT SetDefaultStore(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID);
+	virtual HRESULT SetDefaultStore(ULONG flags, ULONG eid_size, const ENTRYID *) override;
 	virtual HRESULT AdminServices(ULONG ulFlags, LPSERVICEADMIN *lppServiceAdmin);
-	virtual HRESULT ShowForm(ULONG_PTR ulUIParam, LPMDB lpMsgStore, LPMAPIFOLDER lpParentFolder, LPCIID lpInterface, ULONG ulMessageToken, LPMESSAGE lpMessageSent, ULONG ulFlags, ULONG ulMessageStatus, ULONG ulMessageFlags, ULONG ulAccess, LPSTR lpszMessageClass);
+	virtual HRESULT ShowForm(ULONG_PTR ui_param, IMsgStore *, IMAPIFolder *parent, const IID *intf, ULONG msg_token, IMessage *sesnt, ULONG flags, ULONG msg_status, ULONG msg_flags, ULONG access, const char *msg_class) override;
 	virtual HRESULT PrepareForm(LPCIID lpInterface, LPMESSAGE lpMessage, ULONG *lpulMessageToken);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 
 private:
-	std::map<GUID, KCHL::object_ptr<IMsgStore>> mapStores;
+	std::map<GUID, KC::object_ptr<IMsgStore>> mapStores;
 	/* @todo need a status row per provider */
 	ULONG m_cValuesStatus = 0;
-	KCHL::memory_ptr<SPropValue> m_lpPropsStatus;
+	KC::memory_ptr<SPropValue> m_lpPropsStatus;
 	std::mutex m_mutexStatusRow;
 
 public:
-	HRESULT setStatusRow(ULONG cValues, LPSPropValue lpProps);
+	HRESULT setStatusRow(ULONG nvals, const SPropValue *);
 };
 
 class M4LAddrBook _kc_final : public M4LMAPIProp, public IAddrBook {
@@ -168,27 +168,27 @@ public:
 	virtual ~M4LAddrBook();
 	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
 	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result);
-	virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection) _kc_override;
+	virtual HRESULT Advise(ULONG eid_size, const ENTRYID *, ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn) override;
 	virtual HRESULT Unadvise(ULONG ulConnection);
-	virtual HRESULT CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID) _kc_override;
-	virtual HRESULT NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, LPENTRYID lpEIDContainer, ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl, ULONG *lpcbEIDNewEntry, LPENTRYID *lppEIDNewEntry);
-	virtual HRESULT ResolveName(ULONG_PTR ulUIParam, ULONG ulFlags, LPTSTR lpszNewEntryTitle, LPADRLIST lpAdrList);
+	virtual HRESULT CreateOneOff(const TCHAR *name, const TCHAR *addrtype, const TCHAR *addr, ULONG flags, ULONG *eid_size, ENTRYID **) override;
+	virtual HRESULT NewEntry(ULONG_PTR ui_param, ULONG flags, ULONG eid_size, const ENTRYID *eid_cont, ULONG tpl_size, const ENTRYID *tpl, ULONG *new_size, ENTRYID **new_eid) override;
+	virtual HRESULT ResolveName(ULONG_PTR ui_param, ULONG flags, const TCHAR *new_title, ADRLIST *adrlist) override;
 	virtual HRESULT Address(ULONG_PTR *lpulUIParam, LPADRPARM lpAdrParms, LPADRLIST *lppAdrList);
-	virtual HRESULT Details(ULONG *lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID, LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText, ULONG ulFlags);
-	virtual HRESULT RecipOptions(ULONG_PTR ulUIParam, ULONG ulFlags, LPADRENTRY lpRecip);
-	virtual HRESULT QueryDefaultRecipOpt(LPTSTR lpszAdrType, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppOptions);
+	virtual HRESULT Details(ULONG_PTR *ui_param, DISMISSMODELESS *, void *dismiss_ctx, ULONG eid_size, const ENTRYID *, LPFNBUTTON callback, void *btn_ctx, const TCHAR *btn_text, ULONG flags) override;
+	virtual HRESULT RecipOptions(ULONG_PTR ui_param, ULONG flags, const ADRENTRY *recip) override;
+	virtual HRESULT QueryDefaultRecipOpt(const TCHAR *addrtype, ULONG flags, ULONG *nvals, SPropValue **opts) override;
 	virtual HRESULT GetPAB(ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-	virtual HRESULT SetPAB(ULONG cbEntryID, LPENTRYID lpEntryID);
+	virtual HRESULT SetPAB(ULONG eid_size, const ENTRYID *) override;
 	virtual HRESULT GetDefaultDir(ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
-	virtual HRESULT SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID);
+	virtual HRESULT SetDefaultDir(ULONG eid_size, const ENTRYID *) override;
 	virtual HRESULT GetSearchPath(ULONG ulFlags, LPSRowSet *lppSearchPath);
-	virtual HRESULT SetSearchPath(ULONG ulFlags, LPSRowSet lpSearchPath);
+	virtual HRESULT SetSearchPath(ULONG flags, const SRowSet *) override;
 	virtual HRESULT PrepareRecips(ULONG ulFlags, const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 
 private:
 	// variables
-	KCHL::object_ptr<IMAPISupport> m_lpMAPISup;
+	KC::object_ptr<IMAPISupport> m_lpMAPISup;
 	std::list<abEntry> m_lABProviders;
 	SRowSet *m_lpSavedSearchPath = nullptr;
 	HRESULT getDefaultSearchPath(ULONG ulFlags, LPSRowSet* lppSearchPath);
@@ -197,6 +197,6 @@ public:
 	HRESULT addProvider(const std::string &profilename, const std::string &displayname, LPMAPIUID lpUID, LPABPROVIDER newProvider);
 };
 
-extern ECConfig *m4l_lpConfig;
+extern KC::ECConfig *m4l_lpConfig;
 
 #endif

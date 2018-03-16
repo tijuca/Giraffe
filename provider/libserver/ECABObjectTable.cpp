@@ -38,8 +38,6 @@
 #include "ECSessionManager.h"
 #include <kopano/stringutil.h>
 
-using namespace KCHL;
-
 namespace KC {
 
 ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, ulABType, ulFlags, locale)
@@ -144,8 +142,8 @@ ECRESULT ECABObjectTable::GetMVRowCount(std::list<unsigned int> &&ids,
 }
 
 ECRESULT ECABObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
-    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
-    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct soap *soap, ECSession *lpSession, const ECObjectTableList *lpRowList,
+    const struct propTagArray *lpsPropTagArray, const void *lpObjectData,
     struct rowSet **lppRowSet, bool bTableData, bool bTableLimit)
 {
 	ECRESULT er = erSuccess;

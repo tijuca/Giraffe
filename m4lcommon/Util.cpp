@@ -51,9 +51,6 @@
 #include "HtmlToTextParser.h"
 #include <kopano/ECLogger.h>
 #include "HtmlEntity.h"
-
-using namespace KCHL;
-
 #include <kopano/ECGetText.h>
 
 namespace KC {
@@ -1652,10 +1649,7 @@ HRESULT Util::HrMAPIErrorToText(HRESULT hr, LPTSTR *lppszError, void *lpBase)
 		break;
 	}
 
-	if (lpBase == NULL)
-		hr = MAPIAllocateBuffer((_tcslen(lpszError) + 1) * sizeof *lpszError, (void**)lppszError);
-	else
-		hr = MAPIAllocateMore((_tcslen(lpszError) + 1) * sizeof *lpszError, lpBase, (void**)lppszError);
+	hr = MAPIAllocateMore((_tcslen(lpszError) + 1) * sizeof(*lpszError), lpBase, reinterpret_cast<void **>(lppszError));
 	if (hr != hrSuccess)
 		return hr;
 	_tcscpy(*lppszError, lpszError);
@@ -1817,7 +1811,7 @@ HRESULT Util::HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::w
 
 	try {
 		wstrOutput->assign(converter.convert_to<std::wstring>(CHARSET_WCHAR"//IGNORE", data, rawsize(data), lpszCharset));
-	} catch (std::exception &) {
+	} catch (const std::exception &) {
 		return MAPI_E_INVALID_PARAMETER;
 	}
 	return hrSuccess;

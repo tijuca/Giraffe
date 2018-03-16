@@ -36,9 +36,9 @@
 #include <kopano/charset/convstring.h>
 #include <kopano/ECGetText.h>
 
-using namespace KCHL;
+using namespace KC;
 
-ECABContainer::ECABContainer(void *lpProvider, ULONG ulObjType, BOOL fModify,
+ECABContainer::ECABContainer(ECABLogon *lpProvider, ULONG ulObjType, BOOL fModify,
     const char *szClassName) :
 	ECABProp(lpProvider, ulObjType, fModify, szClassName)
 {
@@ -65,7 +65,8 @@ HRESULT	ECABContainer::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT	ECABContainer::Create(void* lpProvider, ULONG ulObjType, BOOL fModify, ECABContainer **lppABContainer)
+HRESULT ECABContainer::Create(ECABLogon *lpProvider, ULONG ulObjType,
+    BOOL fModify, ECABContainer **lppABContainer)
 {
 	return alloc_wrap<ECABContainer>(lpProvider, ulObjType, fModify, "IABContainer")
 	       .put(lppABContainer);
@@ -124,9 +125,9 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 		if(hr != hrSuccess)
 			return hr;
 		lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
-		if ((hr = MAPIAllocateMore(sizeof(GUID), lpBase, (void **) &lpsPropValue->Value.bin.lpb)) != hrSuccess)
+		hr = KAllocCopy(lpSectionUid->Value.bin.lpb, sizeof(GUID), reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
+		if (hr != hrSuccess)
 			return hr;
-		memcpy(lpsPropValue->Value.bin.lpb, lpSectionUid->Value.bin.lpb, sizeof(GUID));
 		lpsPropValue->Value.bin.cb = sizeof(GUID);
 		break;
 		}
@@ -192,7 +193,9 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 	return hr;
 }
 
-HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType)
+HRESULT ECABContainer::TableRowGetProp(void *lpProvider,
+    const struct propVal *lpsPropValSrc, SPropValue *lpsPropValDst,
+    void **lpBase, ULONG ulType)
 {
 	HRESULT hr = hrSuccess;
 	ULONG size = 0;
@@ -212,12 +215,8 @@ HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 		else
 			return MAPI_E_NOT_FOUND;
 		size = (wcslen(lpszW) + 1) * sizeof(WCHAR);
-		hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszW);
-		if (hr != hrSuccess)
-			return hr;
-		memcpy(lpsPropValDst->Value.lpszW, lpszW, size);
 		lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
-		break;
+		return KAllocCopy(lpszW, size, reinterpret_cast<void **>(&lpsPropValDst->Value.lpszW), lpBase);
 	}
 	case PR_ACCOUNT_A:
 	case PR_NORMALIZED_SUBJECT_A:
@@ -233,12 +232,8 @@ HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 		else
 			return MAPI_E_NOT_FOUND;
 		size = (strlen(lpszA) + 1) * sizeof(CHAR);
-		hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszA);
-		if (hr != hrSuccess)
-			return hr;
-		memcpy(lpsPropValDst->Value.lpszA, lpszA, size);
 		lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
-		break;
+		return KAllocCopy(lpszA, size, reinterpret_cast<void **>(&lpsPropValDst->Value.lpszA), lpBase);
 	}
 	default:
 		hr = MAPI_E_NOT_FOUND;
@@ -253,13 +248,8 @@ HRESULT ECABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	HRESULT			hr = hrSuccess;
 	object_ptr<ECMAPITable> lpTable;
 	object_ptr<WSTableView> lpTableOps;
-	SizedSSortOrderSet(1, sSortByDisplayName);
-
-	sSortByDisplayName.cSorts = 1;
-	sSortByDisplayName.cCategories = 0;
-	sSortByDisplayName.cExpanded = 0;
-	sSortByDisplayName.aSort[0].ulPropTag = PR_DISPLAY_NAME;
-	sSortByDisplayName.aSort[0].ulOrder = TABLE_SORT_ASCEND;
+	static constexpr const SizedSSortOrderSet(1, sSortByDisplayName) =
+		{1, 0, 0, {{PR_DISPLAY_NAME, TABLE_SORT_ASCEND}}};
 
 	hr = ECMAPITable::Create("AB Contents", nullptr, 0, &~lpTable);
 	if(hr != hrSuccess)

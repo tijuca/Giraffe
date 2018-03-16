@@ -28,11 +28,12 @@
 #define SET         1
 #define UNSET       2
 
+using namespace KC;
 class ECMsgStore;
 
 class ECMAPIProp : public ECGenericProp, public IECSecurity {
 protected:
-	ECMAPIProp(void *provider, ULONG obj_type, BOOL modify, const ECMAPIProp *root, const char *class_name = nullptr);
+	ECMAPIProp(ECMsgStore *prov, ULONG obj_type, BOOL modify, const ECMAPIProp *root, const char *cls = nullptr);
 	virtual ~ECMAPIProp() = default;
 
 public:
@@ -42,7 +43,7 @@ public:
 	 * See ECUnkown::QueryInterface.
 	 */
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
-	static HRESULT TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType);
+	static HRESULT TableRowGetProp(void *prov, const struct propVal *src, SPropValue *dst, void **base, ULONG type);
 
 	// Callback for Commit() on streams
 	static HRESULT	HrStreamCommit(IStream *lpStream, void *lpData);
@@ -61,9 +62,7 @@ public:
 	virtual HRESULT GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga);
 
 	virtual HRESULT HrSetSyncId(ULONG ulSyncId);
-
-	virtual HRESULT SetParentID(ULONG cbParentID, LPENTRYID lpParentID);
-
+	virtual HRESULT SetParentID(ULONG eid, const ENTRYID *eid_size);
 	virtual HRESULT SetICSObject(BOOL bICSObject);
 	virtual BOOL IsICSObject();
 
@@ -76,24 +75,25 @@ protected:
 	HRESULT	UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms);
 
 	// IECServiceAdmin and IECSecurity
-	virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers);
-	virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups);
+	virtual HRESULT GetUserList(ULONG eid_size, const ENTRYID *comp_eid, ULONG flags, ULONG *nusers, ECUSER **);
+	virtual HRESULT GetGroupList(ULONG eid_size, const ENTRYID *comp_eid, ULONG flags, ULONG *ngrps, ECGROUP **);
 	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies);
 	// IECSecurity
 	virtual HRESULT GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner);
 	virtual HRESULT GetPermissionRules(int ulType, ULONG* lpcPermissions, ECPERMISSION **lppECPermissions);
-	virtual HRESULT SetPermissionRules(ULONG cPermissions, ECPERMISSION *lpECPermissions);
+	virtual HRESULT SetPermissionRules(ULONG n, const ECPERMISSION *) override;
 
 public:
-	ECMsgStore *GetMsgStore() const;
+	ECMsgStore *GetMsgStore() const { return static_cast<ECMsgStore *>(lpProvider); }
 
 private:
 	BOOL m_bICSObject = false; // coming from the ICS system
 	ULONG m_ulSyncId = 0, m_cbParentID = 0;
-	KCHL::memory_ptr<ENTRYID> m_lpParentID; /* Overrides the parentid from the server */
+	KC::memory_ptr<ENTRYID> m_lpParentID; /* Overrides the parentid from the server */
 
 public:
 	const ECMAPIProp *m_lpRoot; // Points to the 'root' object that was opened by OpenEntry; normally points to 'this' except for Attachments and Submessages
 };
+IID_OF(ECMAPIProp)
 
 #endif // ECMAPIPROP_H

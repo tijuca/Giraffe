@@ -24,26 +24,29 @@
 #include "kcore.hpp"
 #include <kopano/kcodes.h>
 #include <kopano/Util.h>
-#include "soapKCmdProxy.h"
 #include "ics_client.hpp"
 #include <vector>
 
 #include <mapi.h>
 #include <mapispi.h>
+#include "soapStub.h"
 
 namespace KC {
 class utf8string;
 }
 
+class KCmdProxy;
 class WSTransport;
+
+using namespace KC;
 
 class WSMAPIFolderOps _kc_final : public ECUnknown {
 protected:
-	WSMAPIFolderOps(KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *);
+	WSMAPIFolderOps(KCmdProxy *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *);
 	virtual ~WSMAPIFolderOps();
 
 public:
-	static HRESULT Create(KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *, WSMAPIFolderOps **);
+	static HRESULT Create(KCmdProxy *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *, WSMAPIFolderOps **);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	
 	// Creates a folder object with only a PR_DISPLAY_NAME and type
@@ -63,7 +66,7 @@ public:
 	virtual HRESULT HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestriction *lppRestriction, ULONG *lpulFlags);
 
 	// Move or copy a folder
-	virtual HRESULT HrCopyFolder(ULONG cbEntryFrom, LPENTRYID lpEntryFrom, ULONG cbEntryDest, LPENTRYID lpEntryDest, const utf8string &strNewFolderName, ULONG ulFlags, ULONG ulSyncId);
+	virtual HRESULT HrCopyFolder(ULONG srceid_size, const ENTRYID *srceid, ULONG dsteid_size, const ENTRYID *dsteid, const utf8string &newname, ULONG flags, ULONG sync_id);
 
 	// Move or copy a message
 	virtual HRESULT HrCopyMessage(ENTRYLIST *lpMsgList, ULONG cbEntryDest, LPENTRYID lpEntryDest, ULONG ulFlags, ULONG ulSyncId);
@@ -83,7 +86,7 @@ private:
 	virtual HRESULT UnLockSoap();
 
 	entryId			m_sEntryId;		// Entryid of the folder
-	KCmd*		lpCmd;			// command object
+	KCmdProxy *lpCmd; // command object
 	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;	// Id of the session
 	ULONG			m_ulSessionReloadCallback;

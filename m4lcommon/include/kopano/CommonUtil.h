@@ -24,6 +24,9 @@
 #include <mapix.h>
 #include <string>
 #include <kopano/ECTags.h>
+#include <kopano/IECInterfaces.hpp>
+#include <kopano/automapi.hpp>
+#include <kopano/ecversion.h>
 #include <kopano/memory.hpp>
 #include <kopano/ustringutil.h>
 
@@ -43,18 +46,20 @@ namespace KC {
 
 extern _kc_export const char *GetServerUnixSocket(const char *pref = nullptr);
 extern _kc_export HRESULT HrOpenECAdminSession(IMAPISession **, const char *const app_ver, const char *app_misc, const char *path = nullptr, ULONG profflags = 0, const char *sslkey_file = nullptr, const char *sslkey_password = nullptr);
+extern _kc_export HRESULT HrOpenECSession(IMAPISession **ses, const char *app_ver, const char *app_misc, const char *user, const char *pass, const char *path = nullptr, ULONG profile_flags = 0, const char *sslkey_file = nullptr, const char *sslkey_password = nullptr, const char *profname = nullptr);
 extern _kc_export HRESULT HrOpenECSession(IMAPISession **ses, const char *app_ver, const char *app_misc, const wchar_t *user, const wchar_t *pass, const char *path = nullptr, ULONG profile_flags = 0, const char *sslkey_file = nullptr, const char *sslkey_password = nullptr, const char *profname = nullptr);
 extern _kc_export HRESULT HrOpenECPublicStoreOnline(IMAPISession *, IMsgStore **ret);
 extern _kc_export HRESULT ECCreateOneOff(const TCHAR * name, const TCHAR * addrtype, const TCHAR * addr, ULONG flags, ULONG *eid_size, LPENTRYID *eid);
 extern _kc_export HRESULT ECParseOneOff(const ENTRYID *eid, ULONG eid_size, std::wstring &name, std::wstring &type, std::wstring &addr);
 extern _kc_export HRESULT HrNewMailNotification(IMsgStore *, IMessage *);
 extern _kc_export HRESULT HrCreateEmailSearchKey(const char *type, const char *addr, ULONG *size, LPBYTE *out);
-extern _kc_export HRESULT DoSentMail(IMAPISession *, IMsgStore *, ULONG flags, KCHL::object_ptr<IMessage>);
+extern _kc_export HRESULT DoSentMail(IMAPISession *, IMsgStore *, ULONG flags, object_ptr<IMessage>);
 extern _kc_export HRESULT GetClientVersion(unsigned int *);
 extern _kc_export HRESULT OpenSubFolder(LPMDB, const wchar_t *folder, wchar_t psep, bool is_public, bool create_folder, LPMAPIFOLDER *subfolder);
 extern _kc_export HRESULT HrOpenDefaultCalendar(LPMDB, LPMAPIFOLDER *default_folder);
 extern _kc_export HRESULT HrGetAllProps(IMAPIProp *prop, ULONG flags, ULONG *nvals, LPSPropValue *props);
 extern _kc_export HRESULT UnWrapStoreEntryID(ULONG eid_size, const ENTRYID *eid, ULONG *ret_size, ENTRYID **ret);
+extern _kc_export HRESULT GetECObject(IMAPIProp *, const IID &, void **);
 
 // Auto-accept settings
 extern _kc_export HRESULT HrGetRemoteAdminStore(IMAPISession *, IMsgStore *, LPCTSTR server, ULONG flags, IMsgStore **ret);
@@ -118,9 +123,27 @@ private:
 #define PROPMAP_DECL() ECPropMap m_propmap;
 #define PROPMAP_START(hint) ECPropMap m_propmap(hint);
 #define PROPMAP_NAMED_ID(name, type, guid, id) ULONG PROP_##name; m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
-#define PROPMAP_INIT(lpObject) do { hr = m_propmap.Resolve(lpObject); if (hr != hrSuccess) goto exitpm; } while (false);
+#define PROPMAP_INIT(lpObject) do { hr = m_propmap.Resolve(lpObject); if (hr != hrSuccess) return hr; } while (false);
 #define PROPMAP_DEF_NAMED_ID(name) ULONG PROP_##name = 0;
 #define PROPMAP_INIT_NAMED_ID(name, type, guid, id) m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
+
+class _kc_export KServerContext {
+	public:
+	HRESULT logon(const char *user = nullptr, const char *password = nullptr);
+
+	const char *m_app_misc = nullptr, *m_app_ver = PROJECT_VERSION, *m_host = nullptr;
+	const char *m_ssl_keyfile = nullptr, *m_ssl_keypass = nullptr;
+	unsigned int m_ses_flags = EC_PROFILE_FLAGS_NO_NOTIFICATIONS;
+
+	private:
+	AutoMAPI m_mapi;
+
+	public:
+	object_ptr<IMAPISession> m_session;
+	object_ptr<IMsgStore> m_admstore;
+	object_ptr<IUnknown> m_ecobject;
+	object_ptr<IECServiceAdmin> m_svcadm;
+};
 
 } /* namespace */
 

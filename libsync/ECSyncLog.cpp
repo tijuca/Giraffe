@@ -31,6 +31,8 @@
 // for LOG_MAIL
 #include <syslog.h>
 
+namespace KC {
+
 HRESULT ECSyncLog::GetLogger(ECLogger **lppLogger)
 {
 	HRESULT		hr = hrSuccess;
@@ -91,7 +93,7 @@ HRESULT ECSyncLog::SetLogger(ECLogger *lpLogger)
 }
 
 std::mutex ECSyncLog::s_hMutex;
-KCHL::object_ptr<ECLogger> ECSyncLog::s_lpLogger;
+object_ptr<ECLogger> ECSyncLog::s_lpLogger;
 
 ECSyncLog::initializer::~initializer()
 {
@@ -108,3 +110,5 @@ ECSyncLog::initializer::~initializer()
 }
 
 ECSyncLog::initializer ECSyncLog::xinit;
+
+} /* namespace */

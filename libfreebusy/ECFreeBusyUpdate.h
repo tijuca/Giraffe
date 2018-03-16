@@ -55,12 +55,12 @@ public:
 	virtual HRESULT RemoveAppt(void) { return S_OK; }
 	virtual HRESULT ResetPublishedFreeBusy();
 	virtual HRESULT ChangeAppt(void) { return S_OK; }
-	virtual HRESULT SaveChanges(FILETIME ftStart, FILETIME ftEnd);
+	virtual HRESULT SaveChanges(const FILETIME &start, const FILETIME &end) override;
 	virtual HRESULT GetFBTimes(void) { return S_OK; }
 	virtual HRESULT Intersect(void) { return S_OK; }
 
 private:
-	KCHL::object_ptr<IMessage> m_lpMessage; /**< Pointer to the free/busy message received from GetFreeBusyMessage */
+	object_ptr<IMessage> m_lpMessage; /**< Pointer to the free/busy message received from GetFreeBusyMessage */
 	ECFBBlockList	m_fbBlockList; /**< Freebusy time blocks */
 	ALLOC_WRAP_FRIEND;
 };

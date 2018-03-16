@@ -38,11 +38,7 @@ struct configsetting_t {
 #define CONFIGGROUP_PROPMAP			0x0001
 };
 
-#ifdef UNICODE
 #define GetConfigSetting(_config, _name) ((_config)->GetSettingW(_name))
-#else
-#define GetConfigSetting(_config, _name) ((_config)->GetSetting(_name))
-#endif
 
 static const char *const lpszDEFAULTDIRECTIVES[] = {"include", NULL};
 
@@ -67,6 +63,7 @@ public:
 	_kc_hidden virtual const std::list<std::string> *GetWarnings(void) = 0;
 	_kc_hidden virtual bool	HasErrors(void) = 0;
 	_kc_hidden virtual const std::list<std::string> *GetErrors(void) = 0;
+	_kc_hidden virtual int dump_config(FILE *) = 0;
 };
 
 } /* namespace */

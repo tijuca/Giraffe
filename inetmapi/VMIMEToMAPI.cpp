@@ -70,7 +70,6 @@
 #include "ICalToMAPI.h"
 #include "config.h"
 
-using namespace KCHL;
 using std::list;
 using std::string;
 using std::vector;
@@ -120,9 +119,7 @@ static ULONG CreateIntTime(ULONG seconds, ULONG minutes, ULONG hours)
 static ULONG FileTimeToIntDate(const FILETIME &ft)
 {
 	struct tm date;
-	time_t t;
-	FileTimeToUnixTime(ft, &t);
-	gmtime_safe(&t, &date);
+	gmtime_safe(FileTimeToUnixTime(ft), &date);
 	return CreateIntDate(date.tm_mday, date.tm_mon+1, date.tm_year+1900);
 }
 
@@ -367,12 +364,10 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 			if (hr != hrSuccess)
 				return hrSuccess;
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -510,12 +505,10 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::shared_ptr<vmime::message> vmMessage,
 				return hr;
 			}
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on create message: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on create message: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -1014,12 +1007,10 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::shared_ptr<vmime::header> vmHeader,
 			lpMessage->SetProps(1, &sProp, nullptr);
 			// in case of error: ignore this x-header as named props then
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on parsing headers: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on parsing headers: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -1143,12 +1134,10 @@ HRESULT VMIMEToMAPI::handleRecipients(vmime::shared_ptr<vmime::header> vmHeader,
 		hr = lpMessage->ModifyRecipients(0, lpRecipients);
 		if (hr != hrSuccess)
 			return hr;
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on recipients: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on recipients: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -1222,12 +1211,10 @@ HRESULT VMIMEToMAPI::modifyRecipientList(LPADRLIST lpRecipients,
 				wstrName = getWideFromVmimeText(vmText);
 			else
 				wstrName.clear();
-		}
-		catch (vmime::exception& e) {
+		} catch (const vmime::exception &e) {
 			ec_log_err("VMIME exception on modify recipient: %s", e.what());
 			return MAPI_E_CALL_FAILED;
-		}
-		catch (std::exception& e) {
+		} catch (const std::exception &e) {
 			ec_log_err("STD exception on modify recipient: %s", e.what());
 			return MAPI_E_CALL_FAILED;
 		}
@@ -1286,34 +1273,25 @@ HRESULT VMIMEToMAPI::modifyRecipientList(LPADRLIST lpRecipients,
 		     MAPI_UNICODE | MAPI_SEND_NO_RICH_INFO, &cbEntryID, &~lpEntryID);
 		if (hr != hrSuccess)
 			return hr;
-
-		hr = MAPIAllocateMore(cbEntryID, prop,
-		     reinterpret_cast<void **>(&prop[3].Value.bin.lpb));
+		prop[3].Value.bin.cb = cbEntryID;
+		hr = KAllocCopy(lpEntryID, cbEntryID, reinterpret_cast<void **>(&prop[3].Value.bin.lpb), prop);
 		if (hr != hrSuccess)
 			return hr;
-
-		prop[3].Value.bin.cb = cbEntryID;
-		memcpy(prop[3].Value.bin.lpb, lpEntryID, cbEntryID);
-
 		prop[4].ulPropTag = PR_ADDRTYPE_W;
 		prop[4].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 		strSearch = strToUpper("SMTP:" + strEmail);
 		prop[5].ulPropTag = PR_SEARCH_KEY;
 		prop[5].Value.bin.cb = strSearch.size() + 1; // we include the trailing 0 as MS does this also
-		hr = MAPIAllocateMore(strSearch.size() + 1, prop,
-		     reinterpret_cast<void **>(&prop[5].Value.bin.lpb));
+		hr = KAllocCopy(strSearch.c_str(), strSearch.size() + 1, reinterpret_cast<void **>(&prop[5].Value.bin.lpb), prop);
 		if (hr != hrSuccess)
 			return hr;
-		memcpy(prop[5].Value.bin.lpb, strSearch.c_str(), strSearch.size() + 1);
 
 		// Add Email address
 		prop[6].ulPropTag = PR_EMAIL_ADDRESS_A;
-		hr = MAPIAllocateMore(strEmail.size() + 1, prop,
-		     reinterpret_cast<void **>(&prop[6].Value.lpszA));
+		hr = KAllocCopy(strEmail.c_str(), strEmail.size() + 1, reinterpret_cast<void **>(&prop[6].Value.lpszA), prop);
 		if (hr != hrSuccess)
 			return hr;
-		strcpy(prop[6].Value.lpszA, strEmail.c_str());
 
 		// Add display type
 		prop[7].ulPropTag = PR_DISPLAY_TYPE;
@@ -1839,7 +1817,7 @@ HRESULT VMIMEToMAPI::dissect_body(vmime::shared_ptr<vmime::header> vmHeader,
 
 		try {
 			vmBody->getContents()->getEncoding().getEncoder();
-		} catch (vmime::exceptions::no_encoder_available &) {
+		} catch (const vmime::exceptions::no_encoder_available &) {
 			/* RFC 2045 §6.4 page 17 */
 			ec_log_debug("Encountered unknown Content-Transfer-Encoding \"%s\".",
 				vmBody->getContents()->getEncoding().getName().c_str());
@@ -1893,9 +1871,9 @@ HRESULT VMIMEToMAPI::dissect_body(vmime::shared_ptr<vmime::header> vmHeader,
 			if (hr == hrSuccess) {
 				hr = tnef.Finish();
 				if (hr != hrSuccess)
-					ec_log_warn("TNEF attachment saving failed: 0x%08X", hr);
+					ec_log_err("TNEF attachment saving failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
 			} else {
-				ec_log_warn("TNEF attachment parsing failed: 0x%08X", hr);
+				ec_log_err("TNEF attachment parsing failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
 			}
 			hr = hrSuccess;
 		} else if (mt->getType() == vmime::mediaTypes::TEXT && mt->getSubType() == "calendar") {
@@ -1959,13 +1937,11 @@ HRESULT VMIMEToMAPI::dissect_body(vmime::shared_ptr<vmime::header> vmHeader,
 			if (hr != hrSuccess)
 				goto exit;
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on parsing body: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on parsing body: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
@@ -1998,7 +1974,7 @@ VMIMEToMAPI::content_transfer_decode(vmime::shared_ptr<vmime::body> im_body) con
 
 	try {
 		im_cont->extract(str_adap);
-	} catch (vmime::exceptions::no_encoder_available &e) {
+	} catch (const vmime::exceptions::no_encoder_available &e) {
 		ec_log_warn("VMIME could not process the Content-Transfer-Encoding \"%s\" (%s). Reading part raw.",
 			im_cont->getEncoding().generate().c_str(), e.what());
 		im_cont->extractRaw(str_adap);
@@ -2053,7 +2029,7 @@ int VMIMEToMAPI::renovate_encoding(std::string &data,
 			       data, rawsize(data), name);
 			ec_log_debug("renovate_encoding: reading data using charset \"%s\" succeeded.", name);
 			return i;
-		} catch (illegal_sequence_exception &ce) {
+		} catch (const illegal_sequence_exception &ce) {
 			/*
 			 * Basically, choices other than the first are subpar
 			 * and may not yield an RFC-compliant result (but
@@ -2066,7 +2042,7 @@ int VMIMEToMAPI::renovate_encoding(std::string &data,
 				lvl = EC_LOGLEVEL_WARNING;
 			ec_log(lvl, "renovate_encoding: reading data using charset \"%s\" produced partial results: %s",
 				name, ce.what());
-		} catch (unknown_charset_exception &) {
+		} catch (const unknown_charset_exception &) {
 			ec_log_warn("renovate_encoding: unknown charset \"%s\", skipping", name);
 		}
 	}
@@ -2079,7 +2055,7 @@ int VMIMEToMAPI::renovate_encoding(std::string &data,
 		try {
 			data = m_converter.convert_to<std::string>(
 			       (cs[i] + "//IGNORE").c_str(), data, rawsize(data), name);
-		} catch (unknown_charset_exception &) {
+		} catch (const unknown_charset_exception &) {
 			continue;
 		}
 		ec_log_debug("renovate_encoding: forced interpretation as charset \"%s\".", name);
@@ -2212,12 +2188,10 @@ HRESULT VMIMEToMAPI::handleTextpart(vmime::shared_ptr<vmime::header> vmHeader,
 		hr = lpStream->Commit(0);
 		if (hr != hrSuccess)
 			return hr;
-	}
-	catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on text body: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on text body: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -2471,12 +2445,10 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::shared_ptr<vmime::header> vmHeade
 				return hr;
 			strHTML += "</pre>";
 		}
-	}
-	catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on html body: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on html body: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -2564,7 +2536,7 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::shared_ptr<vmime::header> vmHeader,
 
 		try {
 			vmBody->getContents()->generate(osMAPI, vmime::encoding(vmime::encodingTypes::BINARY));
-		} catch (vmime::exceptions::no_encoder_available &) {
+		} catch (const vmime::exceptions::no_encoder_available &) {
 			/* RFC 2045 §6.4 page 17 */
 			vmBody->getContents()->extractRaw(osMAPI);
 			mt->setType(vmime::mediaTypes::APPLICATION);
@@ -2607,8 +2579,8 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::shared_ptr<vmime::header> vmHeader,
 
 		try {
 			strLocation = vmime::dynamicCast<vmime::text>(vmHeader->ContentLocation()->getValue())->getConvertedText(MAPI_CHARSET);
+		} catch (const vmime::exceptions::charset_conv_error &) {
 		}
-		catch (const vmime::exceptions::charset_conv_error &) { }
 		if (!strLocation.empty()) {
 			attProps[nProps].ulPropTag = PR_ATTACH_CONTENT_LOCATION_A;
 			attProps[nProps++].Value.lpszA = (char*)strLocation.c_str();
@@ -2680,13 +2652,11 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::shared_ptr<vmime::header> vmHeader,
 		hr = lpAtt->SetProps(nProps, attProps, NULL);
 		if (hr != hrSuccess)
 			goto exit;
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception on attachment: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on attachment: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
@@ -3056,12 +3026,12 @@ HRESULT VMIMEToMAPI::postWriteFixups(IMessage *lpMessage)
 
 			if(lpProps[2].ulPropTag != PROP_ATTENDEECRITICALCHANGE) {
 				lpProps[2].ulPropTag = PROP_ATTENDEECRITICALCHANGE;
-				UnixTimeToFileTime(time(NULL), &lpProps[2].Value.ft);
+				lpProps[2].Value.ft  = UnixTimeToFileTime(time(nullptr));
 			}
 
 			if(lpProps[3].ulPropTag != PROP_OWNERCRITICALCHANGE) {
 				lpProps[3].ulPropTag = PROP_OWNERCRITICALCHANGE;
-				UnixTimeToFileTime(time(NULL), &lpProps[3].Value.ft);
+				lpProps[3].Value.ft  = UnixTimeToFileTime(time(nullptr));
 			}
 
 			if(lpProps[4].ulPropTag != PR_OWNER_APPT_ID) {
@@ -3218,7 +3188,6 @@ HRESULT VMIMEToMAPI::postWriteFixups(IMessage *lpMessage)
 				return hr;
 		}
 	}
- exitpm:
 	return hr;
 }
 
@@ -3299,7 +3268,7 @@ std::string VMIMEToMAPI::addressListToEnvelope(vmime::shared_ptr<vmime::addressL
 		try {
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
 			lAddr.emplace_back(buffer);
-		} catch (vmime::exception &e) {
+		} catch (const vmime::exception &e) {
 		}
 	}
 	if (lAddr.empty())
@@ -3339,7 +3308,6 @@ HRESULT VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vmMess
 	sEnvelope.Value.lpszA = (char*)buffer.c_str();
 
 	hr = lpMessage->SetProps(1, &sEnvelope, NULL);
- exitpm:
 	return hr;
 }
 
@@ -3382,7 +3350,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->From()->getValue()));
 		lItems.emplace_back("(" + buffer + ")");
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		// this is not allowed, but better than nothing
 		lItems.emplace_back("NIL");
 	}
@@ -3392,7 +3360,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->Sender()->getValue()));
 		lItems.emplace_back("(" + buffer + ")");
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back(lItems.back());
 	}
 	buffer.clear();
@@ -3401,7 +3369,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 	try {
 		buffer = mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(vmHeader->ReplyTo()->getValue()));
 		lItems.emplace_back("(" + buffer + ")");
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back(lItems.back());
 	}
 	buffer.clear();
@@ -3410,7 +3378,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 	try {
 		buffer = addressListToEnvelope(vmime::dynamicCast<vmime::addressList>(vmHeader->To()->getValue()));
 		lItems.emplace_back(buffer);
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
@@ -3422,7 +3390,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 		for (int i = 0; i < aCount; ++i)
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
 		lItems.emplace_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
@@ -3434,7 +3402,7 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::shared_ptr<vmime::message> vm
 		for (int i = 0; i < aCount; ++i)
 			buffer += mailboxToEnvelope(vmime::dynamicCast<vmime::mailbox>(aList->getAddressAt(i)));
 		lItems.emplace_back(buffer.empty() ? "NIL" : "(" + buffer + ")");
-	} catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back("NIL");
 	}
 	buffer.clear();
@@ -3556,8 +3524,7 @@ HRESULT VMIMEToMAPI::messagePartToStructure(const string &input,
 			// just one part
 			bodyPartToStructure(input, vmBodyPart, lpSimple, lpExtended);
 		}
-	}
-	catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		ec_log_warn("Unable to create optimized bodystructure: %s", e.what());
 	}
 
@@ -3715,8 +3682,7 @@ std::string VMIMEToMAPI::getStructureExtendedFields(vmime::shared_ptr<vmime::hea
 		buffer.clear();
 		vmHeaderPart->ContentLocation()->getValue()->generate(os);
 		lItems.emplace_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
-	}
-	catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		lItems.emplace_back("NIL");
 	}
 	return kc_join(lItems, " ");
@@ -3742,8 +3708,7 @@ std::string VMIMEToMAPI::parameterizedFieldToStructure(vmime::shared_ptr<vmime::
 			lParams.emplace_back("\"" + buffer + "\"");
 			buffer.clear();
 		}
-	}
-	catch (vmime::exception &e) {
+	} catch (const vmime::exception &e) {
 		return "NIL";
 	}
 	if (lParams.empty())

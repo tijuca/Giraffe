@@ -38,12 +38,11 @@
 #include <kopano/automapi.hpp>
 #include <kopano/ecversion.h>
 #include <kopano/memory.hpp>
-#include <kopano/charset/convert.h>
 #include <kopano/ECLogger.h>
 #include <kopano/mapi_ptr.h>
 #include "ConsoleTable.h"
 
-using namespace KCHL;
+using namespace KC;
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -204,7 +203,7 @@ static void showtop(LPMDB lpStore)
 	std::set<std::string> setHosts;
 	char date[64];
 	int wx, wy, key;
-	KC::time_point dblLast;
+	time_point dblLast;
 
 	// columns in sizes, not literal offsets
 	static const unsigned int cols[] = {0, 4, 21, 8, 25, 16, 20, 8, 8, 7, 7, 5};
@@ -407,9 +406,9 @@ static void showtop(LPMDB lpStore)
 				ofs += cols[5];
 			}
 			if (bColumns[5]) {
-				std::string dummy = ses.strClientApp + "/" +
-					ses.strClientAppVersion + "/" +
-					ses.strClientAppMisc;
+				auto dummy = ses.strClientAppMisc + "/" +
+					ses.strClientAppVersion + "(" +
+					ses.strClientApp + ")";
 				if (dummy.size() >= cols[6])
 					dummy = dummy.substr(0, cols[6] - 1);
 				wmove(win, 5 + line, ofs);
@@ -496,9 +495,8 @@ static std::string mapitable_ToString(const SPropValue *lpProp)
 	case PT_I8:
 		return stringify_int64(lpProp->Value.li.QuadPart);
 	case PT_SYSTIME: {
-		time_t t;
 		char buf[32]; // must be at least 26 bytes
-		FileTimeToUnixTime(lpProp->Value.ft, &t);
+		auto t = FileTimeToUnixTime(lpProp->Value.ft);
 		ctime_r(&t, buf);
 		return trim(buf, " \t\n\r\v\f");
 	}
@@ -583,9 +581,7 @@ int main(int argc, char *argv[])
 	object_ptr<IMAPISession> lpSession;
 	object_ptr<IMsgStore> lpStore;
 	eTableType eTable = INVALID_STATS;
-	const char *user = NULL;
-	const char *pass = NULL;
-	const char *host = NULL;
+	const char *user = nullptr, *pass = "", *host = nullptr;
 	bool humanreadable(true);
 
 	setlocale(LC_MESSAGES, "");
@@ -644,14 +640,12 @@ int main(int argc, char *argv[])
             return 1;
 	    }
 	}
-
-	auto strwUsername = convert_to<std::wstring>(user ? user : "SYSTEM");
-	auto strwPassword = convert_to<std::wstring>(pass ? pass : "");
-	hr = HrOpenECSession(&~lpSession, PROJECT_VERSION, "stats",
-	     strwUsername.c_str(), strwPassword.c_str(), host,
-	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE);
+	if (user == nullptr)
+		user = KOPANO_SYSTEM_USER;
+	hr = HrOpenECSession(&~lpSession, PROJECT_VERSION, "stats", user, pass,
+	     host, EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE);
 	if (hr != hrSuccess) {
-		cout << "Cannot open admin session on host " << (host ? host : "localhost") << ", username " << (user ? user : "SYSTEM") << endl;
+		cout << "Cannot open admin session on host " << (host ? host : "localhost") << ", username " << user << endl;
 		return EXIT_FAILURE;
 	}
 	hr = HrOpenDefaultStore(lpSession, &~lpStore);
