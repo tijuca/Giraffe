@@ -1,3 +1,22 @@
+kopanocore (8.6.0-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [b769101] New upstream version 8.6.0
+  * [5d05a8a] rebuild patch queue from patch-queue branch
+    Removing debian/add-debian-to-with-distro-switch.patch from the patch queue
+    as upstream has removed this configure switch.
+  * [c83ebd3] debian/control: Adding new packages to Build-Depends
+    The built requires now libjsoncpp-dev and libpopt-dev.
+  * [b1d1d3a] kopano-common.install: remove non existing cron file
+    The file etc/cron.daily/kopano-client-update isn't shipped any more, this
+    requires a modification of the install sequence.
+  * [89589f1] remove unneded configure option
+    This is related to the removed configure option mentioned above, removing
+    Debian specific argument from the configuration.
+  * [65f4d66] kopano-libs.symbols: update symbols to 8.6.0
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Fri, 16 Mar 2018 13:21:24 +0100
+
 kopanocore (8.5.4-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
