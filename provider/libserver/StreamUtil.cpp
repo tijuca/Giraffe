@@ -68,8 +68,6 @@
 	  <message>
 */
 
-using namespace KCHL;
-
 static inline bool operator<(const GUID &lhs, const GUID &rhs)
 {
 	return memcmp(&lhs, &rhs, sizeof(GUID)) < 0;
@@ -904,8 +902,7 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 	unsigned int	ulCount = 0;
 
 	struct soap		*soap = NULL;
-	struct propVal sPropVal{__gszeroinit};
-
+	struct propVal sPropVal;
 	DB_ROW 			lpDBRow = NULL;
 	DB_LENGTHS		lpDBLen = NULL;
 	DB_RESULT lpDBResult;

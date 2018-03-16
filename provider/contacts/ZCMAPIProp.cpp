@@ -32,6 +32,8 @@
 #include <kopano/namedprops.h>
 #include <kopano/mapiguidext.h>
 
+using namespace KC;
+
 ZCMAPIProp::ZCMAPIProp(ULONG ulObjType, const char *szClassName) :
     ECUnknown(szClassName), m_ulObject(ulObjType)
 {
@@ -238,7 +240,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID,
 
 	// named properties
 	SPropTagArrayPtr ptrNameTags;
-	KCHL::memory_ptr<MAPINAMEID *> lppNames;
+	memory_ptr<MAPINAMEID *> lppNames;
 	ULONG ulNames = 5;
 	MAPINAMEID mnNamedProps[5] = {
 		{(LPGUID)&PSETID_Address, MNID_ID, {dispidEmail1DisplayName}},
@@ -291,7 +293,7 @@ HRESULT ZCMAPIProp::Create(IMAPIProp *lpContact, ULONG cbEntryID,
 
 	if (lpCABEntryID->ulObjType != MAPI_MAILUSER && lpCABEntryID->ulObjType != MAPI_DISTLIST)
 		return MAPI_E_INVALID_OBJECT;
-	KCHL::object_ptr<ZCMAPIProp> lpZCMAPIProp(new(std::nothrow) ZCMAPIProp(lpCABEntryID->ulObjType));
+	object_ptr<ZCMAPIProp> lpZCMAPIProp(new(std::nothrow) ZCMAPIProp(lpCABEntryID->ulObjType));
 	if (lpZCMAPIProp == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	hr = lpZCMAPIProp->ConvertProps(lpContact, cbEntryID, lpEntryID, lpCABEntryID->ulOffset);
@@ -359,7 +361,7 @@ HRESULT ZCMAPIProp::GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags,
     ULONG *lpcValues, SPropValue **lppPropArray)
 {
 	HRESULT hr = hrSuccess;
-	KCHL::memory_ptr<SPropValue> lpProps;
+	memory_ptr<SPropValue> lpProps;
 	convert_context converter;
 
 	if((lpPropTagArray != NULL && lpPropTagArray->cValues == 0) || Util::ValidatePropTagArray(lpPropTagArray) == false)

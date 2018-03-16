@@ -67,7 +67,7 @@ HRESULT InstanceIdMapper::Init(ECConfig *lpConfig)
 		ec_log_info("Database not found, creating database.");
 		er = m_ptrDatabase->CreateDatabase(lpConfig, true);
 		if (er == erSuccess)
-			er = m_ptrDatabase->CreateTables();
+			er = m_ptrDatabase->CreateTables(lpConfig);
 	}
 	
 	if (er != erSuccess)
@@ -118,12 +118,9 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 		ec_log_crit("InstanceIdMapper::GetMappedInstanceId(): FetchRowLengths failed");
 		return MAPI_E_DISK_ERROR; // MAPI version of KCERR_DATABASE_ERROR
 	}
-
-	hr = MAPIAllocateBuffer(lpLengths[0], (LPVOID*)lppDestInstanceID);
+	hr = KAllocCopy(lpDBRow[0], lpLengths[0], reinterpret_cast<void **>(lppDestInstanceID));
 	if (hr != hrSuccess)
 		return hr;
-
-	memcpy(*lppDestInstanceID, lpDBRow[0], lpLengths[0]);
 	*lpcbDestInstanceID = lpLengths[0];
 	return hrSuccess;
 }

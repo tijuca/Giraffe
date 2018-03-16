@@ -21,10 +21,12 @@
 #include <kopano/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
+#include "soapKCmdProxy.h"
 
-WSStoreTableView::WSStoreTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
-    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) :
+WSStoreTableView::WSStoreTableView(ULONG ulType, ULONG ulFlags,
+    KCmdProxy *lpCmd, std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
+    ULONG cbEntryId, const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore,
+    WSTransport *lpTransport) :
 	WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId,
 	    lpEntryId, lpTransport, "WSStoreTableView")
 {
@@ -40,9 +42,9 @@ WSStoreTableView::WSStoreTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
 	this->m_ulTableType = TABLETYPE_MS;
 }
 
-HRESULT WSStoreTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
+HRESULT WSStoreTableView::Create(ULONG ulType, ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
+    const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableView **lppTableView)
 {
 	return alloc_wrap<WSStoreTableView>(ulType, ulFlags, lpCmd, lpDataLock,
@@ -57,14 +59,14 @@ HRESULT WSStoreTableView::QueryInterface(REFIID refiid, void **lppInterface)
 }
 
 // WSTableMultiStore view
-WSTableMultiStore::WSTableMultiStore(ULONG ulFlags, KCmd *lpCmd,
+WSTableMultiStore::WSTableMultiStore(ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) :
+    const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore,
+    WSTransport *lpTransport) :
 	WSStoreTableView(MAPI_MESSAGE, ulFlags, lpCmd, lpDataLock, ecSessionId,
 	    cbEntryId, lpEntryId, lpMsgStore, lpTransport)
 {
-    memset(&m_sEntryList, 0, sizeof(m_sEntryList));
-
+	m_sEntryList = entryList();
 	m_ulTableType = TABLETYPE_MULTISTORE;
 	ulTableId = 0;
 }
@@ -74,9 +76,9 @@ WSTableMultiStore::~WSTableMultiStore()
 	FreeEntryList(&m_sEntryList, false);
 }
 
-HRESULT WSTableMultiStore::Create(ULONG ulFlags, KCmd *lpCmd,
+HRESULT WSTableMultiStore::Create(ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
+    const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableMultiStore **lppTableMultiStore)
 {
 	return alloc_wrap<WSTableMultiStore>(ulFlags, lpCmd, lpDataLock,
@@ -97,7 +99,7 @@ HRESULT WSTableMultiStore::HrOpenTable()
 	    goto exit;
 
 	//m_sEntryId is the id of a store
-	if(SOAP_OK != lpCmd->ns__tableOpen(ecSessionId, m_sEntryId, m_ulTableType, MAPI_MESSAGE, this->ulFlags, &sResponse))
+	if (lpCmd->tableOpen(ecSessionId, m_sEntryId, m_ulTableType, MAPI_MESSAGE, this->ulFlags, &sResponse) != SOAP_OK)
 		er = KCERR_NETWORK_ERROR;
 	else
 		er = sResponse.er;
@@ -107,8 +109,7 @@ HRESULT WSTableMultiStore::HrOpenTable()
 		goto exit;
 
 	this->ulTableId = sResponse.ulTableId;
-
-	if (SOAP_OK != lpCmd->ns__tableSetMultiStoreEntryIDs(ecSessionId, ulTableId, &m_sEntryList, &er))
+	if (lpCmd->tableSetMultiStoreEntryIDs(ecSessionId, ulTableId, &m_sEntryList, &er) != SOAP_OK)
 		er = KCERR_NETWORK_ERROR;
 
 	hr = kcerr_to_mapierr(er);
@@ -121,7 +122,7 @@ exit:
 	return hr;
 }
 
-HRESULT WSTableMultiStore::HrSetEntryIDs(LPENTRYLIST lpMsgList)
+HRESULT WSTableMultiStore::HrSetEntryIDs(const ENTRYLIST *lpMsgList)
 {
 	// Not really a transport function, but this is the best place for it for now
 
@@ -132,9 +133,10 @@ HRESULT WSTableMultiStore::HrSetEntryIDs(LPENTRYLIST lpMsgList)
   Miscellaneous tables are not really store tables, but the is the same, so it inherits from the store table
   Supported tables are the stats tables, and userstores table.
 */
-WSTableMisc::WSTableMisc(ULONG ulTableType, ULONG ulFlags, KCmd *lpCmd,
+WSTableMisc::WSTableMisc(ULONG ulTableType, ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) :
+    const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore,
+    WSTransport *lpTransport) :
 	// is MAPI_STATUS even valid here?
 	WSStoreTableView(MAPI_STATUS, ulFlags, lpCmd, lpDataLock, ecSessionId,
 	    cbEntryId, lpEntryId, lpMsgStore, lpTransport)
@@ -143,9 +145,9 @@ WSTableMisc::WSTableMisc(ULONG ulTableType, ULONG ulFlags, KCmd *lpCmd,
 	ulTableId = 0;
 }
 
-HRESULT WSTableMisc::Create(ULONG ulTableType, ULONG ulFlags, KCmd *lpCmd,
+HRESULT WSTableMisc::Create(ULONG ulTableType, ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
+    const ENTRYID *lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
     WSTableMisc **lppTableMisc)
 {
 	return alloc_wrap<WSTableMisc>(ulTableType, ulFlags, lpCmd, lpDataLock,
@@ -165,7 +167,7 @@ HRESULT WSTableMisc::HrOpenTable()
 	    goto exit;
 
 	// the class is actually only to call this function with the correct ulTableType .... hmm.
-	if(SOAP_OK != lpCmd->ns__tableOpen(ecSessionId, m_sEntryId, m_ulTableType, ulType, this->ulFlags, &sResponse))
+	if (lpCmd->tableOpen(ecSessionId, m_sEntryId, m_ulTableType, ulType, this->ulFlags, &sResponse) != SOAP_OK)
 		er = KCERR_NETWORK_ERROR;
 	else
 		er = sResponse.er;
@@ -183,7 +185,7 @@ exit:
 }
 
 // WSTableMailBox view
-WSTableMailBox::WSTableMailBox(ULONG ulFlags, KCmd *lpCmd,
+WSTableMailBox::WSTableMailBox(ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
     ECMsgStore *lpMsgStore, WSTransport *lpTransport) :
 	WSStoreTableView(MAPI_STORE, ulFlags, lpCmd, lpDataLock, ecSessionId,
@@ -192,7 +194,7 @@ WSTableMailBox::WSTableMailBox(ULONG ulFlags, KCmd *lpCmd,
 	m_ulTableType = TABLETYPE_MAILBOX;
 }
 
-HRESULT WSTableMailBox::Create(ULONG ulFlags, KCmd *lpCmd,
+HRESULT WSTableMailBox::Create(ULONG ulFlags, KCmdProxy *lpCmd,
     std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
     ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMailBox **lppTable)
 {

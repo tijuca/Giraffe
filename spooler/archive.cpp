@@ -40,6 +40,7 @@
 #include <kopano/ECDebug.h>
 #include "PyMapiPlugin.h"
 
+using namespace KC;
 using namespace KC::helpers;
 using namespace KC::operations;
 using std::endl;
@@ -47,11 +48,7 @@ using std::list;
 using std::pair;
 using std::string;
 
-#ifdef UNICODE
 typedef std::wostringstream tostringstream;
-#else
-typedef std::ostringstream tostringstream;
-#endif
 
 void ArchiveResult::AddMessage(MessagePtr ptrMessage) {
 	m_lstMessages.emplace_back(ptrMessage);

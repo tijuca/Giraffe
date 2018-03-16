@@ -26,8 +26,6 @@
 #include <mutex>
 #include "kcore.hpp"
 #include "ECMAPIProp.h"
-#include "soapKCmdProxy.h"
-
 #include <kopano/kcodes.h>
 #include <kopano/Util.h>
 #include "WSStoreTableView.h"
@@ -43,6 +41,7 @@ namespace KC {
 class utf8string;
 }
 
+class KCmdProxy;
 class WSMessageStreamExporter;
 class WSMessageStreamImporter;
 
@@ -150,7 +149,7 @@ public:
 	virtual HRESULT HrAbortSubmit(ULONG eid_size, const ENTRYID *);
 
 	// Get user information
-	virtual HRESULT HrResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
+	virtual HRESULT HrResolveStore(const GUID *, ULONG *user_id, ULONG *store_size, ENTRYID **store_eid);
 	virtual HRESULT HrResolveUserStore(const utf8string &strUserName, ULONG ulFlags, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID, std::string *lpstrRedirServer = NULL);
 	virtual HRESULT HrResolveTypedStore(const utf8string &strUserName, ULONG ulStoreType, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
 
@@ -158,14 +157,12 @@ public:
 	virtual HRESULT HrCreateUser(ECUSER *lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId);
 	virtual HRESULT HrDeleteUser(ULONG cbUserId, LPENTRYID lpUserId);
 	virtual HRESULT HrSetUser(ECUSER *lpECUser, ULONG ulFlags);
-	virtual HRESULT HrGetUser(ULONG cbUserID, LPENTRYID lpUserID, ULONG ulFlags, ECUSER **lpECUser);
-
-	virtual HRESULT HrCreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG cbStoreID, LPENTRYID lpStoreID, ULONG cbRootID, LPENTRYID lpRootID, ULONG ulFLags);
-	virtual HRESULT HrHookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, LPGUID lpGuid, ULONG ulSyncId);
-	virtual HRESULT HrUnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG ulSyncId);
-	virtual HRESULT HrRemoveStore(LPGUID lpGuid, ULONG ulSyncId);
-
-	virtual HRESULT HrGetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers);
+	virtual HRESULT HrGetUser(ULONG eid_size, const ENTRYID *user_eid, ULONG flags, ECUSER **);
+	virtual HRESULT HrCreateStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG store_size, const ENTRYID *store_eid, ULONG root_size, const ENTRYID *root_eid, ULONG flags);
+	virtual HRESULT HrHookStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, const GUID *, ULONG sync_id);
+	virtual HRESULT HrUnhookStore(ULONG store_type, ULONG user_size, const ENTRYID *user_eid, ULONG sync_id);
+	virtual HRESULT HrRemoveStore(const GUID *, ULONG sync_id);
+	virtual HRESULT HrGetUserList(ULONG eid_size, const ENTRYID *comp_eid, ULONG flags, ULONG *nusers, ECUSER **);
 	virtual HRESULT HrResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId);
 
 	virtual HRESULT HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders);
@@ -197,9 +194,9 @@ public:
 
 	virtual HRESULT HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId);
 	virtual HRESULT HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags);
-	virtual HRESULT HrGetGroup(ULONG cbGroupID, LPENTRYID lpGroupID, ULONG ulFlags, ECGROUP **lppECGroup);
+	virtual HRESULT HrGetGroup(ULONG grp_size, const ENTRYID *grp_eid, ULONG flags, ECGROUP **);
 	virtual HRESULT HrDeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId);
-	virtual HRESULT HrGetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups);
+	virtual HRESULT HrGetGroupList(ULONG eid_size, const ENTRYID *comp_eid, ULONG flags, ULONG *ngrp, ECGROUP **);
 
 	// IECServiceAdmin Group and user functions
 	virtual HRESULT HrDeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId);
@@ -211,7 +208,7 @@ public:
 	virtual HRESULT HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId);
 	virtual HRESULT HrDeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId);
 	virtual HRESULT HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags);
-	virtual HRESULT HrGetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ECCOMPANY **lppECCompany);
+	virtual HRESULT HrGetCompany(ULONG cmp_size, const ENTRYID *cmp_eid, ULONG flags, ECCOMPANY **);
 	virtual HRESULT HrResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId);
 	virtual HRESULT HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies);
 	virtual HRESULT HrAddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId);
@@ -227,7 +224,7 @@ public:
 	virtual HRESULT HrGetPermissionRules(int ulType, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG* lpcPermissions, ECPERMISSION **lppECPermissions);
 
 	// Set the object rights
-	virtual HRESULT HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cPermissions, ECPERMISSION *lpECPermissions);
+	virtual HRESULT HrSetPermissionRules(ULONG eid_size, const ENTRYID *eid, ULONG nperm, const ECPERMISSION *);
 
 	// Get owner information
 	virtual HRESULT HrGetOwner(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbOwnerId, LPENTRYID *lppOwnerId);
@@ -248,7 +245,7 @@ public:
 	virtual bool IsConnected();
 
 	/* multi store table functions */
-	virtual HRESULT HrOpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableOps);
+	virtual HRESULT HrOpenMultiStoreTable(const ENTRYLIST *msglist, ULONG flags, ULONG eid_size, const ENTRYID *eid, ECMsgStore *, WSTableView **ops);
 
 	/* statistics tables (system, threads, users), ulTableType is proto.h TABLETYPE_STATS_... */
 	/* userstores table TABLETYPE_USERSTORE */
@@ -290,14 +287,15 @@ private:
 	virtual HRESULT LockSoap();
 	virtual HRESULT UnLockSoap();
 
+	static ECRESULT KCOIDCLogon(KCmdProxy *, const char *server, const utf8string &user, const utf8string &imp_user, const utf8string &password, unsigned int caps, ECSESSIONGROUPID, const char *app_name, ECSESSIONID *, unsigned int *srv_caps, unsigned long long *flags, GUID *srv_guid, const std::string &cl_app_ver, const std::string &cl_app_misc);
 	//TODO: Move this function to the right file
-	static ECRESULT TrySSOLogon(KCmd *, const char *server, const utf8string &user, const utf8string &imp_user, unsigned int caps, ECSESSIONGROUPID, const char *app_name, ECSESSIONID *, unsigned int *srv_caps, unsigned long long *flags, GUID *srv_guid, const std::string &cl_app_ver, const std::string &cl_app_misc);
+	static ECRESULT TrySSOLogon(KCmdProxy *, const char *server, const utf8string &user, const utf8string &imp_user, unsigned int caps, ECSESSIONGROUPID, const char *app_name, ECSESSIONID *, unsigned int *srv_caps, unsigned long long *flags, GUID *srv_guid, const std::string &cl_app_ver, const std::string &cl_app_misc);
 
 	// Returns name of calling application (eg 'program.exe' or 'httpd')
 	std::string GetAppName();
 
 protected:
-	KCmd *m_lpCmd = nullptr;
+	KCmdProxy *m_lpCmd = nullptr;
 	std::recursive_mutex m_hDataLock;
 	ECSESSIONID m_ecSessionId = 0;
 	ECSESSIONGROUPID m_ecSessionGroupId = 0;
@@ -313,7 +311,7 @@ protected:
 
 private:
 	std::recursive_mutex m_ResolveResultCacheMutex;
-	ECCache<ECMapResolveResults>	m_ResolveResultCache;
+	ECCache<ECMapResolveResults> m_ResolveResultCache;
 	bool m_has_session;
 
 friend class WSMessageStreamExporter;

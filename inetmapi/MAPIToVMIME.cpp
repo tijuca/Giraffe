@@ -61,7 +61,6 @@
 // icalmapi
 #include "MAPIToICal.h"
 
-using namespace KCHL;
 using std::min;
 using std::string;
 using std::wstring;
@@ -191,21 +190,14 @@ HRESULT MAPIToVMIME::processRecipients(IMessage *lpMessage, vmime::messageBuilde
 		PR_OBJECT_TYPE}};
 
 	hr = lpMessage->GetRecipientTable(MAPI_UNICODE | MAPI_DEFERRED_ERRORS, &~lpRecipientTable);
-	if (hr != hrSuccess) {
-		ec_log_err("Unable to open recipient table. Error: 0x%08X", hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("Unable to open recipient table", hr);
 	hr = lpRecipientTable->SetColumns(sPropRecipColumns, 0);
-	if (hr != hrSuccess) {
-		ec_log_err("Unable to set columns on recipient table. Error: 0x%08X", hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("Unable to set columns on recipient table", hr);
 	hr = HrQueryAllRows(lpRecipientTable, nullptr, nullptr, nullptr, 0, &~pRows);
-	if (hr != hrSuccess) {
-		ec_log_err("Unable to read recipient table. Error: 0x%08X", hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perror("Unable to read recipient table", hr);
 	try {
 		for (ULONG i = 0; i < pRows->cRows; ++i) {
 			auto pPropRecipType = pRows[i].cfind(PR_RECIPIENT_TYPE);
@@ -257,12 +249,10 @@ HRESULT MAPIToVMIME::processRecipients(IMessage *lpMessage, vmime::messageBuilde
 			lpVMMessageBuilder->getRecipients().appendAddress(undisclosed);
 		}
 			
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on recipients: %s", e.what());
 		return MAPI_E_CALL_FAILED;
 	}
@@ -328,12 +318,14 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 
 		hr = lpMessage->OpenAttach(ulAttachmentNum, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 		if (hr != hrSuccess) {
-			ec_log_err("Could not open message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			ec_log_err("Could not open message attachment %d: %s (%x)",
+				ulAttachmentNum, GetMAPIErrorMessage(hr), hr);
 			return hr;
 		}
 		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_DEFERRED_ERRORS, &~lpAttachedMessage);
 		if (hr != hrSuccess) {
-			ec_log_err("Could not open data of message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			ec_log_err("Could not open data of message attachment %d: %s (%x)",
+				ulAttachmentNum, GetMAPIErrorMessage(hr), hr);
 			return hr;
 		}
 
@@ -373,7 +365,8 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 	} else if (ulAttachmentMethod == ATTACH_BY_VALUE) {
 		hr = lpMessage->OpenAttach(ulAttachmentNum, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 		if (hr != hrSuccess) {
-			ec_log_err("Could not open attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			ec_log_err("Could not open attachment %d: %s (%x)",
+				ulAttachmentNum, GetMAPIErrorMessage(hr), hr);
 			return hr;
 		}
 	
@@ -390,7 +383,8 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
         else {
             hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, &~lpStream);
             if (hr != hrSuccess) {
-                ec_log_err("Could not open data of attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+				ec_log_err("Could not open data of attachment %d: %s (%x)",
+					ulAttachmentNum, GetMAPIErrorMessage(hr), hr);
 			return hr;
             }
         }
@@ -442,12 +436,10 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 				               vmime::word(m_converter.convert_to<std::string>(m_strCharset.c_str(), szFilename, rawsize(szFilename), CHARSET_WCHAR), m_vmCharset));
 				lpVMMessageBuilder->appendAttachment(vmMapiAttach);
 			}
-		}
-		catch (vmime::exception& e) {
+		} catch (const vmime::exception &e) {
 			ec_log_err("VMIME exception: %s", e.what());
 			return MAPI_E_CALL_FAILED;
-		}
-		catch (std::exception& e) {
+		} catch (const std::exception &e) {
 			ec_log_err("STD exception on attachment: %s", e.what());
 			return MAPI_E_CALL_FAILED;
 		}
@@ -513,15 +505,11 @@ HRESULT MAPIToVMIME::handleAttachments(IMessage* lpMessage, vmime::messageBuilde
 
 	// get attachment table
 	hr = lpMessage->GetAttachmentTable(0, &~lpAttachmentTable);
-	if (hr != hrSuccess) {
-		ec_log_err("Unable to open attachment table. Error: 0x%08X", hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("Unable to open attachment table", hr);
 	hr = HrQueryAllRows(lpAttachmentTable, nullptr, nullptr, sosRTFSeq, 0, &~pRows);
-	if (hr != hrSuccess) {
-		ec_log_err("Unable to fetch rows of attachment table. Error: 0x%08X", hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_perror("Unable to fetch rows of attachment table", hr);
 	
 	for (ULONG i = 0; i < pRows->cRows; ++i) {
 		// if one attachment fails, we're not sending what the user intended to send so abort. Logging was done in handleSingleAttachment()
@@ -584,7 +572,7 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
     vmime::shared_ptr<vmime::message> *lpvmMessage, unsigned int flags)
 {
 	HRESULT					hr					= hrSuccess;
-	memory_ptr<SPropValue> lpDeliveryDate, lpTransportHeaders;
+	memory_ptr<SPropValue> lpDeliveryDate, lpTransportHeaders, prop;
 	vmime::messageBuilder   vmMessageBuilder;
 	vmime::shared_ptr<vmime::message> vmMessage;
 
@@ -621,6 +609,8 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
 		// If we're sending a msg-in-msg, use the original date of that message
 		if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_MESSAGE_DELIVERY_TIME, &~lpDeliveryDate) == hrSuccess)
 			vmHeader->Date()->setValue(FiletimeTovmimeDatetime(lpDeliveryDate->Value.ft));
+		else if (HrGetOneProp(lpMessage, PR_LAST_MODIFICATION_TIME, &~prop) == hrSuccess)
+			vmHeader->Date()->setValue(FiletimeTovmimeDatetime(prop->Value.ft));
 		
 		// Regenerate some headers if available (basically a copy of the headers in
 		// PR_TRANSPORT_MESSAGE_HEADERS)
@@ -649,7 +639,7 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
 						// Just append at the end of this list, order is not important
 						vmHeader->appendField(vmime::dynamicCast<vmime::headerField>(vmField->clone()));
 				}
-			} catch (vmime::exception& e) {
+			} catch (const vmime::exception &e) {
 				ec_log_warn("VMIME exception adding extra headers: %s", e.what());
 			}
 			catch(...) { 
@@ -668,12 +658,10 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
 
 		// no hr checking
 		handleXHeaders(lpMessage, vmHeader, flags);
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on note message: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
 	}
@@ -735,16 +723,11 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage,
 		
 		// Create Recipient
 		hr = lpMessage->GetRecipientTable(MAPI_DEFERRED_ERRORS, &~lpRecipientTable);
-		if (hr != hrSuccess) {
-			ec_log_err("Unable to open MDN recipient table. Error: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Unable to open MDN recipient table", hr);
 		hr = HrQueryAllRows(lpRecipientTable, nullptr, nullptr, nullptr, 0, &~pRows);
-		if (hr != hrSuccess) {
-			ec_log_err("Unable to read MDN recipient table. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Unable to read MDN recipient table", hr);
 		if (pRows->cRows == 0) {
 			if (sopt.no_recipients_workaround == false) {
 				ec_log_err("No MDN recipient found");
@@ -802,11 +785,8 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage,
 
 		// Store owner, actual sender
 		hr = HrGetAddress(m_lpAdrBook, lpMessage, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmailAdd);
-		if(hr != hrSuccess) {
-			ec_log_err("Unable to get MDN sender information. Error: 0x%08X", hr);
-			return hr;
-		}
-		
+		if (hr != hrSuccess)
+			return kc_perror("Unable to get MDN sender information", hr);
 		// Ignore errors here and let strRep* untouched
 		HrGetAddress(m_lpAdrBook, lpMessage, PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, strRepName, strRepType, strRepEmailAdd);
 
@@ -836,13 +816,10 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage,
 			else
 				vmMessage->getHeader()->From()->setValue(vmime::mailbox(getVmimeTextFromWide(strRepName), m_converter.convert_to<string>(strRepEmailAdd)));
 		}
-
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on MDN message: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
 	}
@@ -936,23 +913,15 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage,
 		// - find attachment, and convert to char, and place in lpszRawSMTP
 		// - normal convert the message, but only from/to headers and such .. nothing else
 		hr = lpMessage->GetAttachmentTable(0, &~lpAttachmentTable);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not get attachment table of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Could not get attachment table of signed attachment", hr);
 		// set columns to get pr attach mime tag and pr attach num only.
 		hr = lpAttachmentTable->SetColumns(sPropAttachColumns, 0);
-		if (hr != hrSuccess) {
-			ec_log_err("Could set table contents of attachment table of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Could set table contents of attachment table of signed attachment", hr);
 		hr = HrQueryAllRows(lpAttachmentTable, nullptr, nullptr, nullptr, 0, &~lpRows);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not get table contents of attachment table of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Could not get table contents of attachment table of signed attachment", hr);
 		if (lpRows->cRows != 1)
 			goto normal;
 		lpPropAttach = lpRows[0].cfind(PR_ATTACH_MIME_TAG);
@@ -962,28 +931,18 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage,
 		if (!lpPropAttach)
 			goto normal;
 		hr = lpMessage->OpenAttach(lpPropAttach->Value.ul, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not open signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Could not open signed attachment", hr);
 		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, &~lpStream);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not open data of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Could not open data of signed attachment", hr);
 		hr = lpStream->Stat(&sStreamStat, 0);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not find size of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Could not find size of signed attachment", hr);
 		lpszRawSMTP.reset(new char[(ULONG)sStreamStat.cbSize.QuadPart+1]);
 		hr = lpStream->Read(lpszRawSMTP.get(), (ULONG)sStreamStat.cbSize.QuadPart, NULL);
-		if (hr != hrSuccess) {
-			ec_log_err("Could not read data of signed attachment. Error: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Could not read data of signed attachment", hr);
 		lpszRawSMTP[(ULONG)sStreamStat.cbSize.QuadPart] = '\0';
 
 		// build the message, but without the bodies and attachments
@@ -1016,21 +975,15 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage,
 			const char *lpszContentType = NULL;
 
 			hr = MAPIAllocateBuffer(sizeof(MAPINAMEID), &~lpNameID);
-			if (hr != hrSuccess) {
-				ec_log_err("Not enough memory. Error: 0x%08X", hr);
-				return hr;
-			}
-
+			if (hr != hrSuccess)
+				return kc_perror("Not enough memory", hr);
 			lpNameID->lpguid = (GUID*)&PS_INTERNET_HEADERS;
 			lpNameID->ulKind = MNID_STRING;
 			lpNameID->Kind.lpwstrName = const_cast<wchar_t *>(L"Content-Type");
 
 			hr = lpMessage->GetIDsFromNames(1, &+lpNameID, MAPI_CREATE, &~lpPropTags);
-			if (hr != hrSuccess) {
-				ec_log_err("Unable to read encrypted mail properties. Error: 0x%08X", hr);
-				return hr;
-			}
-
+			if (hr != hrSuccess)
+				return kc_perror("Unable to read encrypted mail properties", hr);
 			if (HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PT_STRING8), &~lpPropContentType) == hrSuccess)
 				lpszContentType = lpPropContentType->Value.lpszA;
 			else
@@ -1115,22 +1068,17 @@ HRESULT MAPIToVMIME::fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime
 
 		std::wstring strName, strType, strEmAdd;
 		hr = HrGetAddress(m_lpAdrBook, lpMessage, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmAdd);
-		if (hr != hrSuccess) {
-			ec_log_err("Unable to get sender information. Error: 0x%08X", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return kc_perror("Unable to get sender information", hr);
 		if (!strName.empty())
 			lpVMMessageBuilder->setExpeditor(vmime::mailbox(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmAdd)));
 		else
 			lpVMMessageBuilder->setExpeditor(vmime::mailbox(m_converter.convert_to<string>(strEmAdd)));
 		// sender and reply-to is set elsewhere because it can only be done on a message object...
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on fill message: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
 	}
@@ -1159,11 +1107,8 @@ HRESULT MAPIToVMIME::getMailBox(LPSRow lpRow,
 	std::wstring strName, strEmail, strType;
 
 	hr = HrGetAddress(m_lpAdrBook, lpRow->lpProps, lpRow->cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail);
-	if(hr != hrSuccess) {
-		ec_log_err("Unable to create mailbox. Error: %08X", hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perror("Unable to create mailbox", hr);
 	auto pPropObjectType = lpRow->cfind(PR_OBJECT_TYPE);
 	if (strName.empty() && !strEmail.empty()) {
 		// email address only
@@ -1223,13 +1168,13 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 	if(hr == hrSuccess) {
 		hr = WrapCompressedRTFStream(lpCompressedRTFStream, 0, &~lpUncompressedRTFStream);
 		if (hr != hrSuccess) {
-			ec_log_warn("Unable to create RTF-text stream. Error: 0x%08X", hr);
+			kc_perror("Unable to create RTF text stream", hr);
 			goto exit;
 		}
 
 		hr = Util::HrStreamToString(lpUncompressedRTFStream, strRtf);
 		if (hr != hrSuccess) {
-			ec_log_err("Unable to read RTF-text stream. Error: 0x%08X", hr);
+			kc_perror("Unable to read RTF text stream", hr);
 			goto exit;
 		}
 
@@ -1244,7 +1189,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 
 				hr = Util::HrStreamToString(lpHTMLStream, strHTMLOut);
 				if (hr != hrSuccess) {
-					ec_log_warn("Unable to read HTML-text stream. Error: 0x%08X", hr);
+					kc_perror("Unable to read HTML text stream", hr);
 					goto exit;
 				}
 
@@ -1252,7 +1197,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 				// Or, if something failed, the HTML is now empty
 				*bestBody = html;
 			} else {
-				ec_log_warn("Unable to open HTML-text stream. Error: 0x%08X", hr);
+				kc_perror("Unable to open HTML text stream", hr);
 				// continue with plaintext
 			}
 		} else if (isrtftext(strRtf.c_str(), strRtf.size())) {
@@ -1263,7 +1208,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 		}
 	} else {
 		if (hr != MAPI_E_NOT_FOUND)
-			ec_log_info("Unable to open rtf-text stream. Error: 0x%08X", hr);
+			kc_perror("Unable to open RTF text stream", hr);
 		hr = hrSuccess;
 	}
 	
@@ -1275,7 +1220,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 			hr = Util::HrStreamToString(lpBody, strBody);
 		} else {
 			if (hr != MAPI_E_NOT_FOUND)
-				ec_log_info("Unable to open plain-text stream. Error: 0x%08X", hr);
+				kc_perror("Unable to open plain text stream", hr);
 			hr = hrSuccess;
 		}
 
@@ -1313,13 +1258,11 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 			lpVMMessageBuilder->getTextPart()->setCharset(m_vmCharset);
 			vmime::dynamicCast<vmime::mapiTextPart>(lpVMMessageBuilder->getTextPart())->setPlainText(vmime::make_shared<vmime::stringContentHandler>(outString, bodyEncoding));
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on text part: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
@@ -1650,10 +1593,8 @@ HRESULT MAPIToVMIME::handleSenderInfo(IMessage *lpMessage,
 	if (hr != hrSuccess) {
 		// Store owner, actual sender
 		hr = HrGetAddress(m_lpAdrBook, lpProps, cValues, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmail);
-		if (hr != hrSuccess) {
-			ec_log_err("Unable to get sender information. Error: 0x%08X", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return kc_perror("Unable to get sender information", hr);
 	}
 
 	// -- sender
@@ -1669,7 +1610,7 @@ HRESULT MAPIToVMIME::handleSenderInfo(IMessage *lpMessage,
 	if (hr != hrSuccess) {
 		hr = HrGetAddress(m_lpAdrBook, lpProps, cValues, PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, strResName, strResType, strResEmail);
 		if (hr != hrSuccess) {
-			ec_log_warn("Unable to get representing information. Error: 0x%08X", hr);
+			kc_pwarn("Unable to get representing information", hr);
 			// ignore error, since we still have enough information to send, maybe not just under the correct name
 			hr = hrSuccess;
 		}
@@ -2010,13 +1951,10 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 
 tnef_anyway:
 				hr = CreateStreamOnHGlobal(nullptr, TRUE, &~lpStream);
-				if (hr != hrSuccess) {
-					ec_log_err("Unable to create stream for TNEF attachment. Error 0x%08X", hr);
-					return hr;
-				}
-			 
+				if (hr != hrSuccess)
+					return kc_perror("Unable to create stream for TNEF attachment", hr);
+
 				ECTNEF tnef(TNEF_ENCODE, lpMessage, lpStream);
-			
 				// Encode the properties now, add all message properties except for the exclude list
 				hr = tnef.AddProps(TNEF_PROP_EXCLUDE, sptaExclude);
 				if(hr != hrSuccess) {
@@ -2057,12 +1995,10 @@ tnef_anyway:
 				lpVMMessageBuilder->appendAttachment(vmTNEFAtt); 
 			}
 		}
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		ec_log_err("VMIME exception: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		ec_log_err("STD exception on fill message: %s", e.what());
 		return MAPI_E_CALL_FAILED; // set real error
 	}

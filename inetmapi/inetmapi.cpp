@@ -49,7 +49,6 @@
 #include <kopano/ECLogger.h>
 #include <kopano/mapi_ptr.h>
 
-using namespace KCHL;
 using std::string;
 using std::wstring;
 
@@ -71,8 +70,7 @@ static void InitializeVMime()
 	scoped_lock l_vm(vmInitLock);
 	try {
 		vmime::platform::getHandler();
-	}
-	catch (vmime::exceptions::no_platform_handler &) {
+	} catch (const vmime::exceptions::no_platform_handler &) {
 		vmime::platform::setHandler<vmime::platforms::posix::posixHandler>();
 	}
 	if (vmimeInitialized)
@@ -86,15 +84,21 @@ static void InitializeVMime()
 	vmimeInitialized = true;
 }
 
-static string generateRandomMessageId()
+static std::string generate_message_id(IMessage *msg)
 {
 #define IDLEN 38
-	char id[IDLEN] = {0};
-	// the same format as the vmime generator, but with more randomness
-	snprintf(id, IDLEN, "kcim.%lx.%x.%08x%08x",
-		static_cast<unsigned long>(time(NULL)), getpid(),
-		rand_mt(), rand_mt());
-	return string(id, strlen(id));
+	memory_ptr<SPropValue> prop;
+	auto hr = HrGetOneProp(msg, PR_SEARCH_KEY, &~prop);
+	if (hr != hrSuccess) {
+		char id[IDLEN] = {0};
+		// Fallback: the same format as the vmime generator
+		// but with more randomness
+		snprintf(id, IDLEN, "kcim.%lx.%x.%08x%08x",
+			static_cast<unsigned long>(time(NULL)), getpid(),
+			rand_mt(), rand_mt());
+		return string(id, strlen(id));
+	}
+	return "kcis." + bin2hex(prop->Value.bin);
 #undef IDLEN
 }
 
@@ -181,14 +185,18 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 		if (HrGetOneProp(lpMessage, PR_CLIENT_SUBMIT_TIME, &~lpTime) == hrSuccess)
 			lpVMMessage->getHeader()->Date()->setValue(FiletimeTovmimeDatetime(lpTime->Value.ft));
 		// else, try PR_MESSAGE_DELIVERY_TIME, maybe other timestamps?
+
+		vmime::messageId msgid;
 		if (HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &~lpMessageId) == hrSuccess)
-			lpVMMessage->getHeader()->MessageId()->setValue(lpMessageId->Value.lpszA);
+			msgid = lpMessageId->Value.lpszA;
+		else
+			msgid = vmime::messageId(generate_message_id(lpMessage), vmime::platform::getHandler()->getHostName());
+		lpVMMessage->getHeader()->MessageId()->setValue(msgid);
+
 		lpVMMessage->generate(adapter);
-	}
-	catch (vmime::exception&) {
+	} catch (const vmime::exception &) {
 		return MAPI_E_NOT_FOUND;
-	}
-	catch (std::exception&) {
+	} catch (const std::exception &) {
 		return MAPI_E_NOT_FOUND;
 	}
 	return hrSuccess;
@@ -229,15 +237,13 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 			msgId = ptrProps[1].Value.lpszA;
 		else
 			// vmime::messageId::generateId() is not random enough since we use forking in the spooler
-			msgId = vmime::messageId(generateRandomMessageId(), vmime::platform::getHandler()->getHostName());
+			msgId = vmime::messageId(generate_message_id(lpMessage), vmime::platform::getHandler()->getHostName());
 		vmMessage->getHeader()->MessageId()->setValue(msgId);
 		ec_log_debug("Sending message with Message-ID: " + msgId.getId());
-	}
-	catch (vmime::exception& e) {
+	} catch (const vmime::exception &e) {
 		mailer->setError(e.what());
 		return MAPI_E_NOT_FOUND;
-	}
-	catch (std::exception& e) {
+	} catch (const std::exception &e) {
 		mailer->setError(e.what());
 		return MAPI_E_NOT_FOUND;
 	}

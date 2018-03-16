@@ -143,7 +143,7 @@ public:
 // FLAGS: \Seen \Answered \Flagged \Deleted \Draft \Recent
 class IMAP _kc_final : public ClientProto {
 public:
-	IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig);
+	IMAP(const char *path, KC::ECChannel *, KC::ECLogger *, KC::ECConfig *);
 	~IMAP();
 
 	// getTimeoutMinutes: 30 min when logged in otherwise 1 min
@@ -168,22 +168,21 @@ private:
 
 	// All IMAP4rev1 commands
 	HRESULT HrCmdCapability(const std::string &tag);
-	template<bool> HRESULT HrCmdNoop(const std::string &tag);
+	template<bool check> HRESULT HrCmdNoop(const std::string &tag) { return HrCmdNoop(tag, check); }
 	HRESULT HrCmdNoop(const std::string &tag, bool check);
 	HRESULT HrCmdLogout(const std::string &tag);
 	HRESULT HrCmdStarttls(const std::string &tag);
 	HRESULT HrCmdAuthenticate(const std::string &tag, std::string auth_method, const std::string &auth_data);
 	HRESULT HrCmdLogin(const std::string &tag, const std::vector<std::string> &args);
-	template<bool> HRESULT HrCmdSelect(const std::string &tag, const std::vector<std::string> &args);
+	template<bool read_only> HRESULT HrCmdSelect(const std::string &tag, const std::vector<std::string> &args) { return HrCmdSelect(tag, args, read_only); }
 	HRESULT HrCmdSelect(const std::string &tag, const std::vector<std::string> &args, bool read_only);
 	HRESULT HrCmdCreate(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdDelete(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdRename(const std::string &tag, const std::vector<std::string> &args);
-	template<bool> HRESULT HrCmdSubscribe(const std::string &tag, const std::vector<std::string> &args);
+	template<bool subscribe> HRESULT HrCmdSubscribe(const std::string &tag, const std::vector<std::string> &args) { return HrCmdSubscribe(tag, args, subscribe); }
 	HRESULT HrCmdSubscribe(const std::string &tag, const std::vector<std::string> &args, bool subscribe);
-	template<bool> HRESULT HrCmdList(const std::string &tag, const std::vector<std::string> &args);
+	template<bool sub_only> HRESULT HrCmdList(const std::string &tag, const std::vector<std::string> &args) { return HrCmdList(tag, args, sub_only); }
 	HRESULT HrCmdList(const std::string &tag, const std::vector<std::string> &args, bool sub_only);
-	HRESULT get_recent_uidnext2(IMAPIFolder *folder, ULONG &recent, ULONG &uidnext, const ULONG &messages);
 	HRESULT get_recent_uidnext(IMAPIFolder *folder, const std::string &tag, ULONG &recent, ULONG &uidnext, const ULONG &messages);
 	HRESULT HrCmdStatus(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdAppend(const std::string &tag, const std::string &folder, const std::string &data, std::string flags = {}, const std::string &time = {});
@@ -191,11 +190,11 @@ private:
 	HRESULT HrCmdExpunge(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdSearch(const std::string &tag, std::vector<std::string> &search_crit, bool uid_mode);
 	HRESULT HrCmdFetch(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
-	template <bool uid> HRESULT HrCmdFetch(const std::string &strTag, const std::vector<std::string> &args);
+	template <bool uid> HRESULT HrCmdFetch(const std::string &strTag, const std::vector<std::string> &args) { return HrCmdFetch(strTag, args, uid); }
 	HRESULT HrCmdStore(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
-	template <bool uid> HRESULT HrCmdStore(const std::string &strTag, const std::vector<std::string> &args);
+	template <bool uid> HRESULT HrCmdStore(const std::string &strTag, const std::vector<std::string> &args) { return HrCmdStore(strTag, args, uid); }
 	HRESULT HrCmdCopy(const std::string &tag, const std::vector<std::string> &args, bool uid_mode);
-	template <bool uid> HRESULT HrCmdCopy(const std::string &strTag, const std::vector<std::string> &args);
+	template <bool uid> HRESULT HrCmdCopy(const std::string &strTag, const std::vector<std::string> &args) { return HrCmdCopy(strTag, args, uid); }
 	HRESULT HrCmdUidXaolMove(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdIdle(const std::string &tag);
 	HRESULT HrCmdNamespace(const std::string &tag);
@@ -240,15 +239,15 @@ private:
 		bool operator==(ULONG ulUid) const noexcept { return this->ulUid == ulUid; }
 	};
 
-	KCHL::object_ptr<IMAPISession> lpSession;
-	KCHL::object_ptr<IAddrBook> lpAddrBook;
-	KCHL::memory_ptr<SPropTagArray> m_lpsIMAPTags;
+	KC::object_ptr<IMAPISession> lpSession;
+	KC::object_ptr<IAddrBook> lpAddrBook;
+	KC::memory_ptr<SPropTagArray> m_lpsIMAPTags;
 
 	// current folder name
-	KCHL::object_ptr<IMAPIFolder> current_folder;
+	KC::object_ptr<IMAPIFolder> current_folder;
 	std::pair<std::wstring, bool> current_folder_state;
 	std::wstring strCurrentFolder;
-	KCHL::object_ptr<IMAPITable> m_lpTable; /* current contents table */
+	KC::object_ptr<IMAPITable> m_lpTable; /* current contents table */
 	std::vector<std::string> m_vTableDataColumns; /* current dataitems that caused the setcolumns on the table */
 
 	// true if folder is opened with examine
@@ -256,7 +255,7 @@ private:
 
 	// vector of mails in the current folder. The index is used for mail number.
 	std::vector<SMail> lstFolderMailEIDs;
-	KCHL::object_ptr<IMsgStore> lpStore, lpPublicStore;
+	KC::object_ptr<IMsgStore> lpStore, lpPublicStore;
 
 	enum { PR_IPM_FAKEJUNK_ENTRYID = PR_ADDITIONAL_REN_ENTRYIDS };
 	// special folder entryids (not able to move/delete inbox and such ...)
@@ -275,14 +274,14 @@ private:
 
 	// Idle mode variables
 	bool m_bIdleMode = false;
-	KCHL::object_ptr<IMAPIAdviseSink> m_lpIdleAdviseSink;
+	KC::object_ptr<IMAPIAdviseSink> m_lpIdleAdviseSink;
 	ULONG m_ulIdleAdviseConnection = 0;
 	std::string m_strIdleTag;
-	KCHL::object_ptr<IMAPITable> m_lpIdleTable;
+	KC::object_ptr<IMAPITable> m_lpIdleTable;
 	std::mutex m_mIdleLock;
 	ULONG m_ulLastUid = 0, m_ulErrors = 0;
 	std::wstring m_strwUsername;
-	delivery_options dopt;
+	KC::delivery_options dopt;
 
 	HRESULT HrPrintQuotaRoot(const std::string &tag);
 	HRESULT HrFindFolder(const std::wstring &folder, bool readonly, IMAPIFolder **, ULONG * = nullptr, ENTRYID ** = nullptr);
@@ -292,6 +291,7 @@ private:
 	bool IsMailFolder(IMAPIFolder *) const;
 	HRESULT HrOpenParentFolder(IMAPIFolder *lpFolder, IMAPIFolder **lppFolder);
 	HRESULT HrGetFolderList(std::list<SFolder> &);
+	int check_mboxname_with_resp(const std::wstring &name, const std::string &tag, const std::string &cmd);
 
 	/* subscribed folders */
 	std::vector<BinaryArray> m_vSubscriptions;
@@ -314,33 +314,33 @@ private:
 	ULONG LastOrNumber(const char *szNr, bool bUID);
 	HRESULT HrParseSeqSet(const std::string &seq, std::list<ULONG> &mails);
 	HRESULT HrParseSeqUidSet(const std::string &seq, std::list<ULONG> &mails);
-	HRESULT HrSeqUidSetToRestriction(const std::string &seq, std::unique_ptr<ECRestriction> &);
+	HRESULT HrSeqUidSetToRestriction(const std::string &seq, std::unique_ptr<KC::ECRestriction> &);
 	HRESULT HrStore(const std::list<ULONG> &mails, std::string msgdata_itemname, std::string msgdata_itemvalue, bool *do_del);
-	HRESULT HrCopy(const std::list<ULONG> &mails, const std::string &folder, bool move);
+	HRESULT HrCopy(const std::list<ULONG> &mails, const std::wstring &folder, bool move);
 	HRESULT HrSearchNU(const std::vector<std::string> &cond, ULONG startcond, std::list<ULONG> &mailnr);
 	HRESULT HrSearch(std::vector<std::string> &&cond, ULONG startcond, std::list<ULONG> &mailnr);
 	HRESULT HrGetBodyStructure(bool ext, std::string &body_structure, const std::string &msg);
 	HRESULT HrGetEmailAddress(LPSPropValue props, ULONG addr_type, ULONG eid, ULONG name, ULONG email, std::string header_name, std::string *hdrs);
 
 	// IMAP4rev1 date format: 01-Jan-2000 00:00 +0000
-	std::string FileTimeToString(FILETIME sFiletime);
+	std::string FileTimeToString(const FILETIME &sFiletime);
 	bool StringToFileTime(std::string t, FILETIME &sFileTime, bool date_only = false);
 	// add 24 hour to the time to be able to check if a time is on a date
-	FILETIME AddDay(FILETIME sFileTime);
+	FILETIME AddDay(const FILETIME &sFileTime);
 
 	// Folder names are in a *modified* utf-7 form. See RFC2060, chapter 5.1.3
 	HRESULT MAPI2IMAPCharset(const std::wstring &input, std::string &output);
 	HRESULT IMAP2MAPICharset(const std::string &input, std::wstring &output);
 	
 	// Match a folder path
-	bool MatchFolderPath(std::wstring folder, const std::wstring &pattern);
+	bool MatchFolderPath(const std::wstring &folder, const std::wstring &pattern);
 
 	// Various conversion functions
 	std::string PropsToFlags(LPSPropValue props, unsigned int nprops, bool recent, bool read);
 	void HrParseHeaders(const std::string &, std::list<std::pair<std::string, std::string> > &);
 	void HrGetSubString(std::string &output, const std::string &input, const std::string &begin, const std::string &end);
-	HRESULT HrExpungeDeleted(const std::string &tag, const std::string &cmd, std::unique_ptr<ECRestriction> &&);
-	HRESULT HrGetCurrentFolder(KCHL::object_ptr<IMAPIFolder> &);
+	HRESULT HrExpungeDeleted(const std::string &tag, const std::string &cmd, std::unique_ptr<KC::ECRestriction> &&);
+	HRESULT HrGetCurrentFolder(KC::object_ptr<IMAPIFolder> &);
 };
 
 /** @} */

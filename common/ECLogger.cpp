@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <kopano/ECConfig.h>
+#include <kopano/MAPIErrors.h>
 
 namespace KC {
 
@@ -155,6 +156,18 @@ int ECLogger::snprintf(char *str, size_t size, const char *format, ...) {
 	va_end(va);
 
 	return len;
+}
+
+HRESULT ECLogger::perr(const char *text, HRESULT code)
+{
+	Log(EC_LOGLEVEL_ERROR, "%s: %s (%x)", text, GetMAPIErrorMessage(code), code);
+	return code;
+}
+
+HRESULT ECLogger::pwarn(const char *text, HRESULT code)
+{
+	Log(EC_LOGLEVEL_WARNING, "%s: %s (%x)", text, GetMAPIErrorMessage(code), code);
+	return code;
 }
 
 ECLogger_Null::ECLogger_Null() : ECLogger(EC_LOGLEVEL_NONE) {}
@@ -466,8 +479,7 @@ bool ECLogger_Tee::Log(unsigned int loglevel)
 	bool bResult = false;
 
 	for (auto log : m_loggers)
-		bResult = log->Log(loglevel);
-
+		bResult |= log->Log(loglevel);
 	return bResult;
 }
 
@@ -517,7 +529,7 @@ void ECLogger_Tee::LogVA(unsigned int loglevel, const char *format, va_list &va)
 void ECLogger_Tee::AddLogger(ECLogger *lpLogger) {
 	if (lpLogger == nullptr)
 		return;
-	m_loggers.emplace_back(KCHL::object_ptr<ECLogger>(lpLogger));
+	m_loggers.emplace_back(object_ptr<ECLogger>(lpLogger));
 }
 
 ECLogger_Pipe::ECLogger_Pipe(int fd, pid_t childpid, int loglevel) :

@@ -19,6 +19,7 @@
 #include <kopano/ECInterfaceDefs.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/memory.hpp>
+#include <kopano/scope.hpp>
 #include <mapiutil.h>
 #include <edkguid.h>
 #include <list>
@@ -63,11 +64,10 @@
 #include "ECExchangeModifyTable.h"
 
 #include <kopano/mapi_ptr.h>
-typedef KCHL::object_ptr<WSTransport> WSTransportPtr;
-
 #include <kopano/charset/convstring.h>
 
-using namespace KCHL;
+using namespace KC;
+typedef object_ptr<WSTransport> WSTransportPtr;
 
 // FIXME: from libserver/ECMAPI.h
 #define MSGFLAG_DELETED                           ((ULONG) 0x00000400)
@@ -357,7 +357,9 @@ HRESULT ECMsgStore::OpenStatsTable(unsigned int ulTableType, LPMAPITABLE *lppTab
  * @param[out] lpulConnection Connection ID of the registered subscription
  * @return result
  */
-HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection){
+HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
+{
 	HRESULT hr = hrSuccess;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
@@ -438,7 +440,9 @@ HRESULT ECMsgStore::Reload(void *lpParam, ECSESSIONID sessionid)
 	return hr;
 }
 
-HRESULT ECMsgStore::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType)
+HRESULT ECMsgStore::TableRowGetProp(void *lpProvider,
+    const struct propVal *lpsPropValSrc, SPropValue *lpsPropValDst,
+    void **lpBase, ULONG ulType)
 {
 	HRESULT hr = hrSuccess;
 	auto lpMsgStore = static_cast<ECMsgStore *>(lpProvider);
@@ -967,11 +971,8 @@ HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 			if(hr != hrSuccess)
 				return hr;
 			lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
-			if ((hr = MAPIAllocateMore(sizeof(GUID), lpBase, (void **) &lpsPropValue->Value.bin.lpb)) != hrSuccess)
-				return hr;
-			memcpy(lpsPropValue->Value.bin.lpb, lpProp->Value.bin.lpb, sizeof(GUID));
 			lpsPropValue->Value.bin.cb = sizeof(GUID);
-			break;
+			return KAllocCopy(lpProp->Value.bin.lpb, sizeof(GUID), reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
 			}
 		case PROP_ID(PR_SEARCH_KEY):
 		case PROP_ID(PR_ENTRYID):
@@ -1598,7 +1599,9 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
 	return AddRenAdditionalFolder(lpInboxFolder, ulType, &lpPropValueEID->Value.bin);
 }
 
-HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG* lpcbStoreId, LPENTRYID* lppStoreId, ULONG* lpcbRootId, LPENTRYID *lppRootId)
+HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG *lpcbStoreId, ENTRYID **lppStoreId,
+    ULONG *lpcbRootId, ENTRYID **lppRootId)
 {
 	HRESULT				hr				= hrSuccess;
 	object_ptr<WSTransport> lpTempTransport;
@@ -1981,7 +1984,9 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpU
  * lpcbStoreId, lppStoreId, lpcbRootId and lppRootId are optional. But if a root id is specified, the store id must
  * also be specified. A store id however may be passed without passing a root id.
  */
-HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG* lpcbStoreId, LPENTRYID* lppStoreId, ULONG* lpcbRootId, LPENTRYID* lppRootId)
+HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG ulFlags, ULONG *lpcbStoreId,
+    ENTRYID **lppStoreId, ULONG *lpcbRootId, ENTRYID **lppRootId)
 {
 	HRESULT hr = hrSuccess;
 	ULONG cbStoreId = 0;
@@ -2010,11 +2015,18 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 	if ((*lpcbStoreId == 0 || *lpcbRootId == 0) && CoCreateGuid(&guidStore) != S_OK)
 		return MAPI_E_CALL_FAILED;
 
+	auto laters = make_scope_success([&]() {
+		if (lpcbStoreId != nullptr && *lpcbStoreId == 0)
+			MAPIFreeBuffer(lpStoreId);
+		if (lpcbRootId != nullptr && *lpcbRootId == 0)
+			MAPIFreeBuffer(lpRootId);
+	});
+
 	if (*lpcbStoreId == 0) {
 		// Create store entryid
 		hr = HrCreateEntryId(guidStore, MAPI_STORE, &cbStoreId, &lpStoreId);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	} else {
 		ULONG cbTmp = 0;
 		LPENTRYID lpTmp = NULL;
@@ -2028,7 +2040,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 		if (hr != hrSuccess) {
 			if (lpTmp != *lppStoreId)
 				MAPIFreeBuffer(lpTmp);
-			goto exit;
+			return hr;
 		}
 	}
 
@@ -2036,7 +2048,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 		// create root entryid
 		hr = HrCreateEntryId(guidStore, MAPI_FOLDER, &cbRootId, &lpRootId);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	} else {
 		cbRootId = *lpcbRootId;
 		lpRootId = *lppRootId;
@@ -2045,7 +2057,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 	// Create the messagestore
 	hr = lpTransport->HrCreateStore(ulStoreType, cbUserId, lpUserId, cbStoreId, lpStoreId, cbRootId, lpRootId, ulFlags);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (*lppStoreId == 0) {
 		*lpcbStoreId = cbStoreId;
@@ -2059,31 +2071,28 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 		lpRootId = NULL;
 	}
 
-exit:
-	if (lpcbStoreId != NULL && *lpcbStoreId == 0)
-		MAPIFreeBuffer(lpStoreId);
-	if (lpcbRootId != nullptr && *lpcbRootId == 0)
-		MAPIFreeBuffer(lpRootId);
-
 	return hr;
 }
 
-HRESULT ECMsgStore::HookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, LPGUID lpGuid)
+HRESULT ECMsgStore::HookStore(ULONG ulStoreType, ULONG cbUserId,
+    const ENTRYID *lpUserId, const GUID *lpGuid)
 {
 	return lpTransport->HrHookStore(ulStoreType, cbUserId, lpUserId, lpGuid, 0);
 }
 
-HRESULT ECMsgStore::UnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT ECMsgStore::UnhookStore(ULONG ulStoreType, ULONG cbUserId,
+    const ENTRYID *lpUserId)
 {
 	return lpTransport->HrUnhookStore(ulStoreType, cbUserId, lpUserId, 0);
 }
 
-HRESULT ECMsgStore::RemoveStore(LPGUID lpGuid)
+HRESULT ECMsgStore::RemoveStore(const GUID *lpGuid)
 {
 	return lpTransport->HrRemoveStore(lpGuid, 0);
 }
 
-HRESULT ECMsgStore::ResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
+HRESULT ECMsgStore::ResolveStore(const GUID *lpGuid, ULONG *lpulUserID,
+    ULONG *lpcbStoreID, ENTRYID **lppStoreID)
 {
 	ULONG			cbStoreEntryID = 0;
 	memory_ptr<ENTRYID> lpStoreEntryID;
@@ -2211,8 +2220,8 @@ HRESULT ECMsgStore::SetUser(ECUSER *lpECUser, ULONG ulFlags)
 	return lpTransport->HrSetUser(lpECUser, ulFlags);
 }
 
-HRESULT ECMsgStore::GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags,
-    ECUSER **lppECUser)
+HRESULT ECMsgStore::GetUser(ULONG cbUserId, const ENTRYID *lpUserId,
+    ULONG ulFlags, ECUSER **lppECUser)
 {
 	return lpTransport->HrGetUser(cbUserId, lpUserId, ulFlags, lppECUser);
 }
@@ -2220,18 +2229,6 @@ HRESULT ECMsgStore::GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags,
 HRESULT ECMsgStore::DeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
 {
 	return lpTransport->HrDeleteUser(cbUserId, lpUserId);
-}
-
-HRESULT ECMsgStore::GetUserList(ULONG company_size, ENTRYID *company_eid,
-    ULONG flags, ULONG *nusers, ECUSER **out)
-{
-	return ECMAPIProp::GetUserList(company_size, company_eid, flags, nusers, out);
-}
-
-HRESULT ECMsgStore::GetGroupList(ULONG company_size, ENTRYID *company_eid,
-    ULONG flags, ULONG *ngroups, ECGROUP **out)
-{
-	return ECMAPIProp::GetGroupList(company_size, company_eid, flags, ngroups, out);
 }
 
 HRESULT ECMsgStore::ResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
@@ -2282,7 +2279,7 @@ HRESULT ECMsgStore::SetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 	return lpTransport->HrSetGroup(lpECGroup, ulFlags);
 }
 
-HRESULT ECMsgStore::GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
+HRESULT ECMsgStore::GetGroup(ULONG cbGroupId, const ENTRYID *lpGroupId,
     ULONG ulFlags, ECGROUP **lppECGroup)
 {
 	return lpTransport->HrGetGroup(cbGroupId, lpGroupId, ulFlags, lppECGroup);
@@ -2332,7 +2329,7 @@ HRESULT ECMsgStore::SetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 	return lpTransport->HrSetCompany(lpECCompany, ulFlags);
 }
 
-HRESULT ECMsgStore::GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+HRESULT ECMsgStore::GetCompany(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
     ULONG ulFlags, ECCOMPANY **lppECCompany)
 {
 	return lpTransport->HrGetCompany(cbCompanyId, lpCompanyId, ulFlags, lppECCompany);
@@ -2341,12 +2338,6 @@ HRESULT ECMsgStore::GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 HRESULT ECMsgStore::ResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
 	return lpTransport->HrResolveCompanyName(lpszCompanyName, ulFlags, lpcbCompanyId, lppCompanyId);
-}
-
-HRESULT ECMsgStore::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
-    ECCOMPANY **lppsCompanies)
-{
-	return lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
 }
 
 HRESULT ECMsgStore::AddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
@@ -2554,7 +2545,9 @@ HRESULT ECMsgStore::UnwrapNoRef(LPVOID *ppvObject)
 
 // open a table with given entryids and columns.
 // entryids can be from any store
-HRESULT ECMsgStore::OpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, LPMAPITABLE *lppTable) {
+HRESULT ECMsgStore::OpenMultiStoreTable(const ENTRYLIST *lpMsgList,
+    ULONG ulFlags, IMAPITable **lppTable)
+{
 	HRESULT		hr = hrSuccess;
 	object_ptr<ECMAPITable> lpTable;
 	object_ptr<WSTableView> lpTableOps;
@@ -2723,7 +2716,7 @@ DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, GetNamesFromIDs, (SPropTagA
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))
 
 // IECMultiStoreTable interface
-DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, OpenMultiStoreTable, (LPENTRYLIST, lpMsgList), (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, OpenMultiStoreTable, (const ENTRYLIST *, msglist), (ULONG, flags), (IMAPITable **, table))
 
 // IECTestProtocol interface
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, TestPerform, (const char *, cmd), (unsigned int, argc), (char **, args))
@@ -2774,7 +2767,8 @@ HRESULT ECMSLogon::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
 	return m_lpStore->CompareEntryIDs(cbEntryID1, lpEntryID1, cbEntryID2, lpEntryID2, ulFlags, lpulResult);
 }
 
-HRESULT ECMSLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
+HRESULT ECMSLogon::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
 {
 	return m_lpStore->Advise(cbEntryID, lpEntryID, ulEventMask, lpAdviseSink, lpulConnection);
 }

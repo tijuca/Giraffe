@@ -78,11 +78,7 @@ static const unsigned int EC_LOGLEVEL_EXTENDED_MASK = 0xFFFF0000;
 			(_plog)->Log(EC_LOGLEVEL_FATAL, __VA_ARGS__); \
 	} while (false)
 
-#ifdef UNICODE
 #define TSTRING_PRINTF "%ls"
-#else
-#define TSTRING_PRINTF "%s"
-#endif
 
 /**
  * Prefixes in log message in different process models.
@@ -189,6 +185,8 @@ class _kc_export ECLogger {
 		 * @param	format		formatted string for the parameter list
 		 */
 		_kc_hidden virtual void Log(unsigned int level, const char *fmt, ...) KC_LIKE_PRINTF(3, 4) = 0;
+		HRESULT perr(const char *text, HRESULT);
+		HRESULT pwarn(const char *text, HRESULT);
 
 		/**
 		 * Log a message on a specified loglevel using char* format
@@ -266,7 +264,7 @@ class _kc_export_dycast ECLogger_File _kc_final : public ECLogger {
  */
 class _kc_export_dycast ECLogger_Syslog _kc_final : public ECLogger {
 	private:
-	std::unique_ptr<char[], KCHL::cstdlib_deleter> m_ident;
+	std::unique_ptr<char[], cstdlib_deleter> m_ident;
 	static const int levelmap[16]; /* converts to syslog levels */
 
 	public:
@@ -310,7 +308,7 @@ extern _kc_export ECLogger *StartLoggerProcess(ECConfig *, ECLogger *file_logger
  */
 class _kc_export ECLogger_Tee _kc_final : public ECLogger {
 	private:
-	std::list<KCHL::object_ptr<ECLogger>> m_loggers;
+	std::list<object_ptr<ECLogger>> m_loggers;
 
 	public:
 		ECLogger_Tee();
@@ -337,6 +335,7 @@ extern _kc_export void ec_log(unsigned int level, const std::string &msg);
 #define ec_log_debug(...)   ec_log(EC_LOGLEVEL_DEBUG, __VA_ARGS__)
 #define kc_perror(s, r)     (ec_log(EC_LOGLEVEL_ERROR, s ": %s (%x)", GetMAPIErrorMessage(r), (r)), (r))
 #define kc_perrorf(s, r)    (ec_log(EC_LOGLEVEL_ERROR, "%s: " s ": %s (%x)", __PRETTY_FUNCTION__, GetMAPIErrorMessage(r), (r)), (r))
+#define kc_pwarn(s, r)      (ec_log(EC_LOGLEVEL_WARNING, s ": %s (%x)", GetMAPIErrorMessage(r), (r)), (r))
 
 extern _kc_export ECLogger *CreateLogger(ECConfig *, const char *argv0, const char *service, bool audit = false);
 extern _kc_export int DeleteLogger(ECLogger *);

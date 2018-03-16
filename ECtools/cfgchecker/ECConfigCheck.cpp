@@ -242,7 +242,7 @@ int ECConfigCheck::testCharset(const config_check_t *check)
 
 int ECConfigCheck::testBoolean(const config_check_t *check)
 {
-	auto v1 = strToLower(check->value1);
+	auto v1 = KC::strToLower(check->value1);
 	if (v1.empty() || v1 == "true" || v1 == "false" || v1 == "yes" ||
 	    v1 == "no")
 		return CHECK_OK;
@@ -353,8 +353,6 @@ MonitorConfigCheck::MonitorConfigCheck(const char *lpszConfigFile) :
 void MonitorConfigCheck::loadChecks()
 {
 	addCheck("companyquota_warning_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
-	addCheck("companyquota_soft_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
-	addCheck("companyquota_hard_template", CONFIG_MANDATORY | CONFIG_HOSTED_USED, &testFile);
 	addCheck("userquota_warning_template", CONFIG_MANDATORY, &testFile);
 	addCheck("userquota_soft_template", CONFIG_MANDATORY, &testFile);
 	addCheck("userquota_hard_template", CONFIG_MANDATORY, &testFile);

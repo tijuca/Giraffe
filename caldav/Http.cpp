@@ -22,8 +22,10 @@
 #include "Http.h"
 #include <kopano/mapi_ptr.h>
 #include <kopano/stringutil.h>
-
+#include <kopano/MAPIErrors.h>
 #include <kopano/ECConfig.h>
+
+using namespace KC;
 
 /** 
  * Parse the incoming URL into known pieces:
@@ -173,7 +175,7 @@ HRESULT Http::HrReadHeaders()
 
 	hr = HrParseHeaders();
 	if (hr != hrSuccess)
-		ec_log_debug("parsing headers failed: 0x%08X", hr);
+		ec_log_debug("parsing headers failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
 	return hr;
 }
 
@@ -379,11 +381,8 @@ bool Http::CheckIfMatch(LPMAPIPROP lpProp)
 	SPropValuePtr ptrLastModTime;
 
 	if (lpProp != nullptr &&
-	    HrGetOneProp(lpProp, PR_LAST_MODIFICATION_TIME, &~ptrLastModTime) == hrSuccess) {
-		time_t stamp;
-		FileTimeToUnixTime(ptrLastModTime->Value.ft, &stamp);
-		strValue = stringify_int64(stamp, false);
-	}
+	    HrGetOneProp(lpProp, PR_LAST_MODIFICATION_TIME, &~ptrLastModTime) == hrSuccess)
+		strValue = stringify_int64(FileTimeToUnixTime(ptrLastModTime->Value.ft), false);
 
 	if (HrGetHeaderValue("If-Match", &strIf) == hrSuccess) {
 		if (strIf.compare("*") == 0 && !ptrLastModTime)
@@ -518,12 +517,8 @@ HRESULT Http::HrValidateReq()
 	bool bFound = false;
 	int i;
 
-	if (m_strMethod.empty()) {
-		static const HRESULT hr = MAPI_E_INVALID_PARAMETER;
-		ec_log_err("HTTP request method is empty: %08X", hr);
-		return hr;
-	}
-
+	if (m_strMethod.empty())
+		return kc_perror("HTTP request method is empty", MAPI_E_INVALID_PARAMETER);
 	if (!parseBool(m_lpConfig->GetSetting("enable_ical_get")) && m_strMethod == "GET") {
 		ec_log_err("Denying iCalendar GET since it is disabled");
 		return MAPI_E_NO_ACCESS;
@@ -538,7 +533,7 @@ HRESULT Http::HrValidateReq()
 
 	if (bFound == false) {
 		static const HRESULT hr = MAPI_E_INVALID_PARAMETER;
-		ec_log_err("HTTP request '%s' not implemented: %08X", m_strMethod.c_str(), hr);
+		ec_log_err("HTTP request \"%s\" not implemented: %s (%x)", m_strMethod.c_str(), GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
 
@@ -737,7 +732,6 @@ HRESULT Http::HrFlushHeaders()
 	HRESULT hr = hrSuccess;
 	std::string strOutput;
 	char lpszChar[128];
-	time_t tmCurrenttime = time(NULL);
 	std::string strConnection;
 
 	HrGetHeaderValue("Connection", &strConnection);
@@ -745,8 +739,7 @@ HRESULT Http::HrFlushHeaders()
 	// Add misc. headers
 	HrResponseHeader("Server","Kopano");
 	struct tm dummy;
-	strftime(lpszChar, 127, "%a, %d %b %Y %H:%M:%S GMT", gmtime_safe(&tmCurrenttime, &dummy));
-
+	strftime(lpszChar, 127, "%a, %d %b %Y %H:%M:%S GMT", gmtime_safe(time(nullptr), &dummy));
 	HrResponseHeader("Date", lpszChar);
 	if (m_ulKeepAlive != 0 && strcasecmp(strConnection.c_str(), "keep-alive") == 0) {
 		HrResponseHeader("Connection", "Keep-Alive");

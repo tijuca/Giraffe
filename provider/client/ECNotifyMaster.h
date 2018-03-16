@@ -31,6 +31,7 @@
 #include <kopano/kcodes.h>
 #include <kopano/memory.hpp>
 
+using namespace KC;
 class ECNotifyClient;
 class ECNotifyMaster;
 class WSTransport;
@@ -90,7 +91,7 @@ private:
 	/* Connection settings */
 	/* weak ptr: ECNotifyMaster is owned by SessionGroupData */
 	SessionGroupData *m_lpSessionGroupData;
-	KCHL::object_ptr<WSTransport> m_lpTransport;
+	KC::object_ptr<WSTransport> m_lpTransport;
 	std::atomic<unsigned int> m_ulConnection{1};
 
 	/* Threading information */

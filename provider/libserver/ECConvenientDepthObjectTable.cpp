@@ -187,8 +187,8 @@ ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession,
  * here.
  */
 ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGenTable,
-    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
-    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct soap *soap, ECSession *lpSession, const ECObjectTableList *lpRowList,
+    const struct propTagArray *lpsPropTagArray, const void *lpObjectData,
     struct rowSet **lppRowSet, bool bTableData, bool bTableLimit)
 {
 	unsigned int n = 0;
@@ -238,7 +238,7 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
 	// 'Recursively' loop through all our containers and add each of those children to our object list
 	for (const auto &obj : lstObjects) {
 		std::unique_ptr<std::list<localobjectdetails_t> > lpSubObjects;
-		if (LoadHierarchyContainer(obj.ulId, 0, &KCHL::unique_tie(lpSubObjects)) != erSuccess)
+		if (LoadHierarchyContainer(obj.ulId, 0, &unique_tie(lpSubObjects)) != erSuccess)
 			continue;
 		for (const auto &subobj : *lpSubObjects) {
 			CONTAINERINFO folder;

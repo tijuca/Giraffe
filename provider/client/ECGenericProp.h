@@ -30,6 +30,7 @@
 #include <map>
 #include <set>
 
+using namespace KC;
 // These are the callback functions called when a software-handled property is requested
 typedef HRESULT (*SetPropCallBack)(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 typedef HRESULT (* GetPropCallBack)(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
@@ -71,8 +72,7 @@ public:
 	static HRESULT		DefaultGetProp(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
 
 	// Our table-row getprop handler (handles client-side generation of table columns)
-	static HRESULT		TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType);
-
+	static HRESULT TableRowGetProp(void *prov, const struct propVal *src, SPropValue *dst, void **base, ULONG type);
 	virtual HRESULT HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadProps);
 	virtual HRESULT HrSetRealProp(const SPropValue *lpsPropValue);
 	virtual HRESULT		HrGetRealProp(ULONG ulPropTag, ULONG ulFlags, void *lpBase, LPSPropValue lpsPropValue, ULONG ulMaxSize = 0);
@@ -97,7 +97,7 @@ protected: ///?
 
 	// For IECSingleInstance
 	virtual HRESULT GetSingleInstanceId(ULONG *id_size, ENTRYID **id);
-	virtual HRESULT SetSingleInstanceId(ULONG id_size, ENTRYID *id);
+	virtual HRESULT SetSingleInstanceId(ULONG eid_size, const ENTRYID *eid) override;
 
 public:
 	// From IMAPIProp
@@ -145,8 +145,8 @@ public:
 	ULONG m_cbEntryId = 0;
 	std::recursive_mutex m_hMutexMAPIObject; /* Mutex for locking the MAPIObject */
 	BOOL m_bReload = false, m_bLoading = false;
-	KCHL::memory_ptr<ENTRYID> m_lpEntryId;
-	KCHL::object_ptr<IECPropStorage> lpStorage;
+	KC::memory_ptr<ENTRYID> m_lpEntryId;
+	KC::object_ptr<IECPropStorage> lpStorage;
 	std::unique_ptr<MAPIOBJECT> m_sMapiObject;
 };
 

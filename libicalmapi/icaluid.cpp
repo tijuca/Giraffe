@@ -53,9 +53,7 @@ HRESULT HrGenerateUid(std::string *lpStrData)
 	HRESULT hr = CoCreateGuid(&sGuid);
 	if (hr != hrSuccess)
 		return hr;
-	hr = UnixTimeToFileTime(time(NULL), &ftNow);
-	if (hr != hrSuccess)
-		return hr;
+	ftNow = UnixTimeToFileTime(time(nullptr));
 	auto strBinUid = outlook_guid;
 	strBinUid += "00000000";	// InstanceDate
 	strBinUid += bin2hex(sizeof(FILETIME), &ftNow);
@@ -81,12 +79,9 @@ HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 	LPSPropValue lpPropVal = NULL;
 	std::string strUid, strBinUid;
 
-	if (base) {
-		hr = MAPIAllocateMore(sizeof(SPropValue), base, (void**)&lpPropVal);
-	} else {
-		hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpPropVal);
+	hr = MAPIAllocateMore(sizeof(SPropValue), base, reinterpret_cast<void **>(&lpPropVal));
+	if (base == nullptr)
 		base = lpPropVal;
-	}
 	if (hr != hrSuccess)
 		return hr;
 
@@ -99,13 +94,9 @@ HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 	strBinUid = hex2bin(strUid);
 
 	lpPropVal->Value.bin.cb = strBinUid.length();
-
-	hr = MAPIAllocateMore(lpPropVal->Value.bin.cb, base, (void**)&lpPropVal->Value.bin.lpb);
+	hr = KAllocCopy(strBinUid.data(), lpPropVal->Value.bin.cb, reinterpret_cast<void **>(&lpPropVal->Value.bin.lpb), base);
 	if (hr != hrSuccess)
 		goto exit;
-
-	memcpy(lpPropVal->Value.bin.lpb, strBinUid.data(), lpPropVal->Value.bin.cb);
-
 	*lppPropVal = lpPropVal;
 
 exit:
@@ -206,11 +197,9 @@ HRESULT HrMakeBinaryUID(const std::string &strUid, void *base, SPropValue *lpPro
 
 	// Caller sets .ulPropTag
 	sPropValue.Value.bin.cb = strBinUid.size();
-	HRESULT hr = MAPIAllocateMore(sPropValue.Value.bin.cb, base,
-	             reinterpret_cast<void **>(&sPropValue.Value.bin.lpb));
+	auto hr = KAllocCopy(strBinUid.data(), sPropValue.Value.bin.cb, reinterpret_cast<void **>(&sPropValue.Value.bin.lpb), base);
 	if (hr != hrSuccess)
 		return hr;
-	memcpy(sPropValue.Value.bin.lpb, strBinUid.data(), sPropValue.Value.bin.cb);
 
 	// set return value
 	lpPropValue->Value.bin.cb  = sPropValue.Value.bin.cb;

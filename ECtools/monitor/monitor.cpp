@@ -44,6 +44,7 @@
 #include <kopano/ecversion.h>
 #include "charset/localeutil.h"
 
+using namespace KC;
 using std::cout;
 using std::endl;
 
@@ -51,10 +52,11 @@ static std::unique_ptr<ECTHREADMONITOR> m_lpThreadMonitor;
 static std::mutex m_hExitMutex;
 static std::condition_variable m_hExitSignal;
 static pthread_t			mainthread;
+static bool g_dump_config;
 
 static HRESULT running_service(void)
 {
-	KCHL::AutoMAPI mapiinit;
+	AutoMAPI mapiinit;
 	auto hr = mapiinit.Initialize(nullptr);
 	if (hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI");
@@ -159,11 +161,11 @@ int main(int argc, char *argv[]) {
 		{ "quota_check_interval", "15" },
 		{ "mailquota_resend_interval", "1", CONFIGSETTING_RELOADABLE },
 		{ "userquota_warning_template", "/etc/kopano/quotamail/userwarning.mail", CONFIGSETTING_RELOADABLE },
-		{ "userquota_soft_template", "", CONFIGSETTING_UNUSED },
-		{ "userquota_hard_template", "", CONFIGSETTING_UNUSED },
+		{ "userquota_soft_template", "/etc/kopano/quotamail/usersoft.mail", CONFIGSETTING_RELOADABLE },
+		{ "userquota_hard_template", "/etc/kopano/quotamail/userhard.mail", CONFIGSETTING_RELOADABLE },
 		{ "companyquota_warning_template", "/etc/kopano/quotamail/companywarning.mail", CONFIGSETTING_RELOADABLE },
-		{ "companyquota_soft_template", "/etc/kopano/quotamail/companysoft.mail", CONFIGSETTING_RELOADABLE },
-		{ "companyquota_hard_template", "/etc/kopano/quotamail/companyhard.mail", CONFIGSETTING_RELOADABLE },
+		{ "companyquota_soft_template", "", CONFIGSETTING_UNUSED },
+		{ "companyquota_hard_template", "", CONFIGSETTING_UNUSED },
 		{ "servers", "" },
 		{ NULL, NULL },
 	};
@@ -173,7 +175,8 @@ int main(int argc, char *argv[]) {
 		OPT_HOST,
 		OPT_CONFIG,
 		OPT_FOREGROUND,
-		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS
+		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS,
+		OPT_DUMP_CONFIG,
 	};
 	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },
@@ -181,6 +184,7 @@ int main(int argc, char *argv[]) {
 		{ "config", 1, NULL, OPT_CONFIG },
 		{ "foreground", 1, NULL, OPT_FOREGROUND },
 		{ "ignore-unknown-config-options", 0, NULL, OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS },
+		{"dump-config", no_argument, nullptr, OPT_DUMP_CONFIG},
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -210,6 +214,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
 			bIgnoreUnknownConfigOptions = true;
+			break;
+		case OPT_DUMP_CONFIG:
+			g_dump_config = true;
 			break;
 		case 'V':
 			cout << "kopano-monitor " PROJECT_VERSION << endl;
@@ -242,6 +249,8 @@ int main(int argc, char *argv[]) {
 		hr = E_FAIL;
 		goto exit;
 	}
+	if (g_dump_config)
+		return m_lpThreadMonitor->lpConfig->dump_config(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	mainthread = pthread_self();
 

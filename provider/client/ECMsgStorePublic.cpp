@@ -35,7 +35,7 @@
 
 #include <kopano/ECGuid.h>
 
-using namespace KCHL;
+using namespace KC;
 
 ECMsgStorePublic::ECMsgStorePublic(const char *lpszProfname,
     IMAPISupport *lpSupport, WSTransport *lpTransport, BOOL fModify,
@@ -161,11 +161,9 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 		ePublicEntryID = ePE_FavoriteSubFolder;
 
 		// Replace the original entryid because this one is only readable
-		hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryIDIntern);
+		hr = KAllocCopy(lpEntryIDIntern, cbEntryID, &~lpEntryIDIntern);
 		if (hr != hrSuccess)
 			return hr;
-		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
-
 		// Remove Flags intern
 		lpEntryIDIntern->abFlags[3] &= ~KOPANO_FAVORITE;
 
@@ -316,15 +314,9 @@ HRESULT ECMsgStorePublic::GetPublicEntryId(enumPublicEntryID ePublicEntryID, voi
 			return MAPI_E_INVALID_PARAMETER;
 	}
 
-	if (lpBase)
-		hr = MAPIAllocateMore(cbPublicID, lpBase, (void**)&lpEntryID);
-	else
-		hr = MAPIAllocateBuffer(cbPublicID, (void**)&lpEntryID);
+	hr = KAllocCopy(lpPublicID, cbPublicID, reinterpret_cast<void **>(&lpEntryID), lpBase);
 	if (hr != hrSuccess)
 		return hr;
-
-	memcpy(lpEntryID, lpPublicID, cbPublicID);
-
 	*lpcbEntryID = cbPublicID;
 	*lppEntryID = lpEntryID;
 	return hrSuccess;
@@ -585,65 +577,6 @@ ECMemTable *ECMsgStorePublic::GetIPMSubTree()
 	return m_lpIPMSubTree;
 }
 
-HRESULT ECMsgStorePublic::GetDefaultShortcutFolder(IMAPIFolder** lppFolder)
-{
-	HRESULT hr = hrSuccess;
-	ULONG ulObjType;
-	object_ptr<IMAPIFolder> lpFolder;
-	object_ptr<IMsgStore> lpMsgStore;
-	memory_ptr<SPropValue> lpPropValue;
-	ULONG cbEntryId;
-	memory_ptr<ENTRYID> lpEntryId, lpStoreEntryID;
-	ULONG cbStoreEntryID;
-	std::string strRedirServer;
-	object_ptr<WSTransport> lpTmpTransport;
-
-	if (m_lpDefaultMsgStore == NULL)
-	{
-		// Get the default store for this user
-		hr = lpTransport->HrGetStore(0, NULL, &cbStoreEntryID, &~lpStoreEntryID, NULL, NULL, &strRedirServer);
-		if (hr == MAPI_E_UNABLE_TO_COMPLETE) {
-			// reopen store of user which is on another server
-			hr = lpTransport->CreateAndLogonAlternate(strRedirServer.c_str(), &~lpTmpTransport);
-			if (hr != hrSuccess)
-				goto exit;
-			hr = lpTmpTransport->HrGetStore(0, NULL, &cbStoreEntryID, &~lpStoreEntryID, NULL, NULL);
-		}
- 		if(hr != hrSuccess)
-			goto exit;
-		hr = WrapStoreEntryID(0, reinterpret_cast<const TCHAR *>(WCLIENT_DLL_NAME), cbStoreEntryID, lpStoreEntryID, &cbEntryId, &~lpEntryId);
-		if(hr != hrSuccess)
-			goto exit;
-
-		// Open default store
-		hr = lpSupport->OpenEntry(cbEntryId, lpEntryId, &IID_IMsgStore, MAPI_BEST_ACCESS, &ulObjType, &~lpMsgStore);
- 		if(hr != hrSuccess) 
-			goto exit;
-		hr = lpMsgStore->QueryInterface(iid_of(m_lpDefaultMsgStore), &~m_lpDefaultMsgStore);
-		if (hr != hrSuccess)
-			goto exit;
-	}
-
-	// Get shortcut entryid
-	hr = HrGetOneProp(m_lpDefaultMsgStore, PR_IPM_FAVORITES_ENTRYID, &~lpPropValue);
-	if(hr != hrSuccess)
-		goto exit;
-
-	// Open Shortcut folder
-	hr = m_lpDefaultMsgStore->OpenEntry(lpPropValue->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropValue->Value.bin.lpb), &IID_IMAPIFolder, MAPI_BEST_ACCESS, &ulObjType, &~lpFolder);
-	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpFolder->QueryInterface(IID_IMAPIFolder, (void**)lppFolder);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	if (lpTmpTransport != nullptr)
-		lpTmpTransport->HrLogOff();
-	return hr;
-}
-
 HRESULT ECMsgStorePublic::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
     ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
 {
@@ -659,11 +592,9 @@ HRESULT ECMsgStorePublic::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
 		return MAPI_E_NO_SUPPORT; // FIXME
 	} else if (lpEntryID && (lpEntryID->abFlags[3] & KOPANO_FAVORITE)) {
 		// Replace the original entryid because this one is only readable
-		hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryIDIntern);
+		hr = KAllocCopy(lpEntryID, cbEntryID, &~lpEntryIDIntern);
 		if (hr != hrSuccess)
 			return hr;
-		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
-
 		// Remove Flags intern
 		lpEntryIDIntern->abFlags[3] &= ~KOPANO_FAVORITE;
 

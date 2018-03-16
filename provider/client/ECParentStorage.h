@@ -32,10 +32,10 @@
 #include "WSMAPIPropStorage.h"
 
 #include <kopano/kcodes.h>
-#include "soapKCmdProxy.h"
-
 #include <mapi.h>
 #include <mapispi.h>
+
+using namespace KC;
 
 class ECParentStorage _kc_final : public ECUnknown, public IECPropStorage {
 	/*
@@ -63,13 +63,13 @@ private:
 	virtual HRESULT HrLoadObject(MAPIOBJECT **lppsMapiObject);
 	
 	// Returns the correct storage which can connect to the server
-	virtual IECPropStorage* GetServerStorage();
+	virtual IECPropStorage *GetServerStorage() override { return m_lpServerStorage; }
 
 private:
-	KCHL::object_ptr<ECGenericProp> m_lpParentObject;
+	KC::object_ptr<ECGenericProp> m_lpParentObject;
 	ULONG m_ulObjId;
 	ULONG m_ulUniqueId;
-	KCHL::object_ptr<IECPropStorage> m_lpServerStorage;
+	KC::object_ptr<IECPropStorage> m_lpServerStorage;
 	ALLOC_WRAP_FRIEND;
 };
 

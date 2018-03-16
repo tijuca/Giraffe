@@ -77,6 +77,8 @@ static const sUpdateList_t sUpdateList[] = {
 	// New in 8.1.0 / 7.2.4, MySQL 5.7 compatibility
 	{ Z_UPDATE_ABCHANGES_PKEY, 0, "Updating abchanges table", UpdateABChangesTbl },
 	{ Z_UPDATE_CHANGES_PKEY, 0, "Updating changes table", UpdateChangesTbl },
+	{Z_DROP_CLIENTUPDATESTATUS_PKEY, 0, "Drop clientupdatestatus table", DropClientUpdateStatusTbl},
+	{68, 0, "Perform column type upgrade missed in SVN r23897", db_update_68},
 };
 
 static const char *const server_groups[] = {
@@ -210,9 +212,9 @@ static const STOREDPROCS stored_procedures[] = {
 
 std::string zcp_versiontuple::stringify(char sep) const
 {
-	return ::stringify(v_major) + sep + ::stringify(v_minor) + sep +
-	       ::stringify(v_micro) + sep + ::stringify(v_rev) + sep +
-	       ::stringify(v_schema);
+	return KC::stringify(v_major) + sep + KC::stringify(v_minor) + sep +
+	       KC::stringify(v_micro) + sep + KC::stringify(v_rev) + sep +
+	       KC::stringify(v_schema);
 }
 
 int zcp_versiontuple::compare(const zcp_versiontuple &rhs) const
@@ -681,8 +683,7 @@ ECRESULT ECDatabase::CreateDatabase(void)
 	auto er = KDatabase::CreateDatabase(m_lpConfig, false);
 	if (er != erSuccess)
 		return er;
-
-	er = KDatabase::CreateTables();
+	er = KDatabase::CreateTables(m_lpConfig);
 	if (er != erSuccess)
 		return er;
 
@@ -715,9 +716,9 @@ ECRESULT ECDatabase::CreateDatabase(void)
 		return er;
 
 	// Loop throught the update list
-	for (size_t i = Z_UPDATE_RELEASE_ID;
-	     i < ARRAY_SIZE(sUpdateList); ++i)
-	{
+	for (size_t i = 0; i < ARRAY_SIZE(sUpdateList); ++i) {
+		if (sUpdateList[i].ulVersion <= Z_UPDATE_RELEASE_ID)
+			continue;
 		er = UpdateDatabaseVersion(sUpdateList[i].ulVersion);
 		if(er != erSuccess)
 			return er;
@@ -957,7 +958,6 @@ static constexpr const sSQLDatabase_t kcsrv_tables[] = {
 	{"singleinstances", Z_TABLEDEF_REFERENCES},
 	{"abchanges", Z_TABLEDEF_ABCHANGES},
 	{"syncedmessages", Z_TABLEDEFS_SYNCEDMESSAGES},
-	{"clientupdatestatus", Z_TABLEDEF_CLIENTUPDATESTATUS},
 	{nullptr, nullptr},
 };
 

@@ -38,10 +38,10 @@
 #include <kopano/IECInterfaces.hpp>
 #include "PyMapiPlugin.h"
 
-using namespace KCHL;
+using namespace KC;
 using std::string;
 using std::wstring;
-extern KC::ECConfig *g_lpConfig;
+extern ECConfig *g_lpConfig;
 
 static HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo,
     std::wstring &wstrCc, std::wstring &wstrBcc)
@@ -157,9 +157,8 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		strForwardText += L"\nSent: ";
 		if (PROP_TYPE(ptrInfo[2].ulPropTag) != PT_ERROR) {
 			WCHAR buffer[64];
-			time_t t;
 			struct tm date;
-			FileTimeToUnixTime(ptrInfo[2].Value.ft, &t);
+			auto t = FileTimeToUnixTime(ptrInfo[2].Value.ft);
 			localtime_r(&t, &date);
 			wcsftime(buffer, ARRAY_SIZE(buffer), L"%c", &date);
 			strForwardText += buffer;
@@ -223,9 +222,8 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		strHTMLForwardText += "<br><b>Sent:</b> ";
 		if (PROP_TYPE(ptrInfo[2].ulPropTag) != PT_ERROR) {
 			char buffer[32];
-			time_t t;
 			struct tm date;
-			FileTimeToUnixTime(ptrInfo[2].Value.ft, &t);
+			auto t = FileTimeToUnixTime(ptrInfo[2].Value.ft);
 			localtime_r(&t, &date);
 			strftime(buffer, 32, "%c", &date);
 			strHTMLForwardText += buffer;
@@ -384,7 +382,6 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 
 	// return message
 	hr = lpReplyMessage->QueryInterface(IID_IMessage, (void**)lppMessage);
- exitpm:
 	return hr;
 }
 
@@ -764,7 +761,6 @@ static HRESULT CreateForwardCopy(IAddrBook *lpAdrBook, IMsgStore *lpOrigStore,
 		MungeForwardBody(lpFwdMsg, lpOrigMessage);
 	}
 	*lppMessage = lpFwdMsg.release();
- exitpm:
 	return hr;
 }
 
@@ -840,7 +836,9 @@ static int proc_op_fwd(IAddrBook *abook, IMsgStore *orig_store,
 		 */
 		PROPMAP_START(1)
 		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
-		PROPMAP_INIT((*lppMessage));
+		hr = m_propmap.Resolve(*lppMessage);
+		if (hr != hrSuccess)
+			return -1;
 
 		memory_ptr<SPropValue> lpPropRule;
 		if (HrGetOneProp(*lppMessage, PROP_KopanoRuleAction, &~lpPropRule) == hrSuccess) {
@@ -867,8 +865,6 @@ static int proc_op_fwd(IAddrBook *abook, IMsgStore *orig_store,
 	// update original message, set as forwarded
 	bAddFwdFlag = true;
 	return 2;
- exitpm:
-	return -1;
 }
 
 // lpMessage: gets EntryID, maybe pass this and close message in DAgent.cpp
@@ -934,15 +930,11 @@ HRESULT HrProcessRules(const std::string &recip, pym_plugin_intf *pyMapiPlugin,
 		bOOFactive = OOFProps[0].ulPropTag == PR_EC_OUTOFOFFICE && OOFProps[0].Value.b;
 
 		if (bOOFactive) {
-			time_t ts, now = time(nullptr);
-			if (OOFProps[1].ulPropTag == PR_EC_OUTOFOFFICE_FROM) {
-				FileTimeToUnixTime(OOFProps[1].Value.ft, &ts);
-				bOOFactive &= ts <= now;
-			}
-			if (OOFProps[2].ulPropTag == PR_EC_OUTOFOFFICE_UNTIL) {
-				FileTimeToUnixTime(OOFProps[2].Value.ft, &ts);
-				bOOFactive &= now <= ts;
-			}
+			time_t now = time(nullptr);
+			if (OOFProps[1].ulPropTag == PR_EC_OUTOFOFFICE_FROM)
+				bOOFactive &= FileTimeToUnixTime(OOFProps[1].Value.ft) <= now;
+			if (OOFProps[2].ulPropTag == PR_EC_OUTOFOFFICE_UNTIL)
+				bOOFactive &= now <= FileTimeToUnixTime(OOFProps[2].Value.ft);
 		}
 	}
 
@@ -1233,8 +1225,7 @@ HRESULT HrProcessRules(const std::string &recip, pym_plugin_intf *pyMapiPlugin,
 	}
  exit:
 	if (hr != hrSuccess && hr != MAPI_E_CANCEL)
-		ec_log_info("Error while processing rules: 0x%08X", hr);
-
+		kc_perror("Error while processing rules", hr);
 	// The message was moved to another folder(s), do not save it in the inbox anymore, so cancel it.
 	if (hr == hrSuccess && bMoved)
 		hr = MAPI_E_CANCEL;

@@ -125,7 +125,6 @@
 #include <execinfo.h>
 
 using namespace KC;
-using namespace KCHL;
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -187,10 +186,9 @@ public:
  */
 class ECRecipient {
 public:
-	ECRecipient(const std::wstring &wstrName) :
-		wstrRCPT(wstrName)
+	ECRecipient(const std::string &wstrName) : wstrRCPT(wstrName)
 	{
-		/* strRCPT much match recipient string from LMTP caller */
+		/* strRCPT must match recipient string from LMTP caller */
 		vwstrRecipients.emplace_back(wstrName);
 		sEntryId.cb = 0;
 		sEntryId.lpb = NULL;
@@ -220,8 +218,8 @@ public:
 	ULONG ulResolveFlags = MAPI_UNRESOLVED;
 
 	/* Information from LMTP caller */
-	std::wstring wstrRCPT;
-	std::vector<std::wstring> vwstrRecipients;
+	std::string wstrRCPT;
+	std::vector<std::string> vwstrRecipients;
 
 	/* User properties */
 	std::wstring wstrUsername;
@@ -229,7 +227,7 @@ public:
 	std::wstring wstrCompany;
 	std::wstring wstrEmail;
 	std::wstring wstrServerDisplayName;
-	std::wstring wstrDeliveryStatus;
+	std::string wstrDeliveryStatus;
 	ULONG ulDisplayType = 0;
 	ULONG ulAdminLevel = 0;
 	std::string strAddrType;
@@ -263,6 +261,7 @@ static unsigned int g_nLMTPThreads = 0;
 static ECLogger *g_lpLogger;
 extern ECConfig *g_lpConfig;
 ECConfig *g_lpConfig = NULL;
+static bool g_dump_config;
 
 class sortRecipients {
 public:
@@ -532,9 +531,7 @@ static void SaveRawMessage(FILE *fp, const char *lpRecipient)
 
 	char szBuff[64];
 	tm tmResult;
-	time_t now = time(NULL);
-	gmtime_safe(&now, &tmResult);
-
+	gmtime_safe(time(nullptr), &tmResult);
 	if (strFileName.empty()) {
 		 ec_log_crit("Unable to save raw message. Wrong configuration: field \"log_raw_message_path\" is empty.");
 		 return;
@@ -637,9 +634,8 @@ static HRESULT ResolveUsers(IABContainer *lpAddrFolder, recipients_t *lRCPT)
 			return kc_perrorf("MAPIAllocateBuffer failed(3)", hr);
 		++lpAdrList->cEntries;
 		/* szName can either be the email address or username, it doesn't really matter */
-		lpAdrList->aEntries[ulRCPT].rgPropVals[0].ulPropTag = PR_DISPLAY_NAME_W;
-		lpAdrList->aEntries[ulRCPT].rgPropVals[0].Value.lpszW = const_cast<wchar_t *>(recip->wstrRCPT.c_str());
-
+		lpAdrList->aEntries[ulRCPT].rgPropVals[0].ulPropTag = PR_DISPLAY_NAME_A;
+		lpAdrList->aEntries[ulRCPT].rgPropVals[0].Value.lpszA = const_cast<char *>(recip->wstrRCPT.c_str());
 		lpFlagList->ulFlag[ulRCPT] = MAPI_UNRESOLVED;
 		++ulRCPT;
 	}
@@ -656,7 +652,7 @@ static HRESULT ResolveUsers(IABContainer *lpAddrFolder, recipients_t *lRCPT)
 
 		ULONG temp = lpFlagList->ulFlag[ulRCPT];
 		if (temp != MAPI_RESOLVED) {
-			ec_log_err("Failed to resolve recipient %ls (%x)", recip->wstrRCPT.c_str(), temp);
+			ec_log_err("Failed to resolve recipient %s (%x)", recip->wstrRCPT.c_str(), temp);
 			continue;
 		}
 
@@ -669,20 +665,20 @@ static HRESULT ResolveUsers(IABContainer *lpAddrFolder, recipients_t *lRCPT)
 		// the only property that is allowed NULL in this list
 		auto lpDisplayProp  = lpAdrList->aEntries[ulRCPT].cfind(PR_DISPLAY_TYPE);
 		if(!lpEntryIdProp || !lpFullNameProp || !lpAccountProp || !lpSMTPProp || !lpObjectProp) {
-			ec_log_err("Not all properties found for %ls", recip->wstrRCPT.c_str());
+			ec_log_err("Not all properties found for %s", recip->wstrRCPT.c_str());
 			continue;
 		}
 
 		if (lpObjectProp->Value.ul != MAPI_MAILUSER) {
-			ec_log_warn("Resolved recipient %ls is not a user", recip->wstrRCPT.c_str());
+			ec_log_warn("Resolved recipient %s is not a user", recip->wstrRCPT.c_str());
 			continue;
 		} else if (lpDisplayProp && lpDisplayProp->Value.ul == DT_REMOTE_MAILUSER) {
 			// allowed are DT_MAILUSER, DT_ROOM and DT_EQUIPMENT. all other DT_* defines are no MAPI_MAILUSER
-			ec_log_warn("Resolved recipient %ls is a contact address, unable to deliver", recip->wstrRCPT.c_str());
+			ec_log_warn("Resolved recipient %s is a contact address, unable to deliver", recip->wstrRCPT.c_str());
 			continue;
 		}
 
-		ec_log_notice("Resolved recipient %ls as user %ls", recip->wstrRCPT.c_str(), lpAccountProp->Value.lpszW);
+		ec_log_notice("Resolved recipient %s as user %ls", recip->wstrRCPT.c_str(), lpAccountProp->Value.lpszW);
 
 		/* The following are allowed to be NULL */
 		auto lpCompanyProp   = lpAdrList->aEntries[ulRCPT].cfind(PR_EC_COMPANY_NAME_W);
@@ -727,11 +723,9 @@ static HRESULT ResolveUsers(IABContainer *lpAddrFolder, recipients_t *lRCPT)
 			key = strToUpper(key);
 
 			recip->sSearchKey.cb = key.size() + 1; // + terminating 0
-			if (MAPIAllocateBuffer(recip->sSearchKey.cb, reinterpret_cast<void **>(&recip->sSearchKey.lpb)) != hrSuccess) {
+			if (KAllocCopy(key.c_str(), recip->sSearchKey.cb,
+			    reinterpret_cast<void **>(&recip->sSearchKey.lpb)) != hrSuccess)
 				++ulRCPT;
-				continue;
-			}
-			memcpy(recip->sSearchKey.lpb, key.c_str(), recip->sSearchKey.cb);
 		}
 
 		auto lpFeatureList = lpAdrList->aEntries[ulRCPT].cfind(PR_EC_ENABLED_FEATURES_A);
@@ -815,7 +809,8 @@ static HRESULT AddServerRecipient(companyrecipients_t *lpCompanyRecips,
 		// The recipient is in the list, and no longer belongs to the caller
 		*lppRecipient = NULL;
 	} else {
-		ec_log_info("Combining recipient %ls and %ls, delivering only once", lpRecipient->wstrRCPT.c_str(), (*iterRecip)->wstrUsername.c_str());
+		ec_log_info("Combining recipient %s and %ls, delivering only once",
+			lpRecipient->wstrRCPT.c_str(), (*iterRecip)->wstrUsername.c_str());
 		(*iterRecip)->combine(lpRecipient);
 	}
 	return hrSuccess;
@@ -853,14 +848,9 @@ static HRESULT ResolveServerToPath(IMAPISession *lpSession,
 	if (hr != hrSuccess)
 		// HrLogon() failed .. try again later
 		return kc_perror("Unable to open default store for system account", hr);
-	hr = HrGetOneProp(lpAdminStore, PR_EC_OBJECT, &~lpsObject);
+	hr = GetECObject(lpAdminStore, iid_of(lpServiceAdmin), &~lpServiceAdmin);
 	if (hr != hrSuccess)
 		return kc_perror("Unable to get internal object", hr);
-
-	// NOTE: object is placed in Value.lpszA, not Value.x
-	hr = reinterpret_cast<IUnknown *>(lpsObject->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
-	if (hr != hrSuccess)
-		return kc_perror("Unable to get service admin", hr);
 	hr = MAPIAllocateBuffer(sizeof(ECSVRNAMELIST), &~lpSrvNameList);
 	if (hr != hrSuccess)
 		return kc_perrorf("MAPIAllocateBuffer failed", hr);
@@ -1002,7 +992,7 @@ static HRESULT HrGetDeliveryStoreAndFolder(IMAPISession *lpSession,
 		     lpArgs->szPathSeparator, bPublicStore,
 		     lpArgs->bCreateFolder, &~lpSubFolder);
 		if (hr != hrSuccess) {
-			ec_log_warn("Subfolder not found, using normal Inbox. Error code 0x%08X", hr);
+			kc_pwarn("Subfolder not found, using normal Inbox", hr);
 			// folder not found, use inbox
 			lpDeliveryFolder = lpInbox;
 			lpDeliveryStore = lpUserStore;
@@ -1083,10 +1073,8 @@ static HRESULT FallbackDelivery(LPMESSAGE lpMessage, const string &msg)
 
 	// Add the original message into the errorMessage
 	hr = lpMessage->CreateAttach(nullptr, 0, &ulAttachNum, &~lpAttach);
-	if (hr != hrSuccess) {
-		ec_log_warn("Unable to create attachment, error code: 0x%08X", hr);
-		return hr;
-	}
+	if (hr != hrSuccess)
+		return kc_pwarn("Unable to create attachment", hr);
 	hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~lpStream);
 	if (hr != hrSuccess)
 		return kc_perrorf("lpAttach->OpenProperty failed", hr);
@@ -1172,15 +1160,11 @@ static bool dagent_oof_active(const SPropValue *prop)
 	bool a = prop[0].ulPropTag == PR_EC_OUTOFOFFICE && prop[0].Value.b;
 	if (!a)
 		return false;
-	time_t ts, now = time(nullptr);
-	if (prop[3].ulPropTag == PR_EC_OUTOFOFFICE_FROM) {
-		FileTimeToUnixTime(prop[3].Value.ft, &ts);
-		a &= ts <= now;
-	}
-	if (prop[4].ulPropTag == PR_EC_OUTOFOFFICE_UNTIL) {
-		FileTimeToUnixTime(prop[4].Value.ft, &ts);
-		a &= now <= ts;
-	}
+	time_t now = time(nullptr);
+	if (prop[3].ulPropTag == PR_EC_OUTOFOFFICE_FROM)
+		a &= FileTimeToUnixTime(prop[3].Value.ft) <= now;
+	if (prop[4].ulPropTag == PR_EC_OUTOFOFFICE_UNTIL)
+		a &= now <= FileTimeToUnixTime(prop[4].Value.ft);
 	return a;
 }
 
@@ -1530,7 +1514,7 @@ static HRESULT HrCreateMessage(IMAPIFolder *lpFolder,
 
 	auto hr = lpFolder->CreateMessage(nullptr, 0, &~lpMessage);
 	if (hr != hrSuccess && lpFallbackFolder) {
-		ec_log_warn("Unable to create new message in subfolder, using regular inbox. Error code: %08X", hr);
+		kc_pwarn("Unable to create new message in subfolder, using regular inbox", hr);
 		lpFolder = lpFallbackFolder;
 		hr = lpFolder->CreateMessage(nullptr, 0, &~lpMessage);
 	}
@@ -1573,7 +1557,7 @@ static HRESULT HrStringToMAPIMessage(const string &strMail,
 	// Set the properties on the object
 	auto hr = IMToMAPI(lpSession, lpMsgStore, lpAdrBook, lpMessage, strMail, lpArgs->sDeliveryOpts);
 	if (hr != hrSuccess) {
-		ec_log_warn("E-mail parsing failed: 0x%08X. Starting fallback delivery.", hr);
+		kc_pwarn("E-mail parsing failed; starting fallback delivery.", hr);
 
 		// create new message
 		hr = lpDeliveryFolder->CreateMessage(nullptr, 0, &~lpFallbackMessage);
@@ -1645,21 +1629,14 @@ static HRESULT HrMessageExpired(IMessage *lpMessage, bool *bExpired)
 	 * If the message has an expiry date, and it is past that time,
 	 * skip delivering the email.
 	 */
-	if (HrGetOneProp(lpMessage, PR_EXPIRY_TIME, &~lpsExpiryTime) == hrSuccess) {
-		time_t now = time(NULL);
-		time_t expire;
-
-		FileTimeToUnixTime(lpsExpiryTime->Value.ft, &expire);
-
-		if (now > expire) {
-			// exit with no errors
-			hr = hrSuccess;
-			*bExpired = true;
-
-			ec_log_warn("Message was expired, not delivering");
-			// TODO: if a read-receipt was requested, we need to send a non-read read-receipt
-			goto exit;
-		}
+	if (HrGetOneProp(lpMessage, PR_EXPIRY_TIME, &~lpsExpiryTime) == hrSuccess &&
+	    time(nullptr) > FileTimeToUnixTime(lpsExpiryTime->Value.ft)) {
+		// exit with no errors
+		hr = hrSuccess;
+		*bExpired = true;
+		ec_log_warn("Message was expired, not delivering");
+		// TODO: if a read-receipt was requested, we need to send a non-read read-receipt
+		goto exit;
 	}
 
 	*bExpired = false;
@@ -2008,7 +1985,8 @@ static HRESULT HrGetSession(const DeliveryArgs *lpArgs,
 	case MAPI_E_LOGON_FAILED: {
 		// running dagent as Unix user != lpRecip->strUsername and ! listed in local_admin_user, which gives this error too
 		if (!bSuppress)
-			ec_log_err("Access denied or connection failed for user %ls, using socket: \"%s\", error code: 0x%08X", szUsername, lpArgs->strPath.c_str(), hr);
+			ec_log_err("Access denied or connection failed for user \"%ls\", using socket: \"%s\": %s (%x)",
+				szUsername, lpArgs->strPath.c_str(), GetMAPIErrorMessage(hr), hr);
 		// so also log userid we're running as
 		auto pwd = getpwuid(getuid());
 		std::string strUnixUser = (pwd != nullptr && pwd->pw_name != nullptr) ? pwd->pw_name : stringify(getuid());
@@ -2018,7 +1996,8 @@ static HRESULT HrGetSession(const DeliveryArgs *lpArgs,
 	}
 	default:
 		if (!bSuppress)
-			ec_log_err("Unable to login for user %ls, error code: 0x%08X", szUsername, hr);
+			ec_log_err("Unable to login for user \"%ls\": %s (%x)",
+				szUsername, GetMAPIErrorMessage(hr), hr);
 		break;
 	}
 	return hr;
@@ -2086,7 +2065,7 @@ static HRESULT HrPostDeliveryProcessing(pym_plugin_intf *lppyMapiPlugin,
 		if (hr == MAPI_E_CANCEL)
 			ec_log_notice("Message canceled by rule");
 		else if (hr != hrSuccess)
-			ec_log_warn("Unable to process rules, error code: 0x%08X",hr);
+			kc_pwarn("Unable to process rules", hr);
 		// continue, still send possible out-of-office message
 	}
 
@@ -2343,7 +2322,7 @@ static HRESULT ProcessDeliveryToRecipient(pym_plugin_intf *lppyMapiPlugin,
 			if (ulNewMailNotify == true) {
 				hr = HrNewMailNotification(lpTargetStore, lpDeliveryMessage);
 				if (hr != hrSuccess)
-					ec_log_warn("Unable to send 'New Mail' notification, error code: 0x%08X", hr);
+					kc_pwarn("Unable to send \"New Mail\" notification", hr);
 				else
 					ec_log_debug("Send 'New Mail' notification");
 
@@ -2372,7 +2351,7 @@ static void RespondMessageExpired(recipients_t::const_iterator iter,
 	convert_context converter;
 	ec_log_warn("Message was expired, not delivering");
 	for (; iter != end; ++iter)
-		(*iter)->wstrDeliveryStatus = L"250 2.4.7 %ls Delivery time expired";
+		(*iter)->wstrDeliveryStatus = "250 2.4.7 %s Delivery time expired";
 }
 
 /** 
@@ -2428,7 +2407,7 @@ static HRESULT ProcessDeliveryToServer(pym_plugin_intf *lppyMapiPlugin,
 		// notify LMTP client soft error to try again later
 		for (const auto &recip : listRecipients)
 			// error will be shown in postqueue status in postfix, probably too in other serves and mail syslog service
-			recip->wstrDeliveryStatus = L"450 4.5.0 %ls network or permissions error to storage server: " + wstringify(hr, true);
+			recip->wstrDeliveryStatus = "450 4.5.0 %s network or permissions error to storage server: " + stringify(hr, true);
 		return hr;
 	}
 
@@ -2460,19 +2439,19 @@ static HRESULT ProcessDeliveryToServer(pym_plugin_intf *lppyMapiPlugin,
 			}
 			// cancel already logged.
 			hr = hrSuccess;
-			recip->wstrDeliveryStatus = L"250 2.1.5 %ls Ok";
+			recip->wstrDeliveryStatus = "250 2.1.5 %s Ok";
 		} else if (hr == MAPI_W_CANCEL_MESSAGE) {
 			/* Loop through all remaining recipients and start responding the status to LMTP */
 			RespondMessageExpired(iter, listRecipients.cend());
 			return MAPI_W_CANCEL_MESSAGE;
 		} else {
-			ec_log_err("Unable to deliver message to \"%ls\", error code: 0x%08X", recip->wstrUsername.c_str(), hr);
-				
+			ec_log_err("Unable to deliver message to \"%ls\": %s (%x)",
+				recip->wstrUsername.c_str(), GetMAPIErrorMessage(hr), hr);
 			/* LMTP requires different notification when Quota for user was exceeded */
 			if (hr == MAPI_E_STORE_FULL)
-				recip->wstrDeliveryStatus = L"552 5.2.2 %ls Quota exceeded";
+				recip->wstrDeliveryStatus = "552 5.2.2 %s Quota exceeded";
 			else
-				recip->wstrDeliveryStatus = L"450 4.2.0 %ls Mailbox temporarily unavailable";
+				recip->wstrDeliveryStatus = "450 4.2.0 %s Mailbox temporarily unavailable";
 		}
 
 		if (lpMessageTmp) {
@@ -2640,7 +2619,8 @@ FindLowestAdminLevelSession(const serverrecipients_t *lpServerRecips,
 					goto found;
 				}
 				// remove found entry, so higher admin levels can be found too if a lower cannot login
-				ec_log_debug("Login on user %ls for addressbook resolves failed: 0x%08X", lpRecip->wstrUsername.c_str(), hr);
+				ec_log_debug("Login on user \"%ls\" for addressbook resolves failed: %s (%x)",
+					lpRecip->wstrUsername.c_str(), GetMAPIErrorMessage(hr), hr);
 				lpRecip = NULL;
 			}
 		}
@@ -2876,14 +2856,12 @@ static void *HandlerLMTP(void *lpArg)
 				sc -> countInc("DAgent::LMTP", "bad_recipient_address");
 				break;
 			}
-			auto lpRecipient = new ECRecipient(converter.convert_to<std::wstring>(strMailAddress));
-					
+			auto lpRecipient = new ECRecipient(strMailAddress);
 			// Resolve the mail address, so to have a user name instead of a mail address
 			hr = ResolveUser(lpAddrDir, lpRecipient);
 			if (hr == hrSuccess) {
 				// This is the status until it is delivered or some other error occurs
-				lpRecipient->wstrDeliveryStatus = L"450 4.2.0 %ls Mailbox temporarily unavailable";
-
+				lpRecipient->wstrDeliveryStatus = "450 4.2.0 %s Mailbox temporarily unavailable";
 				hr = AddServerRecipient(&mapRCPT, &lpRecipient);
 				if (hr != hrSuccess)
 					lmtp.HrResponse("503 5.1.1 Failed to add user to recipients");
@@ -2967,12 +2945,11 @@ static void *HandlerLMTP(void *lpArg)
 			for (const auto &company : mapRCPT)
 				for (const auto &server : company.second)
 					for (const auto &recip : server.second) {
-						WCHAR wbuffer[4096];
+						char wbuffer[4096];
 						for (const auto i : recip->vwstrRecipients) {
-							swprintf(wbuffer, ARRAY_SIZE(wbuffer), recip->wstrDeliveryStatus.c_str(), i.c_str());
-							mapRecipientResults.emplace(converter.convert_to<std::string>(i),
-								// rawsize([N]) returns N, not contents len, so cast to fix
-								converter.convert_to<std::string>(CHARSET_CHAR, wbuffer, rawsize(reinterpret_cast<WCHAR *>(wbuffer)), CHARSET_WCHAR));
+							static_assert(std::is_same<decltype(recip->wstrDeliveryStatus.c_str()), decltype(i.c_str())>::value, "need compatible types");
+							snprintf(wbuffer, ARRAY_SIZE(wbuffer), recip->wstrDeliveryStatus.c_str(), i.c_str());
+							mapRecipientResults.emplace(converter.convert_to<std::string>(i), wbuffer);
 							if (save_all)
 								continue;
 							auto save_username = converter.convert_to<std::string>(recip->wstrUsername);
@@ -3202,7 +3179,7 @@ static HRESULT deliver_recipient(pym_plugin_intf *lppyMapiPlugin,
 		// we have to strip off the @domainname.tld to get the username
 		strUsername = strUsername.substr(0, strUsername.find_first_of("@"));
 
-	ECRecipient single_recip(convert_to<std::wstring>(strUsername));
+	ECRecipient single_recip(strUsername);
 	
 	// Always try to resolve the user unless we just stripped an email address.
 	if (!bStringEmail) {
@@ -3227,12 +3204,12 @@ static HRESULT deliver_recipient(pym_plugin_intf *lppyMapiPlugin,
 		}
 		else {
 			// set commandline user in resolved name to deliver without resolve function
-			single_recip.wstrUsername = single_recip.wstrRCPT;
+			single_recip.wstrUsername = convert_to<std::wstring>(single_recip.wstrRCPT);
 		}
 	}
 	else {
 		// set commandline user in resolved name to deliver without resolve function
-		single_recip.wstrUsername = single_recip.wstrRCPT;
+		single_recip.wstrUsername = convert_to<std::wstring>(single_recip.wstrRCPT);
 	}
 	
 	hr = HrGetSession(lpArgs, single_recip.wstrUsername.c_str(), &~lpSession);
@@ -3354,7 +3331,8 @@ int main(int argc, char *argv[]) {
 		OPT_PUBLIC,
 		OPT_CREATE,
 		OPT_MARKREAD,
-		OPT_NEWMAIL
+		OPT_NEWMAIL,
+		OPT_DUMP_CONFIG,
 	};
 	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },	// help text
@@ -3370,6 +3348,7 @@ int main(int argc, char *argv[]) {
 		{ "read", 0, NULL, OPT_MARKREAD },	// mark mail as read on delivery
 		{ "do-not-notify", 0, NULL, OPT_NEWMAIL },	// do not send new mail notification
 		{ "ignore-unknown-config-options", 0, NULL, OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS }, // ignore unknown settings
+		{"dump-config", 0, nullptr, OPT_DUMP_CONFIG},
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -3518,7 +3497,9 @@ int main(int argc, char *argv[]) {
 		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
 			bIgnoreUnknownConfigOptions = true;
 			break;
-
+		case OPT_DUMP_CONFIG:
+			g_dump_config = true;
+			break;
 		case 'V':
 			cout << "kopano-dagent " PROJECT_VERSION << endl;
 			return EX_USAGE;
@@ -3556,7 +3537,6 @@ int main(int argc, char *argv[]) {
 		// options are parsed.
 		optind += argidx;
 	}
-
 	if (!bListenLMTP && optind == argc) {
 		cerr << "Not enough options given, need at least the username" << endl;
 		return EX_USAGE;
@@ -3572,7 +3552,8 @@ int main(int argc, char *argv[]) {
 	else 
 		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoDAgent");
 	ec_log_set(g_lpLogger);
-	if (!bExplicitConfig && loglevel)
+	if (!g_lpLogger->Log(loglevel))
+		/* raise loglevel if there are more -v on the command line than in dagent.cfg */
 		g_lpLogger->SetLoglevel(loglevel);
 
 	/* Warn users that we are using the default configuration */
@@ -3592,6 +3573,8 @@ int main(int argc, char *argv[]) {
 		hr = E_FAIL;
 		goto exit;
 	}
+	if (g_dump_config)
+		return g_lpConfig->dump_config(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	/* When path wasn't provided through commandline, resolve it from config file */
 	if (sDeliveryArgs.strPath.empty())

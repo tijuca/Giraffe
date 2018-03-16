@@ -38,8 +38,6 @@
 #include "icalcompat.hpp"
 #include "icalmem.hpp"
 
-using namespace KCHL;
-
 namespace KC {
 
 using std::string;
@@ -72,11 +70,7 @@ HRESULT HrCopyString(void *base, const wchar_t *src, wchar_t **dst)
 	if (src == nullptr)
 		src = L"";
 	auto len = (wcslen(src) + 1) * sizeof(*src);
-	HRESULT hr = MAPIAllocateMore(len, base, reinterpret_cast<void **>(dst));
-	if (hr != hrSuccess)
-		return hr;
-	memcpy(*dst, src, len);
-	return hrSuccess;
+	return KAllocCopy(src, len, reinterpret_cast<void **>(dst), base);
 }
 
 /**
@@ -325,21 +319,19 @@ HRESULT VConverter::HrResolveUser(void *base , std::list<icalrecip> *lplstIcalRe
 
 		//Create EntryID by using mapped names, ical data might not have names.
 		if (lpFlagList->ulFlag[ulRecpCnt] == MAPI_RESOLVED && lpMappedProp) {
-			hr = MAPIAllocateMore(lpMappedProp->Value.bin.cb, base, (void**)&icalRecipient.lpEntryID);
+			icalRecipient.cbEntryID = lpMappedProp->Value.bin.cb;
+			hr = KAllocCopy(lpMappedProp->Value.bin.lpb, lpMappedProp->Value.bin.cb, reinterpret_cast<void **>(&icalRecipient.lpEntryID), base);
 			if (hr != hrSuccess)
 				return hr;
-			icalRecipient.cbEntryID = lpMappedProp->Value.bin.cb;
-			memcpy(icalRecipient.lpEntryID, lpMappedProp->Value.bin.lpb, lpMappedProp->Value.bin.cb);
 		} else {
 			memory_ptr<ENTRYID> lpEID;
 			hr = ECCreateOneOff((LPTSTR)icalRecipient.strName.c_str(), (LPTSTR)L"SMTP", (LPTSTR)icalRecipient.strEmail.c_str(), MAPI_UNICODE, &cbEID, &~lpEID);
 			if (hr == hrSuccess) {
 				// realloc on lpIcalItem
-				hr = MAPIAllocateMore(cbEID, base, (void**)&icalRecipient.lpEntryID);
+				icalRecipient.cbEntryID = cbEID;
+				hr = KAllocCopy(lpEID, cbEID, reinterpret_cast<void **>(&icalRecipient.lpEntryID), base);
 				if (hr != hrSuccess)
 					return hr;
-				icalRecipient.cbEntryID = cbEID;
-				memcpy(icalRecipient.lpEntryID, lpEID, cbEID);
 			}
 		}
 
@@ -463,12 +455,7 @@ HRESULT VConverter::HrHandleExceptionGuid(icalcomponent *lpiEvent, void *base, S
 	auto strBinUid = hex2bin(strUid);
 
 	lpsProp->Value.bin.cb = strBinUid.size();
-	HRESULT hr = MAPIAllocateMore(strBinUid.size(), base,
-	             reinterpret_cast<void **>(&lpsProp->Value.bin.lpb));
-	if (hr != hrSuccess)
-		return hr;
-	memcpy(lpsProp->Value.bin.lpb, strBinUid.data(), lpsProp->Value.bin.cb);
-	return hrSuccess;
+	return KAllocCopy(strBinUid.data(), strBinUid.size(), reinterpret_cast<void **>(&lpsProp->Value.bin.lpb), base);
 }
 
 /**
@@ -505,9 +492,9 @@ HRESULT VConverter::HrAddRecurrenceID(icalcomponent *lpiEvent, icalitem *lpIcalI
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RECURRINGBASE], PT_SYSTIME);
 	if (icalproperty_get_recurrenceid(icProp).is_date)
-		UnixTimeToFileTime(icaltime_as_timet(icalproperty_get_recurrenceid (icProp)), &sPropVal.Value.ft);
+		sPropVal.Value.ft = UnixTimeToFileTime(icaltime_as_timet(icalproperty_get_recurrenceid(icProp)));
 	else
-		UnixTimeToFileTime(ICalTimeTypeToLocal(icProp), &sPropVal.Value.ft);
+		sPropVal.Value.ft = UnixTimeToFileTime(ICalTimeTypeToLocal(icProp));
 	lpIcalItem->lstMsgProps.emplace_back(sPropVal);	
 
 	//RECURRENCE-ID is present only for exception
@@ -780,7 +767,7 @@ HRESULT VConverter::HrAddXHeaders(icalcomponent *lpicEvent, icalitem *lpIcalItem
 				continue;
 			auto ttCritcalChange = icaltime_as_timet_with_zone(icalvalue_get_datetime(lpicValue), NULL); // no timezone
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ATTENDEECRITICALCHANGE], PT_SYSTIME);
-			UnixTimeToFileTime(ttCritcalChange, &sPropVal.Value.ft);
+			sPropVal.Value.ft  = UnixTimeToFileTime(ttCritcalChange);
 			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 			icalvalue_free(lpicValue);
 
@@ -790,7 +777,7 @@ HRESULT VConverter::HrAddXHeaders(icalcomponent *lpicEvent, icalitem *lpIcalItem
 				continue;
 			auto ttCritcalChange = icaltime_as_timet_with_zone(icalvalue_get_datetime(lpicValue), NULL); // no timezone
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_OWNERCRITICALCHANGE], PT_SYSTIME);
-			UnixTimeToFileTime(ttCritcalChange, &sPropVal.Value.ft);
+			sPropVal.Value.ft  = UnixTimeToFileTime(ttCritcalChange);
 			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 			icalvalue_free(lpicValue);
 
@@ -892,11 +879,10 @@ HRESULT VConverter::HrAddCategories(icalcomponent *lpicEvent, icalitem *lpIcalIt
 
 	int i = 0;
 	for (const auto &cat : vCategories) {
-		int length = cat.length() + 1;
-		hr = MAPIAllocateMore(length, lpIcalItem->base, (void **) &sPropVal.Value.MVszA.lppszA[i]);
+		hr = KAllocCopy(cat.c_str(), cat.length() + 1, reinterpret_cast<void **>(&sPropVal.Value.MVszA.lppszA[i]), lpIcalItem->base);
 		if (hr != hrSuccess)
 			return hr;
-		memcpy(sPropVal.Value.MVszA.lppszA[i++], cat.c_str(), length);
+		++i;
 	}
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_KEYWORDS], PT_MV_STRING8);
@@ -1035,13 +1021,10 @@ HRESULT VConverter::HrAddRecipients(icalcomponent *lpicEvent, icalitem *lpIcalIt
 		}
 
 		// add the organiser to the recipient list
-		hr = MAPIAllocateMore(cbEntryID, lpIcalItem->base, (void**)&icrAttendee.lpEntryID);
+		icrAttendee.cbEntryID = cbEntryID;
+		hr = KAllocCopy(lpEntryID, cbEntryID, reinterpret_cast<void **>(&icrAttendee.lpEntryID), lpIcalItem->base);
 		if (hr != hrSuccess)
 			return hr;
-		
-		memcpy(icrAttendee.lpEntryID, lpEntryID, cbEntryID);
-		icrAttendee.cbEntryID = cbEntryID;
-
 		icrAttendee.strEmail = strEmail;
 		icrAttendee.strName = strName;
 		icrAttendee.ulRecipientType = MAPI_ORIG;
@@ -1260,7 +1243,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 			auto lpicValue = icalvalue_new_from_string(ICAL_DATETIME_VALUE, icalproperty_get_x(lpicProp));
 			ttReminderNext = icaltime_as_timet_with_zone(icalvalue_get_datetime(lpicValue), NULL); // no timezone			
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERNEXTTIME], PT_SYSTIME);
-			UnixTimeToFileTime(ttReminderNext, &sPropVal.Value.ft);
+			sPropVal.Value.ft  = UnixTimeToFileTime(ttReminderNext);
 			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 			
 			// X-MOZ-SNOOZE-TIME-1231250400000000
@@ -1270,7 +1253,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 				sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MOZ_SNOOZE_SUFFIX], PT_SYSTIME);
 				strSuffix.erase(0, strlen("X-MOZ-SNOOZE-TIME-"));
 				strSuffix.erase(10);									// ignoring trailing 6 zeros for hh:mm:ss
-				UnixTimeToFileTime(atoi(strSuffix.c_str()), &sPropVal.Value.ft);
+				sPropVal.Value.ft = UnixTimeToFileTime(atoi(strSuffix.c_str()));
 				lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 			}
 			icalvalue_free(lpicValue);
@@ -1279,12 +1262,9 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 			string rtf = base64_decode(icalvalue_get_x(lpicValue));
 			sPropVal.ulPropTag = PR_RTF_COMPRESSED;
 			sPropVal.Value.bin.cb = rtf.size();
-			
-			hr = MAPIAllocateMore(sPropVal.Value.bin.cb,
-			     lpIcalItem->base, reinterpret_cast<void **>(&sPropVal.Value.bin.lpb));
+			hr = KAllocCopy(rtf.c_str(), sPropVal.Value.bin.cb, reinterpret_cast<void **>(&sPropVal.Value.bin.lpb), lpIcalItem->base);
 			if (hr != hrSuccess)
 				return hr;
-			memcpy(sPropVal.Value.bin.lpb, (LPBYTE)rtf.c_str(), sPropVal.Value.bin.cb);
 			lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 			icalvalue_free(lpicValue);
 		}
@@ -1293,7 +1273,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 
 	if (bHasMozAck) { // save X-MOZ-LAST-ACK if found in request.
 		sPropMozAck.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MOZLASTACK], PT_SYSTIME);
-		UnixTimeToFileTime(ttMozLastAckMax, &sPropMozAck.Value.ft);		
+		sPropMozAck.Value.ft  = UnixTimeToFileTime(ttMozLastAckMax);
 		lpIcalItem->lstMsgProps.emplace_back(sPropMozAck);
 	}
 	else { //delete X-MOZ-LAST-ACK if not found in request.
@@ -1320,7 +1300,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 		ttReminderTime = ICalTimeTypeToUTC(lpicEventRoot, lpicDTStartProp);
 	}
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERTIME], PT_SYSTIME);
-	UnixTimeToFileTime(ttReminderTime, &sPropVal.Value.ft);
+	sPropVal.Value.ft  = UnixTimeToFileTime(ttReminderTime);
 	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 
 	if (ttReminderNext != 0)
@@ -1331,7 +1311,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 		return hrSuccess;
 	}
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERNEXTTIME], PT_SYSTIME);
-	UnixTimeToFileTime(ttReminderTime - (ulRemindBefore * 60), &sPropVal.Value.ft);
+	sPropVal.Value.ft  = UnixTimeToFileTime(ttReminderTime - ulRemindBefore * 60);
 	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	return hrSuccess;
 }
@@ -1835,7 +1815,7 @@ HRESULT VConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsgProp
 	// Set creation time / CREATED
 	auto lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, PR_CREATION_TIME);
 	if (lpPropVal) {
-		auto ittICalTime = icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime), 0, nullptr);
+		auto ittICalTime = icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft), 0, nullptr);
 		kc_ical_utc(ittICalTime, true);
 		auto lpProp = icalproperty_new_created(ittICalTime);
 		icalcomponent_add_property(lpEvent, lpProp);
@@ -1844,8 +1824,7 @@ HRESULT VConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsgProp
 	// exchange 2003 is using DTSTAMP for 'X-MICROSOFT-CDO-OWNER-CRITICAL-CHANGE'
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_OWNERCRITICALCHANGE], PT_SYSTIME));
 	if (lpPropVal) {
-		auto ittICalTime = icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime), false, icaltimezone_get_utc_timezone());
-		auto lpProp = icalproperty_new_dtstamp(ittICalTime);
+		auto lpProp = icalproperty_new_dtstamp(icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft), false, icaltimezone_get_utc_timezone()));
 		icalcomponent_add_property(lpEvent,lpProp);
 
 		bHasOwnerCriticalChange = true;
@@ -1854,7 +1833,7 @@ HRESULT VConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsgProp
 	// Set modification time / LAST-MODIFIED + DTSTAMP
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, PR_LAST_MODIFICATION_TIME);
 	if (lpPropVal) {
-		auto ittICalTime = icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime), 0, nullptr);
+		auto ittICalTime = icaltime_from_timet_with_zone(FileTimeToUnixTime(lpPropVal->Value.ft), 0, nullptr);
 		kc_ical_utc(ittICalTime, true);
 		auto lpProp = icalproperty_new_lastmodified(ittICalTime);
 		icalcomponent_add_property(lpEvent,lpProp);
@@ -2036,11 +2015,7 @@ HRESULT VConverter::HrSetXHeaders(ULONG ulMsgProps, LPSPropValue lpMsgProps, LPM
 	// set X-MICROSOFT-CDO & X-MOZ properties 
 	// X-MICROSOFT-CDO-OWNER-CRITICAL-CHANGE
 	auto lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_OWNERCRITICALCHANGE], PT_SYSTIME));
-	if (lpPropVal != nullptr)
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttCriticalChange);
-	else
-		ttCriticalChange = time(NULL);
-
+	ttCriticalChange = lpPropVal != nullptr ? FileTimeToUnixTime(lpPropVal->Value.ft) : time(nullptr);
 	auto icCriticalChange = icaltime_from_timet_with_zone(ttCriticalChange, false, icaltimezone_get_utc_timezone());
 	auto lpicValue = icalvalue_new_datetime(icCriticalChange);
 	auto lpszTemp = icalvalue_as_ical_string_r(lpicValue);
@@ -2052,11 +2027,7 @@ HRESULT VConverter::HrSetXHeaders(ULONG ulMsgProps, LPSPropValue lpMsgProps, LPM
 
 	// X-MICROSOFT-CDO-ATTENDEE-CRITICAL-CHANGE
 	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ATTENDEECRITICALCHANGE], PT_SYSTIME));
-	if (lpPropVal != nullptr)
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttCriticalChange);
-	else
-		ttCriticalChange = time(NULL);
-
+	ttCriticalChange = lpPropVal != nullptr ? FileTimeToUnixTime(lpPropVal->Value.ft) : time(nullptr);
 	icCriticalChange = icaltime_from_timet_with_zone(ttCriticalChange, false, icaltimezone_get_utc_timezone());
 	lpicValue = icalvalue_new_datetime(icCriticalChange);
 	lpszTemp = icalvalue_as_ical_string_r(lpicValue);
@@ -2183,7 +2154,7 @@ HRESULT VConverter::HrSetVAlarm(ULONG ulProps, LPSPropValue lpProps, icalcompone
 		lRemindBefore = lpPropVal->Value.l;
 	lpPropVal = PCpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERTIME], PT_SYSTIME));
 	if (lpPropVal)
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttReminderTime);
+		ttReminderTime = FileTimeToUnixTime(lpPropVal->Value.ft);
 	lpPropVal = PCpropFindProp(lpProps, ulProps, PR_MESSAGE_CLASS);
 	if (lpPropVal && _tcsicmp(lpPropVal->Value.LPSZ, KC_T("IPM.Task")) == 0)
 		bTask = true;
@@ -2199,7 +2170,7 @@ HRESULT VConverter::HrSetVAlarm(ULONG ulProps, LPSPropValue lpProps, icalcompone
 	// retrieve the suffix time for property X-MOZ-SNOOZE-TIME
 	lpPropVal = PCpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MOZ_SNOOZE_SUFFIX], PT_SYSTIME));
 	if(lpPropVal)
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttSnoozeSuffix);	
+		ttSnoozeSuffix = FileTimeToUnixTime(lpPropVal->Value.ft);
 	// check latest snooze time
 	lpPropVal = PCpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERNEXTTIME], PT_SYSTIME));
 	if (lpPropVal) {
@@ -2210,8 +2181,7 @@ HRESULT VConverter::HrSetVAlarm(ULONG ulProps, LPSPropValue lpProps, icalcompone
 		// set timestamp in name for recurring items i.e. X-MOZ-SNOOZE-TIME-1231250400000000:20090107T132846Z
 		if (ttSnoozeSuffix != 0 && blisItemReccr)
 			strSnoozeTime += "-" + stringify(ttSnoozeSuffix) + "000000";
-
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttSnooze);
+		ttSnooze = FileTimeToUnixTime(lpPropVal->Value.ft);
 		icSnooze = icaltime_from_timet_with_zone(ttSnooze, false, icaltimezone_get_utc_timezone());
 		lpicValue = icalvalue_new_datetime(icSnooze);
 		auto lpszTemp = icalvalue_as_ical_string_r(lpicValue);
@@ -2231,11 +2201,9 @@ HRESULT VConverter::HrSetVAlarm(ULONG ulProps, LPSPropValue lpProps, icalcompone
 	lpPropVal = PCpropFindProp(lpProps, ulProps,  CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MOZLASTACK], PT_SYSTIME));
 	if (lpPropVal)
 	{
-		time_t ttLastAckTime = 0;
 		icaltimetype icModTime;
 		icalvalue *lpicValue = NULL;
-		
-		FileTimeToUnixTime(lpPropVal->Value.ft, &ttLastAckTime);
+		auto ttLastAckTime = FileTimeToUnixTime(lpPropVal->Value.ft);
 		//do not send X-MOZ-LASTACK if reminder older than last ack time
 		if(ttLastAckTime > ttSnooze && !blxmozgen)
 			return hrSuccess;
@@ -2392,7 +2360,7 @@ HRESULT VConverter::HrSetRecurrenceID(LPSPropValue lpMsgProps, ULONG ulMsgProps,
 		else 
 			tRecId = icaltime_as_timet_with_zone(icTime,lpicTZinfo);
 	} else {
-		tRecId = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);	
+		tRecId = FileTimeToUnixTime(lpPropVal->Value.ft);	
 	}
 	
 	return HrSetTimeProperty(tRecId, bIsSeriesAllDay, lpicTZinfo, strTZid,
@@ -2579,7 +2547,7 @@ HRESULT VConverter::HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEven
 			lpProp = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_OLDSTART], PT_SYSTIME));
 
 		if (lpProp) {
-			tNewTime = FileTimeToUnixTime(lpProp->Value.ft.dwHighDateTime, lpProp->Value.ft.dwLowDateTime);
+			tNewTime = FileTimeToUnixTime(lpProp->Value.ft);
 			hr = HrSetTimeProperty(tNewTime, bIsAllDay, lpicTZinfo,
 			     strTZid, ICAL_RECURRENCEID_PROPERTY, lpicException.get());
 			if (hr != hrSuccess)
@@ -2619,7 +2587,7 @@ HRESULT VConverter::HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEven
 
 				lpProp = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_REMINDERTIME], PT_LONG));
 				if (lpProp)
-					FileTimeToUnixTime(lpProp->Value.ft, &ttReminderTime);
+					ttReminderTime = FileTimeToUnixTime(lpProp->Value.ft);
 			}
 
 			// add new valarm
@@ -2738,7 +2706,7 @@ HRESULT VConverter::HrGetExceptionMessage(LPMESSAGE lpMessage, time_t tStart, LP
 	SPropValue sMethod = {0};
 
 	sStart.ulPropTag = PR_EXCEPTION_STARTTIME;
-	UnixTimeToFileTime(tStart, &sStart.Value.ft);
+	sStart.Value.ft  = UnixTimeToFileTime(tStart);
 	sMethod.ulPropTag = PR_ATTACH_METHOD;
 	sMethod.Value.ul = ATTACH_EMBEDDED_MSG;
 	auto hr = lpMessage->GetAttachmentTable(0, &~lpAttachTable);
@@ -2820,11 +2788,9 @@ HRESULT VConverter::HrAddTimeZone(icalproperty *lpicProp, icalitem *lpIcalItem)
 		
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TIMEZONEDATA], PT_BINARY);
 	sPropVal.Value.bin.cb = sizeof(TIMEZONE_STRUCT);
-
-	HRESULT hr = MAPIAllocateMore(sizeof(TIMEZONE_STRUCT), lpIcalItem->base, (void**)&sPropVal.Value.bin.lpb);
+	auto hr = KAllocCopy(&m_iCurrentTimeZone->second, sizeof(TIMEZONE_STRUCT), reinterpret_cast<void **>(&sPropVal.Value.bin.lpb), lpIcalItem->base);
 	if (hr != hrSuccess)
 		return hr;
-	memcpy(sPropVal.Value.bin.lpb, &m_iCurrentTimeZone->second, sizeof(TIMEZONE_STRUCT));
 	lpIcalItem->lstMsgProps.emplace_back(sPropVal);
 	// save timezone in icalitem
 	lpIcalItem->tTZinfo = m_iCurrentTimeZone->second;

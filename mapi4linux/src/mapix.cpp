@@ -56,8 +56,6 @@
 #define _MAPI_MEM_DEBUG 0
 #define _MAPI_MEM_MORE_DEBUG 0
 
-using namespace KCHL;
-
 namespace KC {
 
 class SessionRestorer _kc_final {
@@ -72,7 +70,7 @@ class SessionRestorer _kc_final {
 	std::string::const_iterator m_input;
 	size_t m_left = 0;
 	std::string m_profname;
-	KCHL::object_ptr<M4LMsgServiceAdmin> m_svcadm;
+	object_ptr<M4LMsgServiceAdmin> m_svcadm;
 };
 
 class SessionSaver _kc_final {
@@ -81,6 +79,8 @@ class SessionSaver _kc_final {
 };
 
 } /* namespace */
+
+using namespace KC;
 
 enum mapibuf_ident {
 	/*
@@ -1248,8 +1248,9 @@ HRESULT M4LMAPISession::CompareEntryIDs(ULONG cbEntryID1,
  * @return		HRESULT
  * @retval		MAPI_E_INVALID_ENTRYID	either lpEntryID1 or lpEntryID2 is NULL
  */
-HRESULT M4LMAPISession::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink,
-							   ULONG* lpulConnection) {
+HRESULT M4LMAPISession::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
+{
 	object_ptr<IMsgStore> lpMsgStore;
 
 	//FIXME: Advise should handle one or more stores/addressbooks not only the default store,
@@ -1286,19 +1287,22 @@ HRESULT M4LMAPISession::Unadvise(ULONG ulConnection) {
 	return hr;
 }
 
-HRESULT M4LMAPISession::MessageOptions(ULONG_PTR ulUIParam, ULONG ulFlags,
-    LPTSTR lpszAdrType, LPMESSAGE lpMessage)
+HRESULT M4LMAPISession::MessageOptions(ULONG_PTR ui_param, ULONG flags,
+    const TCHAR *addrtype, IMessage *)
 {
 	ec_log_err("M4LMAPISessionM4LMAPISession::MessageOptions not implemented");
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISession::QueryDefaultMessageOpt(LPTSTR lpszAdrType, ULONG ulFlags, ULONG* lpcValues, LPSPropValue* lppOptions) {
+HRESULT M4LMAPISession::QueryDefaultMessageOpt(const TCHAR *addrtype,
+    ULONG flags, ULONG *nvals, SPropValue **opts)
+{
 	ec_log_err("M4LMAPISession::QueryDefaultMessageOpt not implemented");
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISession::EnumAdrTypes(ULONG ulFlags, ULONG* lpcAdrTypes, LPTSTR** lpppszAdrTypes) {
+HRESULT M4LMAPISession::EnumAdrTypes(ULONG flags, ULONG *ntypes, TCHAR ***types)
+{
 	ec_log_err("M4LMAPISession::EnumAdrTypes not implemented");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1329,7 +1333,8 @@ HRESULT M4LMAPISession::Logoff(ULONG_PTR ulUIParam, ULONG ulFlags,
 	return hrSuccess;
 }
 
-HRESULT M4LMAPISession::SetDefaultStore(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) {
+HRESULT M4LMAPISession::SetDefaultStore(ULONG flags, ULONG eid_size, const ENTRYID *)
+{
 	ec_log_err("M4LMAPISession::SetDefaultStore(): not implemented");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1340,10 +1345,10 @@ HRESULT M4LMAPISession::AdminServices(ULONG ulFlags, LPSERVICEADMIN* lppServiceA
 	return hr;
 }
 
-HRESULT M4LMAPISession::ShowForm(ULONG_PTR ulUIParam, LPMDB lpMsgStore,
-    LPMAPIFOLDER lpParentFolder, LPCIID lpInterface, ULONG ulMessageToken,
-    LPMESSAGE lpMessageSent, ULONG ulFlags, ULONG ulMessageStatus,
-    ULONG ulMessageFlags, ULONG ulAccess, LPSTR lpszMessageClass)
+HRESULT M4LMAPISession::ShowForm(ULONG_PTR ui_param, IMsgStore *,
+    IMAPIFolder *parent, const IID *intf, ULONG msg_token, IMessage *sent,
+    ULONG flags, ULONG msg_status, ULONG msg_flags, ULONG access,
+    const char *msg_class)
 {
 	ec_log_err("M4LMAPISession::ShowForm(): not implemented");
 	return MAPI_E_NO_SUPPORT;
@@ -1367,7 +1372,7 @@ HRESULT M4LMAPISession::QueryInterface(REFIID refiid, void **lpvoid) {
 	return hrSuccess;
 }
 
-HRESULT M4LMAPISession::setStatusRow(ULONG cValues, LPSPropValue lpProps)
+HRESULT M4LMAPISession::setStatusRow(ULONG cValues, const SPropValue *lpProps)
 {
 	scoped_lock l_status(m_mutexStatusRow);
 	m_cValuesStatus = 0;
@@ -1587,7 +1592,9 @@ HRESULT M4LAddrBook::CompareEntryIDs(ULONG cbEntryID1,
 	return hr;
 }
 
-HRESULT M4LAddrBook::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG* lpulConnection) {
+HRESULT M4LAddrBook::Advise(ULONG eid_size, const ENTRYID *, ULONG evt_mask,
+    IMAPIAdviseSink *, ULONG *conn)
+{
 	ec_log_err("M4LAddrBook::Advise not implemented");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1609,15 +1616,16 @@ HRESULT M4LAddrBook::Unadvise(ULONG ulConnection) {
  *
  * @return	HRESULT
  */
-HRESULT M4LAddrBook::CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags, ULONG* lpcbEntryID,
-								  LPENTRYID* lppEntryID) {
+HRESULT M4LAddrBook::CreateOneOff(const TCHAR *lpszName,
+    const TCHAR *lpszAdrType, const TCHAR *lpszAddress, ULONG ulFlags,
+    ULONG *lpcbEntryID, ENTRYID **lppEntryID)
+{
 	return ECCreateOneOff(lpszName, lpszAdrType, lpszAddress, ulFlags, lpcbEntryID, lppEntryID);
 }
 
-HRESULT M4LAddrBook::NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags,
-    ULONG cbEIDContainer, LPENTRYID lpEIDContainer, ULONG cbEIDNewEntryTpl,
-    LPENTRYID lpEIDNewEntryTpl, ULONG *lpcbEIDNewEntry,
-    LPENTRYID *lppEIDNewEntry)
+HRESULT M4LAddrBook::NewEntry(ULONG_PTR ui_param, ULONG flags,
+    ULONG eid_size, const ENTRYID *eid_cont, ULONG tpl_size,
+    const ENTRYID *tpl, ULONG *new_size, ENTRYID **new_eid)
 {
 	ec_log_err("M4LAddrBook::NewEntry not implemented");
 	return MAPI_E_NO_SUPPORT;
@@ -1639,7 +1647,7 @@ HRESULT M4LAddrBook::NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags,
  */
 // should use PR_AB_SEARCH_PATH
 HRESULT M4LAddrBook::ResolveName(ULONG_PTR ulUIParam, ULONG ulFlags,
-    LPTSTR lpszNewEntryTitle, LPADRLIST lpAdrList)
+    const TCHAR *lpszNewEntryTitle, ADRLIST *lpAdrList)
 {
 	HRESULT hr = hrSuccess;
 	ULONG objType;
@@ -1801,19 +1809,24 @@ HRESULT M4LAddrBook::Address(ULONG_PTR *lpulUIParam, LPADRPARM lpAdrParms,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LAddrBook::Details(ULONG* lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID, LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText, ULONG ulFlags) {
+HRESULT M4LAddrBook::Details(ULONG_PTR *ui_param, DISMISSMODELESS *dsfunc,
+    void *dismiss_ctx, ULONG cbEntryID, const ENTRYID *lpEntryID,
+    LPFNBUTTON callback, void *btn_ctx, const TCHAR *btn_text, ULONG flags)
+{
 	ec_log_err("not implemented: M4LAddrBook::Details");
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LAddrBook::RecipOptions(ULONG_PTR ulUIParam, ULONG ulFlags,
-    LPADRENTRY lpRecip)
+HRESULT M4LAddrBook::RecipOptions(ULONG_PTR ui_param, ULONG flags,
+    const ADRENTRY *recip)
 {
 	ec_log_err("not implemented: M4LAddrBook::RecipOptions");
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LAddrBook::QueryDefaultRecipOpt(LPTSTR lpszAdrType, ULONG ulFlags, ULONG* lpcValues, LPSPropValue* lppOptions) {
+HRESULT M4LAddrBook::QueryDefaultRecipOpt(const TCHAR *addrtype, ULONG flags,
+    ULONG *nvals, SPropValue **opts)
+{
 	ec_log_err("not implemented: M4LAddrBook::QueryDefaultRecipOpt");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1825,7 +1838,8 @@ HRESULT M4LAddrBook::GetPAB(ULONG* lpcbEntryID, LPENTRYID* lppEntryID) {
 }
 
 // Set Personal AddressBook
-HRESULT M4LAddrBook::SetPAB(ULONG cbEntryID, LPENTRYID lpEntryID) {
+HRESULT M4LAddrBook::SetPAB(ULONG eid_size, const ENTRYID *)
+{
 	ec_log_err("not implemented: M4LAddrBook::SetPAB");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1905,7 +1919,8 @@ no_hierarchy:
 	return hrSuccess;
 }
 
-HRESULT M4LAddrBook::SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID) {
+HRESULT M4LAddrBook::SetDefaultDir(ULONG eid_size, const ENTRYID *)
+{
 	ec_log_err("not implemented M4LAddrBook::SetDefaultDir");
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1940,7 +1955,8 @@ HRESULT M4LAddrBook::GetSearchPath(ULONG ulFlags, LPSRowSet* lppSearchPath) {
 	return hrSuccess;
 }
 
-HRESULT M4LAddrBook::SetSearchPath(ULONG ulFlags, LPSRowSet lpSearchPath) {
+HRESULT M4LAddrBook::SetSearchPath(ULONG ulFlags, const SRowSet *lpSearchPath)
+{
 	HRESULT hr = hrSuccess;
 
 	if (m_lpSavedSearchPath) {
@@ -2114,7 +2130,7 @@ SCODE MAPIAllocateBuffer(ULONG cbSize, LPVOID *lppBuffer)
 	try {
 		new(bfr) struct mapibuf_head; /* init mutex */
 		bfr->child = nullptr;
-	} catch (std::exception &e) {
+	} catch (const std::exception &e) {
 		fprintf(stderr, "MAPIAllocateBuffer: %s\n", e.what());
 		free(bfr);
 		return MAKE_MAPI_E(1);
@@ -2261,9 +2277,9 @@ HRESULT MAPILogonEx(ULONG_PTR ulUIParam, const TCHAR *lpszProfileName,
 		// since a profilename can only be us-ascii, convert
 		try {
 			strProfname = convert_to<std::string>(reinterpret_cast<const wchar_t *>(lpszProfileName));
-		} catch (illegal_sequence_exception &) {
+		} catch (const illegal_sequence_exception &) {
 			return MAPI_E_INVALID_PARAMETER;
-		} catch (unknown_charset_exception &) {
+		} catch (const unknown_charset_exception &) {
 			return MAPI_E_CALL_FAILED;
 		}
 	} else {
@@ -2317,11 +2333,8 @@ HRESULT MAPIInitialize(LPVOID lpMapiInit)
 	// Loads the mapisvc.inf, and finds all providers and entry point functions
 	m4l_lpMAPISVC = new MAPISVC();
 	auto hr = m4l_lpMAPISVC->Init();
-	if (hr != hrSuccess) {
-		ec_log_crit("MAPIInitialize(): MAPISVC::Init fail %x: %s", hr, GetMAPIErrorMessage(hr));
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return kc_perrorf("MAPISVC::Init fail", hr);
 	if (!localProfileAdmin) {
 		localProfileAdmin = new M4LProfAdmin;
 		if (localProfileAdmin == nullptr)
@@ -2693,6 +2706,16 @@ HRESULT SessionRestorer::restore_profile(const std::string &serin,
 HRESULT kc_session_restore(const std::string &a, IMAPISession **s)
 {
 	return SessionRestorer().restore_profile(a, s);
+}
+
+SCODE KAllocCopy(const void *src, size_t z, void **dst, void *base)
+{
+	auto ret = MAPIAllocateMore(z, base, dst);
+	if (ret != hrSuccess)
+		return ret;
+	if (src != nullptr)
+		memcpy(*dst, src, z);
+	return hrSuccess;
 }
 
 } /* namespace */

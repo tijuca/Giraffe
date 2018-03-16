@@ -43,6 +43,7 @@
 #include <kopano/MAPIErrors.h>
 #include <kopano/Util.h>
 #include <kopano/lockhelper.hpp>
+#include <kopano/scope.hpp>
 #include <inetmapi/inetmapi.h>
 #include <kopano/mapiext.h>
 #include <vector>
@@ -63,7 +64,7 @@
 #include <kopano/ECFeatures.hpp>
 #include <kopano/mapi_ptr.h>
 #include "IMAP.h"
-using namespace KCHL;
+using namespace KC;
 using std::list;
 using std::string;
 using std::swap;
@@ -568,11 +569,6 @@ HRESULT IMAP::HrCmdNoop(const std::string &strTag, bool check)
 	return hrSuccess;
 }
 
-template<bool check> HRESULT IMAP::HrCmdNoop(const std::string &strTag)
-{
-	return HrCmdNoop(strTag, check);
-}
-
 /** 
  * @brief Handles the LOGOUT command
  * 
@@ -701,6 +697,11 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 	const std::string &strUser = args[0], &strPass = args[1];
 
+	auto laters = make_scope_success([&]() {
+		if (hr != hrSuccess)
+			CleanupObject();
+	});
+
 	// strUser isn't sent in imap style utf-7, but \ is escaped, so strip those
 	for (i = 0; i < strUser.length(); ++i) {
 		if (strUser[i] == '\\' && i+1 < strUser.length() && (strUser[i+1] == '"' || strUser[i+1] == '\\'))
@@ -718,25 +719,24 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Aborted login from %s with username \"%s\" (tried to use disallowed plaintext auth)",
 					  lpChannel->peer_addr(), strUsername.c_str());
-		goto exitpm;
+		return hr;
 	}
 
 	if (lpSession != NULL) {
 		lpLogger->Log(EC_LOGLEVEL_INFO, "Ignoring to login TWICE for username \"%s\"", strUsername.c_str());
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN Can't login twice");
-		// hr = MAPI_E_CALL_FAILED;
-		goto exitpm;
+		return hr;
 	}
 
 	hr = TryConvert(strUsername, rawsize(strUsername), "windows-1252", strwUsername);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Illegal byte sequence in username");
-		goto exitpm;
+		return hr;
 	}
 	hr = TryConvert(strPass, rawsize(strPass), "windows-1252", strwPassword);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Illegal byte sequence in password");
-		goto exitpm;
+		return hr;
 	}
 
 	flags = EC_PROFILE_FLAGS_NO_COMPRESSION;
@@ -759,21 +759,21 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 		if (m_ulFailedLogins >= LOGIN_RETRIES)
 			// disconnect client
 			hr = MAPI_E_END_OF_SESSION;
-		goto exitpm;
+		return hr;
 	}
 
 	hr = HrOpenDefaultStore(lpSession, &~lpStore);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open default store");
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN can't open default store");
-		goto exitpm;
+		return hr;
 	}
 
 	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAddrBook);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open addressbook");
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN can't open addressbook");
-		goto exitpm;
+		return hr;
 	}
 
 	// check if imap access is disabled
@@ -781,7 +781,7 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "IMAP not enabled for user '%s'", strUsername.c_str());
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN imap feature disabled");
 		hr = MAPI_E_LOGON_FAILED;
-		goto exitpm;
+		return hr;
 	}
 
 	m_strwUsername = strwUsername;
@@ -793,7 +793,7 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 
 		hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), &~m_lpsIMAPTags);
 		if (hr != hrSuccess)
-			goto exitpm;
+			return hr;
 
 		m_lpsIMAPTags->aulPropTag[0] = PROP_ENVELOPE;
 	}
@@ -813,15 +813,32 @@ HRESULT IMAP::HrCmdLogin(const std::string &strTag,
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to find special folder properties");
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN can't find special folder properties");
-		goto exitpm;
+		return hr;
 	}
 
 	lpLogger->Log(EC_LOGLEVEL_NOTICE, "IMAP Login from %s for user %s", lpChannel->peer_addr(), strUsername.c_str());
 	HrResponse(RESP_TAGGED_OK, strTag, "[" + GetCapabilityString(false) + "] LOGIN completed");
- exitpm:
-	if (hr != hrSuccess)
-		CleanupObject();
 	return hr;
+}
+
+int IMAP::check_mboxname_with_resp(const std::wstring &s,
+    const std::string &tag, const std::string &cmd)
+{
+	if (s.empty()) {
+		/* Apple mail client does this, so we need to block it. */
+		HrResponse(RESP_TAGGED_NO, tag, cmd + " invalid mailbox name: empty name");
+		return MAPI_E_CALL_FAILED;
+	}
+	/* Courier and Dovecot also block this */
+	if (s.front() == IMAP_HIERARCHY_DELIMITER) {
+		HrResponse(RESP_TAGGED_NO, tag, cmd + " invalid mailbox name: begins with hierarchy separator");
+		return MAPI_E_CALL_FAILED;
+	}
+	if (s.back() == IMAP_HIERARCHY_DELIMITER) {
+		HrResponse(RESP_TAGGED_NO, tag, cmd + " invalid mailbox name: ends with hierarchy separator");
+		return MAPI_E_CALL_FAILED;
+	}
+	return hrSuccess;
 }
 
 /**
@@ -854,17 +871,14 @@ HRESULT IMAP::HrCmdSelect(const std::string &strTag,
 	// close old contents table if cached version was open
 	ReleaseContentsCache();
 
-	// Apple mail client does this request, so we need to block it.
-	if (strFolder.empty()) {
-		HrResponse(RESP_TAGGED_NO, strTag, command + " invalid folder name");
-		return MAPI_E_CALL_FAILED;
-	}
-
 	hr = IMAP2MAPICharset(strFolder, strCurrentFolder);
 	if (hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, command + " invalid folder name");
 		return hr;
 	}
+	hr = check_mboxname_with_resp(strCurrentFolder, strTag, command);
+	if (hr != hrSuccess)
+		return hr;
 
 	bCurrentFolderReadOnly = bReadOnly;
 	hr = HrRefreshFolderMails(true, !bCurrentFolderReadOnly, &ulUnseen, &ulUIDValidity);
@@ -899,13 +913,6 @@ HRESULT IMAP::HrCmdSelect(const std::string &strTag,
 	return hrSuccess;
 }
 
-template<bool read_only>
-HRESULT IMAP::HrCmdSelect(const std::string &strTag,
-    const std::vector<std::string> &args)
-{
-	return HrCmdSelect(strTag, args, read_only);
-}
-
 /** 
  * @brief Handles the CREATE command
  *
@@ -931,23 +938,14 @@ HRESULT IMAP::HrCmdCreate(const std::string &strTag,
 		HrResponse(RESP_TAGGED_NO, strTag, "CREATE error no session");
 		return MAPI_E_CALL_FAILED;
 	}
-
-	if (strFolderParam.empty()) {
-		HrResponse(RESP_TAGGED_NO, strTag, "CREATE error no folder");
-		return MAPI_E_CALL_FAILED;
-	}
-
 	hr = IMAP2MAPICharset(strFolderParam, strFolder);
 	if (hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, "CREATE invalid folder name");
 		return hr;
 	}
-
-	if (strFolder[0] == IMAP_HIERARCHY_DELIMITER) {
-		// courier and dovecot also block this
-		HrResponse(RESP_TAGGED_NO, strTag, "CREATE invalid folder name");
+	hr = check_mboxname_with_resp(strFolder, strTag, "CREATE");
+	if (hr != hrSuccess)
 		return hr;
-	}
 	hr = HrFindFolderPartial(strFolder, &~lpFolder, &strPath);
 	if (hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, "CREATE error opening destination folder");
@@ -1024,6 +1022,9 @@ HRESULT IMAP::HrCmdDelete(const std::string &strTag,
 		HrResponse(RESP_TAGGED_NO, strTag, "DELETE error deleting INBOX is not allowed");
 		return MAPI_E_CALL_FAILED;
 	}
+	hr = check_mboxname_with_resp(strFolder, strTag, "DELETE");
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrFindFolder(strFolder, false, &~folder, &cb, &~entry_id);
 	if (hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, "DELETE error folder not found");
@@ -1125,7 +1126,9 @@ HRESULT IMAP::HrCmdRename(const std::string &strTag,
 
 		return MAPI_E_CALL_FAILED;
 	}
-
+	hr = check_mboxname_with_resp(strExistingFolder, strTag, "RENAME");
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrFindFolder(strExistingFolder, false, &~lpMovFolder, &cb, &~entry_id);
 	if (hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, "RENAME error source folder not found");
@@ -1256,6 +1259,9 @@ HRESULT IMAP::HrCmdSubscribe(const std::string &strTag,
 		HrResponse(RESP_TAGGED_NO, strTag, strAction + " invalid folder name");
 		return hr;
 	}
+	hr = check_mboxname_with_resp(strFolder, strTag, strAction);
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrFindFolder(strFolder, false, &~folder, &cb, &~entry_id);
 	if (hr != hrSuccess) {
 		// folder not found, but not error, so thunderbird updates view correctly.
@@ -1278,13 +1284,6 @@ HRESULT IMAP::HrCmdSubscribe(const std::string &strTag,
 	}
 	HrResponse(RESP_TAGGED_OK, strTag, strAction + " completed");
 	return hrSuccess;
-}
-
-template<bool subscribe>
-HRESULT IMAP::HrCmdSubscribe(const std::string &tag,
-    const std::vector<std::string> &args)
-{
-	return HrCmdSubscribe(tag, args, subscribe);
 }
 
 /** 
@@ -1419,19 +1418,17 @@ HRESULT IMAP::HrCmdList(const std::string &strTag,
 	return hrSuccess;
 }
 
-template<bool sub_only> HRESULT
-IMAP::HrCmdList(const std::string &tag, const std::vector<std::string> &args)
-{
-	return HrCmdList(tag, args, sub_only);
-}
-
-HRESULT IMAP::get_recent_uidnext2(IMAPIFolder *folder, ULONG &recent, ULONG &uidnext, const ULONG &messages)
+HRESULT IMAP::get_recent_uidnext(IMAPIFolder *folder, const std::string &tag, ULONG &recent, ULONG &uidnext, const ULONG &messages)
 {
 	static constexpr const SizedSSortOrderSet(1, sortuid) =
 		{1, 0, 0, {{PR_EC_IMAP_ID, TABLE_SORT_DESCEND}}};
 	static constexpr const SizedSPropTagArray(1, cols) = {1, {PR_EC_IMAP_ID}};
 	memory_ptr<SPropValue> max_id;
 	auto ret = HrGetOneProp(folder, PR_EC_IMAP_MAX_ID, &~max_id);
+	auto laters = make_scope_success([&]() {
+		if (ret != hrSuccess)
+			HrResponse(RESP_TAGGED_NO, tag, "STATUS error getting contents");
+	});
 	if (ret != hrSuccess && ret != MAPI_E_NOT_FOUND)
 		return kc_perror("K-2390", ret);
 
@@ -1473,15 +1470,6 @@ HRESULT IMAP::get_recent_uidnext2(IMAPIFolder *folder, ULONG &recent, ULONG &uid
 		uidnext = 1;
 
 	return hrSuccess;
-}
-
-HRESULT IMAP::get_recent_uidnext(IMAPIFolder *folder, const std::string &tag,
-    ULONG &recent, ULONG &uidnext, const ULONG &messages)
-{
-	auto ret = get_recent_uidnext2(folder, recent, uidnext, messages);
-	if (ret != hrSuccess)
-		HrResponse(RESP_TAGGED_NO, tag, "STATUS error getting contents");
-	return ret;
 }
 
 /** 
@@ -1536,6 +1524,9 @@ HRESULT IMAP::HrCmdStatus(const std::string &strTag,
 		HrResponse(RESP_TAGGED_NO, strTag, "STATUS invalid folder name");
 		return hr;
 	}
+	hr = check_mboxname_with_resp(strIMAPFolder, strTag, "STATUS");
+	if (hr != hrSuccess)
+		return hr;
 
 	strStatusData = strToUpper(strStatusData);
 	strIMAPFolder = strToUpper(strIMAPFolder);
@@ -1665,6 +1656,9 @@ HRESULT IMAP::HrCmdAppend(const string &strTag, const string &strFolderParam, co
 		HrResponse(RESP_TAGGED_NO, strTag, "APPEND invalid folder name");
 		return hr;
 	}
+	hr = check_mboxname_with_resp(strFolder, strTag, "APPEND");
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrFindFolder(strFolder, false, &~lpAppendFolder);
 	if(hr != hrSuccess) {
 		HrResponse(RESP_TAGGED_NO, strTag, "[TRYCREATE] APPEND error finding folder");
@@ -2061,11 +2055,6 @@ HRESULT IMAP::HrCmdFetch(const string &strTag, const std::vector<std::string> &a
 	return hr;
 }
 
-template <bool uid> HRESULT IMAP::HrCmdFetch(const std::string &strTag, const std::vector<std::string> &args)
-{
-	return HrCmdFetch(strTag, args, uid);
-}
-
 /** 
  * @brief Handles the STORE command
  * 
@@ -2143,12 +2132,6 @@ HRESULT IMAP::HrCmdStore(const string &strTag, const std::vector<std::string> &a
 	return hr;
 }
 
-template <bool uid> HRESULT IMAP::HrCmdStore(const std::string &strTag, const std::vector<std::string> &args)
-{
-	return HrCmdStore(strTag, args, uid);
-}
-
-
 /** 
  * @brief Handles the COPY command
  * 
@@ -2165,9 +2148,7 @@ HRESULT IMAP::HrCmdCopy(const string &strTag, const std::vector<std::string> &ar
 	HRESULT hr = hrSuccess;
 	list<ULONG> lstMails;
 	string strMode;
-
-	const std::string &strSeqSet = args[0];
-	const std::string &strFolder = args[1];
+	const std::string &strSeqSet = args[0], &strFolderParam = args[1];
 
 	if (bUidMode)
 		strMode = "UID ";
@@ -2186,6 +2167,15 @@ HRESULT IMAP::HrCmdCopy(const string &strTag, const std::vector<std::string> &ar
 		return hr;
 	}
 
+	std::wstring strFolder;
+	hr = IMAP2MAPICharset(strFolderParam, strFolder);
+	if (hr != hrSuccess) {
+		HrResponse(RESP_TAGGED_NO, strTag, "COPY invalid folder name");
+		return hr;
+	}
+	hr = check_mboxname_with_resp(strFolder, strTag, "COPY");
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrCopy(lstMails, strFolder, false);
 	if (hr == MAPI_E_NOT_FOUND) {
 		HrResponse(RESP_TAGGED_NO, strTag, "[TRYCREATE] " + strMode + "COPY folder not found");
@@ -2197,11 +2187,6 @@ HRESULT IMAP::HrCmdCopy(const string &strTag, const std::vector<std::string> &ar
 
 	HrResponse(RESP_TAGGED_OK, strTag, strMode + "COPY completed");
 	return hr;
-}
-
-template <bool uid> HRESULT IMAP::HrCmdCopy(const std::string &strTag, const std::vector<std::string> &args)
-{
-	return HrCmdCopy(strTag, args, uid);
 }
 
 /** 
@@ -2220,9 +2205,7 @@ template <bool uid> HRESULT IMAP::HrCmdCopy(const std::string &strTag, const std
 HRESULT IMAP::HrCmdUidXaolMove(const string &strTag, const std::vector<std::string> &args) {
 	HRESULT hr = hrSuccess;
 	list<ULONG> lstMails;
-
-	const std::string &strSeqSet = args[0];
-	const std::string &strFolder = args[1];
+	const std::string &strSeqSet = args[0], &strFolderParam = args[1];
 
 	if (strCurrentFolder.empty() || !lpSession) {
 		HrResponse(RESP_TAGGED_NO, strTag, "UID XAOL-MOVE error no folder");
@@ -2235,6 +2218,15 @@ HRESULT IMAP::HrCmdUidXaolMove(const string &strTag, const std::vector<std::stri
 		return hr;
 	}
 
+	std::wstring strFolder;
+	hr = IMAP2MAPICharset(strFolderParam, strFolder);
+	if (hr != hrSuccess) {
+		HrResponse(RESP_TAGGED_NO, strTag, "COPY invalid folder name");
+		return hr;
+	}
+	hr = check_mboxname_with_resp(strFolder, strTag, "COPY");
+	if (hr != hrSuccess)
+		return hr;
 	hr = HrCopy(lstMails, strFolder, true);
 	if (hr == MAPI_E_NOT_FOUND) {
 		HrResponse(RESP_TAGGED_NO, strTag, "[TRYCREATE] UID XAOL-MOVE folder not found");
@@ -3819,12 +3811,24 @@ HRESULT IMAP::HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &st
 					assert(lpMessage);
 					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Generating message");
 
-					if (oss.tellp() == std::ostringstream::pos_type(0) && // already converted in previous loop?
-					    (lpMessage == NULL || IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt) != hrSuccess)) {
-						vProps.emplace_back(item);
-						vProps.emplace_back("NIL");
-						lpLogger->Log(EC_LOGLEVEL_WARNING, "Error in generating message %d for user %ls in folder %ls", ulMailnr+1, m_strwUsername.c_str(), strCurrentFolder.c_str());
-						continue;
+					if (oss.tellp() == std::ostringstream::pos_type(0)) {
+						// already converted in previous loop?
+						if (lpMessage == NULL) {
+							vProps.emplace_back(item);
+							vProps.emplace_back("NIL");
+							lpLogger->Log(EC_LOGLEVEL_WARNING, "K-1579: No message to pass to IMToINet. (user \"%ls\" folder \"%ls\" message %d)",
+								m_strwUsername.c_str(), strCurrentFolder.c_str(), ulMailnr + 1);
+							continue;
+						}
+						hr = IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt);
+						if (hr != hrSuccess) {
+							vProps.emplace_back(item);
+							vProps.emplace_back("NIL");
+							lpLogger->Log(EC_LOGLEVEL_WARNING, "K-1580: IMToInet (user \"%ls\" folder \"%ls\" message %d): %s (%x)",
+								m_strwUsername.c_str(), strCurrentFolder.c_str(), ulMailnr + 1,
+								GetMAPIErrorMessage(hr), hr);
+							continue;
+						}
 					}
 					strMessage = oss.str();
 
@@ -4668,12 +4672,13 @@ HRESULT IMAP::HrStore(const list<ULONG> &lstMails, string strMsgDataItemName, st
  * 
  * @return MAPI Error code
  */
-HRESULT IMAP::HrCopy(const list<ULONG> &lstMails, const string &strFolderParam, bool bMove) {
+HRESULT IMAP::HrCopy(const list<ULONG> &lstMails,
+    const std::wstring &strFolder, bool bMove)
+{
 	HRESULT hr = hrSuccess;
 	object_ptr<IMAPIFolder> lpFromFolder, lpDestFolder;
 	ULONG ulCount;
 	memory_ptr<ENTRYLIST> entry_list;
-	wstring strFolder;
 
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~entry_list);
 	if (hr != hrSuccess)
@@ -4685,11 +4690,6 @@ HRESULT IMAP::HrCopy(const list<ULONG> &lstMails, const string &strFolderParam, 
 		return MAPI_E_CALL_FAILED;
 
 	hr = HrGetCurrentFolder(lpFromFolder);
-	if (hr != hrSuccess)
-		return hr;
-
-	// get dest folder
-	hr = IMAP2MAPICharset(strFolderParam, strFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrFindFolder(strFolder, false, &~lpDestFolder);
@@ -5197,16 +5197,14 @@ HRESULT IMAP::HrGetBodyStructure(bool bExtended, string &strBodyStructure, const
  * 
  * @return date/time in string format
  */
-string IMAP::FileTimeToString(FILETIME sFileTime) {
-	string strTime;
+std::string IMAP::FileTimeToString(const FILETIME &sFileTime)
+{
 	char szBuffer[31];
-	time_t sTime;
 	struct tm ptr;
 
-	sTime = FileTimeToUnixTime(sFileTime.dwHighDateTime, sFileTime.dwLowDateTime);
-	gmtime_safe(&sTime, &ptr);
+	gmtime_safe(FileTimeToUnixTime(sFileTime), &ptr);
 	strftime(szBuffer, 30, "%d-", &ptr);
-	strTime += szBuffer;
+	std::string strTime = szBuffer;
 	strTime += strMonth[ptr.tm_mon];
 	strftime(szBuffer, 30, "-%Y %H:%M:%S +0000", &ptr);
 	strTime += szBuffer;
@@ -5263,7 +5261,7 @@ bool IMAP::StringToFileTime(string strTime, FILETIME &sFileTime, bool bDateOnly)
 	}
 
 	sTime = timegm(&sTm);
-	UnixTimeToFileTime(sTime, &sFileTime);
+	sFileTime = UnixTimeToFileTime(sTime);
 	return true;
 }
 
@@ -5274,11 +5272,12 @@ bool IMAP::StringToFileTime(string strTime, FILETIME &sFileTime, bool bDateOnly)
  * 
  * @return Input + 24 hours
  */
-FILETIME IMAP::AddDay(FILETIME sFileTime) {
+FILETIME IMAP::AddDay(const FILETIME &sFileTime)
+{
 	FILETIME sFT;
 
 	// add 24 hour in seconds = 24*60*60 seconds
-	UnixTimeToFileTime(FileTimeToUnixTime(sFileTime.dwHighDateTime, sFileTime.dwLowDateTime) + 24 * 60 * 60, &sFT);
+	sFT = UnixTimeToFileTime(FileTimeToUnixTime(sFileTime) + 24 * 60 * 60);
 	return sFT;
 }
 
@@ -5388,13 +5387,13 @@ HRESULT IMAP::IMAP2MAPICharset(const string& input, wstring& output) {
  * 
  * @return whether folder matches
  */
-bool IMAP::MatchFolderPath(wstring strFolder, const wstring& strPattern)
+bool IMAP::MatchFolderPath(const std::wstring &in_folder,
+    const std::wstring &strPattern)
 {
     bool bMatch = false;
     int f = 0;
     int p = 0;
-    
-    strFolder = strToUpper(strFolder);
+	auto strFolder = strToUpper(in_folder);
     
     while(1) {
         if (f == static_cast<int>(strFolder.size()) &&
@@ -5610,11 +5609,9 @@ HRESULT IMAP::HrFindSubFolder(IMAPIFolder *lpFolder, const wstring& strFolder, U
             if(hr != hrSuccess)
 				return hr;
             cbEntryID = lpProp->Value.bin.cb;
-            hr = MAPIAllocateBuffer(cbEntryID, (void **)&lpEntryID);
+            hr = KAllocCopy(lpProp->Value.bin.lpb, cbEntryID, reinterpret_cast<void **>(&lpEntryID));
             if(hr != hrSuccess)
 				return hr;
-            memcpy(lpEntryID, lpProp->Value.bin.lpb, cbEntryID);
-            
             *lppEntryID = lpEntryID;
             *lpcbEntryID = cbEntryID;
 			return hr;
@@ -5655,13 +5652,9 @@ HRESULT IMAP::HrFindSubFolder(IMAPIFolder *lpFolder, const wstring& strFolder, U
 		return MAPI_E_INVALID_PARAMETER;
     
     cbEntryID = lpRowSet->aRow[0].lpProps[0].Value.bin.cb;
-
-    hr = MAPIAllocateBuffer(cbEntryID, (void **)&lpEntryID);
+	hr = KAllocCopy(lpRowSet->aRow[0].lpProps[0].Value.bin.lpb, cbEntryID, reinterpret_cast<void **>(&lpEntryID));
     if(hr != hrSuccess)
 		return hr;
-        
-    memcpy(lpEntryID, lpRowSet->aRow[0].lpProps[0].Value.bin.lpb, cbEntryID);
-    
     *lppEntryID = lpEntryID;
     *lpcbEntryID = cbEntryID;
 	return hrSuccess;

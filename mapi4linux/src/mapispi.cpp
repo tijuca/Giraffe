@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <kopano/mapi_ptr.h>
 
-using namespace KCHL;
+using namespace KC;
 
 M4LMAPIGetSession::M4LMAPIGetSession(IMAPISession *new_session) :
 	session(new_session)
@@ -83,8 +83,9 @@ HRESULT M4LMAPISupport::GetMemAllocRoutines(LPALLOCATEBUFFER * lpAllocateBuffer,
 	return hrSuccess;
 }
 
-HRESULT M4LMAPISupport::Subscribe(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink,
-								  ULONG * lpulConnection) {
+HRESULT M4LMAPISupport::Subscribe(const NOTIFKEY *lpKey, ULONG ulEventMask,
+    ULONG ulFlags, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
+{
 	LPNOTIFKEY lpNewKey = NULL;
 	ulock_normal l_adv(m_advises_mutex, std::defer_lock_t());
 
@@ -113,11 +114,17 @@ HRESULT M4LMAPISupport::Unsubscribe(ULONG ulConnection) {
 	return hrSuccess;
 }
 
-HRESULT M4LMAPISupport::Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICATION lpNotifications, ULONG * lpulFlags) {
-	KCHL::object_ptr<IMAPIAdviseSink> lpAdviseSink;
+HRESULT M4LMAPISupport::Notify(const NOTIFKEY *lpKey, ULONG cNotification,
+    NOTIFICATION *lpNotifications, ULONG *lpulFlags)
+{
+	object_ptr<IMAPIAdviseSink> lpAdviseSink;
 	ulock_normal l_adv(m_advises_mutex);
 
-	auto iter = find_if(m_advises.cbegin(), m_advises.cend(), findKey(lpKey));
+	auto iter = find_if(m_advises.cbegin(), m_advises.cend(),
+		[=](const M4LSUPPORTADVISES::value_type &entry) {
+			return entry.second.lpKey->cb == lpKey->cb &&
+			       memcmp(entry.second.lpKey->ab, lpKey->ab, lpKey->cb) == 0;
+		});
 	if (iter == m_advises.cend())
 		/* Should this be reported as error? */
 		return hrSuccess;
@@ -126,7 +133,9 @@ HRESULT M4LMAPISupport::Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICA
 	return lpAdviseSink->OnNotify(cNotification, lpNotifications);
 }
 
-HRESULT M4LMAPISupport::ModifyStatusRow(ULONG cValues, LPSPropValue lpColumnVals, ULONG ulFlags) {
+HRESULT M4LMAPISupport::ModifyStatusRow(ULONG cValues,
+    const SPropValue *lpColumnVals, ULONG ulFlags)
+{
 	return static_cast<M4LMAPISession *>(this->session)->setStatusRow(cValues, lpColumnVals);
 }
 
@@ -138,8 +147,10 @@ HRESULT M4LMAPISupport::OpenProfileSection(const MAPIUID *lpUid, ULONG ulFlags,
 	return session->OpenProfileSection(lpUid, nullptr, ulFlags, lppProfileObj);
 }
 
-HRESULT M4LMAPISupport::RegisterPreprocessor(LPMAPIUID lpMuid, LPTSTR lpszAdrType, LPTSTR lpszDLLName, LPSTR lpszPreprocess,
-											 LPSTR lpszRemovePreprocessInfo, ULONG ulFlags) {
+HRESULT M4LMAPISupport::RegisterPreprocessor(const MAPIUID *,
+    const TCHAR *addrtype, const TCHAR *dllname, const char *preprocess,
+    const char *remove_pp_info, ULONG flags)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
@@ -160,14 +171,17 @@ HRESULT M4LMAPISupport::SpoolerNotify(ULONG ulFlags, LPVOID lpvData) {
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags,
-									 ULONG * lpcbEntryID, LPENTRYID * lppEntryID) {
+HRESULT M4LMAPISupport::CreateOneOff(const TCHAR *lpszName,
+    const TCHAR *lpszAdrType, const TCHAR *lpszAddress, ULONG ulFlags,
+    ULONG *lpcbEntryID, ENTRYID **lppEntryID)
+{
 	// although it's called EC... the return value is HRESULT :)
 	return ECCreateOneOff(lpszName, lpszAdrType, lpszAddress, ulFlags,
 	       lpcbEntryID, lppEntryID);
 }
 
-HRESULT M4LMAPISupport::SetProviderUID(LPMAPIUID lpProviderID, ULONG ulFlags) {
+HRESULT M4LMAPISupport::SetProviderUID(const MAPIUID *, ULONG flags)
+{
     return hrSuccess;
 }
 
@@ -186,8 +200,10 @@ HRESULT M4LMAPISupport::CompareEntryIDs(ULONG cbEntry1, const ENTRYID *lpEntry1,
 	return hrSuccess;
 }
 
-HRESULT M4LMAPISupport::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData,
-									   LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling) {
+HRESULT M4LMAPISupport::OpenTemplateID(ULONG tpl_size, const ENTRYID *tpl_eid,
+    ULONG tpl_flags, IMAPIProp *propdata, const IID *intf, IMAPIProp **propnew,
+    IMAPIProp *sibling)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
@@ -207,31 +223,37 @@ HRESULT M4LMAPISupport::Address(ULONG * lpulUIParam, LPADRPARM lpAdrParms, LPADR
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::Details(ULONG * lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID,
-								LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText,
-								ULONG ulFlags) {
-    return MAPI_E_NO_SUPPORT;
-}
-
-HRESULT M4LMAPISupport::NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags,
-    ULONG cbEIDContainer, ENTRYID *lpEIDContainer, ULONG cbEIDNewEntryTpl,
-    ENTRYID *lpEIDNewEntryTpl, ULONG *lpcbEIDNewEntry, ENTRYID **lppEIDNewEntry)
+HRESULT M4LMAPISupport::Details(ULONG_PTR *ui_param, DISMISSMODELESS *dsfunc,
+    void *dismiss_ctx, ULONG cbEntryID, const ENTRYID *lpEntryID,
+    LPFNBUTTON callback, void *btn_ctx, const TCHAR *btn_text, ULONG flags)
 {
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::DoConfigPropsheet(ULONG ulUIParam, ULONG ulFlags, LPTSTR lpszTitle, LPMAPITABLE lpDisplayTable,
-										  LPMAPIPROP lpCOnfigData, ULONG ulTopPage) {
+HRESULT M4LMAPISupport::NewEntry(ULONG_PTR ui_param, ULONG flags,
+    ULONG eid_size, const ENTRYID *eid_cont, ULONG tpl_size, const ENTRYID *tpl,
+    ULONG *new_size, ENTRYID **new_eid)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, LPENTRYLIST lpMsgList, LPCIID lpDestInterface,
-									 LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) {
+HRESULT M4LMAPISupport::DoConfigPropsheet(ULONG_PTR ui_param, ULONG flags,
+    const TCHAR *title, IMAPITable *disp_tbl, IMAPIProp *cfg_data,
+    ULONG top_page)
+{
+    return MAPI_E_NO_SUPPORT;
+}
+
+HRESULT M4LMAPISupport::CopyMessages(const IID *lpSrcInterface,
+    void *lpSrcFolder, const ENTRYLIST *lpMsgList, const IID *lpDestInterface,
+    void *lpDestFolder, ULONG_PTR ulUIParam, IMAPIProgress *lpProgress,
+    ULONG ulFlags)
+{
 	HRESULT hr = hrSuccess;
 	LPMAPIFOLDER lpSource = NULL;
 	LPMAPIFOLDER lpDest = NULL;
 	ULONG ulObjType;
-	KCHL::memory_ptr<ENTRYLIST> lpDeleteEntries;
+	memory_ptr<ENTRYLIST> lpDeleteEntries;
 	bool bPartial = false;
 	ULONG i;
 
@@ -296,13 +318,15 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 	return hr;
 }
 
-HRESULT M4LMAPISupport::CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, ULONG cbEntryID, LPENTRYID lpEntryID,
-								   LPCIID lpDestInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam,
-								   LPMAPIPROGRESS lpProgress, ULONG ulFlags) {
+HRESULT M4LMAPISupport::CopyFolder(const IID *lpSrcInterface, void *lpSrcFolder,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, const IID *lpDestInterface,
+    void *lpDestFolder, const TCHAR *lpszNewFolderName, ULONG_PTR ulUIParam,
+    IMAPIProgress *lpProgress, ULONG ulFlags)
+{
 	HRESULT hr = hrSuccess;
 	IMAPIFolder *lpSource, *lpDest;
 	object_ptr<IMAPIFolder> lpFolder, lpSubFolder;
-	KCHL::memory_ptr<SPropValue> lpSourceName;
+	memory_ptr<SPropValue> lpSourceName;
 	ULONG ulObjType  = 0;
 	ULONG ulFolderFlags = 0;
 	static constexpr const SizedSPropTagArray (1, sExcludeProps) = {1, {PR_DISPLAY_NAME_A}};
@@ -511,11 +535,13 @@ HRESULT M4LMAPISupport::OpenAddressBook(LPCIID lpInterface, ULONG ulFlags, LPADR
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::Preprocess(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) {
+HRESULT M4LMAPISupport::Preprocess(ULONG flags, ULONG eid_size, const ENTRYID *)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::CompleteMsg(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) {
+HRESULT M4LMAPISupport::CompleteMsg(ULONG flags, ULONG eid_size, const ENTRYID *)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
@@ -523,7 +549,8 @@ HRESULT M4LMAPISupport::StoreLogoffTransports(ULONG * lpulFlags) {
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::StatusRecips(LPMESSAGE lpMessage, LPADRLIST lpRecipList) {
+HRESULT M4LMAPISupport::StatusRecips(IMessage *, const ADRLIST *recips)
+{
     return MAPI_E_NO_SUPPORT;
 }
 

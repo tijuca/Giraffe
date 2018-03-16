@@ -18,6 +18,10 @@
 #ifndef PLATFORM_LINUX_H
 #define PLATFORM_LINUX_H
 
+#ifndef UNICODE
+#        error But KC libmapi only knows to deal with UNICODE
+#endif
+
 /*
  * Functions and (type)definitions that are needed for the Linux platform
  *
@@ -297,13 +301,9 @@ typedef unsigned int*	LPLHANDLE;
 /* mapidefs.h (and more) types */
 typedef wchar_t 	WCHAR;
 
-#ifdef UNICODE
-  typedef WCHAR		TCHAR;
+typedef WCHAR		TCHAR;
 #define KC_T(x) L##x
-#else
-  typedef char		TCHAR;
-#define KC_T(x) x
-#endif
+
 namespace KC {
 typedef std::basic_string<TCHAR> tstring;
 }
@@ -445,17 +445,10 @@ static inline LPWSTR lstrcpyW(LPWSTR dst, LPCWSTR src)
 	return dst;
 }
 
-#ifdef UNICODE
 #define _tcslen	wcslen
 #define _tcscpy wcscpy
 #define _tcscmp wcscmp
 #define _tcsicmp wcscasecmp
-#else
-#define _tcslen strlen
-#define _tcscpy strcpy
-#define _tcscmp strcmp
-#define _tcsicmp strcasecmp
-#endif
 
 extern _kc_export void Sleep(unsigned int usec);
 
@@ -477,16 +470,11 @@ typedef void * DLIB;
 
 namespace KC {
 
-// unavailable in linux
-#define _dstbias 0
-
 extern _kc_export time_t GetProcessTime(void);
 
-#define OutputDebugStringA(dstr) fprintf(stderr,"%s",dstr)
 #define GetTickCount() 0L
 
 #define TICKS_PER_SEC (sysconf(_SC_CLK_TCK))
-#define localemask(_cat) (_cat ## _MASK)
 #define createlocale(_cat, _loc) newlocale(_cat ## _MASK, _loc, NULL)
 #define createlocale_real(_cat, _loc) newlocale(_cat, _loc, NULL)
 

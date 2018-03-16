@@ -26,23 +26,28 @@ import icalmapi
 
 from MAPI import (
     KEEP_OPEN_READWRITE, PT_MV_BINARY, PT_BOOLEAN, MSGFLAG_READ,
-    CLEAR_READ_FLAG, PT_MV_STRING8, PT_BINARY, PT_LONG,
+    CLEAR_READ_FLAG, PT_MV_UNICODE, PT_BINARY, PT_LONG,
     MAPI_CREATE, MAPI_MODIFY, MAPI_DEFERRED_ERRORS,
     ATTACH_BY_VALUE, ATTACH_EMBEDDED_MSG, STGM_WRITE, STGM_TRANSACTED,
     MAPI_UNICODE, MAPI_TO, MAPI_CC, MAPI_BCC, MAPI_E_NOT_FOUND,
     MAPI_E_NOT_ENOUGH_MEMORY, PT_SYSTIME, MAPI_ASSOCIATED,
     WrapCompressedRTFStream
 )
-from MAPI.Defs import HrGetOneProp, CHANGE_PROP_TYPE, bin2hex
+
+from MAPI.Defs import (
+    HrGetOneProp, CHANGE_PROP_TYPE,
+)
+
 from MAPI.Struct import (
     SPropValue, MAPIErrorNotFound, MAPIErrorUnknownEntryid,
     MAPIErrorInterfaceNotSupported, MAPIErrorUnconfigured, MAPIErrorNoAccess,
 )
+
 from MAPI.Tags import (
-    PR_BODY, PR_DISPLAY_NAME_W, PR_MESSAGE_CLASS_W,
-    PR_CONTAINER_CLASS, PR_ENTRYID, PR_EC_HIERARCHYID,
+    PR_BODY, PR_DISPLAY_NAME_W, PR_MESSAGE_CLASS_W, PR_CHANGE_KEY,
+    PR_CONTAINER_CLASS_W, PR_ENTRYID, PR_EC_HIERARCHYID, PR_HASATTACH,
     PR_SOURCE_KEY, PR_SUBJECT_W, PR_ATTACH_LONG_FILENAME_W,
-    PR_MESSAGE_SIZE, PR_BODY_W, PR_CREATION_TIME,
+    PR_MESSAGE_SIZE, PR_BODY_W, PR_CREATION_TIME, PR_CLIENT_SUBMIT_TIME,
     PR_MESSAGE_DELIVERY_TIME, PR_LAST_MODIFICATION_TIME,
     PR_MESSAGE_FLAGS, PR_PARENT_ENTRYID, PR_IMPORTANCE,
     PR_ATTACH_NUM, PR_ATTACH_METHOD, PR_ATTACH_DATA_BIN,
@@ -58,16 +63,26 @@ from MAPI.Tags import (
     PR_START_DATE, PR_END_DATE, PR_OWNER_APPT_ID, PR_RESPONSE_REQUESTED,
     PR_SENT_REPRESENTING_SEARCH_KEY, PR_ATTACHMENT_FLAGS,
     PR_ATTACHMENT_HIDDEN, PR_ATTACHMENT_LINKID, PR_ATTACH_FLAGS,
-    PR_NORMALIZED_SUBJECT_W,
+    PR_NORMALIZED_SUBJECT_W, PR_INTERNET_MESSAGE_ID_W, PR_CONVERSATION_ID,
+    PR_READ_RECEIPT_REQUESTED, PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED,
+    PR_REPLY_RECIPIENT_ENTRIES, PR_EC_BODY_FILTERED, PR_SENSITIVITY,
+    PR_SEARCH_KEY, PR_LAST_VERB_EXECUTED, PR_LAST_VERB_EXECUTION_TIME
 )
 
-from MAPI.Tags import IID_IAttachment, IID_IStream, IID_IMAPITable, IID_IMailUser, IID_IMessage
+from MAPI.Tags import (
+    IID_IAttachment, IID_IStream, IID_IMAPITable, IID_IMailUser, IID_IMessage,
+)
+
+from .pidlid import (
+    PidLidAppointmentStateFlags,
+)
 
 from .compat import (
-    hex as _hex, unhex as _unhex, is_str as _is_str, repr as _repr,
+    unhex as _unhex, is_str as _is_str, repr as _repr,
     pickle_load as _pickle_load, pickle_loads as _pickle_loads,
     fake_unicode as _unicode, is_file as _is_file,
-    encode as _encode
+    encode as _encode, benc as _benc, bdec as _bdec,
+    default as _default,
 )
 
 from .defs import (
@@ -79,7 +94,8 @@ from .errors import Error, NotFoundError, _DeprecationWarning
 from .attachment import Attachment
 from .body import Body
 from .properties import Properties
-from .meetingrequest import MeetingRequest
+from .recurrence import Occurrence
+from .meetingrequest import MeetingRequest, _copytags
 from .address import Address
 from .table import Table
 from .contact import Contact
@@ -107,7 +123,6 @@ else:
     import utils as _utils
     import property_ as _prop
 
-PidLidAppointmentStateFlags = 'PT_LONG:appointment:0x8217'
 
 class PersistentList(list):
     def __init__(self, mapiobj, proptag, *args, **kwargs):
@@ -182,7 +197,7 @@ class Item(Properties, Contact, Appointment):
                 self.loads(loads, attachments=attachments)
             else:
                 try:
-                    container_class = HrGetOneProp(self.folder.mapiobj, PR_CONTAINER_CLASS).Value
+                    container_class = HrGetOneProp(self.folder.mapiobj, PR_CONTAINER_CLASS_W).Value
                 except MAPIErrorNotFound:
                     self.mapiobj.SetProps([SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Note')])
                 else:
@@ -231,7 +246,7 @@ class Item(Properties, Contact, Appointment):
     def entryid(self):
         """ Item entryid """
 
-        return _hex(self._get_fast(PR_ENTRYID, must_exist=True))
+        return _benc(self._get_fast(PR_ENTRYID, must_exist=True))
 
     @property
     def guid(self):
@@ -248,18 +263,37 @@ class Item(Properties, Contact, Appointment):
         """ Item sourcekey """
 
         if not hasattr(self, '_sourcekey'): # XXX more general caching solution
-            self._sourcekey = bin2hex(HrGetOneProp(self.mapiobj, PR_SOURCE_KEY).Value)
+            self._sourcekey = _benc(self[PR_SOURCE_KEY])
         return self._sourcekey
+
+    @property
+    def searchkey(self):
+        """ Item searchkey """
+
+        if not hasattr(self, '_searchkey'): # XXX more general caching solution
+            self._searchkey = bin2hex(HrGetOneProp(self.mapiobj, PR_SEARCH_KEY).Value)
+        return self._searchkey
+
+    @property
+    def changekey(self):
+        """ Item changekey """
+
+        return _benc(self[PR_CHANGE_KEY])
 
     @property
     def subject(self):
         """ Item subject """
 
-        return self._get_fast(PR_SUBJECT_W, u'')
+        return self._get_fast(PR_SUBJECT_W, _default(u''))
 
     @subject.setter
     def subject(self, x):
-        self._set_fast(PR_SUBJECT_W, _unicode(x))
+        if x is None:
+            prop = self.get_prop(PR_SUBJECT_W)
+            if prop:
+                self.delete(prop)
+        else:
+            self._set_fast(PR_SUBJECT_W, _unicode(x))
 
     @property
     def name(self):
@@ -340,6 +374,14 @@ class Item(Properties, Contact, Appointment):
         self.prop(PR_MESSAGE_DELIVERY_TIME, create=True).value = value
 
     @property
+    def sent(self):
+        """Client submit time."""
+        try:
+            return self.prop(PR_CLIENT_SUBMIT_TIME).value
+        except NotFoundError:
+            pass
+
+    @property
     def last_modified(self):
         """Last modification time."""
         return self._get_fast(PR_LAST_MODIFICATION_TIME)
@@ -356,6 +398,8 @@ class Item(Properties, Contact, Appointment):
         except MAPIErrorNotFound:
             return False
 
+    # TODO draft status, how to determine? GetMessageStatus?
+
     @property
     def read(self):
         """Item is read."""
@@ -369,10 +413,20 @@ class Item(Properties, Contact, Appointment):
             self.mapiobj.SetReadFlag(CLEAR_READ_FLAG)
 
     @property
+    def read_receipt(self):
+        """A read receipt was requested."""
+        return self.get(PR_READ_RECEIPT_REQUESTED, False)
+
+    @property
+    def delivery_receipt(self):
+        """A delivery receipt was requested."""
+        return self.get(PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED, False)
+
+    @property
     def categories(self):
         """Categories."""
         proptag = self.mapiobj.GetIDsFromNames([NAMED_PROP_CATEGORY], MAPI_CREATE)[0]
-        proptag = CHANGE_PROP_TYPE(proptag, PT_MV_STRING8)
+        proptag = CHANGE_PROP_TYPE(proptag, PT_MV_UNICODE)
         try:
             value = self.prop(proptag).value
         except NotFoundError:
@@ -382,7 +436,7 @@ class Item(Properties, Contact, Appointment):
     @categories.setter
     def categories(self, value):
         proptag = self.mapiobj.GetIDsFromNames([NAMED_PROP_CATEGORY], MAPI_CREATE)[0]
-        proptag = CHANGE_PROP_TYPE(proptag, PT_MV_STRING8)
+        proptag = CHANGE_PROP_TYPE(proptag, PT_MV_UNICODE)
         self.mapiobj.SetProps([SPropValue(proptag, list(value))])
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
@@ -392,7 +446,7 @@ class Item(Properties, Contact, Appointment):
         if self._folder:
             return self._folder
         try:
-            return _folder.Folder(self.store, _hex(HrGetOneProp(self.mapiobj, PR_PARENT_ENTRYID).Value))
+            return _folder.Folder(self.store, _benc(HrGetOneProp(self.mapiobj, PR_PARENT_ENTRYID).Value))
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
@@ -400,7 +454,7 @@ class Item(Properties, Contact, Appointment):
     def importance(self):
         """ Importance """
 
-        # TODO: userfriendly repr of value
+        warnings.warn('item.importance is deprecated (use item.urgency)', _DeprecationWarning)
         try:
             return self.prop(PR_IMPORTANCE).value
         except NotFoundError:
@@ -415,8 +469,36 @@ class Item(Properties, Contact, Appointment):
         PR_IMPORTANCE_HIGH
         """
 
+        warnings.warn('item.importance is deprecated (use item.urgency)', _DeprecationWarning)
         self.mapiobj.SetProps([SPropValue(PR_IMPORTANCE, value)])
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
+    @property
+    def urgency(self): # TODO rename back to 'importance' with core 9?
+        """Urgency ('low', 'normal' or 'high')"""
+        try:
+            return {
+                0: u'low',
+                1: u'normal',
+                2: u'high'
+            }[self[PR_IMPORTANCE]]
+        except NotFoundError:
+            return u'normal'
+
+    # TODO urgency setter
+
+    @property
+    def sensitivity(self):
+        """Sensitivity ('normal', 'personal', 'private' or 'confidential')."""
+        try:
+            return {
+                0: u'normal',
+                1: u'personal',
+                2: u'private',
+                3: u'confidential',
+            }[self[PR_SENSITIVITY]]
+        except NotFoundError:
+            return u'normal'
 
     @property
     def private(self):
@@ -443,7 +525,20 @@ class Item(Properties, Contact, Appointment):
     def reminder(self, value):
         return self.create_prop('common:34051', value, proptype=PT_BOOLEAN)
 
-    def attachments(self, embedded=False):
+    @property
+    def messageid(self):
+        return self.get(PR_INTERNET_MESSAGE_ID_W)
+
+    @property
+    def conversationid(self):
+        try:
+            return _benc(self[PR_CONVERSATION_ID])
+        except NotFoundError:
+            pass
+
+    def attachments(self, embedded=False, page_start=None, page_limit=None,
+            order=None
+        ):
         """ Return item :class:`attachments <Attachment>`
 
         :param embedded: include embedded attachments
@@ -459,7 +554,17 @@ class Item(Properties, Contact, Appointment):
 
         for row in table.rows():
             if row[1].value == ATTACH_BY_VALUE or (embedded and row[1].value == ATTACH_EMBEDDED_MSG):
-                yield Attachment(mapiitem, row[0].value)
+                yield Attachment(self, mapiitem, row[0].value)
+
+    def attachment(self, entryid):
+        # TODO can we use something existing for entryid, like PR_ENTRYID? check exchange?
+
+        # TODO performance, restriction on PR_RECORD_KEY part?
+        for attachment in self.attachments(embedded=True):
+            if attachment.entryid == entryid:
+                return attachment
+        else:
+            raise NotFoundError("no attachment with entryid '%s'" % entryid)
 
     def create_attachment(self, name, data):
         """Create a new attachment
@@ -478,7 +583,11 @@ class Item(Properties, Contact, Appointment):
         stream.Commit(0)
         attach.SaveChanges(KEEP_OPEN_READWRITE)
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
-        return Attachment(mapiobj=attach)
+        return Attachment(self, mapiobj=attach)
+
+    @property
+    def has_attachments(self):
+        return self.get(PR_HASATTACH, False)
 
     def header(self, name):
         """ Return transport message header with given name """
@@ -518,11 +627,19 @@ class Item(Properties, Contact, Appointment):
         try:
             return _utils.stream(self._arch_item, PR_HTML)
         except MAPIErrorNotFound:
-            return ''
+            return b''
 
     @html.setter
     def html(self, x):
         self.create_prop(PR_HTML, x)
+
+    @property
+    def filtered_html(self):
+        """ Filtered HTML representation """
+        try:
+            return self.prop(PR_EC_BODY_FILTERED).value
+        except NotFoundError:
+            pass
 
     @property
     def rtf(self):
@@ -531,7 +648,7 @@ class Item(Properties, Contact, Appointment):
         try:
             return _utils.stream(self._arch_item, PR_RTF_COMPRESSED)
         except MAPIErrorNotFound:
-            return ''
+            return b''
 
     @rtf.setter
     def rtf(self, x):
@@ -618,15 +735,80 @@ class Item(Properties, Contact, Appointment):
         item.create_prop('meeting:35', goid, PT_BINARY)
         return item
 
+    def _generate_reply_body(self):
+        """Create a reply body"""
+        # TODO(jelle): HTML formatted text support.
+        body = u"\r\n".join(u"> " + line for line in self.text.split('\r\n'))
+        return u"\r\nOn {} at {}, {} wrote:\r\n{}".format(self.sent.strftime('%d-%m-%Y'),
+                                                          self.sent.strftime('%H:%M'),
+                                                          self.from_.name,
+                                                          body)
+
+
+    def _create_source_message_info(self, action):
+        """Create source message info, value of the record, based on action
+        type (reply, replyall, forward) and add 48byte entryid at the end.
+
+        :param action: the reply action
+        :type action: str
+        :return:
+        :rtype: str
+        """
+
+        id_map = {
+            'reply': '0501000066000000',
+            'replyall': '0501000067000000',
+            'forward': '0601000068000000',
+        }
+
+        try:
+            return "01000E000C000000{0}0200000030000000{1}".format(id_map[action], self.entryid)
+        except KeyError:
+            return ""
+
+
+    def reply(self, folder=None, all=False):
+        # TODO(jelle): support reply all.
+        if not folder:
+            folder = self.store.drafts
+        # TODO(jelle): Remove multiple Re:'s, should only be one Re: <subject> left
+        subject = 'Re: {}'.format(self.subject)
+        body = self._generate_reply_body()
+        # TODO(jelle): pass an Address in to?
+        item = folder.create_item(subject=subject, body=body, from_=self.store.user,
+                                  to=self.from_.email, message_class=self.message_class)
+
+        source_message_info = self._create_source_message_info('reply')
+        item.create_prop('common:0x85CE', source_message_info, PT_BINARY)
+
+        return item
+
+
     def send(self, copy_to_sentmail=True):
         item = self
         if self.message_class == 'IPM.Appointment':
             item = self._send_meeting_request()
 
+        icon_index = {
+            '66': 261,  # reply
+            '67': 261,  # reply all
+            '68': 262,  # forward
+        }
+        # TOOD(jelle): check if property exists?
+        try:
+            source_message = item.prop('common:0x85CE').value
+            msgtype = source_message[24:26]
+            orig = self.store.item(entryid=source_message[48:])
+            orig.create_prop(PR_ICON_INDEX, icon_index[msgtype])
+            orig.create_prop(PR_LAST_VERB_EXECUTED, int(msgtype, 16))
+            orig.create_prop(PR_LAST_VERB_EXECUTION_TIME, datetime.datetime.now())
+        except NotFoundError:
+            pass
+
         props = []
 
         if copy_to_sentmail:
-            props.append(SPropValue(PR_SENTMAIL_ENTRYID, _unhex(item.folder.store.sentmail.entryid)))
+            props.append(SPropValue(PR_SENTMAIL_ENTRYID, _bdec(item.folder.store.sentmail.entryid)))
         props.append(SPropValue(PR_DELETE_AFTER_SUBMIT, True))
         item.mapiobj.SetProps(props)
         item.mapiobj.SubmitMessage(0)
@@ -684,6 +866,17 @@ class Item(Properties, Contact, Appointment):
         args = [self.get_prop(p).value if self.get_prop(p) else None for p in addrprops]
         return Address(self.server, *args)
 
+    @sender.setter
+    def sender(self, addr):
+        pr_addrtype, pr_dispname, pr_email, pr_entryid = self._addr_props(addr)
+        self.mapiobj.SetProps([
+            SPropValue(PR_SENDER_ADDRTYPE_W, _unicode(pr_addrtype)), # XXX pr_addrtype should be unicode already
+            SPropValue(PR_SENDER_NAME_W, pr_dispname),
+            SPropValue(PR_SENDER_EMAIL_ADDRESS_W, pr_email),
+            SPropValue(PR_SENDER_ENTRYID, pr_entryid),
+        ])
+        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
     @property
     def from_(self):
         """ From :class:`Address` """
@@ -701,6 +894,11 @@ class Item(Properties, Contact, Appointment):
             SPropValue(PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, pr_email),
             SPropValue(PR_SENT_REPRESENTING_ENTRYID, pr_entryid),
         ])
+
+        # XXX Hack around missing sender
+        if not self.sender.email:
+            self.sender = addr
+
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     def table(self, name, restriction=None, order=None, columns=None):
@@ -740,6 +938,34 @@ class Item(Properties, Contact, Appointment):
         return self.recipients(_type=MAPI_BCC)
 
     @property
+    def replyto(self):
+        try:
+            entries = self[PR_REPLY_RECIPIENT_ENTRIES]
+        except NotFoundError:
+            return
+
+        # specs say addressbook eids, but they are one-offs?
+        # TODO use ECParseOneOff
+        count = _utils.unpack_long(entries, 0)
+        pos = 8
+        for i in range(count):
+            size = _utils.unpack_long(entries, pos)
+            content = entries[pos+4+24:pos+4+24+size]
+
+            start = sos = 0
+            info = []
+            while True:
+                if content[sos:sos+2] == b'\x00\x00':
+                    info.append(content[start:sos].decode('utf-16-le'))
+                    if len(info) == 3:
+                        yield Address(self.server, info[1], info[0], info[2])
+                        break
+                    start = sos+2
+                sos += 2
+
+            pos += 4+size
+
+    @property
     def meetingrequest(self):
         return MeetingRequest(self)
 
@@ -748,7 +974,7 @@ class Item(Properties, Contact, Appointment):
             pr_addrtype = 'ZARAFA'
             pr_dispname = addr.name
             pr_email = addr.email
-            pr_entryid = _unhex(addr.userid)
+            pr_entryid = _bdec(addr.userid)
         elif isinstance(addr, Address):
             pr_addrtype = addr.addrtype
             pr_dispname = addr.name
@@ -758,7 +984,7 @@ class Item(Properties, Contact, Appointment):
             addr = _unicode(addr)
             pr_addrtype = 'SMTP'
             pr_dispname, pr_email = email.utils.parseaddr(addr)
-            pr_dispname = pr_dispname or u'nobody'
+            pr_dispname = pr_dispname or addr
             pr_entryid = self.server.ab.CreateOneOff(pr_dispname, u'SMTP', _unicode(pr_email), MAPI_UNICODE)
         return pr_addrtype, pr_dispname, pr_email, pr_entryid
 
@@ -786,11 +1012,14 @@ class Item(Properties, Contact, Appointment):
 
         :param objects: The object(s) to delete
         """
-        objects = _utils.arg_objects(objects, (Attachment, _prop.Property), 'Item.delete')
+        objects = _utils.arg_objects(objects, (Attachment, _prop.Property, Occurrence), 'Item.delete')
         # XXX embedded items?
 
         attach_ids = [item.number for item in objects if isinstance(item, Attachment)]
         proptags = [item.proptag for item in objects if isinstance(item, _prop.Property)]
+        occs = [item for item in objects if isinstance(item, Occurrence)]
+        for occ in occs:
+            self.recurrence.delete_exception(occ.start, self, _copytags(self.mapiobj))
         if proptags:
             self.mapiobj.DeleteProps(proptags)
         for attach_id in attach_ids:
@@ -1016,7 +1245,7 @@ class Item(Properties, Contact, Appointment):
         entryid = HrGetOneProp(self.mapiobj, PROP_REF_ITEM_ENTRYID).Value
 
         try:
-            return self.folder.primary_store.item(entryid=_hex(entryid))
+            return self.folder.primary_store.item(entryid=_benc(entryid))
         except NotFoundError:
             pass
 
@@ -1070,6 +1299,7 @@ class Item(Properties, Contact, Appointment):
 
         mapiobj = folder.mapiobj.CreateMessage(None, 0)
         self.mapiobj.CopyTo([], [], 0, None, IID_IMessage, mapiobj, 0)
+        mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
         if _delete:
             self.folder.delete(self)
         item = Item(mapiobj=mapiobj)

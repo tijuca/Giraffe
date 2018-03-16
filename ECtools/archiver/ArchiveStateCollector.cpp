@@ -26,7 +26,7 @@
 #include "ArchiverSession.h"
 #include "ArchiveStateUpdater.h"
 #include "ECIterators.h"
-#include "HrException.h"
+#include <kopano/hl.hpp>
 #include <kopano/ECRestriction.h>
 
 namespace KC {
@@ -45,7 +45,7 @@ namespace details {
 
 	private:
 		ArchiveStateCollector::ArchiveInfoMap &m_mapArchiveInfo;
-		KCHL::object_ptr<ECLogger> m_lpLogger;
+		object_ptr<ECLogger> m_lpLogger;
 	};
 
 	MailboxDataCollector::MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger): m_mapArchiveInfo(mapArchiveInfo), m_lpLogger(lpLogger)
@@ -73,7 +73,6 @@ namespace details {
 		ptrPropTagArray->aulPropTag[3] = PROP_ITEM_ENTRYIDS;
 
 		*lppPropTagArray = ptrPropTagArray.release();
-	exitpm:
 		return hr;
 	}
 
@@ -208,10 +207,10 @@ HRESULT ArchiveStateCollector::PopulateUserList()
 			if (hr != hrSuccess)
 				return hr;
 		}
-	} catch (const HrException &he) {
-		hr = he.hr();
+	} catch (const KMAPIError &e) {
+		hr = e.code();
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate addressbook containers. (hr=0x%08x)", hr);
-		return hr;;
+		return hr;
 	}
 	return hrSuccess;
 }

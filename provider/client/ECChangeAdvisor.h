@@ -34,6 +34,7 @@ namespace KC {
 class ECLogger;
 }
 
+using namespace KC;
 class ECMsgStore;
 
 /**
@@ -135,9 +136,9 @@ private:
 	std::recursive_mutex m_hConnectionLock;
 	ConnectionMap			m_mapConnections;
 	SyncStateMap			m_mapSyncStates;
-	KCHL::object_ptr<ECMsgStore> m_lpMsgStore;
-	KCHL::object_ptr<ECLogger> m_lpLogger;
-	KCHL::object_ptr<IECChangeAdviseSink> m_lpChangeAdviseSink;
+	KC::object_ptr<ECMsgStore> m_lpMsgStore;
+	KC::object_ptr<ECLogger> m_lpLogger;
+	KC::object_ptr<IECChangeAdviseSink> m_lpChangeAdviseSink;
 };
 
 #endif // ndef ECCHANGEADVISOR_H

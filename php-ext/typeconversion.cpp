@@ -58,6 +58,8 @@ extern "C" {
 #define MAPI_FREE(lpbase, lpp) \
 	do { if (lpBase == nullptr) MAPIFreeBuffer(lpp); } while (false)
 
+using namespace KC;
+
 ZEND_EXTERN_MODULE_GLOBALS(mapi)
 
 static LONG PropTagToPHPTag(ULONG ulPropTag) {
@@ -113,13 +115,11 @@ HRESULT PHPArraytoSBinaryArray(zval * entryid_array , void *lpBase, SBinaryArray
 		pentry = *ppentry;
 
 		convert_to_string_ex(&pentry);
-		
-		MAPI_G(hr) = MAPIAllocateMore(pentry->value.str.len, lpBase, (void **) &lpBinaryArray->lpbin[n].lpb);
+		lpBinaryArray->lpbin[n].cb = pentry->value.str.len;
+		MAPI_G(hr) = KAllocCopy(pentry->value.str.val, pentry->value.str.len, reinterpret_cast<void **>(&lpBinaryArray->lpbin[n].lpb), lpBase);
 		if(MAPI_G(hr) != hrSuccess)
 			return MAPI_G(hr);
-		
-		memcpy(lpBinaryArray->lpbin[n].lpb, pentry->value.str.val, pentry->value.str.len);
-		lpBinaryArray->lpbin[n++].cb = pentry->value.str.len;
+		++n;
 		zend_hash_move_forward(target_hash);
 	}
 
@@ -363,26 +363,26 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 		case PT_SYSTIME:
 			convert_to_long_ex(entry);
 			// convert timestamp to windows FileTime
-			UnixTimeToFileTime(entry[0]->value.lval, &lpPropValue[cvalues++].Value.ft);
+			lpPropValue[cvalues++].Value.ft = UnixTimeToFileTime(entry[0]->value.lval);
 			break;
 		case PT_BINARY:
 			convert_to_string_ex(entry);
 
 			// Allocate and copy data
-			MAPI_G(hr) = MAPIAllocateMore(entry[0]->value.str.len, lpBase ? lpBase : lpPropValue, (void **)&lpPropValue[cvalues].Value.bin.lpb);
+			lpPropValue[cvalues].Value.bin.cb =  entry[0]->value.str.len;
+			MAPI_G(hr) = KAllocCopy(entry[0]->value.str.val, entry[0]->value.str.len, reinterpret_cast<void **>(&lpPropValue[cvalues].Value.bin.lpb), lpBase != nullptr ? lpBase : lpPropValue);
 			if (MAPI_G(hr) != hrSuccess)
 				return MAPI_G(hr);
-			memcpy(lpPropValue[cvalues].Value.bin.lpb, entry[0]->value.str.val, entry[0]->value.str.len);
-			lpPropValue[cvalues++].Value.bin.cb =  entry[0]->value.str.len;
+			++cvalues;
 			break;
 		case PT_STRING8:
 			convert_to_string_ex(entry);
 
 			// Allocate and copy data
-			MAPI_G(hr) = MAPIAllocateMore(entry[0]->value.str.len+1, lpBase ? lpBase : lpPropValue, (void **)&lpPropValue[cvalues].Value.lpszA);
+			MAPI_G(hr) = KAllocCopy(entry[0]->value.str.val, entry[0]->value.str.len + 1, reinterpret_cast<void **>(&lpPropValue[cvalues].Value.lpszA), lpBase != nullptr ? lpBase : lpPropValue);
 			if (MAPI_G(hr) != hrSuccess)
 				return MAPI_G(hr);
-			strncpy(lpPropValue[cvalues++].Value.lpszA, entry[0]->value.str.val, entry[0]->value.str.len + 1);
+			++cvalues;
 			break;
 		case PT_APPTIME:
 			convert_to_double_ex(entry);
@@ -394,10 +394,10 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "GUID must be 16 bytes");
 				return MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 			}
-			MAPI_G(hr) = MAPIAllocateMore(sizeof(GUID), lpBase ? lpBase : lpPropValue, (void **)&lpPropValue[cvalues].Value.lpguid);
+			MAPI_G(hr) = KAllocCopy(entry[0]->value.str.val, sizeof(GUID), reinterpret_cast<void **>(&lpPropValue[cvalues].Value.lpguid), lpBase != nullptr ? lpBase : lpPropValue);
 			if (MAPI_G(hr) != hrSuccess)
 				return MAPI_G(hr);
-			memcpy(lpPropValue[cvalues++].Value.lpguid, entry[0]->value.str.val, sizeof(GUID));
+			++cvalues;
 			break;
 
 #define GET_MV_HASH() \
@@ -462,7 +462,7 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 			for (j = 0; j < countarray; ++j) {
 				zend_hash_get_current_data(dataHash, (void **)&dataEntry);
 				convert_to_long_ex(dataEntry);
-				UnixTimeToFileTime(dataEntry[0]->value.lval, &lpPropValue[cvalues].Value.MVft.lpft[j]);
+				lpPropValue[cvalues].Value.MVft.lpft[j] = UnixTimeToFileTime(dataEntry[0]->value.lval);
 				zend_hash_move_forward(dataHash);
 			}
 			++cvalues;
@@ -477,10 +477,10 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				zend_hash_get_current_data(dataHash, (void **)&dataEntry);
 				convert_to_string_ex(dataEntry);
 				lpPropValue[cvalues].Value.MVbin.lpbin[h].cb = dataEntry[0]->value.str.len;
-				MAPI_G(hr) = MAPIAllocateMore(dataEntry[0]->value.str.len, lpBase ? lpBase : lpPropValue, (void **)&lpPropValue[cvalues].Value.MVbin.lpbin[h].lpb);
+				MAPI_G(hr) = KAllocCopy(dataEntry[0]->value.str.val, dataEntry[0]->value.str.len, reinterpret_cast<void **>(&lpPropValue[cvalues].Value.MVbin.lpbin[h].lpb), lpBase != nullptr ? lpBase : lpPropValue);
 				if (MAPI_G(hr) != hrSuccess)
 					return MAPI_G(hr);
-				memcpy(lpPropValue[cvalues].Value.MVbin.lpbin[h++].lpb, dataEntry[0]->value.str.val, dataEntry[0]->value.str.len);
+				++h;
 				zend_hash_move_forward(dataHash);
 			}
 			lpPropValue[cvalues++].Value.MVbin.cValues = h;
@@ -493,10 +493,10 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 			for (h = 0, j = 0; j < countarray; ++j) {
 				zend_hash_get_current_data(dataHash, (void **)&dataEntry);
 				convert_to_string_ex(dataEntry);
-				MAPI_G(hr) = MAPIAllocateMore(dataEntry[0]->value.str.len+1, lpBase ? lpBase : lpPropValue, (void **)&lpPropValue[cvalues].Value.MVszA.lppszA[h]);
+				MAPI_G(hr) = KAllocCopy(dataEntry[0]->value.str.val, dataEntry[0]->value.str.len + 1, reinterpret_cast<void **>(&lpPropValue[cvalues].Value.MVszA.lppszA[h]), lpBase != nullptr ? lpBase : lpPropValue);
 				if (MAPI_G(hr) != hrSuccess)
 					return MAPI_G(hr);
-				strncpy(lpPropValue[cvalues].Value.MVszA.lppszA[h++], dataEntry[0]->value.str.val, dataEntry[0]->value.str.len + 1);
+				++h;
 				zend_hash_move_forward(dataHash);
 			}
 			lpPropValue[cvalues++].Value.MVszA.cValues = h;
@@ -1160,7 +1160,7 @@ HRESULT PHPArraytoSRestriction(zval *phpVal, void* lpBase, LPSRestriction lpRes 
 				break;
 			case PT_SYSTIME:
 				convert_to_long_ex(valueEntry);
-				UnixTimeToFileTime(valueEntry[0]->value.lval, &lpProp->Value.ft);
+				lpProp->Value.ft = UnixTimeToFileTime(valueEntry[0]->value.lval);
 				break;
 			case PT_BINARY:
 				convert_to_string_ex(valueEntry);
@@ -1605,8 +1605,7 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 
 		case PT_SYSTIME:
 			// convert time to Unix timestamp
-			add_assoc_long(zval_prop_value, pulproptag,
-						   FileTimeToUnixTime(pPropValue->Value.ft.dwHighDateTime,pPropValue->Value.ft.dwLowDateTime));
+			add_assoc_long(zval_prop_value, pulproptag, FileTimeToUnixTime(pPropValue->Value.ft));
 			break;
 		case PT_CLSID:
 			add_assoc_stringl(zval_prop_value, pulproptag, (char *)pPropValue->Value.lpguid, sizeof(GUID),1);
@@ -1673,9 +1672,7 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 
 			for (j = 0; j < pPropValue->Value.MVft.cValues; ++j) {
 				sprintf(ulKey, "%i", j);
-				add_assoc_long(zval_mvprop_value, ulKey,
-							   FileTimeToUnixTime(pPropValue->Value.MVft.lpft[j].dwHighDateTime,
-												  pPropValue->Value.MVft.lpft[j].dwLowDateTime));
+				add_assoc_long(zval_mvprop_value, ulKey, FileTimeToUnixTime(pPropValue->Value.MVft.lpft[j]));
 			}
 
 			add_assoc_zval(zval_prop_value, pulproptag, zval_mvprop_value);

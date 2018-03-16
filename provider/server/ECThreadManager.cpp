@@ -38,12 +38,14 @@
 #include "ECStatsCollector.h"
 #include "ECServerEntrypoint.h"
 #include "ECSoapServerConnection.h"
+#include "soapKCmdService.h"
 
 // errors from stdsoap2.h, differs per gSOAP release
 #define RETURN_CASE(x) \
 	case x: \
 		return #x;
 
+using namespace KC;
 using std::string;
 
 static string GetSoapError(int err)
@@ -218,8 +220,9 @@ void *ECWorkerThread::Work(void *lpParam)
                 err = lpWorkItem->soap->error;
             } else {
                 try {
-                    err = soap_serve_request(lpWorkItem->soap);
-                } catch(int) {
+					err = KCmdService(lpWorkItem->soap).dispatch();
+				} catch (const int &) {
+					/* matching part is in cmd.cpp: "throw SOAP_NULL;" (23) */
                     // Reply processing is handled by the callee, totally ignore the rest of processing for this item
                     delete lpWorkItem;
                     continue;

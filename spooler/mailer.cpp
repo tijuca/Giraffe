@@ -58,11 +58,11 @@
 #include <algorithm>
 #include "fileutil.h"
 
-using namespace KCHL;
+using namespace KC;
 using std::list;
 using std::string;
 using std::wstring;
-extern KC::ECConfig *g_lpConfig;
+extern ECConfig *g_lpConfig;
 
 /**
  * Expand all rows in the lpTable to normal user recipient
@@ -880,7 +880,7 @@ HRESULT SendUndeliverable(ECSender *lpMailer, IMsgStore *lpStore,
 		// If there's a pr_body, outlook will display that, and not the 'default' outlook error report
 
 		// Message error
-		newbody = L"Unfortunately, I was unable to deliver your mail.\nThe error given was:\n\n";
+		newbody = L"Unfortunately, kopano-spooler was unable to deliver your mail.\nThe error given was:\n\n";
 		newbody.append(lpMailer->getErrorString());
 		newbody.append(L"\n\nYou may need to contact your e-mail administrator to solve this problem.\n");
 
@@ -901,7 +901,7 @@ HRESULT SendUndeliverable(ECSender *lpMailer, IMsgStore *lpStore,
 	else if (ulRows > 0)
 	{
 		convert_context converter;
-		newbody = L"Unfortunately, I was unable to deliver your mail to the/some of the recipient(s).\n";
+		newbody = L"Unfortunately, kopano-spooler was unable to deliver your mail to the/some of the recipient(s).\n";
 		newbody.append(L"You may need to contact your e-mail administrator to solve this problem.\n");
 
 		if (!temporaryFailedRecipients.empty()) {
@@ -1073,11 +1073,9 @@ static HRESULT ContactToKopano(IMsgStore *lpUserStore,
 		ec_log_err("Offset %d not found in contact", lpContabEntryID->email_offset);
 		return MAPI_E_NOT_FOUND;
 	}
-
-	hr = MAPIAllocateBuffer(lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb, (void**)eidp);
+	hr = KAllocCopy(lpEntryIds[lpContabEntryID->email_offset].Value.bin.lpb, lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb, reinterpret_cast<void **>(eidp));
 	if (hr != hrSuccess)
 		return kc_perror("No memory for contact EID", hr);
-	memcpy(*eidp, lpEntryIds[lpContabEntryID->email_offset].Value.bin.lpb, lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb);
 	*eid_size = lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb;
 	return hrSuccess;
 }
@@ -1124,10 +1122,9 @@ static HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID,
 		kc_perror("PpropFindProp failed", hr);
 		return hrSuccess;
 	}
-	hr = MAPIAllocateBuffer(lpSpoofEID->Value.bin.cb, (void**)&lpSpoofBin);
+	hr = KAllocCopy(lpSpoofEID->Value.bin.lpb, lpSpoofEID->Value.bin.cb, reinterpret_cast<void **>(&lpSpoofBin));
 	if (hr != hrSuccess)
 		return kc_perrorf("MAPIAllocateBuffer failed", hr);
-	memcpy(lpSpoofBin, lpSpoofEID->Value.bin.lpb, lpSpoofEID->Value.bin.cb);
 	*eidp = lpSpoofBin;
 	*eid_size = lpSpoofEID->Value.bin.cb;
 	return hrSuccess;
@@ -1615,15 +1612,10 @@ static HRESULT CopyDelegateMessageToSentItems(LPMESSAGE lpMessage,
 static HRESULT PostSendProcessing(ULONG cbEntryId, const ENTRYID *lpEntryId,
     IMsgStore *lpMsgStore)
 {
-	memory_ptr<SPropValue> lpObject;
 	object_ptr<IECSpooler> lpSpooler;
-	
-	auto hr = HrGetOneProp(lpMsgStore, PR_EC_OBJECT, &~lpObject);
+	auto hr = GetECObject(lpMsgStore, iid_of(lpSpooler), &~lpSpooler);
 	if (hr != hrSuccess)
 		return kc_perror("Unable to get PR_EC_OBJECT in post-send processing", hr);
-	hr = reinterpret_cast<IUnknown *>(lpObject->Value.lpszA)->QueryInterface(IID_IECSpooler, &~lpSpooler);
-	if (hr != hrSuccess)
-		return kc_perror("Unable to get spooler interface for message", hr);
 	hr = lpSpooler->DeleteFromMasterOutgoingTable(cbEntryId, lpEntryId, EC_SUBMIT_MASTER);
 	if (hr != hrSuccess)
 		ec_log_warn("Could not remove invalid message from queue: %s (%x)",
@@ -1640,10 +1632,9 @@ static void lograw1(IMAPISession *ses, IAddrBook *ab, IMessage *msg,
 		kc_perror("IMToINet", ret);
 		return;
 	}
-	auto now = time(nullptr);
 	struct tm tm;
 	char buf[64];
-	gmtime_safe(&now, &tm);
+	gmtime_safe(time(nullptr), &tm);
 	std::string fname = g_lpConfig->GetSetting("log_raw_message_path");
 	strftime(buf, sizeof(buf), "/SMTP1_%Y%m%d%H%M%S_", &tm);
 	fname += buf;
@@ -1799,12 +1790,8 @@ static HRESULT ProcessMessage(IMAPISession *lpAdminSession,
 	hr = HrGetOneProp(lpMessage, PR_DEFERRED_SEND_TIME, &~lpDeferSendTime);
 	if (hr == hrSuccess) {
 		// check time
-		time_t now = time(NULL);
-		time_t sendat;
-
-		FileTimeToUnixTime(lpDeferSendTime->Value.ft, &sendat);
-
-		if (now < sendat) {
+		auto sendat = FileTimeToUnixTime(lpDeferSendTime->Value.ft);
+		if (time(nullptr) < sendat) {
 			// should actually be logged just once .. but how?
 			struct tm tmp;
 			char timestring[256];
@@ -2171,19 +2158,12 @@ HRESULT ProcessMessageForked(const wchar_t *szUsername, const char *szSMTP,
 		kc_perror("Unable to open default store of user", hr);
 		goto exit;
 	}
-	hr = HrGetOneProp(lpUserStore, PR_EC_OBJECT, &~lpsProp);
-	if (hr != hrSuccess) {
-		kc_perror("Unable to get Kopano internal object", hr);
-		goto exit;
-	}
-
-	// NOTE: object is placed in Value.lpszA, not Value.x
-	hr = reinterpret_cast<IUnknown *>(lpsProp->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
+	hr = GetECObject(lpUserStore, iid_of(lpServiceAdmin), &~lpServiceAdmin);
 	if (hr != hrSuccess) {
 		kc_perror("ServiceAdmin interface not supported", hr);
 		goto exit;
 	}
-	hr = reinterpret_cast<IUnknown *>(lpsProp->Value.lpszA)->QueryInterface(IID_IECSecurity, &~lpSecurity);
+	hr = GetECObject(lpUserStore, iid_of(lpSecurity), &~lpSecurity);
 	if (hr != hrSuccess) {
 		kc_perror("IID_IECSecurity not supported by store", hr);
 		goto exit;

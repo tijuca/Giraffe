@@ -35,7 +35,7 @@
 
 #define MAX_NOTIFS_PER_CALL 64
 
-using namespace KCHL;
+using namespace KC;
 
 struct ECADVISE {
 	ULONG cbKey = 0;
@@ -150,10 +150,9 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	*lpulConnection = 0;
 	pEcAdvise->lpKey = NULL;
 	pEcAdvise->cbKey = cbKey;
-	hr = MAPIAllocateBuffer(cbKey, &~pEcAdvise->lpKey);
+	hr = KAllocCopy(lpKey, cbKey, &~pEcAdvise->lpKey);
 	if (hr != hrSuccess)
 		return hr;
-	memcpy(pEcAdvise->lpKey.get(), lpKey, cbKey);
 	pEcAdvise->lpAdviseSink.reset(lpAdviseSink);
 	pEcAdvise->ulEventMask = ulEventMask;
 	/*
@@ -410,7 +409,6 @@ HRESULT ECNotifyClient::NotifyReload()
 	struct notificationTable table;
 	NOTIFYLIST notifications;
 
-	memset(&notif, 0, sizeof(notif));
 	memset(&table, 0, sizeof(table));
 
 	notif.ulEventType = fnevTableModified;

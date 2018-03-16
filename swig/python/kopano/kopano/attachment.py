@@ -7,15 +7,34 @@ Copyright 2016 - Kopano and its licensors (see LICENSE file)
 
 import sys
 
+from MAPI import (
+    MAPI_MODIFY, MAPI_DEFERRED_ERRORS,
+)
+
 from MAPI.Tags import (
-    PR_EC_HIERARCHYID, PR_ATTACH_NUM, PR_ATTACH_MIME_TAG_W,
-    PR_ATTACH_LONG_FILENAME_W, PR_ATTACH_SIZE, PR_ATTACH_DATA_BIN,
-    IID_IAttachment
+    PR_EC_HIERARCHYID, PR_ATTACH_NUM, PR_ATTACH_MIME_TAG_W, PR_RECORD_KEY,
+    PR_ATTACH_LONG_FILENAME_W, PR_ATTACH_SIZE, PR_ATTACH_DATA_BIN, PR_ENTRYID,
+    PR_LAST_MODIFICATION_TIME, IID_IAttachment, PR_ATTACH_METHOD,
+    ATTACH_EMBEDDED_MSG, PR_ATTACH_DATA_OBJ, IID_IMessage,
 )
 from MAPI.Defs import HrGetOneProp
-from MAPI.Struct import MAPIErrorNotFound
+from MAPI.Struct import (
+    MAPIErrorNotFound, MAPIErrorNoAccess,
+)
+
+if sys.hexversion >= 0x03000000:
+    try:
+        from . import item as _item
+    except ImportError:
+        _item = sys.modules[__package__+'.item']
+else:
+    import item as _item
 
 from .properties import Properties
+
+from .compat import (
+    benc as _benc, fake_unicode as _unicode,
+)
 
 if sys.hexversion >= 0x03000000:
     try:
@@ -28,7 +47,8 @@ else:
 class Attachment(Properties):
     """Attachment class"""
 
-    def __init__(self, mapiitem=None, entryid=None, mapiobj=None):
+    def __init__(self, parent, mapiitem=None, entryid=None, mapiobj=None):
+        self.parent = parent
         self._mapiitem = mapiitem
         self._entryid = entryid
         self._mapiobj = mapiobj
@@ -43,6 +63,10 @@ class Attachment(Properties):
             self._entryid, IID_IAttachment, 0
         )
         return self._mapiobj
+
+    @property
+    def entryid(self):
+        return _benc(HrGetOneProp(self._mapiitem, PR_ENTRYID).Value) + _benc(self[PR_RECORD_KEY])
 
     @mapiobj.setter
     def mapiobj(self, mapiobj):
@@ -67,6 +91,10 @@ class Attachment(Properties):
         except MAPIErrorNotFound:
             return u''
 
+    @mimetype.setter
+    def mimetype(self, m):
+        self[PR_ATTACH_MIME_TAG_W] = _unicode(m)
+
     @property
     def filename(self):
         """Filename"""
@@ -74,6 +102,26 @@ class Attachment(Properties):
             return HrGetOneProp(self.mapiobj, PR_ATTACH_LONG_FILENAME_W).Value
         except MAPIErrorNotFound:
             return u''
+
+    @property
+    def embedded(self):
+        """Is attachment an embedded message."""
+        try:
+            return self[PR_ATTACH_METHOD] == ATTACH_EMBEDDED_MSG
+        except MAPIErrorNotFound:
+            return False
+
+    @property
+    def item(self):
+        try:
+            msg = self.mapiobj.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_DEFERRED_ERRORS | MAPI_MODIFY)
+        except MAPIErrorNoAccess:
+            # XXX the following may fail for embedded items in certain public stores, while
+            # the above does work (opening read-only doesn't work, but read-write works! wut!?)
+            msg = self.mapiobj.OpenProperty(PR_ATTACH_DATA_OBJ, IID_IMessage, 0, MAPI_DEFERRED_ERRORS)
+        item = _item.Item(mapiobj=msg)
+        item.server = self.parent.server
+        return item
 
     @property
     def size(self):
@@ -104,6 +152,11 @@ class Attachment(Properties):
     @property
     def name(self):
         return self.filename
+
+    @property
+    def last_modified(self):
+        """Last modification time."""
+        return self.get(PR_LAST_MODIFICATION_TIME)
 
     def __unicode__(self):
         return u'Attachment("%s")' % self.name

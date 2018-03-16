@@ -34,7 +34,7 @@
  * @ingroup userplugin
  * @{
  */
-namespace KC {
+using namespace KC;
 
 /** 
  * LDAP user plugin
@@ -837,12 +837,12 @@ private:
 	std::vector<std::string> ldap_servers;
 };
 
-} /* namespace */
-
 extern "C" {
 	extern _kc_export UserPlugin *getUserPluginInstance(std::mutex &, ECPluginSharedData *);
 	extern _kc_export void deleteUserPluginInstance(UserPlugin *);
 	extern _kc_export unsigned long getUserPluginVersion(void);
+	extern _kc_export const char kcsrv_plugin_version[];
 }
 /** @} */
+
 #endif

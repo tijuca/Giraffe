@@ -1,13 +1,13 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.5.4], [development@kopano.io])
+AC_INIT([kopano], [8.6.0], [development@kopano.io])
 
 dnl ABI tags are used to prevent inadvertent mixing of wildly different
 dnl versions of KC components without knowing it.
 dnl Development cycle: ABI changes frequently, don't bother with the tag
-dnl  -> versions 8.4.90 through 8.4.99 use ABI tag "8.4.90"
+dnl  -> versions 8.5.80 through 8.5.99 use ABI tag "8.5.80"
 dnl Maintenance cycle: ABI ought to not change, hence no tag change
-dnl  -> versions 8.5 through 8.5.89 use ABI tag "8.5"
-PACKAGE_ABI=8.5
+dnl  -> versions 8.6 through 8.6.79 use ABI tag "8.6"
+PACKAGE_ABI=8.6
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
 AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
@@ -126,30 +126,9 @@ else
     ZCXXFLAGS="$ZCXXFLAGS -Wno-long-long"
 fi
 
-AC_ARG_ENABLE([unicode], AS_HELP_STRING([--disable-unicode], [enable unicode mode (compile flag -DUNICODE)]),
-  [want_unicode=${enableval}],[want_unicode=yes])
-SWIG_FLAGS=""
-if test "$want_unicode" = "yes"; then
-    ZCPPFLAGS="$ZCPPFLAGS -DUNICODE"
-    SWIG_FLAGS="-DUNICODE "
-fi
+ZCPPFLAGS="$ZCPPFLAGS -DUNICODE"
+SWIG_FLAGS="-DUNICODE "
 AC_SUBST([SWIG_FLAGS])
-
-AS_IF([test "$BUILDOS" = "linux"], [
-AC_MSG_CHECKING([specified Linux distribution name])
-AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, suse or sles]),
-  [with_distro=${withval}],[with_distro=rhel])
-if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a \
-   "$with_distro" != "sles"; then
-	AC_MSG_ERROR([no initscript for $with_distro known])
-else
-	AC_MSG_RESULT([$with_distro])
-fi
-DISTRO=$with_distro
-],
-[test "$BUILDOS" = "openbsd"], [DISTRO="openbsd"]
-)
-AC_SUBST(DISTRO)
 
 dnl These are the only two I will allow to edit LIBS
 AC_ARG_WITH([asan], AS_HELP_STRING([--with-asan], [Activate Address Sanitizer]),
@@ -290,7 +269,12 @@ AS_IF([test "$with_php" != "no"], [
 ])
 AM_CONDITIONAL([WITH_PHP5], [test "$with_php" = 5])
 AM_CONDITIONAL([WITH_PHP7], [test "$with_php" = 7])
-
+PKG_CHECK_EXISTS([popt],
+	[PKG_CHECK_MODULES([popt], [popt])],
+	[AC_CHECK_HEADER([popt.h], [
+		popt_LIBS="-lpopt"
+		AC_SUBST([popt_LIBS])
+	], [AC_MSG_ERROR([popt.h is required])])])
 PKG_CHECK_MODULES([XML2], [libxml-2.0])
 
 # Checks for MySQL 4.1 or better
@@ -418,6 +402,7 @@ CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
 AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
 CPPFLAGS="$CPPFLAGS_system"
 PKG_CHECK_MODULES([VMIME], [vmime >= 0.9.2])
+PKG_CHECK_MODULES([jsoncpp], [jsoncpp >= 1.4.0])
 
 
 #
@@ -588,6 +573,12 @@ AC_CHECK_HEADERS([libs3.h])
 AC_SEARCH_LIBS([S3_initialize], [s3], [s3_LIBS="-ls3"; LIBS="$LIBS_system"])
 AC_SUBST([s3_LIBS])
 
+# Check for kcoidc
+LIBS_system="$LIBS"
+AC_CHECK_HEADERS([kcoidc.h])
+AC_SEARCH_LIBS([kcoidc_initialize], [kcoidc], [kcoidc_LIBS="-lkcoidc"; LIBS="$LIBS_system"])
+AC_SUBST([kcoidc_LIBS])
+
 AC_CHECK_FUNCS([uuid_create], UUID_LIBS="",	dnl uuid_create is in libc on FreeBSD
   AC_CHECK_LIB([uuid], [uuid_create],
     UUID_LIBS="-luuid"
@@ -619,12 +610,11 @@ AC_CHECK_FUNCS([gettext], INTL_LIBS="", dnl gettext in libc
 AC_SUBST(INTL_LIBS)
 
 # check epoll support
-AC_ARG_ENABLE([epoll], AS_HELP_STRING([--enable-epoll], [enable building epoll socket handling]), [want_epoll=${enableval}], [want_epoll=no])
+AC_ARG_ENABLE([epoll], AS_HELP_STRING([--disable-epoll], [disable epoll and fallback to select]), [want_epoll=${enableval}], [want_epoll=yes])
 AM_CONDITIONAL(WITH_EPOLL, test "$want_epoll" = "yes")
-if test "$want_epoll" = "yes"; then
-AC_CHECK_FUNCS([epoll_create])
-ZCPPFLAGS="$ZCPPFLAGS -DUSE_EPOLL"
-fi
+AS_IF([test "$BUILDOS" = linux && test "$want_epoll" = "yes"], [
+	AC_CHECK_FUNCS([epoll_create], [ZCPPFLAGS="$ZCPPFLAGS -DUSE_EPOLL"])
+])
 
 tidy_CPPFLAGS="-I/usr/include/tidy"
 CPPFLAGS="$CPPFLAGS $tidy_CPPFLAGS"
@@ -731,7 +721,9 @@ AC_CONFIG_FILES([Makefile
 		ECtools/cli/Makefile
 		ECtools/presence/Makefile
 		ECtools/search/Makefile
+		ECtools/spamd/Makefile
 		ECtools/migration-pst/Makefile
+		ECtools/utils/Makefile
 		installer/Makefile
 		installer/linux/Makefile
 		installer/userscripts/Makefile
@@ -771,13 +763,15 @@ AC_CONFIG_FILES([ECtools/cli/kopano-cli], [chmod +x ECtools/cli/kopano-cli])
 AC_CONFIG_FILES([ECtools/presence/kopano-presence], [chmod +x ECtools/presence/kopano-presence])
 AC_CONFIG_FILES([ECtools/migration-pst/kopano-migration-pst], [chmod +x ECtools/migration-pst/kopano-migration-pst])
 AC_CONFIG_FILES([ECtools/spamd/kopano-spamd], [chmod +x ECtools/spamd/kopano-spamd])
-AC_CONFIG_FILES([installer/linux/kopano-mr-accept.py], [chmod +x installer/linux/kopano-mr-accept.py])
-AC_CONFIG_FILES([installer/linux/kopano-mr-process.py], [chmod +x installer/linux/kopano-mr-process.py])
-AC_CONFIG_FILES([installer/linux/kopano-autorespond.py], [chmod +x installer/linux/kopano-autorespond.py])
+AC_CONFIG_FILES([ECtools/utils/kopano-mr-accept.py], [chmod +x ECtools/utils/kopano-mr-accept.py])
+AC_CONFIG_FILES([ECtools/utils/kopano-mr-process.py], [chmod +x ECtools/utils/kopano-mr-process.py])
+AC_CONFIG_FILES([ECtools/utils/kopano-autorespond.py], [chmod +x ECtools/utils/kopano-autorespond.py])
 AC_CONFIG_FILES([ECtools/search/kopano_search/version.py], [])
 AC_CONFIG_FILES([ECtools/backup/kopano_backup/version.py], [])
 AC_CONFIG_FILES([ECtools/cli/kopano_cli/version.py], [])
+AC_CONFIG_FILES([ECtools/rest/kopano_rest/version.py], [])
 AC_CONFIG_FILES([ECtools/spamd/kopano_spamd/version.py], [])
+AC_CONFIG_FILES([ECtools/utils/kopano_utils/version.py], [])
 AC_CONFIG_FILES([swig/python/kopano/kopano/version.py], [])
 
 AC_OUTPUT
@@ -819,6 +813,7 @@ Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
 S3 lib		:	$s3_LIBS
+KCOIDC lib	:	$kcoidc_LIBS
 ICU libs	:	$icu_uc_LIBS $icu_i18n_LIBS
 Python flags	:	$PYTHON_CFLAGS
 Python libs	:	$PYTHON_LIBS

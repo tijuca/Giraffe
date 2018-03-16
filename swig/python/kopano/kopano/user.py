@@ -11,7 +11,7 @@ from MAPI import (
     MAPI_UNICODE, MAPI_UNRESOLVED, ECSTORE_TYPE_PRIVATE, ECSTORE_TYPE_ARCHIVE,
     WrapStoreEntryID
 )
-from MAPI.Defs import bin2hex, HrGetOneProp
+from MAPI.Defs import HrGetOneProp
 from MAPI.Struct import (
     SPropValue, MAPIErrorNotFound, MAPIErrorInvalidParameter,
     MAPIErrorCollision, MAPIErrorNoSupport, ECUSER
@@ -32,7 +32,7 @@ from .defs import (
 )
 from .errors import Error, NotFoundError, NotSupportedError, DuplicateError
 from .compat import (
-    hex as _hex, unhex as _unhex, fake_unicode as _unicode
+    fake_unicode as _unicode, benc as _benc, bdec as _bdec, benc as _benc,
 )
 
 if sys.hexversion >= 0x03000000:
@@ -55,7 +55,7 @@ class User(Properties):
             self._name = ecuser.Username
         elif userid:
             try:
-                self._ecuser = self.server.sa.GetUser(_unhex(userid), MAPI_UNICODE)
+                self._ecuser = self.server.sa.GetUser(_bdec(userid), MAPI_UNICODE)
             except MAPIErrorNotFound:
                 raise NotFoundError("no user found with userid '%s'" % userid)
             self._name = self._ecuser.Username
@@ -201,7 +201,7 @@ class User(Properties):
     def userid(self):
         """ Userid """
 
-        return bin2hex(self._ecuser.UserID)
+        return _benc(self._ecuser.UserID)
 
     @property
     def company(self):
@@ -215,7 +215,7 @@ class User(Properties):
     @property # XXX
     def local(self):
         store = self.store
-        return bool(store and (self.server.guid == bin2hex(HrGetOneProp(store.mapiobj, PR_MAPPING_SIGNATURE).Value)))
+        return bool(store and (self.server.guid == _benc(HrGetOneProp(store.mapiobj, PR_MAPPING_SIGNATURE).Value)))
 
     def create_store(self):
         try:
@@ -223,7 +223,7 @@ class User(Properties):
         except MAPIErrorCollision:
             raise DuplicateError("user '%s' already has store" % self.name)
         store_entryid = WrapStoreEntryID(0, b'zarafa6client.dll', storeid_rootid[0][:-4]) + self.server.pseudo_url + b'\x00'
-        return Store(entryid=_hex(store_entryid), server=self.server)
+        return Store(entryid=_benc(store_entryid), server=self.server)
 
     @property
     def store(self):
@@ -231,33 +231,33 @@ class User(Properties):
 
         try:
             entryid = self.server.ems.CreateStoreEntryID(None, self._name, MAPI_UNICODE)
-            return Store(entryid=_hex(entryid), server=self.server)
+            return Store(entryid=_benc(entryid), server=self.server)
         except (MAPIErrorNotFound, NotFoundError):
             pass
 
     # XXX deprecated? user.store = .., user.archive_store = ..
     def hook(self, store):
         try:
-            self.server.sa.HookStore(ECSTORE_TYPE_PRIVATE, _unhex(self.userid), _unhex(store.guid))
+            self.server.sa.HookStore(ECSTORE_TYPE_PRIVATE, _bdec(self.userid), _bdec(store.guid))
         except MAPIErrorCollision:
             raise DuplicateError("user '%s' already has hooked store" % self.name)
 
     # XXX deprecated? user.store = None
     def unhook(self):
         try:
-            self.server.sa.UnhookStore(ECSTORE_TYPE_PRIVATE, _unhex(self.userid))
+            self.server.sa.UnhookStore(ECSTORE_TYPE_PRIVATE, _bdec(self.userid))
         except MAPIErrorNotFound:
             raise NotFoundError("user '%s' has no hooked store" % self.name)
 
     def hook_archive(self, store):
         try:
-            self.server.sa.HookStore(ECSTORE_TYPE_ARCHIVE, _unhex(self.userid), _unhex(store.guid))
+            self.server.sa.HookStore(ECSTORE_TYPE_ARCHIVE, _bdec(self.userid), _bdec(store.guid))
         except MAPIErrorCollision:
             raise DuplicateError("user '%s' already has hooked archive store" % self.name)
 
     def unhook_archive(self):
         try:
-            self.server.sa.UnhookStore(ECSTORE_TYPE_ARCHIVE, _unhex(self.userid))
+            self.server.sa.UnhookStore(ECSTORE_TYPE_ARCHIVE, _bdec(self.userid))
         except MAPIErrorNotFound:
             raise NotFoundError("user '%s' has no hooked archive store" % self.name)
 
@@ -369,3 +369,6 @@ class User(Properties):
             setattr(self.store, x, val)
         else:
             super(User, self).__setattr__(x, val)
+
+    def __dir__(self):
+        return list(User.__dict__) + list(Store.__dict__)

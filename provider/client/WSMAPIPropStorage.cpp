@@ -23,6 +23,7 @@
 #include <kopano/Util.h>
 #include "pcutil.hpp"
 #include <kopano/charset/convert.h>
+#include "soapKCmdProxy.h"
 
 /*
  *
@@ -41,7 +42,7 @@
 
 WSMAPIPropStorage::WSMAPIPropStorage(ULONG cbParentEntryId,
     LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId,
-    ULONG ulFlags, KCmd *cmd, std::recursive_mutex &data_lock,
+    ULONG ulFlags, KCmdProxy *cmd, std::recursive_mutex &data_lock,
     ECSESSIONID sid, unsigned int sc, WSTransport *tp) :
 	ECUnknown("WSMAPIPropStorage"), lpCmd(cmd), lpDataLock(data_lock),
 	ecSessionId(sid), ulServerCapabilities(sc),
@@ -59,7 +60,7 @@ WSMAPIPropStorage::~WSMAPIPropStorage()
 		ECRESULT er = erSuccess;
 
 		LockSoap();		
-		lpCmd->ns__notifyUnSubscribe(ecSessionId, m_ulConnection, &er);
+		lpCmd->notifyUnSubscribe(ecSessionId, m_ulConnection, &er);
 		UnLockSoap();
 	}
 	
@@ -78,7 +79,7 @@ HRESULT WSMAPIPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT WSMAPIPropStorage::Create(ULONG cbParentEntryId,
     LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId,
-    ULONG ulFlags, KCmd *lpCmd, std::recursive_mutex &lpDataLock,
+    ULONG ulFlags, KCmdProxy *lpCmd, std::recursive_mutex &lpDataLock,
     ECSESSIONID ecSessionId, unsigned int ulServerCapabilities,
     WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage)
 {
@@ -104,7 +105,7 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 
 	START_SOAP_CALL
 	{
-		if(SOAP_OK != lpCmd->ns__loadProp(ecSessionId, m_sEntryId, ulObjId, ulPropTag, &sResponse))
+		if (lpCmd->loadProp(ecSessionId, m_sEntryId, ulObjId, ulPropTag, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -131,7 +132,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, struct saveObject *lpSaveObj, convert_context *lpConverter)
+HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObject,
+    struct saveObject *lpSaveObj, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	unsigned int size;
@@ -226,7 +228,8 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 	return hr;
 } 
 
-HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct saveObject *lpsSaveObj, convert_context *lpConverter)
+HRESULT WSMAPIPropStorage::HrUpdateSoapObject(const MAPIOBJECT *lpsMapiObject,
+    struct saveObject *lpsSaveObj, convert_context *lpConverter)
 {
 	HRESULT hr;
 	std::list<ECProperty>::const_iterator iterProps;
@@ -310,14 +313,16 @@ void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
 		FreeEntryList(lpSaveObj->lpInstanceIds, true);
 }
 
-ECRESULT WSMAPIPropStorage::EcFillPropTags(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj)
+ECRESULT WSMAPIPropStorage::EcFillPropTags(const struct saveObject *lpsSaveObj,
+    MAPIOBJECT *lpsMapiObj)
 {
 	for (gsoap_size_t i = 0; i < lpsSaveObj->delProps.__size; ++i)
 		lpsMapiObj->lstAvailable.emplace_back(lpsSaveObj->delProps.__ptr[i]);
 	return erSuccess;
 }
 
-ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj)
+ECRESULT WSMAPIPropStorage::EcFillPropValues(const struct saveObject *lpsSaveObj,
+     MAPIOBJECT *lpsMapiObj)
 {
 	ECRESULT ec = erSuccess;
 	convert_context	context;
@@ -340,7 +345,8 @@ ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPI
 // sets the ulObjId from the server in the object (hierarchyid)
 // removes deleted sub-objects from memory
 // removes current list of del/mod props, and sets server changes in the lists
-HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct saveObject *lpsServerObj)
+HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj,
+    const struct saveObject *lpsServerObj)
 {
 	lpClientObj->ulObjId = lpsServerObj->ulServerId;
 
@@ -419,7 +425,7 @@ HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject
 	// ulFlags == object flags, e.g. MAPI_ASSOCIATE for messages, FOLDER_SEARCH on folders...
 	START_SOAP_CALL
 	{
-		if (SOAP_OK != lpCmd->ns__saveObject(ecSessionId, m_sParentEntryId, m_sEntryId, &sSaveObj, ulFlags, m_ulSyncId, &sResponse))
+		if (lpCmd->saveObject(ecSessionId, m_sParentEntryId, m_sEntryId, &sSaveObj, ulFlags, m_ulSyncId, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -455,7 +461,9 @@ exit:
 	return hr;
 }
 
-ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObject) {
+ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(const struct saveObject *lpsSaveObj,
+    MAPIOBJECT *lpsMapiObject)
+{
 	MAPIOBJECT *mo = NULL;
 	ULONG ulAttachUniqueId = 0;
 	ULONG ulRecipUniqueId = 0;
@@ -528,7 +536,7 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	HRESULT hr = hrSuccess;
 	struct loadObjectResponse sResponse;
 	MAPIOBJECT *lpsMapiObject = NULL;
-	struct notifySubscribe sNotSubscribe{__gszeroinit};
+	struct notifySubscribe sNotSubscribe;
 
 	if (m_ulConnection) {
 		// Register notification
@@ -556,7 +564,7 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 
 	START_SOAP_CALL
 	{
-		if (SOAP_OK != lpCmd->ns__loadObject(ecSessionId, m_sEntryId, ((m_ulConnection == 0) || m_bSubscribed)?NULL:&sNotSubscribe, m_ulFlags | 0x80000000, &sResponse))
+		if (lpCmd->loadObject(ecSessionId, m_sEntryId, (m_ulConnection == 0 || m_bSubscribed) ? nullptr : &sNotSubscribe, m_ulFlags | 0x80000000, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -580,10 +588,6 @@ exit:
 	UnLockSoap();
 
 	return hr;
-}
-
-IECPropStorage* WSMAPIPropStorage::GetServerStorage() {
-	return this; /* I am the server storage */
 }
 
 //FIXME: one lock/unlock function

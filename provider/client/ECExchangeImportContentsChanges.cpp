@@ -18,6 +18,7 @@
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
+#include <kopano/scope.hpp>
 #include "ECExchangeImportContentsChanges.h"
 #include "WSMessageStreamImporter.h"
 #include "ECMessageStreamImporterIStreamAdapter.h"
@@ -44,7 +45,7 @@
 
 #include <list>
 
-using namespace KCHL;
+using namespace KC;
 
 ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder) :
 	m_lpFolder(lpFolder)
@@ -297,9 +298,17 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 	ULONG ulSKNr;
 	EntryList.lpbin = NULL;
 	EntryList.cValues = 0;
-	
+
+	auto laters = make_scope_success([&]() {
+		if(!EntryList.lpbin)
+			return;
+		for (ulSKNr = 0; ulSKNr < EntryList.cValues; ++ulSKNr)
+			MAPIFreeBuffer(EntryList.lpbin[ulSKNr].lpb);
+		MAPIFreeBuffer(EntryList.lpbin);
+	});
+
 	if ((hr = MAPIAllocateBuffer(sizeof(SBinary)* lpSourceEntryList->cValues, (LPVOID*)&EntryList.lpbin)) != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ++ulSKNr) {
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, &EntryList.lpbin[EntryList.cValues].cb, (LPENTRYID*)&EntryList.lpbin[EntryList.cValues].lpb);
@@ -308,23 +317,17 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 			continue;
 		}
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 		++EntryList.cValues;
 	}
 	
 	if(EntryList.cValues == 0)
-		goto exit;
+		return hr;
 
 	hr = m_lpFolder->GetMsgStore()->lpTransport->HrDeleteObjects(ulFlags & SYNC_SOFT_DELETE ? 0 : DELETE_HARD_DELETE, &EntryList, m_ulSyncId);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-exit:
-	if(EntryList.lpbin){
-		for (ulSKNr = 0; ulSKNr < EntryList.cValues; ++ulSKNr)
-			MAPIFreeBuffer(EntryList.lpbin[ulSKNr].lpb);
-		MAPIFreeBuffer(EntryList.lpbin);
-	}
 	return hr;
 }
 
@@ -678,12 +681,10 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolder(LPTSTR lpszName, L
 	hr = HrGetOneProp(lpConflictFolder, PR_ENTRYID, &~lpEntryId);
 	if(hr != hrSuccess)
 		return hr;
-	hr = MAPIAllocateMore(lpEntryId->Value.bin.cb, lpAdditionalREN, (LPVOID*)&lpAdditionalREN->Value.MVbin.lpbin[ulMVPos].lpb);
+	lpAdditionalREN->Value.MVbin.lpbin[ulMVPos].cb = lpEntryId->Value.bin.cb;
+	hr = KAllocCopy(lpEntryId->Value.bin.lpb, lpEntryId->Value.bin.cb, reinterpret_cast<void **>(&lpAdditionalREN->Value.MVbin.lpbin[ulMVPos].lpb), lpAdditionalREN);
 	if(hr != hrSuccess)
 		return hr;
-	memcpy(lpAdditionalREN->Value.MVbin.lpbin[ulMVPos].lpb, lpEntryId->Value.bin.lpb, lpEntryId->Value.bin.cb);
-	lpAdditionalREN->Value.MVbin.lpbin[ulMVPos].cb = lpEntryId->Value.bin.cb;
-
 	if(lppConflictFolder)
 		*lppConflictFolder = lpConflictFolder.release();
 	return hrSuccess;

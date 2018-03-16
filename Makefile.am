@@ -9,7 +9,7 @@ SUBDIRS = . ECtools/archiver/include/kopano \
 SUBDIRS += installer po
 if ENABLE_PYTHON
 SUBDIRS += ECtools/backup ECtools/cli ECtools/migration-pst \
-	ECtools/presence ECtools/search swig
+	ECtools/presence ECtools/search ECtools/spamd ECtools/utils swig
 endif
 
 
@@ -33,8 +33,10 @@ AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} -DLDAP_THREAD_SAFE \
 	-I${top_srcdir}/librosie \
 	-I${top_srcdir}/ECtools/archiver \
 	${CRYPTO_CFLAGS} ${curl_CFLAGS} ${GSOAP_CFLAGS} ${ICAL_CFLAGS} \
-	${KRB5_CFLAGS} ${LDAP_FLAGS} ${MYSQL_INCLUDES} ${SSL_CFLAGS} \
-	${s3_CFLAGS} ${TCMALLOC_CFLAGS} ${tidy_CPPFLAGS} \
+	${jsoncpp_CFLAGS} \
+	${KRB5_CFLAGS} ${LDAP_FLAGS} ${MYSQL_INCLUDES} ${popt_CFLAGS} \
+	${SSL_CFLAGS} \
+	${s3_CFLAGS} ${kcoidc_CFLAGS} ${TCMALLOC_CFLAGS} ${tidy_CPPFLAGS} \
 	${VMIME_CFLAGS} ${XML2_CFLAGS}
 AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-sign-compare
 
@@ -42,12 +44,13 @@ AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-sign-compare
 #
 # target programs
 #
-bin_PROGRAMS = kopano-fsck kopano-passwd kopano-stats
+bin_PROGRAMS = kopano-fsck kopano-oof kopano-passwd kopano-stats
 dist_bin_SCRIPTS = ECtools/migration-imap/kopano-migration-imap \
 	ECtools/utils/kopano-set-oof
 sbin_PROGRAMS = \
 	kopano-admin kopano-archiver kopano-dagent kopano-gateway kopano-ical \
-	kopano-monitor kopano-server kopano-spooler
+	kopano-monitor kopano-server kopano-spooler \
+	kopano-srvadm kopano-storeadm
 dist_sbin_SCRIPTS = ECtools/utils/kopano-mailbox-permissions \
 	ECtools/archiver/scripts/kopano-archiver-aclset \
 	ECtools/archiver/scripts/kopano-archiver-aclsync \
@@ -217,6 +220,10 @@ kopano_monitor_SOURCES = \
 kopano_monitor_LDADD = libmapi.la libkcmapi.la libkcutil.la ${PROG_LIBS}
 
 
+kopano_oof_SOURCES = ECtools/oof.cpp
+kopano_oof_LDADD = ${jsoncpp_LIBS} ${popt_LIBS} libmapi.la libkcmapi.la libkcutil.la
+
+
 #
 # kopano-passwd
 #
@@ -238,6 +245,10 @@ kopano_spooler_LDADD += libkcpyplug.la
 endif
 
 
+kopano_srvadm_SOURCES = ECtools/srvadm.cpp
+kopano_srvadm_LDADD = ${popt_LIBS} libmapi.la libkcutil.la
+
+
 #
 # kopano-stats
 #
@@ -249,6 +260,10 @@ kopano_stats_LDADD = \
 	${NCURSES_LIBS} libmapi.la libkcmapi.la libkcutil.la ${PROG_LIBS}
 
 
+kopano_storeadm_SOURCES = ECtools/storeadm.cpp
+kopano_storeadm_LDADD = ${popt_LIBS} libmapi.la libkcmapi.la libkcutil.la
+
+
 #
 # kopano-server
 #
@@ -256,13 +271,13 @@ kopano_server_SOURCES = \
 	provider/server/ECServer.cpp \
 	provider/server/ECSoapServerConnection.cpp provider/server/ECSoapServerConnection.h \
 	provider/server/ECThreadManager.cpp provider/server/ECThreadManager.h \
-	provider/soap/soapServer.cpp
+	provider/soap/soapKCmdService.h provider/soap/soapKCmdService.cpp
 kopano_server_LDADD = \
 	libkcutil.la libkcmapi.la libkcssl.la \
 	libkcserver.la libkcsoap.la ${GSOAP_LIBS} \
 	${PROG_LIBS} ${clock_LIBS} \
 	${CRYPTO_LIBS} ${icu_uc_LIBS} ${icu_i18n_LIBS} ${DL_LIBS} \
-	${MYSQL_LIBS} ${SSL_LIBS} ${PAM_LIBS} ${KRB5_LIBS} -lpthread
+	${MYSQL_LIBS} ${SSL_LIBS} ${PAM_LIBS} ${KRB5_LIBS} ${kcoidc_LIBS} -lpthread
 kopano_server_LDFLAGS = ${AM_LDFLAGS}
 
 
@@ -384,7 +399,7 @@ libkcclient_la_SOURCES = \
 	provider/client/epclient.cpp \
 	provider/client/resource.h \
 	provider/common/SOAPSock.cpp provider/common/SOAPSock.h \
-	provider/soap/soapClient.cpp
+	provider/soap/soapKCmdProxy.h provider/soap/soapKCmdProxy.cpp
 libkcclient_la_LIBADD = \
 	libkcmapi.la libkcssl.la libkcutil.la libkcfreebusy.la libkcsync.la \
 	libmapi.la ${COND_libkcrosie_la} libkcsoap.la -lstdc++ \
@@ -554,7 +569,8 @@ libkcserver_la_SOURCES = \
 libkcserver_la_LIBADD = \
 	libkcutil.la libkcmapi.la libkcssl.la libkcsoap.la \
 	-lpthread ${icu_i18n_LIBS} ${icu_uc_LIBS} \
-	${GSOAP_LIBS} ${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS}
+	${GSOAP_LIBS} ${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS} \
+	${kcoidc_LIBS}
 libkcserver_la_SYFLAGS = -Wl,--version-script=provider/libkcserver.sym
 libkcserver_la_LDFLAGS = ${AM_LDFLAGS} \
 	${libkcserver_la_SYFLAGS${NO_VSYM}}
@@ -573,7 +589,7 @@ libkcmapi_la_SOURCES = \
 	common/ECABEntryID.cpp common/ECDebug.cpp \
 	common/ECGuid.cpp common/ECKeyTable.cpp common/ECMemStream.cpp \
 	common/ECUnknown.cpp common/HtmlEntity.cpp common/HtmlToTextParser.cpp \
-	common/IStreamAdapter.cpp common/MAPIErrors.cpp common/kcodes.cpp \
+	common/IStreamAdapter.cpp common/kcodes.cpp \
 	common/codepage.cpp common/rtfutil.cpp
 libkcmapi_la_LIBADD = libkcutil.la -lpthread
 libkcmapi_la_SYFLAGS = -Wl,--version-script=common/libkcmapi.sym
@@ -655,7 +671,7 @@ libkcutil_la_SOURCES = \
 	common/ConsoleTable.cpp common/ECACL.cpp common/ECCache.cpp \
 	common/ECConfig.cpp common/ECConfigImpl.cpp common/ECFifoBuffer.cpp \
 	common/ECGetText.cpp common/ECIConv.cpp common/ECLogger.cpp \
-	common/ECScheduler.cpp common/ECThreadPool.cpp \
+	common/ECScheduler.cpp common/ECThreadPool.cpp common/MAPIErrors.cpp \
 	common/StatsClient.cpp common/SymmetricCrypt.cpp common/TimeUtil.cpp \
 	common/TmpPath.cpp common/UnixUtil.cpp \
 	common/fileutil.cpp common/my_getopt.cpp common/platform.cpp \
@@ -684,8 +700,7 @@ libmapi_la_SOURCES = \
 	mapi4linux/src/m4l.mapisvc.cpp mapi4linux/src/m4l.mapisvc.h \
 	m4lcommon/CommonUtil.cpp \
 	m4lcommon/ECFeatures.cpp m4lcommon/ECFeatureList.h \
-	m4lcommon/ECMemTable.cpp m4lcommon/HrException.h \
-	m4lcommon/ECRestriction.cpp \
+	m4lcommon/ECMemTable.cpp m4lcommon/ECRestriction.cpp \
 	m4lcommon/RecurrenceState.cpp m4lcommon/userutil.cpp \
 	m4lcommon/MAPINotifSink.cpp m4lcommon/MAPINotifSink.h \
 	m4lcommon/Util.cpp \
@@ -802,21 +817,19 @@ spooler/PythonSWIGRuntime.h:
 # soap generators
 #
 SOAPHEADER = provider/include/proto.h
-SOAP_NS = provider/soap/KCmd.nsmap provider/soap/KCmd.wsdl
-SOAP_H_FILES = provider/soap/soapH.h provider/soap/soapStub.h
-SOAP_CPP_CLIENT = provider/soap/soapClient.cpp provider/soap/soapC.cpp
-SOAP_LIB_FILES = provider/soap/soapClientLib.cpp provider/soap/soapServerLib.cpp \
-	provider/soap/soapKCmdObject.h
-SOAP_CPP_SRC = ${SOAP_CPP_CLIENT} provider/soap/soapServer.cpp ${SOAP_H_FILES} \
-	${SOAP_NS} ${SOAP_LIB_FILES}
+SOAP_OUT = \
+	provider/soap/soapC.cpp provider/soap/soapH.h \
+	provider/soap/soapKCmdProxy.cpp provider/soap/soapKCmdProxy.h \
+	provider/soap/soapKCmdService.cpp provider/soap/soapKCmdService.h \
+	provider/soap/soapStub.h
 
-${SOAP_CPP_SRC}: provider/soap/ns.xsd
-provider/soap/ns.xsd: ${SOAPHEADER}
+${SOAP_OUT}: provider/soap/KCmd.nsmap
+provider/soap/KCmd.nsmap: ${SOAPHEADER}
 	${MKDIR_P} provider/soap
-	soapcpp2 -z1 -x -Iinclude/ -d provider/soap/ $<
+	soapcpp2 -jxw -Iinclude/ -d provider/soap/ $<
 
-BUILT_SOURCES += provider/soap/ns.xsd ${SOAP_CPP_SRC}
-CLEANFILES += ${SOAP_CPP_SRC} provider/soap/*
+BUILT_SOURCES += provider/soap/KCmd.nsmap ${SOAP_OUT}
+CLEANFILES += ${SOAP_OUT} provider/soap/*
 
 
 #
@@ -883,18 +896,19 @@ dist_man_MANS = \
 	doc/kopano-ldap.cfg.5 \
 	doc/kopano-mailbox-permissions.8 \
 	doc/kopano-monitor.8 doc/kopano-monitor.cfg.5 \
-	doc/kopano-passwd.1 \
+	doc/kopano-oof.1 doc/kopano-passwd.1 \
 	doc/kopano-search.8 doc/kopano-search.cfg.5 \
 	doc/kopano-server.8 doc/kopano-server.cfg.5 \
 	doc/kopano-set-oof.1 \
+	doc/kopano-spamd.8 doc/kopano-spamd.cfg.5 \
 	doc/kopano-spooler.8 doc/kopano-spooler.cfg.5 \
 	doc/kopano-backup.8 doc/kopano-backup.cfg.5 \
-	doc/kopano-stats.1 \
+	doc/kopano-srvadm.8 doc/kopano-stats.1 doc/kopano-storeadm.8 \
 	doc/kopano-unix.cfg.5 \
 	doc/kopano-migration-pst.8 doc/kopano-migration-pst.cfg.5 \
 	doc/kopano-archiver-aclsync.8 \
 	doc/kopano-archiver-aclset.8 \
-	doc/kopano-archiver-restore.8
+	doc/kopano-archiver-restore.8 doc/mapi.7
 
 #
 # build infrastructure
@@ -905,7 +919,7 @@ include global.am
 
 
 #OLD TOPLEVEL FM
-EXTRA_DIST += version versionheader.sh \
+EXTRA_DIST += .version versionheader.sh \
 	AGPL-3 LICENSE.txt RELNOTES.txt \
 	bootstrap.sh lddcheck global.am pwdcheck.sh \
 	common/include/kopano/ecversion.h
@@ -924,7 +938,7 @@ source-moved-check:
 	@${top_srcdir}/pwdcheck.sh "${abs_top_builddir}"
 
 .version:
-	echo "@PACKAGE_VERSION@" >$@
+	echo "${PACKAGE_VERSION}" >$@
 
 common/include/kopano/ecversion.h: .version versionheader.sh
 	${MKDIR_P} common/include/kopano

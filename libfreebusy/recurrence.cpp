@@ -36,19 +36,6 @@
 namespace KC {
 
 /**
- * Load recurrence from blob property data
- *
- * @param[in]	lpData	Data from named property RecurrenceState
- * @param[in]	ulLen	Length of lpData
- * @param[in]	ulFlags	RECURRENCE_STATE_TASKS if the recurrence is from a task
- */
-HRESULT recurrence::HrLoadRecurrenceState(const char *lpData,
-    unsigned int ulLen, ULONG ulFlags)
-{
-	return m_sRecState.ParseBlob(lpData, ulLen, ulFlags);
-}
-
-/**
  * Write the new recurrence blob.
  *
  * @param[out]	lppData	The blob will be returned in this pointer.
@@ -91,7 +78,7 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 		break;
 	case RF_WEEKLY: {
 		auto tStart = getStartDate();
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(tStart, &tm);
 		int daycount = 0, dayskip = -1;
 		for (int j = 0; j < 7; ++j) {
 			if (m_sRecState.ulWeekDays & (1<<((tm.tm_wday + j)%7))) {
@@ -108,20 +95,15 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 		// weekskip is the amount of weeks to skip from the startdate before the first occurence
 
 		// The real start is start + dayskip + weekskip-1 (since dayskip will already bring us into the next week)
-		tStart = tStart + dayskip * 24 * 60 * 60 + weekskip * (m_sRecState.ulPeriod - 1) * 7 * 24 * 60 * 60;
-		gmtime_safe(&tStart, &tm);
-
-		LONG rStart;
-		UnixTimeToRTime(tStart, &rStart);
-		m_sRecState.ulFirstDateTime = rStart % (m_sRecState.ulPeriod*7*24*60);
-
+		tStart += dayskip * 24 * 60 * 60 + weekskip * (m_sRecState.ulPeriod - 1) * 7 * 24 * 60 * 60;
+		gmtime_safe(tStart, &tm);
+		m_sRecState.ulFirstDateTime = UnixTimeToRTime(tStart) % (m_sRecState.ulPeriod * 7 * 24 * 60);
 		m_sRecState.ulFirstDateTime -= ((tm.tm_wday-1) * 24 * 60); // php says -1, but it's already 0..6 ... err?
 		break;
 	}
 	case RF_MONTHLY:
 	case RF_YEARLY: {
-		auto tStart = getStartDate();
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(getStartDate(), &tm);
 		LONG rStart = ((((12 % m_sRecState.ulPeriod) * ((tm.tm_year + 1900 - 1601) % m_sRecState.ulPeriod)) % m_sRecState.ulPeriod) + tm.tm_mon) % m_sRecState.ulPeriod;
 		m_sRecState.ulFirstDateTime = 0;
 		for (int i = 0; i < rStart; ++i)
@@ -150,11 +132,10 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 	return m_sRecState.GetBlob(lppData, lpulLen, base);
 }
 
-HRESULT recurrence::HrGetHumanReadableString(std::string *lpstrHRS)
+void recurrence::HrGetHumanReadableString(std::string *lpstrHRS)
 {
 	// @todo: make strings like outlook does, and probably make it std::wstring
 	*lpstrHRS = "This item is recurring";
-	return S_OK;
 }
 
 recurrence::freq_type recurrence::getFrequency() const
@@ -201,37 +182,6 @@ HRESULT recurrence::setFrequency(freq_type ft)
 	return S_OK;
 }
 
-time_t recurrence::getStartDate() const
-{
-	time_t tStart = 0;
-	RTimeToUnixTime(m_sRecState.ulStartDate, &tStart);
-	return tStart;
-}
-
-HRESULT recurrence::setStartDate(time_t tStart)
-{
-	return UnixTimeToRTime(StartOfDay(tStart),
-	       reinterpret_cast<LONG *>(&m_sRecState.ulStartDate));
-}
-
-time_t recurrence::getEndDate() const
-{
-	time_t tEnd;
-	RTimeToUnixTime(m_sRecState.ulEndDate, &tEnd);
-	return tEnd;
-}
-
-HRESULT recurrence::setEndDate(time_t tEnd)
-{
-	return UnixTimeToRTime(StartOfDay(tEnd),
-	       reinterpret_cast<LONG *>(&m_sRecState.ulEndDate));
-}
-
-ULONG recurrence::getStartTimeOffset() const
-{
-	return m_sRecState.ulStartTimeOffset*60;
-}
-
 HRESULT recurrence::setStartTimeOffset(ULONG ulMinutesSinceMidnight)
 {
 	if (ulMinutesSinceMidnight >= 24 * 60)
@@ -242,61 +192,18 @@ HRESULT recurrence::setStartTimeOffset(ULONG ulMinutesSinceMidnight)
 	return S_OK;
 }
 
-ULONG recurrence::getEndTimeOffset() const
-{
-	return m_sRecState.ulEndTimeOffset*60;
-}
-
-HRESULT recurrence::setEndTimeOffset(ULONG ulMinutesSinceMidnight)
-{
-	m_sRecState.ulEndTimeOffset = ulMinutesSinceMidnight;
-
-	return S_OK;
-}
-
-time_t recurrence::getStartDateTime() const
-{
-	time_t tStart;
-
-	RTimeToUnixTime(m_sRecState.ulStartDate, &tStart);
-	return tStart + (m_sRecState.ulStartTimeOffset*60);
-}
-
-HRESULT recurrence::setStartDateTime(time_t t)
+void recurrence::setStartDateTime(time_t t)
 {
 	time_t startDate = StartOfDay(t);
-	auto hr = UnixTimeToRTime(startDate, (LONG*)&m_sRecState.ulStartDate);
+	m_sRecState.ulStartDate = UnixTimeToRTime(startDate);
 	m_sRecState.ulStartTimeOffset = (t - startDate)/60;
-
-	return hr;
 }
 
-time_t recurrence::getEndDateTime() const
+void recurrence::setEndDateTime(time_t t)
 {
-	time_t tStart;
-
-	RTimeToUnixTime(m_sRecState.ulEndDate, &tStart);
-	return tStart + (m_sRecState.ulEndTimeOffset*60);
-}
-
-HRESULT recurrence::setEndDateTime(time_t t)
-{
-	auto hr = UnixTimeToRTime(StartOfDay(t), (LONG*)&m_sRecState.ulEndDate);
+	m_sRecState.ulEndDate = UnixTimeToRTime(StartOfDay(t));
 	// end time in minutes since midnight of start of item
 	m_sRecState.ulEndTimeOffset = (t - getStartDate())/60;
-
-	return hr;
-}
-
-ULONG recurrence::getCount() const
-{
-	return m_sRecState.ulOccurrenceCount;
-}
-
-HRESULT recurrence::setCount(ULONG ulCount)
-{
-	m_sRecState.ulOccurrenceCount = ulCount;
-	return S_OK;
 }
 
 recurrence::term_type recurrence::getEndType() const
@@ -346,30 +253,8 @@ HRESULT recurrence::setInterval(ULONG i)
 	return S_OK;
 }
 
-HRESULT recurrence::setSlidingFlag(ULONG s)
-{
-	m_sRecState.ulSlidingFlag = s;
-	return S_OK;
-}
 
-ULONG recurrence::getFirstDOW() const
-{
-	return m_sRecState.ulFirstDOW;
-}
-
-HRESULT recurrence::setFirstDOW(ULONG ulFirstDOW)
-{
-	m_sRecState.ulFirstDOW = ulFirstDOW;
-	return S_OK;
-}
-
-UCHAR recurrence::getWeekDays() const
-{
-	// valid ulPatternTypes: 1 2 4 a c
-	return m_sRecState.ulPatternType == PT_DAY ? 0 : m_sRecState.ulWeekDays;
-}
-
-HRESULT recurrence::setWeekDays(UCHAR d)
+void recurrence::setWeekDays(UCHAR d)
 {
 	// if setWeekDays is called on a daily event, update the pattern type
 	if (m_sRecState.ulPatternType == PT_DAY) {
@@ -378,7 +263,6 @@ HRESULT recurrence::setWeekDays(UCHAR d)
 	}
 
 	m_sRecState.ulWeekDays = d & WD_MASK;
-	return S_OK;
 }
 
 UCHAR recurrence::getDayOfMonth() const
@@ -391,12 +275,6 @@ UCHAR recurrence::getDayOfMonth() const
 	return 0;
 }
 
-HRESULT recurrence::setDayOfMonth(UCHAR d)
-{
-	m_sRecState.ulDayOfMonth = d;
-	return S_OK;
-}
-
 /**
  * Get the month between 1...12
  * 1 = jan
@@ -406,9 +284,7 @@ UCHAR recurrence::getMonth() const
 	if (m_ulMonth > 0 && m_ulMonth < 13)
 		return m_ulMonth;
 	struct tm tmMonth;
-	time_t tStart = getStartDate();
-	gmtime_safe(&tStart, &tmMonth);
-
+	gmtime_safe(getStartDate(), &tmMonth);
 	return tmMonth.tm_mon+1;
 }
 
@@ -430,29 +306,20 @@ UCHAR recurrence::getWeekNumber() const
 	return m_sRecState.ulWeekNumber;
 }
 
-HRESULT recurrence::setWeekNumber(UCHAR s)
+void recurrence::setWeekNumber(UCHAR s)
 {
 	// we should be handling monthly recurrence items here, calendar type 0xB (hijri) is not supported
 	m_sRecState.ulPatternType = PT_MONTH_NTH;
 	m_sRecState.ulWeekNumber = s;
-	return S_OK;
 }
 
 // ------------
 // handle exceptions
 // ------------
 
-HRESULT recurrence::addDeletedException(time_t tDelete)
-{
-	LONG rtime;
-	auto hr = UnixTimeToRTime(StartOfDay(tDelete), &rtime);
-	m_sRecState.lstDeletedInstanceDates.emplace_back(rtime);
-	return hr;
-}
-
 std::list<time_t> recurrence::getDeletedExceptions() const
 {
-	time_t tDayDelete, offset = getStartTimeOffset();
+	time_t offset = getStartTimeOffset();
 	std::list<time_t> lstDeletes;
 	// make copy of struct info
 	auto lstDeletedInstanceDates = m_sRecState.lstDeletedInstanceDates;
@@ -465,30 +332,18 @@ std::list<time_t> recurrence::getDeletedExceptions() const
 		if (d != lstDeletedInstanceDates.end())
 			lstDeletedInstanceDates.erase(d);
 	}
-	for (const auto &d : lstDeletedInstanceDates) {
-		RTimeToUnixTime(d, &tDayDelete);
-		lstDeletes.emplace_back(tDayDelete + offset);
-	}
-
+	for (const auto &d : lstDeletedInstanceDates)
+		lstDeletes.emplace_back(RTimeToUnixTime(d) + offset);
 	return lstDeletes;
 }
 
 std::list<time_t> recurrence::getModifiedOccurrences() const
 {
-	time_t tDayModified;
 	std::list<time_t> lstModified;
 
-	for (const auto &exc : m_sRecState.lstExceptions) {
-		RTimeToUnixTime(exc.ulOriginalStartDate, &tDayModified);
-		lstModified.emplace_back(tDayModified);
-	}
-
+	for (const auto &exc : m_sRecState.lstExceptions)
+		lstModified.emplace_back(RTimeToUnixTime(exc.ulOriginalStartDate));
 	return lstModified;
-}
-
-ULONG recurrence::getModifiedCount() const
-{
-	return m_sRecState.ulModifiedInstanceCount;
 }
 
 ULONG recurrence::getModifiedFlags(ULONG id) const
@@ -499,35 +354,23 @@ ULONG recurrence::getModifiedFlags(ULONG id) const
 
 time_t recurrence::getModifiedStartDateTime(ULONG id) const
 {
-	time_t tDayModified = 0;
-
 	if (id >= m_sRecState.ulModifiedInstanceCount)
 		return 0;
-	
-	RTimeToUnixTime(m_sRecState.lstExceptions[id].ulStartDateTime, &tDayModified);
-	return tDayModified;
+	return RTimeToUnixTime(m_sRecState.lstExceptions[id].ulStartDateTime);
 }
 
 time_t recurrence::getModifiedEndDateTime(ULONG id) const
 {
-	time_t tDayModified = 0;
-
 	if (id >= m_sRecState.ulModifiedInstanceCount)
 		return 0;
-	
-	RTimeToUnixTime(m_sRecState.lstExceptions[id].ulEndDateTime, &tDayModified);
-	return tDayModified;
+	return RTimeToUnixTime(m_sRecState.lstExceptions[id].ulEndDateTime);
 }
 
 time_t recurrence::getModifiedOriginalDateTime(ULONG id) const
 {
-	time_t tDayModified = 0;
-
 	if (id >= m_sRecState.ulModifiedInstanceCount)
 		return 0;
-	
-	RTimeToUnixTime(m_sRecState.lstExceptions[id].ulOriginalStartDate, &tDayModified);
-	return tDayModified;
+	return RTimeToUnixTime(m_sRecState.lstExceptions[id].ulOriginalStartDate);
 }
 
 std::wstring recurrence::getModifiedSubject(ULONG id) const
@@ -578,15 +421,11 @@ ULONG recurrence::getModifiedSubType(ULONG id) const
 	       m_sRecState.lstExceptions[id].ulSubType;
 }
 
-HRESULT recurrence::addModifiedException(time_t tStart, time_t tEnd, time_t tOriginalStart, ULONG *lpid)
+void recurrence::addModifiedException(time_t tStart, time_t tEnd,
+    time_t tOriginalStart, ULONG *lpid)
 {
-	LONG rStart, rEnd, rOrig, rDayStart;
 	RecurrenceState::Exception sException = {0};
 	RecurrenceState::ExtendedException sExtException = {0};
-
-	UnixTimeToRTime(tStart, &rStart);
-	UnixTimeToRTime(tEnd, &rEnd);
-	UnixTimeToRTime(tOriginalStart, &rOrig);
 
 	// this is not thread safe, but since this code is not (yet)
 	// called in a thread unsafe manner I could not care less at
@@ -594,23 +433,22 @@ HRESULT recurrence::addModifiedException(time_t tStart, time_t tEnd, time_t tOri
 	ULONG id = m_sRecState.lstModifiedInstanceDates.size();
 
 	// move is the exception day start
-	UnixTimeToRTime(StartOfDay(tStart), &rDayStart);
+	auto rDayStart = UnixTimeToRTime(StartOfDay(tStart));
 	m_sRecState.lstModifiedInstanceDates.emplace_back(rDayStart);
 
 	// every modify is also a delete in the blob
 	// delete is the original start
-	UnixTimeToRTime(StartOfDay(tOriginalStart), &rDayStart);
+	rDayStart = UnixTimeToRTime(StartOfDay(tOriginalStart));
 	m_sRecState.lstDeletedInstanceDates.emplace_back(rDayStart);
 
-	sExtException.ulStartDateTime     = sException.ulStartDateTime     = rStart;
-	sExtException.ulEndDateTime       = sException.ulEndDateTime       = rEnd;
-	sExtException.ulOriginalStartDate = sException.ulOriginalStartDate = rOrig;
+	sExtException.ulStartDateTime     = sException.ulStartDateTime     = UnixTimeToRTime(tStart);
+	sExtException.ulEndDateTime       = sException.ulEndDateTime       = UnixTimeToRTime(tEnd);
+	sExtException.ulOriginalStartDate = sException.ulOriginalStartDate = UnixTimeToRTime(tOriginalStart);
 	sExtException.ulChangeHighlightValue = 0;
 
 	m_sRecState.lstExceptions.emplace_back(std::move(sException));
 	m_sRecState.lstExtendedExceptions.emplace_back(std::move(sExtException));
 	*lpid = id;
-	return S_OK;
 }
 
 HRESULT recurrence::setModifiedSubject(ULONG id, const std::wstring &strSubject)
@@ -734,7 +572,7 @@ time_t recurrence::calcStartDate() const
 		// Use the default start date.
 		break;
 	case RF_WEEKLY: {
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(tStart, &tm);
 		int daycount = 0, dayskip = -1;
 		for (int j = 0; j < 7; ++j) {
 			if (m_sRecState.ulWeekDays & (1<<((tm.tm_wday + j)%7))) {
@@ -751,14 +589,13 @@ time_t recurrence::calcStartDate() const
 		// weekskip is the amount of weeks to skip from the startdate before the first occurence
 
 		// The real start is start + dayskip + weekskip-1 (since dayskip will already bring us into the next week)
-		tStart = tStart + (dayskip * 24*60*60) + (weekskip * (m_sRecState.ulPeriod-1) * 7 * 24*60*60);
-		gmtime_safe(&tStart, &tm);
-
+		tStart += dayskip * 24 * 60 * 60 + weekskip * (m_sRecState.ulPeriod - 1) * 7 * 24 * 60 * 60;
+		gmtime_safe(tStart, &tm);
 		break;
 	}
 	case RF_MONTHLY:
 	case RF_YEARLY:
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(tStart, &tm);
 
 		if (m_sRecState.ulPatternType == PT_MONTH) {
 			unsigned int count = 0;
@@ -799,7 +636,7 @@ time_t recurrence::calcStartDate() const
             // if the day of the month we got is wrong, and then back up to the last day of the previous
             // month.
 			if ( m_sRecState.ulDayOfMonth >= 28 &&  m_sRecState.ulDayOfMonth <=31) {
-				gmtime_safe(&tStart, &tm);
+				gmtime_safe(tStart, &tm);
 				if (tm.tm_mday < static_cast<int>(m_sRecState.ulDayOfMonth))
 					tStart -= tm.tm_mday * 24 * 60 *60;
 			}
@@ -873,7 +710,7 @@ time_t recurrence::calcStartDate() const
 		}
 
 		// Seek to the right day (tStart should be the first day or the last day of the month.
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(tStart, &tm);
 		for (int i = 0; i < 7; ++i) {
 			if (m_sRecState.ulWeekNumber == 5 && (1<< (tm.tm_wday - i)%7) & m_sRecState.ulWeekDays) {
 				tStart -= i * 24 * 60 *60;
@@ -923,7 +760,7 @@ time_t recurrence::calcEndDate() const
 		fwd *= m_sRecState.ulPeriod;
 
 		tEnd += fwd * 7 * 24 * 60 * 60;
-		gmtime_safe(&tEnd, &tm);
+		gmtime_safe(tEnd, &tm);
 
 		for (int j = 1; m_sRecState.ulWeekDays != 0 && rest > 0; ++j) {
 			if ((tm.tm_wday + j)%7 == (int)getFirstDOW())
@@ -941,7 +778,7 @@ time_t recurrence::calcEndDate() const
 	}
 	case RF_MONTHLY:
 	case RF_YEARLY: {
-		gmtime_safe(&tStart, &tm);
+		gmtime_safe(tStart, &tm);
 		tm.tm_year += 1900;		// 1900 based
 		++tm.tm_mon; // 1-based
 		int fwd = (m_sRecState.ulOccurrenceCount - 1) * m_sRecState.ulPeriod;
@@ -957,7 +794,7 @@ time_t recurrence::calcEndDate() const
 			--fwd;
 		}
 
-		gmtime_safe(&tEnd, &tm);
+		gmtime_safe(tEnd, &tm);
 		tm.tm_year += 1900;
 		++tm.tm_mon;
 
@@ -983,7 +820,7 @@ time_t recurrence::calcEndDate() const
 			tEnd -= (tm.tm_mday-1) * 24 * 60 * 60;
 
 		for (int daycount = 0; daycount < 7; ++daycount) {
-			gmtime_safe(&tEnd, &tm);
+			gmtime_safe(tEnd, &tm);
 			tm.tm_year += 1900;
 			++tm.tm_mon;
 			if (m_sRecState.ulWeekNumber == 5 && (1 << (tm.tm_wday - daycount) % 7) & m_sRecState.ulWeekDays)
@@ -1054,11 +891,6 @@ ULONG recurrence::calcCount() const
 	return ulCount +1;
 }
 
-time_t recurrence::MonthInSeconds(ULONG year, ULONG month)
-{
-	return DaysInMonth(year, month) * 24 * 60 * 60;
-}
-
 time_t recurrence::MonthsInSeconds(ULONG months)
 {
 	ULONG year = 1601, days = 0;
@@ -1070,16 +902,6 @@ time_t recurrence::MonthsInSeconds(ULONG months)
 	return days * 24 * 60 * 60;
 }
 
-time_t recurrence::Minutes2Time(ULONG minutes)
-{
-	return (minutes - NANOSECS_BETWEEN_EPOCHS/600000000) * 60;
-}
-
-ULONG recurrence::Time2Minutes(time_t time)
-{
-	return (time / 60) + (NANOSECS_BETWEEN_EPOCHS/600000000);
-}
-
 ULONG recurrence::Minutes2Month(ULONG minutes)
 {
 	return ceil(minutes / (31.0 * 24.0 * 60.0)) + 1;
@@ -1088,45 +910,34 @@ ULONG recurrence::Minutes2Month(ULONG minutes)
 time_t recurrence::StartOfDay(time_t t)
 {
 	struct tm sTM;
-	gmtime_safe(&t, &sTM);
-
+	gmtime_safe(t, &sTM);
 	return t - (sTM.tm_hour * 60 * 60 + sTM.tm_min * 60 + sTM.tm_sec);
 }
 
 time_t recurrence::StartOfWeek(time_t t)
 {
 	struct tm sTM;
-	gmtime_safe(&t, &sTM);
+	gmtime_safe(t, &sTM);
 	return t - (sTM.tm_wday * 24 * 60 * 60 + sTM.tm_hour * 60 * 60 + sTM.tm_min * 60 + sTM.tm_sec);
 }
 
 time_t recurrence::StartOfMonth(time_t t)
 {
 	struct tm sTM;
-	gmtime_safe(&t, &sTM);
+	gmtime_safe(t, &sTM);
 	return t - ((sTM.tm_mday -1) * 24 * 60 * 60 + sTM.tm_hour * 60 * 60 + sTM.tm_min * 60 + sTM.tm_sec);
 }
 
 time_t recurrence::StartOfYear(time_t t)
 {
 	struct tm sTM;
-	gmtime_safe(&t, &sTM);
+	gmtime_safe(t, &sTM);
 	return t - (sTM.tm_yday * 24 * 60 * 60 + sTM.tm_hour * 60 * 60 + sTM.tm_min * 60 + sTM.tm_sec);
-}
-
-bool recurrence::isLeapYear(ULONG year)
-{
-	return ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0);
-}
-
-ULONG recurrence::DaysInYear(ULONG year)
-{
-	return isLeapYear(year) ? 366 : 365;
 }
 
 ULONG recurrence::DaysInMonth(ULONG month)
 {
-	UCHAR days[13]={0,31,28,31,30,31,30,31,31,30,31,30,31};
+	static const uint8_t days[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
 
 	if (month>12)
 		return 0;
@@ -1142,46 +953,41 @@ ULONG recurrence::DaysInMonth(ULONG year, ULONG month)
 ULONG recurrence::MonthFromTime(time_t t)
 {
 	struct tm lpT;
-	gmtime_safe(&t, &lpT);
-
+	gmtime_safe(t, &lpT);
 	return lpT.tm_mon + 1;
 }
 
 ULONG recurrence::YearFromTime(time_t t)
 {
 	struct tm lpT;
-	gmtime_safe(&t, &lpT);
-
+	gmtime_safe(t, &lpT);
 	return lpT.tm_year + 1900;
 }
 
 ULONG recurrence::AllMonthsFromTime(time_t t)
 {
 	struct tm lpT;
-	gmtime_safe(&t, &lpT);
-
+	gmtime_safe(t, &lpT);
 	return lpT.tm_mon + (lpT.tm_year + 1900 - 1601) * 12;
 }
 
 ULONG recurrence::WeekDayFromTime(time_t t)
 {
 	struct tm lpT;
-	gmtime_safe(&t, &lpT);
-
+	gmtime_safe(t, &lpT);
 	return lpT.tm_wday;
 }
 
 ULONG recurrence::MonthDayFromTime(time_t t)
 {
 	struct tm lpT;
-	gmtime_safe(&t, &lpT);
-
+	gmtime_safe(t, &lpT);
 	return lpT.tm_mday;
 }
 
 bool recurrence::CheckAddValidOccr(time_t tsNow, time_t tsStart, time_t tsEnd,
-    TIMEZONE_STRUCT ttZinfo, ULONG ulBusyStatus, OccrInfo **lppOccrInfoAll,
-    ULONG *lpcValues)
+    const TIMEZONE_STRUCT &ttZinfo, ULONG ulBusyStatus,
+    OccrInfo **lppOccrInfoAll, ULONG *lpcValues)
 {
 	ec_log_debug("Testing match: %lu ==> %s", tsNow, ctime(&tsNow));
 	if (!isOccurrenceValid(UTCToLocal(tsStart, ttZinfo), UTCToLocal(tsEnd, ttZinfo), tsNow + getStartTimeOffset())) {
@@ -1208,7 +1014,7 @@ bool recurrence::CheckAddValidOccr(time_t tsNow, time_t tsStart, time_t tsEnd,
  * @return		HRESULT
  */
 HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
-    TIMEZONE_STRUCT ttZinfo, ULONG ulBusyStatus, OccrInfo **lppOccrInfo,
+    const TIMEZONE_STRUCT &ttZinfo, ULONG ulBusyStatus, OccrInfo **lppOccrInfo,
     ULONG *lpcValues, bool last)
 {
 	HRESULT hr = 0;
@@ -1248,7 +1054,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 			time_t remainder = (tsDayEnd - tsDayStart) % (60 * 1440); // shouldn't this be m_sRecState.ulPeriod * 60? (see above)
 			for (time_t tsNow = tsDayEnd - remainder; tsNow >= tsDayStart; tsNow -= 60 * 1440) { //604800 = 60*60*24*7
 				tm sTm;
-				gmtime_safe(&tsNow, &sTm);
+				gmtime_safe(tsNow, &sTm);
 				if (sTm.tm_wday > 0 && sTm.tm_wday < 6 &&
 				    CheckAddValidOccr(tsNow, tsStart, tsEnd, ttZinfo, ulBusyStatus, &lpOccrInfoAll, lpcValues))
 					break;
@@ -1257,7 +1063,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 		}
 		for (time_t tsNow = tsDayStart ;tsNow <= tsDayEnd; tsNow += 60 * 1440) { //604800 = 60*60*24*7
 			tm sTm;
-			gmtime_safe(&tsNow, &sTm);
+			gmtime_safe(tsNow, &sTm);
 			if (sTm.tm_wday > 0 && sTm.tm_wday < 6)
 				CheckAddValidOccr(tsNow, tsStart, tsEnd, ttZinfo, ulBusyStatus, &lpOccrInfoAll, lpcValues);
 		}
@@ -1403,29 +1209,28 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 
 		lpException = lstExceptions.back();
 		// APPT_STARTWHOLE
-		time_t tsOccStart, tsOccEnd;
-		RTimeToUnixTime(lpException.ulStartDateTime, &tsOccStart);	// tsOccStart == localtime
+		auto tsOccStart = RTimeToUnixTime(lpException.ulStartDateTime); /* tsOccStart is localtime */
 		tsOccStart = LocalToUTC(tsOccStart, ttZinfo);
 		if(tsOccStart > tsEnd) {									// tsStart, tsEnd == gmtime
 			ec_log_debug("Skipping exception start match: %lu ==> %s", tsOccStart, ctime(&tsOccStart));
 			continue;
 		}
-		UnixTimeToRTime(tsOccStart, &sOccrInfo.fbBlock.m_tmStart);	// gmtime in rtime, is this correct?
+		sOccrInfo.fbBlock.m_tmStart = UnixTimeToRTime(tsOccStart);
 
 		// APPT_ENDWHOLE
-		RTimeToUnixTime(lpException.ulEndDateTime, &tsOccEnd);
+		auto tsOccEnd = RTimeToUnixTime(lpException.ulEndDateTime);
 		tsOccEnd = LocalToUTC(tsOccEnd, ttZinfo);
 		if(tsOccEnd < tsStart) {
 			ec_log_debug("Skipping exception end match: %lu ==> %s", tsOccEnd, ctime(&tsOccEnd));
 			continue;
 		}
-		UnixTimeToRTime(tsOccEnd, &sOccrInfo.fbBlock.m_tmEnd);
+		sOccrInfo.fbBlock.m_tmEnd = UnixTimeToRTime(tsOccEnd);
 
 		// APPT_FBSTATUS
 		sOccrInfo.fbBlock.m_fbstatus = (FBStatus)lpException.ulBusyStatus;
 
 		// Freebusy status
-		RTimeToUnixTime(lpException.ulOriginalStartDate, &sOccrInfo.tBaseDate);
+		sOccrInfo.tBaseDate = RTimeToUnixTime(lpException.ulOriginalStartDate);
 		ec_log_debug("Adding exception match: %lu ==> %s", sOccrInfo.tBaseDate, ctime(&sOccrInfo.tBaseDate));
 		hr = HrAddFBBlock(sOccrInfo, &lpOccrInfoAll, lpcValues);
 	}
@@ -1439,12 +1244,11 @@ HRESULT recurrence::AddValidOccr(time_t tsOccrStart, time_t tsOccrEnd, ULONG ulB
 	OccrInfo sOccrInfo;
 
 	// APPT_STARTWHOLE
-	UnixTimeToRTime(tsOccrStart, &sOccrInfo.fbBlock.m_tmStart);
+	sOccrInfo.fbBlock.m_tmStart = UnixTimeToRTime(tsOccrStart);
 	sOccrInfo.tBaseDate = tsOccrStart;
 
 	// APPT_ENDWHOLE
-	UnixTimeToRTime(tsOccrEnd, &sOccrInfo.fbBlock.m_tmEnd);
-
+	sOccrInfo.fbBlock.m_tmEnd = UnixTimeToRTime(tsOccrEnd);
 	sOccrInfo.fbBlock.m_fbstatus = (FBStatus)ulBusyStatus;
 	return HrAddFBBlock(sOccrInfo, lpFBBlocksAll, lpcValues);
 }
