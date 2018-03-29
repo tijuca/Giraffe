@@ -210,6 +210,8 @@ Section: localization
 Depends:
  ${misc:Depends},
  locales,
+Breaks: kopano-lang
+Replaces: kopano-lang
 Description: Complete and feature rich groupware solution - l10n files
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
