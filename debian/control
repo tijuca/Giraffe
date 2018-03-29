@@ -54,6 +54,8 @@ Multi-Arch: same
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
+Breaks: kopano-client
+Replaces: kopano-client
 Description: Complete and feature rich groupware solution - Free/Busy library
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
