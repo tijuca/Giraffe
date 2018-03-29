@@ -24,7 +24,7 @@ Build-Depends:
  libgsoap-dev (>= 2.8.49),
  libical-dev,
  libicu-dev,
- libjsoncpp-dev,
+ libjsoncpp-dev (>= 1.4.0~),
  libkrb5-dev,
  libldap2-dev,
  libncurses5-dev,
