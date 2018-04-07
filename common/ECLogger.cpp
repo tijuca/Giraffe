@@ -386,8 +386,11 @@ void ECLogger_File::Log(unsigned int loglevel, const char *format, ...) {
 
 void ECLogger_File::LogVA(unsigned int loglevel, const char *format, va_list& va) {
 	char msgbuffer[_LOG_BUFSIZE];
-	_vsnprintf_l(msgbuffer, sizeof msgbuffer, format, datalocale, va);
-
+	auto len = _vsnprintf_l(msgbuffer, sizeof msgbuffer, format, datalocale, va);
+	static const char tb[] = "(message truncated due to size)";
+	static_assert(_LOG_BUFSIZE >= sizeof(tb), "buffer too small for static message");
+	if (len >= _LOG_BUFSIZE)
+		strcpy(msgbuffer + sizeof(msgbuffer) - sizeof(tb), tb);
 	Log(loglevel, std::string(msgbuffer));
 }
 
@@ -538,7 +541,15 @@ ECLogger_Pipe::ECLogger_Pipe(int fd, pid_t childpid, int loglevel) :
 }
 
 ECLogger_Pipe::~ECLogger_Pipe() {
-	close(m_fd);						// this will make the log child exit
+	/*
+	 * Closing the fd will make the log child exit, which triggers
+	 * SIGCHLD and an ec_log from the handler right away, which
+	 * then gets a EBADF because the fd is already closed.
+	 * Reset the target first to avoid this.
+	 */
+	if (ec_log_target == this)
+		ec_log_set(nullptr);
+	close(m_fd);
 
 	if (m_childpid)
 		waitpid(m_childpid, NULL, 0);	// wait for the child if we're the one that forked it
