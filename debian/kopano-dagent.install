@@ -1,9 +1,12 @@
 etc/kopano/autorespond
 etc/kopano/dagent.cfg
-usr/sbin/kopano-dagent
+usr/lib/python*/*/kopano_utils
 usr/sbin/kopano-autorespond
+usr/sbin/kopano-dagent
 usr/sbin/kopano-mr-accept
+#usr/sbin/kopano-mr-accept.py
 usr/sbin/kopano-mr-process
+#usr/sbin/kopano-mr-process.py
 usr/share/man/man5/kopano-dagent.cfg.5
 usr/share/man/man8/kopano-autorespond.8
 usr/share/man/man8/kopano-dagent.8
