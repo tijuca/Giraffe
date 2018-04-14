@@ -74,6 +74,7 @@ Depends:
  kopano-monitor (>= ${source:Version}),
  kopano-search (>= ${source:Version}),
  kopano-server (>= ${source:Version}),
+ kopano-spamd (>= ${source:Version}),
  kopano-spooler (>= ${source:Version}),
  kopano-utils (>= ${source:Version}),
 Suggests: kopano-webapp
@@ -300,6 +301,20 @@ Description: Complete and feature rich groupware solution - server component
  .
  This package provides the core server component that connects to gateways
  (like the imap gateway) or the web gui connect to.
+
+Package: kopano-spamd
+Architecture: all
+Depends:
+ ${misc:Depends},
+ kopano-common (>= ${binary:Version}),
+ lsb-base (>= 3.0-6),
+ python,
+Description: Complete and feature rich groupware solution - Spam daemon
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the Spam learning daemon for Kopano / SpamAssasin.
 
 Package: kopano-spooler
 Architecture: any

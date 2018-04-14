@@ -1,0 +1,84 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          kopano-spamd
+# Required-Start:    $syslog $network $remote_fs
+# Required-Stop:     $syslog $network $remote_fs
+# Should-Start:      kopano-spamd
+# Should-Stop:       kopano-spamd
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Kopano Collaboration Platform's Spam daemon
+# Description:       The Kopano Spamd is a Spam learning daemon for Kopano / SpamAssasin
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+SPAMD=/usr/sbin/kopano-spamd
+DESC="Kopano spamd gateway"
+NAME=`basename $SPAMD`
+#QUIETDAEMON=--quiet
+PIDFILE=/var/run/kopano-spamd.pid
+
+test -x $SPAMD || exit 0
+
+# Include kopano defaults if available
+if [ -f /etc/default/kopano ] ; then
+    . /etc/default/kopano
+fi
+if [ -z "$KOPANO_LOCALE" ]; then
+    KOPANO_LOCALE="C"
+fi
+
+if [ -e "$SPAMD_CONFIG" ]; then
+    SPAMD_OPTS="$SPAMD_OPTS -c $SPAMD_CONFIG"
+fi
+
+#set -e
+
+. /lib/lsb/init-functions
+
+case "$1" in
+    start)
+        if [ "$SPAMD_ENABLED" = "no" ]; then
+            log_warning_msg "Kopano Spamd daemon not enabled in /etc/default/kopano ... not starting"
+            exit 0
+        fi
+        log_begin_msg "Starting $DESC: $NAME"
+        export LC_ALL=$KOPANO_LOCALE
+        export LANG=$KOPANO_LOCALE
+        start-stop-daemon --start $QUIETDAEMON --pidfile $PIDFILE --exec $SPAMD -- $SPAMD_OPTS
+        log_end_msg $?
+        unset LC_ALL LANG
+    ;;
+
+    stop)
+        log_begin_msg "Stopping $DESC: $NAME"
+        start-stop-daemon --stop $QUIETDAEMON --pidfile $PIDFILE --retry TERM/15/KILL --exec $SPAMD
+        RETVAL=$?
+        rm -f $PIDFILE
+        log_end_msg $RETVAL
+    ;;
+
+    restart)
+        $0 stop
+        $0 start
+    ;;
+
+    status)
+        status_of_proc "$SPAMD" "$NAME" && exit 0 || exit $?
+    ;;
+
+    reload|force-reload)
+        log_begin_msg "Reloading $DESC: $NAME"
+        start-stop-daemon --stop $QUIETDAEMON --signal HUP --pidfile $PIDFILE --exec $SPAMD
+        log_end_msg $?
+    ;;
+
+    *)
+        N=/etc/init.d/$NAME
+        echo "Usage: $N {start|stop|restart|reload|force-reload|status}" >&2
+        exit 1
+    ;;
+esac
+
+exit 0

@@ -1,0 +1,6 @@
+etc/kopano/spamd.cfg
+usr/lib/python*/*/kopano_spamd*
+usr/lib/systemd/system/kopano-spamd.service  lib/systemd/system/
+usr/sbin/kopano-spamd
+usr/share/man/man5/kopano-spamd.cfg.5
+usr/share/man/man8/kopano-spamd.8
