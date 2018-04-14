@@ -338,6 +338,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  python,
+ python-kopano,
 Description: Complete and feature rich groupware solution - admin tools
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
