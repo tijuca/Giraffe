@@ -368,6 +368,7 @@ Section: python
 Depends:
  ${misc:Depends},
  python,
+ python-dateutil,
  python-mapi,
 Description: Complete and feature rich groupware solution - Python bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
