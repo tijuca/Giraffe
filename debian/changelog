@@ -1,3 +1,32 @@
+kopanocore (8.6.1-2) unstable; urgency=medium
+
+  [ Roel van Meer ]
+  * [716db3e] control: Depend on versioned libjsoncpp-dev
+  * [c0a7d41] control: adding Breaks: kopano-lang on kopano-l10n
+  * [a31d5df] control: adding Breaks: kopano-client on kopano-libs
+    All these addition are helpful for people which creating own backports based
+    on the Debian packages. So one day we will also benefit from these
+    enhancements.
+
+  [ Carsten Schoenert ]
+  * [1fb8fef] debian/control: increase Standards-Version to 4.1.4
+    No further changes needed.
+  * [f6e32ce] kopano-spamd: adding new package spamd
+    There is a new package about a Spam learning daemon prepared and created.
+  * [6ab9a14] kopano-utils.install: add new provided binaries and man-pages
+    Several new binaries targeting the utilities for kopanoserver are added by
+    upstream.
+  * [f535729] kopano-dagent.install: add new shipped files
+    Also the dagent got new additional files in /usr/sbin.
+  * [391f2ad] kopano-search.install: add new shipped file
+    The search tools will get a new binary file based on Python. Currently not
+    really shipped as the file is using *.py as file extension and will replace
+    some other file. Right now it's unclear which file will be replaced.
+  * [c5196b3] python-kopano: add depending package python-dateutil
+    (Closes: #896347)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Thu, 17 May 2018 16:14:59 +0200
+
 kopanocore (8.6.1-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
