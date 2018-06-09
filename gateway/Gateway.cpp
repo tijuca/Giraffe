@@ -177,7 +177,11 @@ static void *Handler(void *lpArg)
 		goto exit;
 	}
 
-	hr = client->HrSendGreeting(g_strHostString);
+	try {
+		hr = client->HrSendGreeting(g_strHostString);
+	} catch (const KMAPIError &e) {
+		hr = e.code();
+	}
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -460,10 +464,7 @@ int main(int argc, char *argv[]) {
 		bThreads = true;
 		g_lpLogger->SetLogprefix(LP_TID);
 	}
-
-	if (bThreads)
-		mainthread = pthread_self();
-
+	mainthread = pthread_self();
 	if (!szPath)
 		szPath = g_lpConfig->GetSetting("server_socket");
 
@@ -680,13 +681,19 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			continue;
 		}
 
+		bool pop3_event = pfd_pop3 >= 0 && pollfd[pfd_pop3].revents & (POLLIN | POLLRDHUP);
+		bool pop3s_event = pfd_pop3s >= 0 && pollfd[pfd_pop3s].revents & (POLLIN | POLLRDHUP);
+		bool imap_event = pfd_imap >= 0 && pollfd[pfd_imap].revents & (POLLIN | POLLRDHUP);
+		bool imaps_event = pfd_imaps >= 0 && pollfd[pfd_imaps].revents & (POLLIN | POLLRDHUP);
+		if (!pop3_event && !pop3s_event && !imap_event && !imaps_event)
+			/* OS might set more bits than requested */
+			continue;
+
 		// One socket has signalled a new incoming connection
 		std::unique_ptr<HandlerArgs> lpHandlerArgs(new HandlerArgs);
 		lpHandlerArgs->lpLogger = g_lpLogger;
 		lpHandlerArgs->lpConfig = g_lpConfig;
 
-		bool pop3_event = pfd_pop3 >= 0 && pollfd[pfd_pop3].revents & (POLLIN | POLLRDHUP);
-		bool pop3s_event = pfd_pop3s >= 0 && pollfd[pfd_pop3s].revents & (POLLIN | POLLRDHUP);
 		if (pop3_event || pop3s_event) {
 			bool usessl;
 
@@ -741,8 +748,6 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			continue;
 		}
 
-		bool imap_event = pfd_imap >= 0 && pollfd[pfd_imap].revents & (POLLIN | POLLRDHUP);
-		bool imaps_event = pfd_imaps >= 0 && pollfd[pfd_imaps].revents & (POLLIN | POLLRDHUP);
 		if (imap_event || imaps_event) {
 			bool usessl;
 
@@ -796,9 +801,6 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			}
 			continue;
 		}
-
-		// should not be able to get here because of continues
-		ec_log_warn("Incoming traffic was not for me??");
 	}
 
 	ec_log(EC_LOGLEVEL_ALWAYS, "POP3/IMAP Gateway will now exit");

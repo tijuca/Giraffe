@@ -588,7 +588,7 @@ static int kc_reexec_with_allocator(char **argv, const char *lib)
 		setenv("KC_ORIGINAL_PRELOAD", s, true);
 		setenv("LD_PRELOAD", (std::string(s) + ":" + lib).c_str(), true);
 	}
-	void *handle = dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
+	void *handle = dlopen(lib, RTLD_LAZY | RTLD_GLOBAL);
 	if (handle == NULL)
 		/*
 		 * Ignore libraries that won't load anyway. This avoids
@@ -715,7 +715,7 @@ int main(int argc, char* argv[])
 		nReturn = running_server(argv[0], config, exp_config, argc, argv,
 		          argc - optind, &argv[optind]);
 	} catch (const std::exception &e) {
-		ec_log_err("Exception caught: %s\n", e.what());
+		ec_log_err("Exception caught: %s", e.what());
 	}
 	return nReturn;
 }
@@ -736,17 +736,17 @@ static int ksrv_listen_inet(ECSoapServerConnection *ssc, ECConfig *cfg)
 	auto https_sock = kc_parse_bindaddrs(cfg->GetSetting("server_listen_tls"), 237);
 
 	/* Historic directives */
-	if (strcmp(g_lpConfig->GetSetting("server_tcp_enabled"), "yes") == 0) {
+	if (strcmp(cfg->GetSetting("server_tcp_enabled"), "yes") == 0) {
 		auto addr = cfg->GetSetting("server_bind");
-		auto port = cfg->GetSetting("server_tcp_port");
-		if (port[0] != '\0')
-			http_sock.emplace(addr, strtoul(port, nullptr, 10));
+		uint16_t port = strtoul(cfg->GetSetting("server_tcp_port"), nullptr, 10);
+		if (port != 0)
+			http_sock.emplace(addr, port);
 	}
-	if (strcmp(g_lpConfig->GetSetting("server_ssl_enabled"), "yes") == 0) {
+	if (strcmp(cfg->GetSetting("server_ssl_enabled"), "yes") == 0) {
 		auto addr = cfg->GetSetting("server_bind");
-		auto port = cfg->GetSetting("server_ssl_port");
-		if (port[0] != '\0')
-			https_sock.emplace(addr, strtoul(port, nullptr, 10));
+		uint16_t port = strtoul(cfg->GetSetting("server_ssl_port"), nullptr, 10);
+		if (port != 0)
+			https_sock.emplace(addr, port);
 	}
 
 	/* Launch */
@@ -783,7 +783,7 @@ static int ksrv_listen_pipe(ECSoapServerConnection *ssc, ECConfig *cfg)
 		if (er != erSuccess)
 			return er;
 	}
-	if (strcmp(g_lpConfig->GetSetting("server_pipe_enabled"), "yes") == 0) {
+	if (strcmp(cfg->GetSetting("server_pipe_enabled"), "yes") == 0) {
 		auto pipe_sock = tokenize(cfg->GetSetting("server_pipe_name"), ' ', true);
 		for (const auto &spec : pipe_sock) {
 			auto er = ssc->ListenPipe(spec.c_str(), false);
@@ -814,14 +814,11 @@ static void cleanup(HRESULT er) {
 		g_lpAudit->Log(EC_LOGLEVEL_ALWAYS, "server shutdown in progress");
 
 	kopano_exit();
-	ssl_threading_cleanup();
-	SSL_library_cleanup(); //cleanup memory so valgrind is happy
-
 #ifdef HAVE_KCOIDC_H
 	if (kcoidc_initialized) {
 		auto res = kcoidc_uninitialize();
 		if (res != 0) {
-			ec_log_always("KCOIDC: failed to uninitialize: 0x%llx\n", res);
+			ec_log_always("KCOIDC: failed to uninitialize: 0x%llx", res);
 		}
 	}
 #endif
@@ -1049,7 +1046,11 @@ static int running_server(char *szName, const char *szConfig, bool exp_config,
 	setlocale(LC_ALL, "");
 	InitBindTextDomain();
 
-	auto laters = make_scope_success([&]() { cleanup(er); });
+	auto laters = make_scope_success([&]() {
+		cleanup(er);
+		ssl_threading_cleanup();
+		SSL_library_cleanup(); //cleanup memory so valgrind is happy
+	});
 	// Load settings
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (!g_lpConfig->LoadSettings(szConfig, !exp_config) ||
@@ -1145,7 +1146,7 @@ static int running_server(char *szName, const char *szConfig, bool exp_config,
 	if (parseBool(g_lpConfig->GetSetting("kcoidc_insecure_skip_verify"))) {
 		auto res = kcoidc_insecure_skip_verify(1);
 		if (res != 0) {
-			ec_log_err("KCOIDC: insecure_skip_verify failed: 0x%llx\n", res);
+			ec_log_err("KCOIDC: insecure_skip_verify failed: 0x%llx", res);
 			return retval;
 		}
 	}
@@ -1153,12 +1154,12 @@ static int running_server(char *szName, const char *szConfig, bool exp_config,
 	if (issuer && strlen(issuer) > 0) {
 		auto res = kcoidc_initialize(const_cast<char *>(issuer));
 		if (res != 0) {
-			ec_log_err("KCOIDC: initialize failed: 0x%llx\n", res);
+			ec_log_err("KCOIDC: initialize failed: 0x%llx", res);
 			return retval;
 		}
 		res = kcoidc_wait_until_ready(10);
 		if (res != 0) {
-			ec_log_err("KCOIDC: wait_until_ready failed: 0x%llx\n", res);
+			ec_log_err("KCOIDC: wait_until_ready failed: 0x%llx", res);
 			return retval;
 		}
 		kcoidc_initialized = true;
