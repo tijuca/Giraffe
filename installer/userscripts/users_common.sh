@@ -1,6 +1,6 @@
 # shell include script
 
-KOPANO_LANG="${KOPANO_USERSCRIPT_LOCALE:-${LC_MESSAGES:-en_US}}"
+KOPANO_LANG="${KOPANO_USERSCRIPT_LOCALE:-${LC_MESSAGES:-C}}"
 PATH=/bin:/usr/local/bin:/usr/bin
 export KOPANO_LANG PATH
 
@@ -24,4 +24,4 @@ fi
 
 # Find cannot cope with unreadable cwd
 cd "$KOPANO_USER_SCRIPTS"
-find "${KOPANO_USER_SCRIPTS}" -maxdepth 1 -type f -perm -u=x ! -name \*~ ! -name \#\* ! -name \*.rpm\* ! -name \*.bak ! -name \*.old -exec {} \;
+find -L "$KOPANO_USER_SCRIPTS"/* -maxdepth 0 -type f -perm -u=x ! -name \*~ ! -name \#\* ! -name \*.rpm\* ! -name \*.bak ! -name \*.old -exec {} \;

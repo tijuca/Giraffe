@@ -1,3 +1,21 @@
+8.6.2 (2018-06-07)
+==================
+Includes changes until including 8.5.9.
+Fixes:
+* installer: remove duplicate defaults from sample config
+* icalmapi: allow RRULE with DTSTART having zulu-marking [KC-414, KC-811]
+* icalmapi: do not mark timestamp as UTC when we explicitly give a
+  timezone [KC-920, KC-1018]
+* icalmapi: do not write empty fields to VCF files [KW-2503]
+* scripts: follow symbolic links when running user/group/company scripts,
+  and run them in lexicographic order [KC-1171,KC-1172]
+* common: force Unicode for internal string translations [KC-1140]
+* common: remove bin2hex warning [KC-1178]
+* pyko: fix Item.searchkey
+Enhancements:
+* libicalmapi: allow some properties to be missing when serializing ADR
+* kopano-dbadm: default to a loglevel so all dbadm messages get shown [KC-1167]
+
 8.6.1 (2018-04-05)
 ==================
 Includes changes from 8.5.6.
@@ -27,6 +45,57 @@ Changes:
 Fixes:
 * monitor: changed inconsistency in soft/hard template for
   user/company [KC-795]
+
+
+8.5.x
+=====
+Enhancements:
+* spooler: allow hard termination via repeated Ctrl-C
+
+
+8.5.9 (2018-05-16)
+==================
+Changes:
+* daemons: disable SSL renegotiation for OpenSSL 1.1+
+* server: invalid port strings are now rejected
+* client: quiesce verbose logon failure messages
+* installer: set default and UTF-8 locale for services [KC-840, KC-1140]
+Fixes:
+* dbadm: recognize -c option properly
+* libserver: drop all remains of clientupdatestatus table [KC-644]
+* dbadm: fix np-defrag crash when run on blank database
+* dbadm: fix np-defrag freemap handling [KC-1126]
+* gateway: fix crash when new client immediately disconnects
+* mapi: avoid garbage at end of malformed RTF [KC-1142]
+Enhancements:
+* dbadm: add timestamps to log messages
+* dbadm: speed up np-defrag by using a reverse run
+* dbadm: add helper index creation/removal as an explicit action
+* dbadm: ad-hoc progress meter during operation
+* dbadm: support mid-way program termination [KC-1156]
+* dbadm: add np-remove-unused action
+* propmap: expose kopanoHidden LDAP attribute as PR_EC_AB_HIDDEN [KC-63]
+
+
+8.5.8 (2018-04-18)
+==================
+Enhancements:
+* dbadm: np-repair-dups will now iterate over more tables that have proptags
+* dbadm: handle overlapping proptags in np-repair-dups [KC-1126]
+* dbadm: respect log_level from server.cfg (e.g. log_level=0x10006 to print
+  SQL queries)
+
+
+8.5.7 (2018-04-18)
+==================
+Fixes:
+* Fix crash due to ODR violation [KF-1245,KC-379]
+Enhancements:
+* kopano-dbadm: new diagnostics program for offline database
+  modification
+* kopano-server: allow use of --ignore-da to skip schema update that won't
+  complete (log id K-1221) [KC-1123]
+* build: support ICU 61
 
 
 8.5.6 (2018-04-05)

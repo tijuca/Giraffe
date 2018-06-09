@@ -1331,10 +1331,14 @@ HRESULT VConverter::HrAddRecurrence(icalcomponent *lpicEventRoot, icalcomponent 
 {
 	SPropValue spSpropVal = {0};
 	TIMEZONE_STRUCT zone;
+
+	auto dtstart_prop = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
+	auto dtstart = icalproperty_get_dtstart(dtstart_prop);
+	bool dtstart_utc = icaltime_is_utc(dtstart);
+
 	icalproperty *lpicProp = icalcomponent_get_first_property(lpicEvent,
 	                         ICAL_RRULE_PROPERTY);
 	if (lpicProp == NULL) {
-
 		// set isRecurring to false , property required by BlackBerry.
 		spSpropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RECURRING], PT_BOOLEAN);
 		spSpropVal.Value.b = false;
@@ -1348,8 +1352,9 @@ HRESULT VConverter::HrAddRecurrence(icalcomponent *lpicEventRoot, icalcomponent 
 		return hrSuccess;
 	}
 
-	if (!bIsAllday && m_iCurrentTimeZone == m_mapTimeZones->end()) {
+	if (!dtstart_utc && !bIsAllday && m_iCurrentTimeZone == m_mapTimeZones->end()) {
 		// if we have an RRULE, we must have a timezone
+		// except for DTSTART in UTC time
 		return MAPI_E_CORRUPT_DATA;
 	} else if (m_iCurrentTimeZone == m_mapTimeZones->end()) {
 		auto hr = HrGetTzStruct("Etc/UTC", &zone);
@@ -1547,12 +1552,18 @@ HRESULT VConverter::HrSetTimeProperty(time_t tStamp, bool bDateOnly, icaltimezon
 			tStamp += 86400;
 	}
 	
-	if (!bDateOnly && lpicTZinfo != NULL)
+	if (!bDateOnly && lpicTZinfo != nullptr) {
 		ittStamp = icaltime_from_timet_with_zone(tStamp, bDateOnly, lpicTZinfo);
-	else
+		kc_ical_utc(ittStamp, false);
+	}
+	else {
 		ittStamp = icaltime_from_timet_with_zone(tStamp, bDateOnly, icaltimezone_get_utc_timezone());
+	}
 
-	icalproperty_set_value(lpicProp, icalvalue_new_datetime(ittStamp));
+	if (bDateOnly)
+		icalproperty_set_value(lpicProp, icalvalue_new_date(ittStamp));
+	else
+		icalproperty_set_value(lpicProp, icalvalue_new_datetime(ittStamp));
 
 	// only allowed to add timezone information on non-allday events
 	if (lpicTZinfo && !bDateOnly)
