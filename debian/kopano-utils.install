@@ -13,6 +13,7 @@ usr/sbin/kopano-archiver-aclsync
 usr/sbin/kopano-archiver-restore
 usr/sbin/kopano-cachestat
 usr/sbin/kopano-cli
+usr/sbin/kopano-dbadm
 usr/sbin/kopano-fix-ipm-subtree
 usr/sbin/kopano-localize-folders
 usr/sbin/kopano-mailbox-permissions
@@ -32,6 +33,7 @@ usr/share/man/man8/kopano-archiver-aclsync.8
 usr/share/man/man8/kopano-archiver-restore.8
 usr/share/man/man8/kopano-cachestat.8
 usr/share/man/man8/kopano-cli.8
+usr/share/man/man8/kopano-dbadm.8
 usr/share/man/man8/kopano-mailbox-permissions.8
 usr/share/man/man8/kopano-migration-pst.8
 usr/share/man/man8/kopano-srvadm.8
