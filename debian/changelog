@@ -1,3 +1,14 @@
+kopanocore (8.6.2-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [a20fb40] New upstream version 8.6.2
+  * [c670a19] kopano-utils: add new binary kopano-dbadm to package
+    There is a new binary kopano-dbadm shipped by upstream, places within
+    kopano-utils. 
+  * [c85dde6] kopano-libs.symbols: update symbols to 8.6.2
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sat, 09 Jun 2018 09:07:29 +0200
+
 kopanocore (8.6.1-2) unstable; urgency=medium
 
   [ Roel van Meer ]
