@@ -1,3 +1,22 @@
+kopanocore (8.6.5-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [6d49674] New upstream version 8.6.5
+  * [4ea513a] debian/control: increase Standards-Version to 4.1.5
+    No further changes needed.
+  * [c1e1ab8] update Maintainers to new contact address
+    Updating the Maintainer email address to
+    pkg-giraffe-maintainers@alioth-lists.debian.net.
+  * [4132ff9] d/kopano-utils.install: adding new content for 'oof'
+    New binary 'kopano-oof' was added by upstream, adding the binary and
+    corresponding man page to kopano-utils.
+  * [d60e3f7] d/kopano-server.install: adding man page for mapi.7
+    There is a new man page available we will put into kopano-server, we don't
+    have a package kopano-common like upstream has.
+  * [fc807fa] kopano-libs.symbols: update symbols to 8.6.5
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sat, 28 Jul 2018 21:20:29 +0800
+
 kopanocore (8.6.2-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
