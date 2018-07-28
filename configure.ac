@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.6.2], [development@kopano.io])
+AC_INIT([kopano], [8.6.5], [development@kopano.io])
 
 dnl ABI tags are used to prevent inadvertent mixing of wildly different
 dnl versions of KC components without knowing it.
@@ -174,8 +174,6 @@ AC_ARG_WITH(userscript-prefix,
   AS_HELP_STRING([--with-userscript-prefix=PATH], [path to install the userscripts in (default SYSCONFDIR/kopano/userscripts)]),
   [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR='/etc/kopano/userscripts'])
 AC_SUBST(USERSCRIPTDIR)
-AS_IF([echo "$USERSCRIPTDIR" | grep -q '\$'],
-	[AC_MSG_ERROR([Variable expansion unfortunately not supported for --with-userscript-prefix])])
 
 # quota warning templates location
 AC_ARG_WITH(quotatemplate-prefix,
@@ -727,17 +725,11 @@ AC_CONFIG_FILES([Makefile
 		installer/Makefile
 		installer/linux/Makefile
 		installer/userscripts/Makefile
-		installer/userscripts/createcompany
 		installer/userscripts/createcompany.d/Makefile
-		installer/userscripts/creategroup
 		installer/userscripts/creategroup.d/Makefile
-		installer/userscripts/createuser
 		installer/userscripts/createuser.d/Makefile
-		installer/userscripts/deletecompany
 		installer/userscripts/deletecompany.d/Makefile
-		installer/userscripts/deletegroup
 		installer/userscripts/deletegroup.d/Makefile
-		installer/userscripts/deleteuser
 		installer/userscripts/deleteuser.d/Makefile
 		installer/quotamail/Makefile
 		installer/searchscripts/Makefile
