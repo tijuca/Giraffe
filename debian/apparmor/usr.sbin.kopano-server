@@ -15,7 +15,12 @@
   network tcp,
 
   /etc/kopano/debian-db.cfg r,
+  /etc/kopano/ldap.cfg r,
+  /etc/kopano/ldap.openldap.cfg r,
+  /etc/kopano/ldap.propmap.cfg r,
   /etc/kopano/server.cfg r,
+  /etc/ldap/ldap.conf r,
+  /etc/ssl/openssl.cnf r,
   /usr/sbin/kopano-server r,
 
   @{PROC}/@{pid}/task/@{tid}/comm rw,
