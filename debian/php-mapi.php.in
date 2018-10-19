@@ -1,3 +1,0 @@
-# PHP modul installation for php-mapi
-mod debian/tmp/etc/php/@PHP_VERSION@/cli/conf.d/mapi.ini
-mod debian/tmp/usr/lib/php/@PHP_API_DATE@/mapi.so

@@ -45,7 +45,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
 
 $(PREPROCESS_FILES:.in=): %: %.in
 	sed -e 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' \
-	-e 's,/@PHP_API_DATE@,$(PHP_API_DATE:%=/%),g' $< > $@
+		$< > $@
 
 %:
 	dh $@ --builddirectory=$(DEB_BUILD_DIR) --with php,python3
@@ -76,9 +76,6 @@ override_dh_install:
 
 	# remove compiled python files
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
-
-	# add php:Depends
-	echo "php:Depends=phpapi-$(PHP_API_DATE)" > debian/php$(PHP_VERSION)-mapi.substvars
 
 	mv debian/tmp/usr/share/doc/kopano-server/example-config/*.cfg \
 	   debian/tmp/usr/share/doc/kopano-server/example-config/autorespond \
