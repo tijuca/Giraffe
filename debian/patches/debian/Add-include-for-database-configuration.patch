@@ -7,10 +7,10 @@ Subject: Add include for database configuration
  1 file changed, 2 insertions(+)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 02792b9..0b72e69 100644
+index c35cb16..64e62a9 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -475,3 +475,5 @@ local_admin_users = root kopano
+@@ -486,3 +486,5 @@ local_admin_users = root kopano
  
  # Enable/disable reminders for shared stores
  #shared_reminders = yes
