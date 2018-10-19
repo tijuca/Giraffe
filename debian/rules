@@ -15,8 +15,7 @@ include /usr/share/dpkg/pkg-info.mk
 DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
-PHP_VERSION=7.2
-PHP_API_DATE=$(shell php-config$(PHPVERSION) --phpapi)
+PHP_API_DATE=$(shell php-config --phpapi)
 PREPROCESS_FILES := $(wildcard debian/*.in)
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
@@ -33,7 +32,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --sysconfdir=/etc \
     --mandir=\$${prefix}/share/man \
     --infodir=\$${prefix}/share/info \
-    --with-php-config=/usr/bin/php-config$(PHPVERSION) \
+    --with-php-config=/usr/bin/php-config \
     --with-quotatemplate-prefix=/etc/kopano/quotamail \
     --disable-static \
     --enable-epoll \
@@ -46,7 +45,6 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
 
 $(PREPROCESS_FILES:.in=): %: %.in
 	sed -e 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' \
-	-e 's,/@PHP_VERSION@,$(PHP_VERSION:%=/%),g' \
 	-e 's,/@PHP_API_DATE@,$(PHP_API_DATE:%=/%),g' $< > $@
 
 %:
