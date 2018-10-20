@@ -161,6 +161,7 @@ Description: C++ Development files and libraries for Kopano Core
 
 Package: kopano-dagent
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
@@ -181,6 +182,7 @@ Description: Complete and feature rich groupware solution - delivery agent
 Package: kopano-gateway
 Architecture: any
 Suggests: python-mapi
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
@@ -196,6 +198,7 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
 
 Package: kopano-ical
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
@@ -226,6 +229,7 @@ Description: Complete and feature rich groupware solution - l10n files
 
 Package: kopano-monitor
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
@@ -244,6 +248,7 @@ Description: Complete and feature rich groupware solution - quota monitor
 
 Package: kopano-presence
 Architecture: all
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  kopano-common (>= ${binary:Version}),
@@ -263,6 +268,7 @@ Description: Complete and feature rich groupware solution - presence daemon
 
 Package: kopano-search
 Architecture: all
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  catdoc,
@@ -288,6 +294,7 @@ Description: Complete and feature rich groupware solution - indexer
 
 Package: kopano-server
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
@@ -320,6 +327,7 @@ Description: Complete and feature rich groupware solution - Spam daemon
 
 Package: kopano-spooler
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
@@ -336,6 +344,7 @@ Description: Complete and feature rich groupware solution - email spooler
 
 Package: kopano-utils
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
