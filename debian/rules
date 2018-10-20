@@ -50,7 +50,7 @@ $(PREPROCESS_FILES:.in=): %: %.in
 	-e 's,/@PHP_API_DATE@,$(PHP_API_DATE:%=/%),g' $< > $@
 
 %:
-	dh $@ --builddirectory=$(DEB_BUILD_DIR) --with systemd,autoreconf,php
+	dh $@ --builddirectory=$(DEB_BUILD_DIR) --with php
 
 override_dh_auto_configure: $(PREPROCESS_FILES:.in=)
 	echo ${DEB_VERSION} > $(CURDIR)/revision
