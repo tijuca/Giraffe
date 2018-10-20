@@ -7,13 +7,16 @@ usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-unix.so
 usr/sbin/kopano-server
 usr/share/doc/kopano-server/
 usr/share/man/man5/kopano-ldap.cfg.5
+usr/share/man/man5/kopano-coredump.5
 usr/share/man/man5/kopano-server.cfg.5
 usr/share/man/man5/kopano-unix.cfg.5
 usr/share/man/man7/kopano.7
 usr/share/man/man7/mapi.7
+usr/share/man/man8/kopano-cfgchecker.8
 usr/share/man/man8/kopano-server.8
 usr/share/kopano/debian
 usr/share/kopano/ldap.active-directory.cfg
 usr/share/kopano/ldap.openldap.cfg
 usr/share/kopano/ldap.propmap.cfg
 debian/apparmor/usr.sbin.kopano-server etc/apparmor.d
+usr/share/doc/kopano-server/example-config/apparmor.d
