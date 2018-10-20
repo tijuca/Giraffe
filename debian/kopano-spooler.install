@@ -1,4 +1,5 @@
 etc/kopano/spooler.cfg
+usr/lib/systemd/system/kopano-spooler.service  lib/systemd/system/
 usr/sbin/kopano-spooler
 usr/share/man/man5/kopano-spooler.cfg.5
 usr/share/man/man8/kopano-spooler.8

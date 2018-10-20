@@ -1,6 +1,7 @@
 etc/kopano/search.cfg
 etc/kopano/searchscripts
 usr/lib/python*/*/kopano_search/
+usr/lib/systemd/system/kopano-search.service  lib/systemd/system/
 usr/sbin/kopano-search
 #usr/sbin/kopano-search-xapian-compact.py
 usr/share/man/man5/kopano-search.cfg.5

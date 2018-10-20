@@ -1,4 +1,5 @@
 etc/kopano/ical.cfg
+usr/lib/systemd/system/kopano-ical.service  lib/systemd/system/
 usr/sbin/kopano-ical
 usr/share/man/man5/kopano-ical.cfg.5
 usr/share/man/man8/kopano-ical.8

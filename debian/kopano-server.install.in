@@ -4,6 +4,7 @@ etc/kopano/unix.cfg
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-db.so
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-ldap.so
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-unix.so
+usr/lib/systemd/system/kopano-server.service  lib/systemd/system/
 usr/sbin/kopano-server
 usr/share/doc/kopano-server/
 usr/share/man/man5/kopano-ldap.cfg.5
