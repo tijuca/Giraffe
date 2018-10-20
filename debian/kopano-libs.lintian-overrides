@@ -1,4 +1,4 @@
 # No spelling issue -> common/ustringutil.cpp: {"vi",42,"Vietnamese_Viet Nam"}
 kopano-libs: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libkcutil.so.0.0.0 Nam Name
-# We can ignore this here, otherwise we would have aprox. 14 individual libary packages
-kopano-libs: package-name-doesnt-match-sonames libkcarchiver0 libkcarchivercore0 libkcfreebusy0 libkcicalmapi0 libkcinetmapi0 libkcmapi0 libkcpyconv-2.7 libkcpydirector-2.7 libkcserver0 libkcsoap0 libkcssl0 libkcsync0 libkcutil0 libmapi1
+# We can ignore this here, otherwise we would have aprox. 9 individual libary packages
+kopano-libs: package-name-doesnt-match-sonames libkcarchiver0 libkcarchivercore0 libkcfreebusy0 libkcicalmapi0 libkcinetmapi0 libkcpyconv-2.7 libkcpydirector-2.7 libkcpyplug0 libkcserver0 libkcsoap0 libkcutil0 libmapi1
