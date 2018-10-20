@@ -2,6 +2,7 @@
 usr/share/bash-completion/completions/kopano-bash-completion.sh => usr/share/bash-completion/completions/kopano
 etc/kopano/migration-pst.cfg
 usr/bin/kopano-fsck
+usr/bin/kopano-ibrule
 usr/bin/kopano-migration-imap
 usr/bin/kopano-oof
 usr/bin/kopano-passwd
@@ -24,6 +25,7 @@ usr/sbin/kopano-recreate-systemfolders
 usr/sbin/kopano-srvadm
 usr/sbin/kopano-storeadm
 usr/share/man/man1/kopano-fsck.1
+usr/share/man/man1/kopano-ibrule.1
 usr/share/man/man1/kopano-oof.1
 usr/share/man/man1/kopano-passwd.1
 usr/share/man/man1/kopano-set-oof.1
