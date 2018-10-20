@@ -1,5 +1,5 @@
 #!/usr/bin/dh-exec
-etc/bash_completion.d/kopano-bash-completion.sh => usr/share/bash-completion/completions/kopano
+usr/share/bash-completion/completions/kopano-bash-completion.sh => usr/share/bash-completion/completions/kopano
 etc/kopano/migration-pst.cfg
 usr/bin/kopano-fsck
 usr/bin/kopano-migration-imap
