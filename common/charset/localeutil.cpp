@@ -1,34 +1,21 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <string>
 #include <iostream>
+#include <clocale>
 #include <cstring>
+#include <unistd.h>
 #include "localeutil.h"
 
 namespace KC {
 
 locale_t createUTF8Locale()
 {
-	locale_t loc;
-
 	/* this trick only works on newer distros */
-	loc = createlocale(LC_CTYPE, "C.UTF-8");
+	auto loc = newlocale(LC_CTYPE_MASK, "C.UTF-8", nullptr);
 	if (loc)
 		return loc;
 
@@ -37,30 +24,27 @@ locale_t createUTF8Locale()
 	char *dot = strchr(cur_locale, '.');
 	if (dot) {
 		if (strcmp(dot+1, "UTF-8") == 0 || strcmp(dot+1, "utf8") == 0) {
-			loc = createlocale(LC_CTYPE, cur_locale);
+			loc = newlocale(LC_CTYPE_MASK, cur_locale, nullptr);
 			goto exit;
 		}
 		// strip current charset selector, to be replaced
 		*dot = '\0';
 	}
 	new_locale = std::string(cur_locale) + ".UTF-8";
-	loc = createlocale(LC_CTYPE, new_locale.c_str()); 
+	loc = newlocale(LC_CTYPE_MASK, new_locale.c_str(), nullptr);
 	if (loc)
 		return loc;
-
-	loc = createlocale(LC_CTYPE, "en_US.UTF-8");
-
+	loc = newlocale(LC_CTYPE_MASK, "en_US.UTF-8", nullptr);
 exit:
 	// too bad, but I don't want to return an unusable object
 	if (!loc)
-		loc = createlocale(LC_CTYPE, "C");
-
+		loc = newlocale(LC_CTYPE_MASK, "C", nullptr);
 	return loc;
 }
 
 /**
  * Initializes the locale to the current language, forced in UTF-8.
- * 
+ *
  * @param[in]	bOutput	Print errors during init to stderr
  * @param[out]	lpstrLocale Last locale trying to set (optional)
  * @retval	true	successfully initialized
@@ -84,7 +68,7 @@ bool forceUTF8Locale(bool bOutput, std::string *lpstrLastSetLocale)
 			return true; // no need to force anything
 		}
 	}
-	if (bOutput) {
+	if (bOutput && (isatty(STDOUT_FILENO) || isatty(STDERR_FILENO))) {
 		std::cerr << "Warning: Terminal locale not UTF-8, but UTF-8 locale is being forced." << std::endl;
 		std::cerr << "         Screen output may not be correctly printed." << std::endl;
 	}

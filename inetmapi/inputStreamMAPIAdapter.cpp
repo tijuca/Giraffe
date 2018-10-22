@@ -1,22 +1,8 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include "inputStreamMAPIAdapter.h"
 
 namespace KC {
@@ -32,8 +18,7 @@ size_t inputStreamMAPIAdapter::read(unsigned char *data, size_t count)
 	if (lpStream->Read(data, count, &ulSize) != hrSuccess)
 		return 0;
 	if (ulSize != count)
-		this->ateof = true;
-
+		ateof = true;
 	return ulSize;
 }
 
@@ -44,8 +29,7 @@ void inputStreamMAPIAdapter::reset()
 	move.QuadPart = 0;
 
 	lpStream->Seek(move, SEEK_SET, NULL);
-
-	this->ateof = false;
+	ateof = false;
 }
 
 size_t inputStreamMAPIAdapter::skip(size_t count)
@@ -58,8 +42,7 @@ size_t inputStreamMAPIAdapter::skip(size_t count)
 	lpStream->Seek(move, SEEK_CUR, &ulSize);
 
 	if (ulSize.QuadPart != count)
-		this->ateof = true;
-
+		ateof = true;
 	return ulSize.QuadPart;
 }
 

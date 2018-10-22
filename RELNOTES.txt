@@ -1,3 +1,121 @@
+8.6.90 (8.7 beta)
+=================
+Enhancements:
+* kopano-statsd: new daemon that records dagent/server/spooler stats
+  (memory use, items processed, etc.) in RRD files.
+  This constitutes a preview. RRA parameters are currently hardcoded (7-day
+  window, 60-second step). PNG image generation is not included (CPU intensive,
+  and styling depends on user taste).
+  To enable, set statsclient_interval=60 in dagent.cfg/server.cfg/spooler.cfg.
+Changes:
+* dagent/spooler: the custom plaintext protocol of StatsClient is
+  replaced by a JSON variant [KC-1264]
+
+
+8.6.82 (8.7 Milestone 2)
+========================
+Fixes:
+* server: logon/logoff times were not reported correctly [KC-1257]
+Enhancements:
+* daemons: coredumps no longer rely on fs.suid_dumpable [KC-1043]
+* server: support for Unicode supplemental plane (Emojis) [KC-725]
+* spooler: support for process_model=thread mode [KC-1235]
+* spooler: add copy_delegate_mails=move-to-rep config directive [KC-412]
+* dagent: "mark mail as read" rule action support [KC-1080]
+* kopano-ibrule: new utility for MAPI rules [KC-1229]
+* server: experimental "files_v2" attachment storage [KC-567]
+Changes:
+* dagent: ignore OP_REPLY/OP_FORWARD for autoreplies [KC-1244]
+* server: the directives "socketspec", "server_tcp_enabled", "server_tcp_port",
+  "server_ssl_enabled", "server_ssl_port" and "server_bind" have been removed
+  in favor of "server_listen" and "server_listen_tls".
+* dagent: the directives "socketspec", "lmtp_port" and "server_bind" have been
+  removed in favor of "lmtp_listen".
+* gateway: the directives "socketspec", "imap_enabled", "imap_port",
+  "imaps_enabled", "imaps_port", "pop3_enabled", "pop3_port", "pop3s_enabled",
+  "pop3s_port" and "server_bind" have been removed in favor of "imap_listen",
+  "imaps_listen", "pop3_listen" and "pop3s_listen".
+* ical: the directives "socketspec", "ical_enable", "ical_port",
+  "icals_enable", "icals_port" and "server_bind" have been removed in favor of
+  "ical_listen" and "icals_listen".
+Packaging changes:
+* The MySQL 8 C API is now supported at build time [KC-1237]
+
+
+8.6.81 (8.7 Milestone 1)
+========================
+Fixes:
+* ical: better support recurring tasks [KC-781]
+Enhancements:
+* dagent: support for process_model=thread mode [KC-1170]
+* dagent: modern socket specification in dagent.cfg with lmtp_listen= [KC-1174]
+* dagent: PF_LOCAL socket support for communicating with postfix [KC-1131]
+* dagent: limited support for RFC 6531 (SMTPUTF8) [KC-833]
+* gateway: modern socket specification in gateway.cfg with
+  imap_listen=, pop3_listen=, etc. [KC-1130]
+* ical: "coredump_enable" config directive now recognized [ZCP-11696]
+* ical: modern socket specification in ical.cfg with
+  ical_listen=, etc. [KC-1187]
+* server: multivalue properties are now cached [KC-1162]
+* server: LDAP STARTTLS support for user backend [KC-1188]
+* spooler: new config value log_raw_message=error [KC-1105]
+* daemons: TLS ECDH curves can now be specified in config [KC-1233]
+* php: new functions to get freebusy message [KC-1077]
+Changes:
+* daemons: the default logging target is now syslog/journalctl [KC-1100]
+* daemons: SSLv3, TLSv1.0 and TLSv1.1 are now disabled by default [KC-1231]
+* dagent will no longer join HTML MIME parts together by default;
+  a new config directive "insecure_html_join" was added [KC-1157]
+* kopano-mr-accept was replaced by a Python script
+* systemd services start with more restrictions [KC-430]
+Packaging changes:
+* libkcpyplug.so.0 is dlopened from kopano-{dagent,spooler};
+  dagent/spooler packages need a Require on it
+  for a default install to function.
+
+
+8.6.8 (2018-10-03)
+==================
+Fixes:
+* dagent/client: fixed broken umlauts in PR_EC_BODY_FILTERED
+  when input was not UTF-8 [KC-1225]
+* daemons: avoid setting possibly nonexisting locales
+  (specifically en_US) [KC-1271]
+Enhancements:
+* zcontacts: expose mobile phone number, business phone number and company name
+  through ZCABContainer [KC-1246]
+Changes:
+* kopano-server no longer reads the KOPANO_USERSCRIPT_LOCALE variable from
+  {/etc/sysconfig/kopano, /etc/default/kopano} and no longer passes it to
+  kopano-storeadm invocations.
+* Instead, kopano-storeadm reads default_store_locale", from admin.cfg, on its
+  own now, thereby making the behavior of kopano-storeadm consistent between
+  automatic invocations from kopano-server and manual invocations from a
+  command prompt. [KC-1262]
+
+
+8.6.7 (2018-08-14)
+==================
+Fixes:
+* gateway, spooler: (re-)activate RFC 2047 header generation
+  (Outlook is still unable to read the RFC 2231 headers that
+  are generated normally) [KC-1226]
+* srvadm: make --purge-softdelete=0 work
+Enhancements:
+* dagent: advertise 8BITMIME/RFC6152 support [KS-41452]
+Changes:
+* PHP function mapi_icaltomapi now returns MAPI_E_TABLE_EMPTY
+  rather than MAPI_E_INVALID_PARAMETER when the .ics file has no (usable)
+  appointments. [KC-1227]
+
+
+8.6.6 (2018-07-31)
+==================
+Fixes:
+* server: avoid SSL crash near ERR_clear_error on shutdown [KC-1132]
+* ical: recognize quotes in Content-Type charset [KC-1198]
+
+
 8.6.5 (2018-07-23)
 ==================
 Fixes:
@@ -555,7 +673,7 @@ Changes:
   (like postfix) instead of yourself [KC-309]
 * Support for building with a no-SSLv2 OpenSSL 1.1. [KC-230]
   If you run such a setup, be aware that a config setting like
-  "ssl_protocol = !SSLv2" in one or more of kopano-{server,gateway,ical}.cfg
+  "ssl_protocols = !SSLv2" in one or more of kopano-{server,gateway,ical}.cfg
   can inhibit the process from starting.
 * Cleanup of the example LDAP configuration files. [KC-229]
   /usr/share/doc/kopano/example-configs/ now has just a ldap.cfg,

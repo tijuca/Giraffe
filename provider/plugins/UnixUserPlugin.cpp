@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <algorithm>
 #include <exception>
@@ -33,7 +20,6 @@
 #include <crypt.h>
 #include <set>
 #include <iterator>
-
 #ifdef HAVE_SHADOW_H
 #include <shadow.h>
 #include <cerrno>
@@ -43,7 +29,6 @@
 #include <kopano/ECDefs.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/stringutil.h>
 #include "UnixUserPlugin.h"
 #include <kopano/ecversion.h>
@@ -107,13 +92,16 @@ UnixUserPlugin::UnixUserPlugin(std::mutex &pluginlock,
 		throw notsupported("Distributed Kopano not supported when using the Unix Plugin");
 }
 
-void UnixUserPlugin::InitPlugin() {
-	DBPlugin::InitPlugin();
+void UnixUserPlugin::InitPlugin(std::shared_ptr<ECStatsCollector> sc)
+{
+	DBPlugin::InitPlugin(std::move(sc));
 
 	// we only need unix_charset -> kopano charset
-	m_iconv.reset(new ECIConv("utf-8", m_config->GetSetting("fullname_charset")));
-	if (!m_iconv -> canConvert())
+	try {
+		m_iconv.reset(new decltype(m_iconv)::element_type("utf-8", m_config->GetSetting("fullname_charset")));
+	} catch (const convert_exception &) {
 		throw runtime_error(string("Cannot setup charset converter, check \"fullname_charset\" in cfg"));
+	}
 }
 
 void UnixUserPlugin::findUserID(const string &id, struct passwd *pwd, char *buffer)
@@ -828,7 +816,7 @@ UnixUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 
 	for (const auto &id : objectids) {
 		try {
-			mapdetails[id] = this->getObjectDetails(id);
+			mapdetails[id] = getObjectDetails(id);
 		} catch (const objectnotfound &e) {
 			// ignore not found error
 		}

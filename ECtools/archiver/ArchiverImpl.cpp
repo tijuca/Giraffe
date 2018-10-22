@@ -1,23 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 /* ArchiverImpl.cpp
  * Definition of class ArchiverImpl
  */
+#include <memory>
 #include <kopano/platform.h>
 #include <kopano/automapi.hpp>
 #include <kopano/memory.hpp>
@@ -49,7 +38,7 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 			return FileNotFound;
 	} else if (m_lpsConfig->HasErrors()) {
 		if (!(ulFlags & InhibitErrorLogging)) {
-			object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
+			std::shared_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false));
 			ec_log_set(lpLogger);
 			LogConfigErrors(m_lpsConfig.get());
 		}
@@ -57,29 +46,29 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 		return InvalidConfig;
 	}
 
-	m_lpLogLogger.reset(CreateLogger(m_lpsConfig.get(), const_cast<char *>(lpszAppName), ""), false);
+	m_lpLogLogger.reset(CreateLogger(m_lpsConfig.get(), const_cast<char *>(lpszAppName), ""));
 	if (ulFlags & InhibitErrorLogging) {
 		// We need to check if we're logging to stderr. If so we'll replace
 		// the logger with a NULL logger.
 		auto lpFileLogger = dynamic_cast<ECLogger_File *>(m_lpLogLogger.get());
 		if (lpFileLogger && lpFileLogger->IsStdErr())
-			m_lpLogLogger.reset(new ECLogger_Null, false);
-		m_lpLogger.reset(m_lpLogLogger);
+			m_lpLogLogger.reset(new ECLogger_Null);
+		m_lpLogger = m_lpLogLogger;
 	} else if (ulFlags & AttachStdErr) {
 		// We need to check if the current logger isn't logging to the console
 		// as that would give duplicate messages
 		auto lpFileLogger = dynamic_cast<ECLogger_File *>(m_lpLogLogger.get());
 		if (lpFileLogger == NULL || !lpFileLogger->IsStdErr()) {
-			object_ptr<ECLogger_Tee> lpTeeLogger(new ECLogger_Tee, false);
+			std::shared_ptr<ECLogger_Tee> lpTeeLogger(new ECLogger_Tee);
 			lpTeeLogger->AddLogger(m_lpLogLogger);
-			object_ptr<ECLogger_File> lpConsoleLogger(new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false), false);
+			std::shared_ptr<ECLogger_File> lpConsoleLogger(new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false));
 			lpTeeLogger->AddLogger(lpConsoleLogger);
-			m_lpLogger.reset(lpTeeLogger);
+			m_lpLogger = lpTeeLogger;
 		} else {
-			m_lpLogger.reset(m_lpLogLogger);
+			m_lpLogger = m_lpLogLogger;
 		}
 	} else {
-		m_lpLogger.reset(m_lpLogLogger);
+		m_lpLogger = m_lpLogLogger;
 	}
 
 	ec_log_set(m_lpLogger);
@@ -147,7 +136,7 @@ ECLogger* ArchiverImpl::GetLogger(eLogType which) const
 		case DefaultLog:
 			return ec_log_get();
 		case LogOnly:
-			return m_lpLogLogger;
+			return m_lpLogLogger.get();
 		default:
 			return nullptr;
 	}

@@ -1,33 +1,22 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
+#include <list>
 #include <new>
 #include <string>
 #include <utility>
+#include <kopano/database.hpp>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
+#include <kopano/stringutil.h>
+#include <kopano/Util.h>
 #include <mapidefs.h>
 #include <mapitags.h>
-#include <kopano/lockhelper.hpp>
 #include "ECMAPI.h"
 #include "ECGenericObjectTable.h"
-#include "ECSearchObjectTable.h"
 #include "ECConvenientDepthObjectTable.h"
 #include "ECStoreObjectTable.h"
-#include "ECMultiStoreTable.h"
 #include "ECUserStoreTable.h"
 #include "ECABObjectTable.h"
 #include "ECStatsTables.h"
@@ -41,12 +30,51 @@
 #include "SOAPUtils.h"
 #include <kopano/stringutil.h>
 #include "ECServerEntrypoint.h"
-#include "ECMailBoxTable.h"
-
 #include <kopano/mapiext.h>
 #include <edkmdb.h>
 
 namespace KC {
+
+class ECMailBoxTable final : public ECStoreObjectTable {
+	public:
+	static ECRESULT Create(ECSession *s, unsigned int flags, const ECLocale &l, ECMailBoxTable **p)
+	{
+		return alloc_wrap<ECMailBoxTable>(s, flags, l).put(p);
+	}
+	virtual ECRESULT Load();
+
+	protected:
+	ECMailBoxTable(ECSession *s, unsigned int f, const ECLocale &l) :
+		ECStoreObjectTable(s, 0, nullptr, 0, MAPI_STORE, f, TABLE_FLAG_OVERRIDE_HOME_MDB, l)
+	{}
+
+	private:
+	ALLOC_WRAP_FRIEND;
+};
+
+/*
+ * The search folders only differ from normal "store" tables in that they load
+ * the object list from the searchresults instead of from the hierarchy table.
+ */
+class ECSearchObjectTable final : public ECStoreObjectTable {
+	public:
+	static ECRESULT Create(ECSession *ses, unsigned int store,
+	    GUID *guid, unsigned int folder, unsigned int objtype,
+	    unsigned int flags, const ECLocale &loc, ECStoreObjectTable **out)
+	{
+		return alloc_wrap<ECSearchObjectTable>(ses, store, guid,
+		       folder, objtype, flags, loc).put(out);
+	}
+
+	virtual ECRESULT Load();
+
+	protected:
+	ECSearchObjectTable(ECSession *, unsigned int store, GUID *guid, unsigned int folder, unsigned int objtype, unsigned int flags, const ECLocale &);
+
+	private:
+	unsigned int m_ulFolderId, m_ulStoreId;
+	ALLOC_WRAP_FRIEND;
+};
 
 void FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel);
 
@@ -137,16 +165,11 @@ static const struct propTagArray sPropTagArrayCompanyStats =
 static const struct propTagArray sPropTagArrayServerStats =
 	{const_cast<unsigned int *>(sServerStatsProps), ARRAY_SIZE(sServerStatsProps)};
 
-ECTableManager::ECTableManager(ECSession *lpSession)
-{
-	this->lpSession = lpSession;
-}
-
 ECTableManager::~ECTableManager()
 {
 	scoped_rlock lock(hListMutex);
 
-	// Clean up tables, if CloseTable(..) isn't called 
+	// Clean up tables, if CloseTable(..) isn't called
 	for (auto iterTables = mapTable.cbegin();
 	     iterTables != mapTable.cend(); ) {
 		auto iterNext = iterTables;
@@ -164,9 +187,7 @@ void ECTableManager::AddTableEntry(std::unique_ptr<TABLE_ENTRY> &&arg,
 	mapTable[ulNextTableId] = std::move(arg);
 	auto &lpEntry = mapTable[ulNextTableId];
 	lpEntry->lpTable->AddRef();
-
 	*lpulTableId = ulNextTableId;
-	
 	lpEntry->lpTable->SetTableId(*lpulTableId);
 
 	// Subscribe to events for this table, if needed
@@ -197,7 +218,6 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	std::string strQuery;
 	struct propTagArray *lpsPropTags = NULL;
 	GUID sGuid;
-	sObjectTableKey sRowItem;
 	const ECLocale locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
 	ECDatabase *lpDatabase = NULL;
 
@@ -225,7 +245,6 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 		strQuery += " WHERE o.flags & 1 =" + stringify(EC_SUBMIT_LOCAL) + " AND o.store_id=" + stringify(ulStoreId);
 	else
 		strQuery += " WHERE o.flags & 1 =" + stringify(EC_SUBMIT_MASTER);
-
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
@@ -233,7 +252,6 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		if(lpDBRow[0] == NULL)
 			continue;
-
 		// Item found without entryid, item already deleted, so delete the item from the queue
 		if (lpDBRow[1] == NULL) {
 			ec_log_err("Removing stray object \"%s\" from outgoing table", lpDBRow[0]);
@@ -241,7 +259,6 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 			lpDatabase->DoDelete(strQuery); //ignore errors
 			continue;
 		}
-		
 		lpTable->UpdateRow(ECKeyTable::TABLE_ROW_ADD, atoi(lpDBRow[0]), 0);
 	}
 
@@ -255,11 +272,8 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	if (lpTable->GetColumns(NULL, TBL_ALL_COLUMNS, &lpsPropTags) == erSuccess)
 		lpTable->SetColumns(lpsPropTags, false);
 	lpTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
-
 exit:
-	if(lpsPropTags)
-		FreePropTagArray(lpsPropTags);
-
+	FreePropTagArray(lpsPropTags);
 	return er;
 }
 
@@ -271,10 +285,10 @@ ECRESULT ECTableManager::OpenUserStoresTable(unsigned int ulFlags, unsigned int 
 	auto er = ECUserStoreTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
 		return er;
-
 	std::unique_ptr<TABLE_ENTRY> lpEntry(new(std::nothrow) TABLE_ENTRY);
 	if (lpEntry == nullptr)
 		return KCERR_NOT_ENOUGH_MEMORY;
+
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_USERSTORES;
@@ -295,10 +309,10 @@ ECRESULT ECTableManager::OpenMultiStoreTable(unsigned int ulObjType, unsigned in
 	auto er = ECMultiStoreTable::Create(lpSession, ulObjType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
 		return er;
-
 	std::unique_ptr<TABLE_ENTRY> lpEntry(new(std::nothrow) TABLE_ENTRY);
 	if (lpEntry == nullptr)
 		return KCERR_NOT_ENOUGH_MEMORY;
+
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_MULTISTORE;
@@ -325,7 +339,9 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 		return er;
 
 	auto locale = sesmgr->GetSortLocale(ulStoreId);
-	if (sesmgr->GetSearchFolders()->IsSearchFolder(ulParent) == erSuccess) {
+	unsigned int folder_flags = 0;
+	er = sesmgr->GetCacheManager()->GetObjectFlags(ulParent, &folder_flags);
+	if (er == erSuccess && folder_flags == FOLDER_SEARCH) {
 		if (ulObjType == MAPI_FOLDER || ulFlags & (MSGFLAG_DELETED | MAPI_ASSOCIATED))
 			return KCERR_NO_SUPPORT;
 		er = lpSession->GetSecurity()->CheckPermission(ulParent, ecSecurityFolderVisible);
@@ -333,7 +349,6 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 			return er;
 		else
 			er = ECSearchObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, &~lpTable);
-
 	} else if(ulObjType == MAPI_FOLDER && (ulFlags & CONVENIENT_DEPTH))
 		er = ECConvenientDepthObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, &~lpTable);
 	else
@@ -355,7 +370,6 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 	// First, add table to internal list of tables. This means we can already start
 	// receiving notifications on this table
 	AddTableEntry(std::move(lpEntry), lpulTableId);
-
 	// Load a default column set
 	if (ulObjType == MAPI_MESSAGE)
 		lpTable->SetColumns(&sPropTagArrayContents, true);
@@ -368,8 +382,7 @@ static void AuditStatsAccess(ECSession *lpSession, const char *access, const cha
 {
 	if (!lpSession->GetSessionManager()->GetAudit())
 		return;
-	std::string strUsername;
-	std::string strImpersonator;
+	std::string strUsername, strImpersonator;
 	auto sec = lpSession->GetSecurity();
 	sec->GetUsername(&strUsername);
 	auto audit = lpSession->GetSessionManager()->GetAudit();
@@ -387,7 +400,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	int adminlevel = lpSession->GetSecurity()->GetAdminLevel();
 	bool hosted = lpSession->GetSessionManager()->IsHostedSupported();
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
-	
+
 	// TABLETYPE_STATS_SYSTEM: only for (sys)admins
 	// TABLETYPE_STATS_SESSIONS: only for (sys)admins
 	// TABLETYPE_STATS_USERS: full list: only for (sys)admins, company list: only for admins
@@ -507,7 +520,6 @@ ECRESULT ECTableManager::OpenABTable(unsigned int ulParent, unsigned int ulParen
 		er = ECConvenientDepthABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	else
 		er = ECABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
-
 	if (er != erSuccess)
 		return er;
 
@@ -550,7 +562,6 @@ ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 		return er;
 
 	auto &lpEntry = iterTables->second;
-
 	// Unsubscribe if needed
 	switch (lpEntry->ulTableType) {
 	case TABLE_ENTRY::TABLE_TYPE_GENERIC:
@@ -571,10 +582,8 @@ ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 	auto lpEntry2 = std::move(lpEntry);
 	// Now, remove the table from the open table list
 	mapTable.erase(ulTableId);
-
 	// Unlock the table now as the search thread may not be able to exit without a hListMutex lock
 	lk.unlock();
-
 	// Free table data and threads running
 	lpEntry2->lpTable->Release();
 	return er;
@@ -583,7 +592,6 @@ ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 ECRESULT ECTableManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, unsigned ulStoreId, std::list<unsigned int> &lstObjId, unsigned int ulFlags, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	sObjectTableKey	sRow;
 	scoped_rlock lock(hListMutex);
 
 	for (const auto &t : mapTable) {
@@ -603,11 +611,9 @@ ECRESULT ECTableManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, uns
 ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned int ulFlags, unsigned int ulObjId, std::list<unsigned int> &lstChildId, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	sObjectTableKey	sRow;
 	scoped_rlock lock(hListMutex);
 	bool filter_private = false;
-	std::string strInQuery;
-	std::string strQuery;
+	std::string strInQuery, strQuery;
 	std::set<unsigned int> setObjIdPrivate;
 	std::list<unsigned int> lstChildId2;
 	ECDatabase *lpDatabase = NULL;
@@ -616,26 +622,16 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
 
 	// This is called when a table has changed, so we have to see if the table in question is actually loaded by this table
 	// manager, and then update the row if required.
-
 	// Outlook may show the subject of sensitive messages (e.g. in
 	// reminder popup), so filter these from shared store notifications
-
 	if(lpSession->GetSecurity()->IsStoreOwner(ulObjId) == KCERR_NO_ACCESS &&
 	    lpSession->GetSecurity()->GetAdminLevel() == 0 &&
 	    lstChildId.size() != 0) {
-
 		er = lpSession->GetDatabase(&lpDatabase);
 		if (er != erSuccess)
 			return er;
-
-		for(auto it = lstChildId.begin(); it != lstChildId.end(); ++it) {
-			if(it != lstChildId.begin())
-				strInQuery += ",";
-			strInQuery += stringify(*it);
-		}
-
-		strQuery = "SELECT hierarchyid FROM properties WHERE hierarchyid IN (" + strInQuery + ") AND tag = " + stringify(PROP_ID(PR_SENSITIVITY)) + " AND val_ulong >= 2;";
-
+		strInQuery = kc_join(lstChildId, ",", stringify);
+		strQuery = "SELECT hierarchyid FROM properties WHERE hierarchyid IN (" + std::move(strInQuery) + ") AND tag = " + stringify(PROP_ID(PR_SENSITIVITY)) + " AND val_ulong >= 2;";
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if(er != erSuccess)
 			return er;
@@ -644,7 +640,6 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
 				continue;
 			setObjIdPrivate.emplace(atoui(lpDBRow[0]));
 		}
-
 		for(auto it = lstChildId.begin(); it != lstChildId.end(); ++it)
 			if (setObjIdPrivate.find(*it) == setObjIdPrivate.end())
 				lstChildId2.emplace_back(*it);
@@ -679,17 +674,124 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
 ECRESULT ECTableManager::GetStats(unsigned int *lpulTables, unsigned int *lpulObjectSize)
 {
 	scoped_rlock lock(hListMutex);
-
 	unsigned int ulTables = mapTable.size();
 	unsigned int ulSize = MEMORY_USAGE_MAP(ulTables, TABLEENTRYMAP);
+
 	for (const auto &e : mapTable)
 		if (e.second->ulTableType != TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS)
 			/* Skip system stats since it would recursively include itself */
 			ulSize += e.second->lpTable->GetObjectSize();
-
 	*lpulTables = ulTables;
 	*lpulObjectSize = ulSize;
 	return erSuccess;
 }
+
+ECRESULT ECMailBoxTable::Load()
+{
+	ECDatabase *lpDatabase = nullptr;
+	auto er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
+		return er;
+	Clear();
+	auto strQuery = "SELECT hierarchy_id FROM stores";
+	DB_RESULT lpDBResult;
+	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		return er;
+	std::list<unsigned int> lstObjIds;
+	while (true) {
+		auto lpDBRow = lpDBResult.fetch_row();
+		if (lpDBRow == nullptr)
+			break;
+		if (lpDBRow[0] == nullptr)
+			continue; /* Broken store table? */
+		lstObjIds.emplace_back(atoui(lpDBRow[0]));
+	}
+	LoadRows(&lstObjIds, 0);
+	return erSuccess;
+}
+
+ECSearchObjectTable::ECSearchObjectTable(ECSession *ses, unsigned int store,
+    GUID *guid, unsigned int folder, unsigned int objtype,
+    unsigned int flags, const ECLocale &locale) :
+	ECStoreObjectTable(ses, store, guid, 0, objtype, flags, 0, locale)
+{
+	/*
+	 * We don't pass ulFolderId to ECStoreObjectTable (see constructor
+	 * above passing '0'), because it will assume that all rows are in that
+	 * folder if we do that. But we still want to remember the folder ID
+	 * for our own use.
+	 */
+	m_ulFolderId = folder;
+	m_ulStoreId = store;
+}
+
+ECRESULT ECSearchObjectTable::Load()
+{
+	if (m_ulFolderId == 0)
+		return erSuccess;
+	/* Get the search results */
+	scoped_rlock biglock(m_hLock);
+	std::list<unsigned int> objlist, objlist2;
+	std::set<unsigned int> priv;
+	auto er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(m_ulStoreId, m_ulFolderId, &objlist);
+	if (er != erSuccess)
+		return er;
+	if (lpSession->GetSecurity()->IsStoreOwner(m_ulFolderId) != KCERR_NO_ACCESS ||
+	    lpSession->GetSecurity()->GetAdminLevel() > 0 ||
+	    objlist.size() == 0)
+		return UpdateRows(ECKeyTable::TABLE_ROW_ADD, &objlist, 0, true);
+	/*
+	 * Outlook may show the subject of sensitive messages (e.g. in reminder
+	 * popup), so filter these from shared store searches.
+	 */
+	ECDatabase *db = nullptr;
+	er = lpSession->GetDatabase(&db);
+	if (er != erSuccess)
+		return er;
+	auto in_query = kc_join(objlist, ",", stringify);
+	auto query = "SELECT hierarchyid FROM properties WHERE hierarchyid IN (" +
+	             std::move(in_query) + ") AND tag = " + stringify(PROP_ID(PR_SENSITIVITY)) +
+	             " AND val_ulong >= 2;";
+	DB_RESULT result;
+	DB_ROW row;
+	er = db->DoSelect(query, &result);
+	if (er != erSuccess)
+		return er;
+	while ((row = result.fetch_row()) != nullptr) {
+		if (row == nullptr || row[0] == nullptr)
+			continue;
+		priv.emplace(atoui(row[0]));
+	}
+	for (auto i = objlist.begin(); i != objlist.end(); ++i)
+		if (priv.find(*i) == priv.end())
+			objlist2.emplace_back(*i);
+	return UpdateRows(ECKeyTable::TABLE_ROW_ADD, &objlist2, 0, true);
+}
+
+ECMultiStoreTable::ECMultiStoreTable(ECSession *ses, unsigned int ulObjType,
+    unsigned int ulFlags, const ECLocale &locale) :
+	ECStoreObjectTable(ses, 0, nullptr, 0, ulObjType, ulFlags, 0, locale)
+{}
+
+ECRESULT ECMultiStoreTable::Create(ECSession *ses, unsigned int ulObjType,
+    unsigned int ulFlags, const ECLocale &locale, ECMultiStoreTable **lppTable)
+{
+	return alloc_wrap<ECMultiStoreTable>(ses, ulObjType,
+	       ulFlags, locale).put(lppTable);
+}
+
+ECRESULT ECMultiStoreTable::SetEntryIDs(ECListInt *lplObjectList) {
+	m_lstObjects = *lplObjectList;
+	return erSuccess;
+}
+
+ECRESULT ECMultiStoreTable::Load() {
+	Clear();
+	for (auto i = m_lstObjects.begin(); i != m_lstObjects.end(); ++i)
+		UpdateRow(ECKeyTable::TABLE_ROW_ADD, *i, 0);
+	return erSuccess;
+}
+
 
 } /* namespace */

@@ -1,10 +1,11 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 %include "typemaps.i"
 
 %apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cbUserId, LPENTRYID lpUserId), (ULONG cbStoreId, LPENTRYID lpStoreId), (ULONG cbRootId, LPENTRYID lpRootId), (ULONG cbCompanyId, LPENTRYID lpCompanyId), (ULONG cbCompanyId, ENTRYID *lpCompanyId), (ULONG cbGroupId, LPENTRYID lpGroupId), (ULONG cbSenderId, LPENTRYID lpSenderId), (ULONG cbRecipientId, LPENTRYID lpRecipientId), (ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId)};
 
 %apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUT, LPECUSER *OUTPUT), (ULONG *OUTPUT, LPECGROUP *OUTPUT), (ULONG *OUTPUT, LPECCOMPANY *OUTPUT)};
 %apply MAPISTRUCT_W_FLAGS {LPECUSER, LPECCOMPANY, LPECGROUP};
-%apply MAPISTRUCT * {LPECUSER *OUTPUT, LPECQUOTA *OUTPUT, LPECUSERCLIENTUPDATESTATUS *OUTPUT, LPECCOMPANY *OUTPUT, LPECGROUP *OUTPUT, LPECQUOTASTATUS *OUTPUT};
+%apply MAPISTRUCT * {LPECUSER *OUTPUT, LPECQUOTA *OUTPUT, LPECCOMPANY *OUTPUT, LPECGROUP *OUTPUT, LPECQUOTASTATUS *OUTPUT};
 %apply MAPISTRUCT {LPECQUOTA};
 
 %apply MAPILIST {LPECSVRNAMELIST};
@@ -62,7 +63,6 @@ public:
 	virtual HRESULT GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *OUTPUT /*lpcSenders*/, LPECUSER *OUTPUT /*lppSenders*/) = 0;
 	virtual HRESULT AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
 	virtual HRESULT DelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
-    virtual HRESULT GetUserClientUpdateStatus(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS  *OUTPUT /*lppECUCUS*/) = 0;
     virtual HRESULT RemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId) = 0;
 
 	// Group functions

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -14,6 +15,19 @@ except ImportError:
 import sys
 import threading
 import traceback
+
+FMT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+def _kopano_logger():
+    log = logging.getLogger('kopano')
+    log.setLevel(logging.WARNING)
+    fh = logging.StreamHandler(sys.stderr)
+    log.addHandler(fh)
+    formatter = logging.Formatter(FMT)
+    fh.setFormatter(formatter)
+    return log
+
+LOG = _kopano_logger()
 
 def _loglevel(options, config):
     if options and getattr(options, 'loglevel', None):
@@ -41,8 +55,7 @@ def logger(service, options=None, stdout=False, config=None, name=''):
     logger = logging.getLogger(name or service)
     if logger.handlers:
         return logger
-    fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    formatter = logging.Formatter(fmt)
+    formatter = logging.Formatter(FMT)
     log_method = 'file'
     log_file = '/var/log/kopano/%s.log' % service
     if config:
@@ -90,12 +103,15 @@ Example usage::
     try: yield
     except Exception:
         log.error(traceback.format_exc())
-        if stats:
+        if stats is not None:
+            if 'errors' not in stats:
+                stats['errors'] = 0
             stats['errors'] += 1
 
+# TODO use python3 builtins if available (log.handlers.*?)
 
 # log-to-queue handler copied from Vinay Sajip
-class QueueHandler(logging.Handler):
+class QueueHandler(logging.Handler): # pragma: no cover
     def __init__(self, queue):
         logging.Handler.__init__(self)
         self.queue = queue
@@ -117,7 +133,7 @@ class QueueHandler(logging.Handler):
             self.handleError(record)
 
 # log-to-queue listener copied from Vinay Sajip
-class QueueListener(object):
+class QueueListener(object): # pragma: no cover
     def __init__(self, queue, *handlers):
         self.queue = queue
         self.handlers = handlers

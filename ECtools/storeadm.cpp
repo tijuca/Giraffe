@@ -1,36 +1,29 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005-2016 Zarafa and its licensors
  * Copyright 2018, Kopano and its licensors
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, version 3 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <clocale>
 #include <cstdio>
 #include <cstdlib>
 #include <mapidefs.h>
-#include <popt.h>
+#include <json/writer.h>
+#include <libHX/option.h>
 #include <kopano/automapi.hpp>
 #include <kopano/CommonUtil.h>
 #include <kopano/ECABEntryID.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECRestriction.h>
+#include <kopano/EMSAbTag.h>
 #include <kopano/IECInterfaces.hpp>
 #include <kopano/MAPIErrors.h>
 #include <kopano/platform.h>
 #include <kopano/stringutil.h>
+#include <kopano/timeutil.hpp>
 #include <kopano/memory.hpp>
 #include <kopano/charset/convert.h>
 #include "ConsoleTable.h"
@@ -40,32 +33,35 @@ using namespace KC;
 
 static int opt_create_store, opt_create_public, opt_detach_store;
 static int opt_copytopublic, opt_list_orphan, opt_show_version;
+static int opt_list_mbt;
 static const char *opt_attach_store, *opt_remove_store;
 static const char *opt_config_file, *opt_host;
 static const char *opt_entity_name, *opt_entity_type;
 static const char *opt_companyname, *opt_lang;
 static std::unique_ptr<ECConfig> adm_config;
 
-static constexpr const struct poptOption adm_options[] = {
-	{nullptr, 'A', POPT_ARG_STRING, &opt_attach_store, 0, "Attach an orphaned store by GUID to a user account (with -n)"},
-	{nullptr, 'C', POPT_ARG_NONE, &opt_create_store, 0, "Create a store and attach it to a user account (with -n)"},
-	{nullptr, 'D', POPT_ARG_NONE, &opt_detach_store, 0, "Detach a user's store (with -n) and make it orphan"},
-	{nullptr, 'O', POPT_ARG_NONE, &opt_list_orphan, 0, "List orphaned stores"},
-	{nullptr, 'P', POPT_ARG_NONE, &opt_create_public, 0, "Create a public store"},
-	{nullptr, 'R', POPT_ARG_STRING, &opt_remove_store, 0, "Remove an orphaned store by GUID"},
-	{nullptr, 'V', POPT_ARG_NONE, &opt_show_version, 0, "Show the program version"},
-	{nullptr, 'c', POPT_ARG_STRING, &opt_config_file, 'c', "Specify alternate config file"},
-	{nullptr, 'h', POPT_ARG_STRING, &opt_host, 0, "URI for server"},
-	{nullptr, 'k', POPT_ARG_STRING, &opt_companyname, 0, "Name of the company for creating a public store in a multi-tenant setup"},
-	{nullptr, 'l', POPT_ARG_STRING, &opt_lang, 0, "Use given locale for selecting folder names"},
-	{nullptr, 'n', POPT_ARG_STRING, &opt_entity_name, 0, "User/group/company account to work on for -A,-C,-D"},
-	{nullptr, 'p', POPT_ARG_NONE, &opt_copytopublic, 0, "Copy an orphaned store's root to a subfolder in the public store"},
-	{nullptr, 't', POPT_ARG_STRING, &opt_entity_type, 0, "Store type for the -n argument (user, archive, group, company)"},
-	POPT_AUTOHELP
-	{nullptr}
+static constexpr const struct HXoption adm_options[] = {
+	{nullptr, 'A', HXTYPE_STRING, &opt_attach_store, nullptr, nullptr, 0, "Attach an orphaned store by GUID to a user account (with -n)", "GUID"},
+	{nullptr, 'C', HXTYPE_NONE, &opt_create_store, nullptr, nullptr, 0, "Create a store and attach it to a user account (with -n)"},
+	{nullptr, 'D', HXTYPE_NONE, &opt_detach_store, nullptr, nullptr, 0, "Detach a user's store (with -n) and make it orphan"},
+	{nullptr, 'M', HXTYPE_NONE, &opt_list_mbt, nullptr, nullptr, 0, "Show the so-called mailbox table"},
+	{nullptr, 'O', HXTYPE_NONE, &opt_list_orphan, nullptr, nullptr, 0, "List orphaned stores"},
+	{nullptr, 'P', HXTYPE_NONE, &opt_create_public, nullptr, nullptr, 0, "Create a public store"},
+	{nullptr, 'R', HXTYPE_STRING, &opt_remove_store, nullptr, nullptr, 0, "Remove an orphaned store by GUID", "GUID"},
+	{nullptr, 'V', HXTYPE_NONE, &opt_show_version, nullptr, nullptr, 0, "Show the program version"},
+	{nullptr, 'c', HXTYPE_STRING, &opt_config_file, nullptr, nullptr, 0, "Specify alternate config file", "FILENAME"},
+	{nullptr, 'h', HXTYPE_STRING, &opt_host, nullptr, nullptr, 0, "URI for server", "URI"},
+	{nullptr, 'k', HXTYPE_STRING, &opt_companyname, nullptr, nullptr, 0, "Name of the company for creating a public store in a multi-tenant setup", "NAME"},
+	{nullptr, 'l', HXTYPE_STRING, &opt_lang, nullptr, nullptr, 0, "Use given locale for selecting folder names", "LOCALE"},
+	{nullptr, 'n', HXTYPE_STRING, &opt_entity_name, nullptr, nullptr, 0, "User/group/company account to work on for -A,-C,-D", "NAME"},
+	{nullptr, 'p', HXTYPE_NONE, &opt_copytopublic, nullptr, nullptr, 0, "Copy an orphaned store's root to a subfolder in the public store"},
+	{nullptr, 't', HXTYPE_STRING, &opt_entity_type, nullptr, nullptr, 0, "Store type for the -n argument (user, archive, group, company)", "TYPE"},
+	HXOPT_AUTOHELP,
+	HXOPT_TABLEEND,
 };
 
 static constexpr const configsetting_t adm_config_defaults[] = {
+	{"default_store_locale", ""},
 	{"server_socket", "default:"},
 	{"sslkey_file", ""},
 	{"sslkey_pass", ""},
@@ -107,10 +103,11 @@ static const char *store_type_string(unsigned int t)
 /**
  * List users without a store, and stores without a user.
  *
- * Gets a list of users and stores. Because of the sorting chosen, stores
- * without a user will be printed first, until the first user without a store
- * is found. Then those are printed, until the first user with a store is
- * found.
+ * Gets a list of users and stores. (The server only returns users/stores which
+ * are home to the chosen server, thereby excluding archives located
+ * elsewhere.) Because of the sorting chosen, stores without a user will be
+ * printed first, until the first user without a store is found. Then those are
+ * printed, until the first user with a store is found.
  */
 static HRESULT adm_list_orphans(IECServiceAdmin *svcadm)
 {
@@ -179,6 +176,55 @@ static HRESULT adm_list_orphans(IECServiceAdmin *svcadm)
 		}
 	}
 	ct.PrintTable();
+	return hrSuccess;
+}
+
+static HRESULT adm_list_mbt(KServerContext &srvctx)
+{
+	/* Unlike ECUserStoreTable, the MBT is the real thing. */
+	object_ptr<IExchangeManageStore> ms;
+	auto ret = srvctx.m_admstore->QueryInterface(IID_IExchangeManageStore, &~ms);
+	if (ret != hrSuccess)
+		return kc_perror("QueryInterface", ret);
+	object_ptr<IMAPITable> table;
+	ret = ms->GetMailboxTable(nullptr, &~table, MAPI_DEFERRED_ERRORS);
+	if (ret != hrSuccess)
+		return ret;
+	static constexpr const SizedSPropTagArray(5, sp) =
+		{5, {PR_MAILBOX_OWNER_ENTRYID, PR_EC_STORETYPE,
+		PR_DISPLAY_NAME_A, PR_DISPLAY_NAME_W, PR_LAST_MODIFICATION_TIME}};
+	ret = table->SetColumns(sp, TBL_BATCH);
+	if (ret != hrSuccess)
+		return ret;
+
+	while (true) {
+		rowset_ptr rowset;
+		ret = table->QueryRows(-1, 0, &~rowset);
+		if (ret != hrSuccess)
+			return kc_perror("QueryRows", ret);
+		if (rowset.size() == 0)
+			break;
+
+		for (unsigned int i = 0; i < rowset->cRows; ++i) {
+			Json::Value outrow;
+			auto p = rowset[i].cfind(PR_MAILBOX_OWNER_ENTRYID);
+			if (p != nullptr)
+				outrow["owner"] = bin2hex(p->Value.bin);
+			p = rowset[i].cfind(PR_EC_STORETYPE);
+			if (p != nullptr)
+				outrow["type"] = store_type_string(p->Value.ul);
+			p = rowset[i].cfind(PR_DISPLAY_NAME_A);
+			if (p != nullptr)
+				outrow["display_name"] = p->Value.lpszA;
+			p = rowset[i].cfind(PR_DISPLAY_NAME_W);
+			if (p != nullptr)
+				outrow["display_name_w"] = p->Value.lpszW;
+			p = rowset[i].cfind(PR_LAST_MODIFICATION_TIME);
+			if (p != nullptr)
+				outrow["mtime"] = static_cast<Json::Value::Int64>(FileTimeToUnixTime(p->Value.ft));
+			puts(Json::writeString(Json::StreamWriterBuilder(), outrow).c_str());
+		}
+	}
 	return hrSuccess;
 }
 
@@ -571,7 +617,7 @@ static HRESULT adm_detach_store(KServerContext &kadm)
 				return kc_perror("Unable to retrieve store entryid", ret);
 		} else {
 			object_ptr<IExchangeManageStore> ms;
-			auto ret = kadm.m_admstore->QueryInterface(IID_IExchangeManageStore, &~ms);
+			ret = kadm.m_admstore->QueryInterface(IID_IExchangeManageStore, &~ms);
 			if (ret != hrSuccess)
 				return kc_perror("QueryInterface", ret);
 			/*
@@ -609,7 +655,7 @@ static HRESULT adm_create_store(IECServiceAdmin *svcadm)
 	ret = svcadm->CreateStore(ECSTORE_TYPE_PRIVATE, user_size, user_eid,
 	      &store_size, &~store_eid, &root_size, &~root_fld);
 	if (ret == MAPI_E_COLLISION)
-		return kc_perror("Public store already exists", ret);
+		return kc_perror("User store already exists", ret);
 	if (ret != hrSuccess)
 		return kc_perror("Unable to create store", ret);
 	if (store_size == sizeof(EID))
@@ -692,39 +738,34 @@ static HRESULT adm_perform()
 		return adm_attach_store(srvctx, opt_attach_store);
 	if (opt_list_orphan)
 		return adm_list_orphans(srvctx.m_svcadm);
+	if (opt_list_mbt)
+		return adm_list_mbt(srvctx);
 	return MAPI_E_CALL_FAILED;
 }
 
-static bool adm_parse_options(int &argc, char **&argv)
+static bool adm_parse_options(int &argc, const char **&argv)
 {
 	adm_config.reset(ECConfig::Create(adm_config_defaults));
-	opt_config_file = ECConfig::GetDefaultPath("admin.cfg");
-	adm_config->LoadSettings(opt_config_file);
+	adm_config->LoadSettings(ECConfig::GetDefaultPath("admin.cfg"));
 
-	auto ctx = poptGetContext(nullptr, argc, const_cast<const char **>(argv), adm_options, 0);
-	int c;
-	while ((c = poptGetNextOpt(ctx)) >= 0) {
-		if (c == 'c') {
-			adm_config->LoadSettings(opt_config_file);
-			if (adm_config->HasErrors()) {
-				fprintf(stderr, "Error reading config file %s\n", opt_config_file);
-				return false;
-			}
-		}
-	}
-	if (c < -1) {
-		fprintf(stderr, "%s\n", poptStrerror(c));
-		poptPrintHelp(ctx, stderr, 0);
+	if (HX_getopt(adm_options, &argc, &argv, HXOPT_USAGEONERR) != HXOPT_ERR_SUCCESS)
 		return false;
+	if (opt_config_file != nullptr) {
+		adm_config->LoadSettings(opt_config_file);
+		if (adm_config->HasErrors()) {
+			fprintf(stderr, "Error reading config file %s\n", opt_config_file);
+			LogConfigErrors(adm_config.get());
+			return false;
+		}
 	}
 	auto act = !!opt_attach_store + !!opt_detach_store + !!opt_create_store +
 	           !!opt_remove_store + !!opt_create_public + !!opt_list_orphan +
-	           !!opt_show_version;
+	           !!opt_list_mbt + !!opt_show_version;
 	if (act > 1) {
-		fprintf(stderr, "-A, -C, -D, -O, -P, -R and -V are mutually exclusive.\n");
+		fprintf(stderr, "-A, -C, -D, -M, -O, -P, -R and -V are mutually exclusive.\n");
 		return false;
 	} else if (act == 0) {
-		fprintf(stderr, "One of -A, -C, -D, -O, -P, -R, -V or -? must be specified.\n");
+		fprintf(stderr, "One of -A, -C, -D, -M, -O, -P, -R, -V or -? must be specified.\n");
 		return false;
 	} else if (opt_attach_store != nullptr && ((opt_entity_name != nullptr) == !!opt_copytopublic)) {
 		fprintf(stderr, "-A needs exactly one of -n or -p\n");
@@ -736,18 +777,22 @@ static bool adm_parse_options(int &argc, char **&argv)
 		fprintf(stderr, "-l can only be used with -C or -P.\n");
 		return false;
 	}
+	if (opt_lang == nullptr)
+		opt_lang = adm_config->GetSetting("default_store_locale");
 	return true;
 }
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv) try
 {
 	setlocale(LC_ALL, "");
 	ec_log_get()->SetLoglevel(EC_LOGLEVEL_INFO);
 	if (!adm_parse_options(argc, argv))
 		return EXIT_FAILURE;
-	if (opt_lang != nullptr && setlocale(LC_MESSAGES, opt_lang) == nullptr) {
+	if (opt_lang != nullptr && *opt_lang != '\0' && setlocale(LC_MESSAGES, opt_lang) == nullptr) {
 		fprintf(stderr, "Your system does not have the \"%s\" locale available.\n", opt_lang);
 		return EXIT_FAILURE;
 	}
 	return adm_perform() == hrSuccess ? EXIT_SUCCESS : EXIT_FAILURE;
+} catch (...) {
+	std::terminate();
 }

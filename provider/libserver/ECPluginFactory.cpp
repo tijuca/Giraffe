@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
+#include <memory>
+#include <utility>
 #include <cstring>
 #include <climits>
-
 #include "ECPluginFactory.h"
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
@@ -27,11 +14,11 @@
 
 namespace KC {
 
-ECPluginFactory::ECPluginFactory(ECConfig *config, ECStatsCollector *lpStatsCollector,
-    bool bHosted, bool bDistributed) :
-	m_config(config)
+ECPluginFactory::ECPluginFactory(std::shared_ptr<ECConfig> cfg,
+    std::shared_ptr<ECStatsCollector> sc, bool bHosted, bool bDistributed) :
+	m_config(std::move(cfg)), m_stats(std::move(sc))
 {
-	ECPluginSharedData::GetSingleton(&m_shareddata, m_config, lpStatsCollector, bHosted, bDistributed);
+	ECPluginSharedData::GetSingleton(&m_shareddata, m_config, sc, bHosted, bDistributed);
 }
 
 ECPluginFactory::~ECPluginFactory() {
@@ -46,7 +33,7 @@ ECPluginFactory::~ECPluginFactory() {
 ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
     UserPlugin *lpPlugin = NULL;
 
-    if(m_dl == NULL) {    
+    if(m_dl == NULL) {
         const char *pluginname = m_config->GetSetting("user_plugin");
         char filename[PATH_MAX + 1];
         if (!pluginname || !strcmp(pluginname, "")) {
@@ -86,13 +73,12 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 			filename, sversion, PROJECT_VERSION);
 		goto out;
         }
-    
+
         m_getUserPluginInstance = (UserPlugin* (*)(std::mutex &, ECPluginSharedData *)) dlsym(m_dl, "getUserPluginInstance");
         if (m_getUserPluginInstance == NULL) {
 			ec_log_crit("Failed to load getUserPluginInstance from plugin: %s", dlerror());
 			goto out;
         }
-
         m_deleteUserPluginInstance = (void (*)(UserPlugin *)) dlsym(m_dl, "deleteUserPluginInstance");
         if (m_deleteUserPluginInstance == NULL) {
 			ec_log_crit("Failed to load deleteUserPluginInstance from plugin: %s", dlerror());
@@ -101,16 +87,14 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
     }
 	try {
 		lpPlugin = m_getUserPluginInstance(m_plugin_lock, m_shareddata);
-		lpPlugin->InitPlugin();
+		lpPlugin->InitPlugin(m_stats);
 	} catch (const std::exception &e) {
 		ec_log_crit("Cannot instantiate user plugin: %s", e.what());
 		return KCERR_NOT_FOUND;
 	}
-	
+
 	*lppPlugin = lpPlugin;
-
 	return erSuccess;
-
  out:
 	if (m_dl)
 		dlclose(m_dl);
@@ -136,10 +120,8 @@ ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory,
 			ec_log_crit("Unable to instantiate user plugin");
 			return er;
 		}
-
-		pthread_setspecific(plugin_key, (void *)lpPlugin);
+		pthread_setspecific(plugin_key, lpPlugin);
 	}
-
 	*lppPlugin = lpPlugin;
 	return erSuccess;
 }

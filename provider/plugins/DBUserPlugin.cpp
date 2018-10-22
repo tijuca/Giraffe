@@ -1,35 +1,21 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <iostream>
 #include <string>
 #include <stdexcept>
 #include <algorithm>
-
 #include <cerrno>
 #include <cassert>
 #include <mutex>
+#include <utility>
 #include <kopano/EMSAbTag.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECDefs.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
-
 #include <kopano/stringutil.h>
 #include "ECDatabaseFactory.h"
 #include "DBUserPlugin.h"
@@ -69,9 +55,9 @@ DBUserPlugin::DBUserPlugin(std::mutex &pluginlock,
 		throw notsupported("Distributed Kopano not supported when using the Database Plugin");
 }
 
-void DBUserPlugin::InitPlugin()
+void DBUserPlugin::InitPlugin(std::shared_ptr<ECStatsCollector> sc)
 {
-	DBPlugin::InitPlugin();
+	DBPlugin::InitPlugin(std::move(sc));
 }
 
 objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)

@@ -1,19 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2017 - Kopano and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <kopano/zcdefs.h>
 #include <algorithm>
 #include <memory>
 #include <new>
@@ -38,24 +26,26 @@
 
 namespace KC {
 
-class vcftomapi_impl _kc_final : public vcftomapi {
+class vcftomapi_impl final : public vcftomapi {
 	public:
 	/*
 	 * - lpPropObj to lookup named properties
 	 * - Addressbook (Global AddressBook for looking up users)
 	 */
 	vcftomapi_impl(IMAPIProp *o) : vcftomapi(o) {}
-	HRESULT parse_vcf(const std::string &) _kc_override;
-	HRESULT get_item(IMessage *) _kc_override;
+	HRESULT parse_vcf(const std::string &) override;
+	HRESULT get_item(IMessage *) override;
 
 	private:
-	HRESULT save_props(const std::list<SPropValue> &, IMAPIProp *);
+	HRESULT save_photo(IMessage *);
+	HRESULT save_props(const std::list<SPropValue> &, IMessage *);
 	HRESULT handle_N(VObject *);
 	HRESULT handle_TEL(VObject *);
 	HRESULT handle_EMAIL(VObject *);
 	HRESULT handle_ADR(VObject *);
 	HRESULT handle_UID(VObject *);
 	HRESULT handle_ORG(VObject *);
+	HRESULT handle_PHOTO(VObject *);
 	HRESULT vobject_to_prop(VObject *, SPropValue &, ULONG proptype);
 	HRESULT vobject_to_named_prop(VObject *, SPropValue &, ULONG named_proptype);
 	HRESULT unicode_to_named_prop(const wchar_t *, SPropValue &, ULONG named_proptype);
@@ -186,6 +176,16 @@ HRESULT vcftomapi_impl::handle_EMAIL(VObject *v)
 	vobject_to_named_prop(v, s, prop_id);
 	props.emplace_back(s);
 
+	prop_id = 0x8084 + (email_count * 0x10);
+	vobject_to_named_prop(v, s, prop_id);
+	props.emplace_back(s);
+
+	// add email as displayname
+	prop_id = 0x8080 + (email_count * 0x10);
+	auto dname = std::wstring(L"(") + vObjectUStringZValue(v) + std::wstring(L")");
+	unicode_to_named_prop(dname.c_str(), s, prop_id);
+	props.emplace_back(s);
+
 	prop_id = 0x8082 + (email_count * 0x10);
 	auto ret = unicode_to_named_prop(L"SMTP", s, prop_id);
 	if (ret != hrSuccess)
@@ -276,8 +276,7 @@ HRESULT vcftomapi_impl::handle_UID(VObject *v)
 	if (hr != hrSuccess)
 		return hr;
 
-	MAPINAMEID name;
-	MAPINAMEID *namep = &name;
+	MAPINAMEID name, *namep = &name;
 	memory_ptr<SPropTagArray> proptag;
 
 	name.lpguid = const_cast<GUID *>(&PSETID_Meeting);
@@ -320,6 +319,47 @@ HRESULT vcftomapi_impl::handle_ORG(VObject *v)
 			return hr;
 		props.emplace_back(std::move(s));
 	}
+	return hrSuccess;
+}
+
+HRESULT vcftomapi_impl::handle_PHOTO(VObject *v)
+{
+	phototype = PHOTO_NONE;
+	bool base64 = false;
+
+	VObjectIterator t;
+	for (initPropIterator(&t, v); moreIteration(&t); ) {
+		auto vv = nextVObject(&t);
+		auto name = vObjectName(vv);
+		std::string value;
+		if(vObjectValueType(vv) == VCVT_USTRINGZ)
+			value = convert_to<std::string>(vObjectUStringZValue(vv));
+		else if(vObjectValueType(vv) == VCVT_STRINGZ)
+			value = convert_to<std::string>(vObjectStringZValue(vv));
+
+		if (strcmp(name, "ENCODING") == 0 && (strcmp(value.c_str(), "b") == 0 || strcmp(value.c_str(), "BASE64"))) {
+			base64 = true;
+			continue;
+		}
+
+		std::pair<std::string, photo_type_enum> mapping[] = { { "JPEG", PHOTO_JPEG }, { "PNG", PHOTO_PNG }, { "GIF", PHOTO_GIF } };
+		for (const auto &elem : mapping) {
+			auto real_value = strcmp(name, "TYPE") == 0 ? value : name;
+			if (elem.first != real_value)
+				continue;
+			phototype = elem.second;
+			break;
+		}
+	}
+
+	if (!base64 || vObjectValueType(v) != VCVT_USTRINGZ)
+		phototype = PHOTO_NONE;
+
+	if (phototype == PHOTO_NONE)
+		return hrSuccess;
+
+	auto tmp = convert_to<std::string>(vObjectUStringZValue(v));
+	std::copy_if(tmp.cbegin(), tmp.cend(), std::back_inserter(photo), [&](char c) { return c != ' '; });
 	return hrSuccess;
 }
 
@@ -422,6 +462,10 @@ HRESULT vcftomapi_impl::parse_vcf(const std::string &ical)
 			auto hr = handle_UID(v);
 			if (hr != hrSuccess)
 				return hr;
+		} else if (strcmp(name, "PHOTO") == 0) {
+			auto hr = handle_PHOTO(v);
+			if (hr != hrSuccess)
+				return hr;
 		}
 	}
 	cleanVObject(v_orig);
@@ -456,8 +500,7 @@ HRESULT vcftomapi_impl::vobject_to_prop(VObject *v, SPropValue &s, ULONG proptyp
 HRESULT vcftomapi_impl::vobject_to_named_prop(VObject *v, SPropValue &s,
     ULONG named_proptype)
 {
-        MAPINAMEID name;
-	MAPINAMEID *namep = &name;
+	MAPINAMEID name, *namep = &name;
 	memory_ptr<SPropTagArray> proptag;
 
 	name.lpguid = const_cast<GUID *>(&PSETID_Address);
@@ -472,8 +515,7 @@ HRESULT vcftomapi_impl::vobject_to_named_prop(VObject *v, SPropValue &s,
 HRESULT vcftomapi_impl::unicode_to_named_prop(const wchar_t *v, SPropValue &s,
     ULONG named_proptype)
 {
-        MAPINAMEID name;
-	MAPINAMEID *namep = &name;
+	MAPINAMEID name, *namep = &name;
 	memory_ptr<SPropTagArray> proptag;
 
 	name.lpguid = const_cast<GUID *>(&PSETID_Address);
@@ -507,7 +549,90 @@ HRESULT vcftomapi_impl::get_item(IMessage *msg)
 	HRESULT hr = HrSetOneProp(msg, &s);
 	if (hr != hrSuccess)
 		return hr;
+
+	MAPINAMEID name, *namep = &name;
+	memory_ptr<SPropTagArray> proptag;
+
+	name.lpguid = const_cast<GUID *>(&PSETID_Common);
+	name.ulKind = MNID_ID;
+	name.Kind.lID = 0x8514;
+
+	hr = msg->GetIDsFromNames(1, &namep, MAPI_CREATE, &~proptag);
+	if (hr != hrSuccess)
+		return hr;
+	s.ulPropTag = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_BOOLEAN);
+	s.Value.b = true;
+	props.emplace_back(s);
+
 	return save_props(props, msg);
+}
+
+HRESULT vcftomapi_impl::save_photo(IMessage *mapiprop)
+{
+	auto bytes = base64_decode(photo);
+	ULONG tmp = 0;
+	object_ptr<IAttach> att;
+	auto hr = mapiprop->CreateAttach(nullptr, 0, &tmp, &~att);
+	if (hr != hrSuccess)
+		return hr;
+
+	object_ptr<IStream> stream;
+	hr = att->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~stream);
+	if (hr != hrSuccess)
+		return hr;
+
+	ULONG written = 0;
+	hr = stream->Write(bytes.c_str(), bytes.size(), &written);
+	if (hr != hrSuccess)
+		return hr;
+
+	if (written != bytes.size())
+		return MAPI_E_CALL_FAILED;
+
+	hr = stream->Commit(0);
+	if (hr != hrSuccess)
+		return hr;
+
+	const wchar_t *filename, *mimetype;
+	switch (phototype) {
+	case PHOTO_JPEG:
+		filename = L"image.jpeg";
+		mimetype = L"image/jpeg";
+		break;
+	case PHOTO_PNG:
+		filename = L"image.png";
+		mimetype = L"image/png";
+		break;
+	case PHOTO_GIF:
+		filename = L"image.gif";
+		mimetype = L"image/gif";
+		break;
+	default:
+		filename = L"unknown";
+		mimetype = L"application/octet-stream";
+		break;
+	}
+
+	SPropValue prop[5];
+	prop[0].ulPropTag = PR_ATTACHMENT_CONTACTPHOTO;
+	prop[0].Value.b = true;
+	prop[1].ulPropTag = PR_ATTACH_METHOD;
+	prop[1].Value.ul = ATTACH_BY_VALUE;
+	prop[2].ulPropTag = PR_ATTACH_LONG_FILENAME_W;
+	prop[2].Value.lpszW = const_cast<wchar_t *>(filename);
+	prop[3].ulPropTag = PR_ATTACH_MIME_TAG_W;
+	prop[3].Value.lpszW = const_cast<wchar_t *>(mimetype);
+	prop[4].ulPropTag = PR_ATTACHMENT_HIDDEN;
+	prop[4].Value.b = true;
+	hr = att->SetProps(ARRAY_SIZE(prop), prop, nullptr);
+	if (hr != hrSuccess)
+		return hr;
+
+	hr = att->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hr != hrSuccess)
+		return hr;
+
+	return hrSuccess;
 }
 
 /**
@@ -520,7 +645,7 @@ HRESULT vcftomapi_impl::get_item(IMessage *msg)
  * @return MAPI error code
  */
 HRESULT vcftomapi_impl::save_props(const std::list<SPropValue> &proplist,
-    IMAPIProp *mapiprop)
+    IMessage *mapiprop)
 {
 	memory_ptr<SPropValue> propvals;
 	HRESULT hr = MAPIAllocateBuffer(proplist.size() * sizeof(SPropValue),
@@ -540,6 +665,13 @@ HRESULT vcftomapi_impl::save_props(const std::list<SPropValue> &proplist,
 		else if (PROP_TYPE(prop.ulPropTag) == PT_BINARY)
 			MAPIFreeBuffer(prop.Value.bin.lpb);
 	}
+
+	if (ret != hrSuccess)
+		return ret;
+
+	if (phototype != PHOTO_NONE)
+		ret = save_photo(mapiprop);
+
 	return ret;
 }
 

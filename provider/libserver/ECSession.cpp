@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <chrono>
 #include <memory>
@@ -30,7 +17,6 @@
 #include <sys/stat.h>
 #include <mapidefs.h>
 #include <mapitags.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/UnixUtil.h>
 #include <kopano/memory.hpp>
 #include <kopano/scope.hpp>
@@ -46,9 +32,9 @@
 #include "SOAPUtils.h"
 #include "ics.h"
 #include "ECICS.h"
-#include <kopano/ECIConv.h>
+#include <kopano/charset/convert.h>
 #include "versions.h"
-
+#include <kopano/MAPIErrors.h>
 #ifdef HAVE_KCOIDC_H
 #include <kcoidc.h>
 #endif
@@ -100,18 +86,10 @@ BTSession::BTSession(const char *src_addr, ECSESSIONID sessionID,
     ECDatabaseFactory *lpDatabaseFactory, ECSessionManager *lpSessionManager,
     unsigned int ulCapabilities) :
 	m_strSourceAddr(src_addr), m_sessionID(sessionID),
+	m_sessionTime(GetProcessTime()), m_ulClientCapabilities(ulCapabilities),
 	m_lpDatabaseFactory(lpDatabaseFactory),
-	m_lpSessionManager(lpSessionManager),
-	m_ulClientCapabilities(ulCapabilities)
-{
-	m_sessionTime = GetProcessTime();
-
-	m_ulSessionTimeout = 300;
-	m_bCheckIP = true;
-	m_ulRequests = 0;
-
-	m_ulLastRequestPort = 0;
-}
+	m_lpSessionManager(lpSessionManager)
+{}
 
 void BTSession::SetClientMeta(const char *const lpstrClientVersion, const char *const lpstrClientMisc)
 {
@@ -153,13 +131,13 @@ void BTSession::UpdateSessionTime()
 
 ECRESULT BTSession::GetDatabase(ECDatabase **lppDatabase)
 {
-	return GetThreadLocalDatabase(this->m_lpDatabaseFactory, lppDatabase);
+	return GetThreadLocalDatabase(m_lpDatabaseFactory, lppDatabase);
 }
 
 ECRESULT BTSession::GetAdditionalDatabase(ECDatabase **lppDatabase)
 {
 	std::string str;
-	return this->m_lpDatabaseFactory->CreateDatabaseObject(lppDatabase, str);
+	return m_lpDatabaseFactory->CreateDatabaseObject(lppDatabase, str);
 }
 
 ECRESULT BTSession::GetServerGUID(GUID* lpServerGuid){
@@ -170,23 +148,23 @@ ECRESULT BTSession::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 	return m_lpSessionManager->GetNewSourceKey(lpSourceKey);
 }
 
-void BTSession::Lock()
+void BTSession::lock()
 {
 	// Increase our refcount by one
 	scoped_lock lock(m_hThreadReleasedMutex);
-	++this->m_ulRefCount;
+	++m_ulRefCount;
 }
 
-void BTSession::Unlock()
+void BTSession::unlock()
 {
 	// Decrease our refcount by one, signal ThreadReleased if RefCount == 0
 	scoped_lock lock(m_hThreadReleasedMutex);
-	--this->m_ulRefCount;
+	--m_ulRefCount;
 	if(!IsLocked())
 		m_hThreadReleased.notify_one();
 }
 
-time_t BTSession::GetIdleTime()
+time_t BTSession::GetIdleTime() const
 {
 	return GetProcessTime() - m_sessionTime;
 }
@@ -207,22 +185,22 @@ unsigned int BTSession::GetRequests()
     return m_ulRequests;
 }
 
-void BTSession::GetRequestURL(std::string *lpstrClientURL)
+std::string BTSession::GetRequestURL()
 {
 	scoped_lock lock(m_hRequestStats);
-	lpstrClientURL->assign(m_strLastRequestURL);
+	return m_strLastRequestURL;
 }
 
-void BTSession::GetProxyHost(std::string *lpstrProxyHost)
+std::string BTSession::GetProxyHost()
 {
 	scoped_lock lock(m_hRequestStats);
-	lpstrProxyHost->assign(m_strProxyHost);
+	return m_strProxyHost;
 }
 
-void BTSession::GetClientPort(unsigned int *lpulPort)
+unsigned int BTSession::GetClientPort()
 {
 	scoped_lock lock(m_hRequestStats);
-	*lpulPort = m_ulLastRequestPort;
+	return m_ulLastRequestPort;
 }
 
 size_t BTSession::GetInternalObjectSize()
@@ -243,25 +221,21 @@ ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
 	    ulCapabilities),
 	m_ulAuthMethod(ulAuthMethod), m_ulConnectingPid(pid),
 	m_ecSessionGroupId(ecSessionGroupId), m_strClientVersion(cl_ver),
-	m_ulClientVersion(KOPANO_VERSION_UNKNOWN), m_strClientApp(cl_app)
+	m_strClientApp(cl_app), m_ulClientVersion(KOPANO_VERSION_UNKNOWN),
+	m_lpTableManager(new ECTableManager(this))
 {
-	m_lpTableManager.reset(new ECTableManager(this));
 	m_strClientApplicationVersion   = cl_app_ver;
-	m_strClientApplicationMisc	= cl_app_misc;
-
-	ParseKopanoVersion(cl_ver, &m_ulClientVersion);
+	m_strClientApplicationMisc      = cl_app_misc;
+	ParseKopanoVersion(cl_ver, nullptr, &m_ulClientVersion);
 	// Ignore result.
-
 	m_ulSessionTimeout = atoi(lpSessionManager->GetConfig()->GetSetting("session_timeout"));
 	if (m_ulSessionTimeout < 300)
 		m_ulSessionTimeout = 300;
 
 	m_bCheckIP = strcmp(lpSessionManager->GetConfig()->GetSetting("session_ip_check"), "no") != 0;
-
 	// Offline implements its own versions of these objects
 	m_lpUserManagement.reset(new ECUserManagement(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig()));
 	m_lpEcSecurity.reset(new ECSecurity(this, m_lpSessionManager->GetConfig(), m_lpSessionManager->GetAudit()));
-
 	// Atomically get and AddSession() on the sessiongroup. Needs a ReleaseSession() on the session group to clean up.
 	m_lpSessionManager->GetSessionGroup(ecSessionGroupId, this, &m_lpSessionGroup);
 }
@@ -269,16 +243,15 @@ ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
 ECSession::~ECSession()
 {
 	Shutdown(0);
-
 	/*
 	 * Release our reference to the session group; none of the threads of this session are
 	 * using the object since there are now 0 threads on this session (except this thread)
 	 * Afterwards tell the session manager that the sessiongroup may be an orphan now.
 	 */
-	if (m_lpSessionGroup) {
-		m_lpSessionGroup->ReleaseSession(this);
-    	m_lpSessionManager->DeleteIfOrphaned(m_lpSessionGroup);
-	}
+	if (m_lpSessionGroup == nullptr)
+		return;
+	m_lpSessionGroup->ReleaseSession(this);
+	m_lpSessionManager->DeleteIfOrphaned(m_lpSessionGroup);
 }
 
 /**
@@ -313,44 +286,31 @@ ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 ECRESULT ECSession::AddAdvise(unsigned int ulConnection, unsigned int ulKey, unsigned int ulEventMask)
 {
 	ECRESULT		hr = erSuccess;
-
-	Lock();
-
+	lock();
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->AddAdvise(m_sessionID, ulConnection, ulKey, ulEventMask);
 	else
 		hr = KCERR_NOT_INITIALIZED;
-
-	Unlock();
-
+	unlock();
 	return hr;
 }
 
 ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *lpSyncState)
 {
-	ECRESULT		er = erSuccess;
-	std::string strQuery;
 	ECDatabase*		lpDatabase = NULL;
 	DB_RESULT lpDBResult;
-	DB_ROW			lpDBRow;
-	ULONG			ulChangeId = 0;
 
-	Lock();
-
-	if (!m_lpSessionGroup) {
-		er = KCERR_NOT_INITIALIZED;
-		goto exit;
-	}
-
-	er = m_lpSessionGroup->AddChangeAdvise(m_sessionID, ulConnection, lpSyncState);
+	lock();
+	auto cleanup = make_scope_success([&]() { unlock(); });
+	if (m_lpSessionGroup == nullptr)
+		return KCERR_NOT_INITIALIZED;
+	auto er = m_lpSessionGroup->AddChangeAdvise(m_sessionID, ulConnection, lpSyncState);
 	if (er != hrSuccess)
-		goto exit;
-
+		return er;
 	er = GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
-
-	strQuery =	"SELECT c.id FROM changes AS c JOIN syncs AS s "
+		return er;
+	auto strQuery = "SELECT c.id FROM changes AS c JOIN syncs AS s "
 					"ON s.sourcekey=c.parentsourcekey "
 				"WHERE s.id=" + stringify(lpSyncState->ulSyncId) + " "
 					"AND c.id>" + stringify(lpSyncState->ulChangeId) + " "
@@ -359,80 +319,60 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 					"AND c.change_type & " + stringify(ICS_MESSAGE) + " !=  0 "
 				"ORDER BY c.id DESC "
 				"LIMIT 1";
-
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != hrSuccess)
-		goto exit;
+		return er;
 	if (lpDBResult.get_num_rows() == 0)
-		goto exit;
-	lpDBRow = lpDBResult.fetch_row();
+		return erSuccess;
+	auto lpDBRow = lpDBResult.fetch_row();
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECSession::AddChangeAdvise(): row or column null");
-		goto exit;
+		return KCERR_DATABASE_ERROR;
 	}
-
-	ulChangeId = strtoul(lpDBRow[0], NULL, 0);
-	er = m_lpSessionGroup->AddChangeNotification(m_sessionID, ulConnection, lpSyncState->ulSyncId, ulChangeId);
-
-exit:
-	Unlock();
-
-	return er;
+	auto ulChangeId = strtoul(lpDBRow[0], NULL, 0);
+	return m_lpSessionGroup->AddChangeNotification(m_sessionID, ulConnection, lpSyncState->ulSyncId, ulChangeId);
 }
 
 ECRESULT ECSession::DelAdvise(unsigned int ulConnection)
 {
 	ECRESULT hr = erSuccess;
-
-	Lock();
-
+	lock();
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->DelAdvise(m_sessionID, ulConnection);
 	else
 		hr = KCERR_NOT_INITIALIZED;
-
-	Unlock();
-
+	unlock();
 	return hr;
 }
 
 ECRESULT ECSession::AddNotificationTable(unsigned int ulType, unsigned int ulObjType, unsigned int ulTableId, sObjectTableKey* lpsChildRow, sObjectTableKey* lpsPrevRow, struct propValArray *lpRow)
 {
 	ECRESULT		hr = hrSuccess;
-
-	Lock();
-
+	lock();
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->AddNotificationTable(m_sessionID, ulType, ulObjType, ulTableId, lpsChildRow, lpsPrevRow, lpRow);
 	else
 		hr = KCERR_NOT_INITIALIZED;
-
-	Unlock();
-
+	unlock();
 	return hr;
 }
 
 ECRESULT ECSession::GetNotifyItems(struct soap *soap, struct notifyResponse *notifications)
 {
 	ECRESULT		hr = erSuccess;
-
-	Lock();
-
+	lock();
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->GetNotifyItems(soap, m_sessionID, notifications);
 	else
 		hr = KCERR_NOT_INITIALIZED;
-
-	Unlock();
-
+	unlock();
 	return hr;
 }
 
 void ECSession::AddBusyState(pthread_t threadId, const char *lpszState,
     const struct timespec &threadstart, const KC::time_point &start)
 {
-	if (!lpszState) {		
+	if (!lpszState) {
 		ec_log_err("Invalid argument \"lpszState\" in call to ECSession::AddBusyState()");
 		return;
 	}
@@ -558,7 +498,7 @@ ECRESULT ECSession::LockObject(unsigned int ulObjId)
 {
 	scoped_lock lock(m_hLocksLock);
 	auto res = m_mapLocks.emplace(ulObjId, ECObjectLock());
-	if (res.second == true)
+	if (res.second)
 		return m_lpSessionManager->GetLockManager()->LockObject(ulObjId, m_sessionID, &res.first->second);
 	return erSuccess;
 }
@@ -584,13 +524,10 @@ size_t ECSession::GetObjectSize()
 	ulSize += MEMORY_USAGE_STRING(m_strClientApp) +
 			MEMORY_USAGE_STRING(m_strUsername) +
 			MEMORY_USAGE_STRING(m_strClientVersion);
-
 	ulSize += MEMORY_USAGE_MAP(m_mapBusyStates.size(), BusyStateMap);
 	ulSize += MEMORY_USAGE_MAP(m_mapLocks.size(), LockMap);
-
 	if (m_lpEcSecurity)
 		ulSize += m_lpEcSecurity->GetObjectSize();
-
 	// The Table manager size is not callculated here
 //	ulSize += GetTableManager()->GetObjectSize();
 	return ulSize;
@@ -613,50 +550,44 @@ ECAuthSession::ECAuthSession(const char *src_addr, ECSESSIONID sessionID,
 ECAuthSession::~ECAuthSession()
 {
 #ifdef HAVE_GSSAPI
-	OM_uint32 status;
-
+	OM_uint32 omstatus;
 	if (m_gssServerCreds)
-		gss_release_cred(&status, &m_gssServerCreds);
-
+		gss_release_cred(&omstatus, &m_gssServerCreds);
 	if (m_gssContext)
-		gss_delete_sec_context(&status, &m_gssContext, GSS_C_NO_BUFFER);
+		gss_delete_sec_context(&omstatus, &m_gssContext, GSS_C_NO_BUFFER);
 #endif
 
 	/* Wait until all locks have been closed */
 	std::unique_lock<std::mutex> l_thread(m_hThreadReleasedMutex);
 	m_hThreadReleased.wait(l_thread, [this](void) { return !IsLocked(); });
 	l_thread.unlock();
-
-	if (m_NTLM_pid != -1) {
-		int status;
-
-		// close I/O to make ntlm_auth exit
-		close(m_stdin);
-		close(m_stdout);
-		close(m_stderr);
-
-		// wait for process status
-		waitpid(m_NTLM_pid, &status, 0);
-		ec_log_info("Removing ntlm_auth on pid %d. Exitstatus: %d", m_NTLM_pid, status);
-		if (status == -1) {
-			ec_log_err(std::string("System call waitpid failed: ") + strerror(errno));
-		} else {
-#ifdef WEXITSTATUS
-				if(WIFEXITED(status)) { /* Child exited by itself */
-					if(WEXITSTATUS(status))
-						ec_log_notice("ntlm_auth exited with non-zero status %d", WEXITSTATUS(status));
-				} else if(WIFSIGNALED(status)) {        /* Child was killed by a signal */
-					ec_log_err("ntlm_auth was killed by signal %d", WTERMSIG(status));
-
-				} else {                        /* Something strange happened */
-					ec_log_err("ntlm_auth terminated abnormally");
-				}
-#else
-				if (status)
-					ec_log_notice("ntlm_auth exited with status %d", status);
-#endif
-		}
+	if (m_NTLM_pid == -1)
+		return;
+	int status;
+	// close I/O to make ntlm_auth exit
+	close(m_stdin);
+	close(m_stdout);
+	close(m_stderr);
+	// wait for process status
+	waitpid(m_NTLM_pid, &status, 0);
+	ec_log_info("Removing ntlm_auth on pid %d. Exitstatus: %d", m_NTLM_pid, status);
+	if (status == -1) {
+		ec_log_err(std::string("System call waitpid failed: ") + strerror(errno));
+		return;
 	}
+#ifdef WEXITSTATUS
+	if (WIFEXITED(status)) { /* Child exited by itself */
+		if (WEXITSTATUS(status))
+			ec_log_notice("ntlm_auth exited with non-zero status %d", WEXITSTATUS(status));
+	} else if (WIFSIGNALED(status)) { /* Child was killed by a signal */
+		ec_log_err("ntlm_auth was killed by signal %d", WTERMSIG(status));
+	} else { /* Something strange happened */
+		ec_log_err("ntlm_auth terminated abnormally");
+	}
+#else
+	if (status)
+		ec_log_notice("ntlm_auth exited with status %d", status);
+#endif
 }
 
 ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
@@ -664,7 +595,6 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
     const std::string &cl_app_ver, const std::string &cl_app_misc,
     ECSESSIONID *sessionID, ECSession **lppNewSession)
 {
-	ECRESULT er = erSuccess;
 	std::unique_ptr<ECSession> lpSession;
 	ECSESSIONID newSID;
 
@@ -680,7 +610,7 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 	            cl_ver, cl_app, cl_app_ver, cl_app_misc));
 	if (lpSession == nullptr)
 		return KCERR_NOT_ENOUGH_MEMORY;
-	er = lpSession->GetSecurity()->SetUserContext(m_ulUserID, m_ulImpersonatorID);
+	auto er = lpSession->GetSecurity()->SetUserContext(m_ulUserID, m_ulImpersonatorID);
 	if (er != erSuccess)
 		/* User not found anymore, or error in getting groups. */
 		return er;
@@ -693,8 +623,6 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 // You always log in as the user you are authenticating with.
 ECRESULT ECAuthSession::ValidateUserLogon(const char* lpszName, const char* lpszPassword, const char* lpszImpersonateUser)
 {
-	ECRESULT er;
-
 	if (!lpszName)
 	{
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserLogon()");
@@ -708,7 +636,7 @@ ECRESULT ECAuthSession::ValidateUserLogon(const char* lpszName, const char* lpsz
 	// SYSTEM can't login with user/pass
 	if (strcasecmp(lpszName, KOPANO_ACCOUNT_SYSTEM) == 0)
 		return KCERR_NO_ACCESS;
-	er = m_lpUserManagement->AuthUserAndSync(lpszName, lpszPassword, &m_ulUserID);
+	auto er = m_lpUserManagement->AuthUserAndSync(lpszName, lpszPassword, &m_ulUserID);
 	if(er != erSuccess)
 		return er;
 	er = ProcessImpersonation(lpszImpersonateUser);
@@ -720,18 +648,38 @@ ECRESULT ECAuthSession::ValidateUserLogon(const char* lpszName, const char* lpsz
 	return erSuccess;
 }
 
+static ECRESULT kc_peer_cred(int fd, uid_t *uid, pid_t *pid)
+{
+#if defined(SO_PEERCRED)
+#ifdef HAVE_SOCKPEERCRED_UID
+	struct sockpeercred cr;
+#else
+	struct ucred cr;
+#endif
+	unsigned int cr_len = sizeof(cr);
+	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &cr_len) != 0 || cr_len != sizeof(cr))
+		return KCERR_LOGON_FAILED;
+	*uid = cr.uid; /* uid is the uid of the user that is connecting */
+	*pid = cr.pid;
+#elif defined(HAVE_GETPEEREID)
+	gid_t gid;
+	if (getpeereid(fd, uid, &gid) != 0)
+		return KCERR_LOGON_FAILED;
+#else
+#	error I have no way to find out the remote user and I want to cry
+#endif
+	return erSuccess;
+}
+
 // Validate a user through the socket they are connecting through. This has the special feature
 // that you can connect as a different user than you are specifying in the username. For example,
 // you could be connecting as 'root' and being granted access because the kopano-server process
 // is also running as 'root', but you are actually loggin in as user 'user1'.
 ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, const char* lpszImpersonateUser)
 {
-	ECRESULT 		er = erSuccess;
-	const char *p = NULL;
 	bool			allowLocalUsers = false;
-	int				pid = 0;
 	char			*ptr = NULL;
-	std::unique_ptr<char, cstdlib_deleter> localAdminUsers;
+	std::unique_ptr<char[], cstdlib_deleter> localAdminUsers;
 
     if (!lpszName)
     {
@@ -742,7 +690,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateUserSocket()");
 		return KCERR_INVALID_PARAMETER;
 	}
-	p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
+	auto p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
 	if (p != nullptr && strcasecmp(p, "yes") == 0)
 		allowLocalUsers = true;
 
@@ -751,29 +699,12 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 
 	struct passwd pwbuf;
 	struct passwd *pw;
-	uid_t uid;
+	auto uid = ~static_cast<uid_t>(0);
+	pid_t pid = 0;
 	char strbuf[1024];
-#ifdef SO_PEERCRED
-	struct ucred cr;
-	unsigned int cr_len;
-
-	cr_len = sizeof(struct ucred);
-	if (getsockopt(socket, SOL_SOCKET, SO_PEERCRED, &cr, &cr_len) != 0 || cr_len != sizeof(struct ucred))
-		return KCERR_LOGON_FAILED;
-
-	uid = cr.uid; // uid is the uid of the user that is connecting
-	pid = cr.pid;
-#else // SO_PEERCRED
-#ifdef HAVE_GETPEEREID
-	gid_t gid;
-
-	if (getpeereid(socket, &uid, &gid) != 0)
-		return KCERR_LOGON_FAILED;
-#else // HAVE_GETPEEREID
-#error I have no way to find out the remote user and I want to cry
-#endif // HAVE_GETPEEREID
-#endif // SO_PEERCRED
-
+	auto er = kc_peer_cred(socket, &uid, &pid);
+	if (er != erSuccess)
+		return er;
 	if (geteuid() == uid)
 		// User connecting is connecting under same UID as the server is running under, allow this
 		goto userok;
@@ -890,10 +821,8 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 		}
 
 		res = EVP_PKEY_cmp(pubkey, storedkey);
-
 		BIO_free(biofile);
 		EVP_PKEY_free(storedkey);
-
 		if (res <= 0) {
 			ec_log_info("Certificate \"%s\" does not match.", bname);
 		} else {
@@ -909,21 +838,16 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 	er = m_lpUserManagement->ResolveObjectAndSync(OBJECTCLASS_USER, lpszName, &m_ulUserID);
 	if (er != erSuccess)
 		goto exit;
-
 	er = ProcessImpersonation(lpszImpersonateUser);
 	if (er != erSuccess)
 		goto exit;
-
 	m_bValidated = true;
 	m_ulValidationMethod = METHOD_SSL_CERT;
-
 exit:
 	if (cert)
 		X509_free(cert);
-
 	if (pubkey)
 		EVP_PKEY_free(pubkey);
-
 	return er;
 }
 
@@ -961,7 +885,6 @@ ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName,
 	}
 
 	er = KCERR_LOGON_FAILED;
-
 	// first NTLM package starts with that signature, continues are detected by the filedescriptor
 	if (m_NTLM_pid != -1 || strncmp((const char*)lpInput->__ptr, "NTLM", 4) == 0)
 		er = ValidateSSOData_NTLM(soap, lpszName, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpInput, lppOutput);
@@ -1020,12 +943,15 @@ ECRESULT ECAuthSession::LogKRB5Error(const char* msg, OM_uint32 major, OM_uint32
 }
 #endif
 
-
 ECRESULT ECAuthSession::ValidateSSOData_KCOIDC(struct soap* soap, const char* name, const char* cl_ver, const char* cl_app, const char *cl_app_ver, const char *cl_app_misc, const struct xsd__base64Binary* input, struct xsd__base64Binary** output)
 {
 #ifdef HAVE_KCOIDC_H
 	auto input_str = std::string(reinterpret_cast<char *>(input->__ptr + 6), input->__size - 6);
+#if defined(KCOIDC_VERSION) && KCOIDC_VERSION >= 10100
+	auto res = kcoidc_validate_token_and_require_scope_s(const_cast<char *>(input_str.c_str()), "kopano/gc");
+#else
 	auto res = kcoidc_validate_token_s(const_cast<char *>(input_str.c_str()));
+#endif
 	auto laters = make_scope_success([&]() {
 		if (res.r0)
 			free(res.r0);
@@ -1043,37 +969,38 @@ ECRESULT ECAuthSession::ValidateSSOData_KCOIDC(struct soap* soap, const char* na
 		return KCERR_LOGON_FAILED;
 	}
 
-	auto username = std::string(name);
-	auto er = m_lpUserManagement->ResolveObjectAndSync(ACTIVE_USER, username.c_str(), &m_ulUserID);
-	if (er != erSuccess)
-		return er;
+	auto username_abid = base64_decode(res.r0);
+	if (strlen(name) > 0) {
+		auto entryid_bin = base64_decode(name);
+		if (entryid_bin.size() > 0 && !CompareABEID(entryid_bin.size(), reinterpret_cast<const ENTRYID *>(entryid_bin.c_str()), username_abid.size(), reinterpret_cast<const ENTRYID *>(username_abid.c_str()))) {
+			ec_log_info("RPC user entryid does not match token entryid, call:\"%s\", token: \"%s\"", name, res.r0);
+			return KCERR_LOGON_FAILED;
+		}
+	}
 
 	objectid_t extern_id;
-	er = m_lpSessionManager->GetCacheManager()->GetUserObject(m_ulUserID, &extern_id, NULL, NULL);
+	unsigned int mapi_type;
+	auto er = ABEntryIDToID(static_cast<ULONG>(username_abid.size()), reinterpret_cast<const BYTE *>(username_abid.c_str()), &m_ulUserID, &extern_id, &mapi_type);
 	if (er != erSuccess)
-		return er;
-
-	entryId user_eid;
-	er = ABIDToEntryID(soap, m_ulUserID, extern_id, &user_eid);
+		return ec_perror("ABEntryIDToID", er);
+	objectdetails_t details;
+	er = m_lpUserManagement->GetObjectDetails(m_ulUserID, &details);
 	if (er != erSuccess)
-		return er;
-
-	auto username_abid = base64_decode(res.r0);
-	if (!CompareABEID(user_eid.__size, reinterpret_cast<const ENTRYID *>(user_eid.__ptr), username_abid.size(), reinterpret_cast<const ENTRYID *>(username_abid.c_str()))) {
-		auto hex_local = bin2hex(user_eid.__size, user_eid.__ptr);
-		auto hex_token = bin2hex(username_abid.size(), username_abid.c_str());
-		ec_log_err("Username does not match token. Local EID: %s, Token EID: %s", hex_local.c_str(), hex_token.c_str());
+		return ec_perror("GetUserDetails", er);
+	auto username = details.GetPropString(OB_PROP_S_LOGIN);
+	if (username.size() == 0) {
+		ec_log_err("UserDetails username size 0");
 		return KCERR_LOGON_FAILED;
 	}
 
-	ec_log_info("KCOIDC Single Sign-On: User \"%s\" authenticated", username.c_str());
+	ec_log_debug("KCOIDC Single Sign-On: User \"%s\" authenticated", username.c_str());
 	ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate ok user='%s' from='%s' method='kcoidc sso' program='%s'", username.c_str(), soap->host, cl_app);
-
 	m_bValidated = true;
 	m_ulValidationMethod = METHOD_SSO;
 	*output = nullptr;
 	return erSuccess;
 #else
+	ec_log_err("Incoming OIDC token, but this server was built without KCOIDC support.");
 	return KCERR_NO_SUPPORT;
 #endif
 }
@@ -1085,18 +1012,15 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 	ec_log_err("Incoming Kerberos request, but this server was build without GSSAPI support.");
 #else
 	OM_uint32 retval, status;
-
 	gss_name_t gssServername = GSS_C_NO_NAME;
 	gss_buffer_desc gssInputBuffer = GSS_C_EMPTY_BUFFER;
 	const char *szHostname = NULL;
 	std::string principal;
-
 	gss_name_t gssUsername = GSS_C_NO_NAME;
 	gss_buffer_desc gssUserBuffer = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc gssOutputToken = GSS_C_EMPTY_BUFFER;
 	std::string strUsername;
 	size_t pos;
-
 	struct xsd__base64Binary *lpOutput = NULL;
 
 	if (!soap) {
@@ -1126,7 +1050,6 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 	er = KCERR_LOGON_FAILED;
 	if (m_gssServerCreds == GSS_C_NO_CREDENTIAL) {
 		m_gssContext = GSS_C_NO_CONTEXT;
-
 		// ECServer made sure this setting option always contains the best hostname
 		// If it's not there, that's unacceptable.
 		szHostname = m_lpSessionManager->GetConfig()->GetSetting("server_hostname");
@@ -1136,18 +1059,15 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 		}
 		principal = "kopano@";
 		principal += szHostname;
-
 		ec_log_debug("Kerberos principal: %s", principal.c_str());
 
 		gssInputBuffer.value = (void*)principal.data();
 		gssInputBuffer.length = principal.length() + 1;
-
 		retval = gss_import_name(&status, &gssInputBuffer, GSS_C_NT_HOSTBASED_SERVICE, &gssServername);
 		if (retval != GSS_S_COMPLETE) {
 			LogKRB5Error("Unable to import server name", retval, status);
 			goto exit;
 		}
-
 		retval = gss_acquire_cred(&status, gssServername, GSS_C_INDEFINITE, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &m_gssServerCreds, NULL, NULL);
 		if (retval != GSS_S_COMPLETE) {
 			LogKRB5Error("Unable to acquire credentials handle", retval, status);
@@ -1157,16 +1077,13 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 
 	gssInputBuffer.length = lpInput->__size;
 	gssInputBuffer.value = lpInput->__ptr;
-
 	retval = gss_accept_sec_context(&status, &m_gssContext, m_gssServerCreds, &gssInputBuffer, GSS_C_NO_CHANNEL_BINDINGS, &gssUsername, NULL, &gssOutputToken, NULL, NULL, NULL);
-
 	if (gssOutputToken.length) {
 		// we need to send data back to the client, no need to consider retval
 		lpOutput = s_alloc<struct xsd__base64Binary>(soap);
 		lpOutput->__size = gssOutputToken.length;
 		lpOutput->__ptr = s_alloc<unsigned char>(soap, gssOutputToken.length);
 		memcpy(lpOutput->__ptr, gssOutputToken.value, gssOutputToken.length);
-
 		gss_release_buffer(&status, &gssOutputToken);
 	}
 
@@ -1201,7 +1118,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 
 		m_bValidated = true;
 		m_ulValidationMethod = METHOD_SSO;
-		ec_log_info("Kerberos Single Sign-On: User \"%s\" authenticated", lpszName);
+		ec_log_debug("Kerberos Single Sign-On: User \"%s\" authenticated", lpszName);
 		ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate ok user='%s' from='%s' method='kerberos sso' program='%s'",
 			lpszName, soap->host, szClientApp);
 	} else {
@@ -1209,23 +1126,18 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 		ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate spoofed user='%s' requested='%s' from='%s' method='kerberos sso' program='%s'",
 			static_cast<char *>(gssUserBuffer.value), lpszName, soap->host, szClientApp);
 	}
-
 exit:
 	if (gssUserBuffer.length)
 		gss_release_buffer(&status, &gssUserBuffer);
-
 	if (gssOutputToken.length)
 		gss_release_buffer(&status, &gssOutputToken);
-
 	if (gssUsername != GSS_C_NO_NAME)
 		gss_release_name(&status, &gssUsername);
-
 	if (gssServername != GSS_C_NO_NAME)
 		gss_release_name(&status, &gssServername);
 	if (lppOutput != nullptr)
 		*lppOutput = lpOutput;
 #endif
-
 	return er;
 }
 
@@ -1270,12 +1182,10 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	if (m_NTLM_pid == -1) {
 		// start new ntlmauth pipe
 		// TODO: configurable path?
-
 		if (pipe(m_NTLM_stdin) == -1 || pipe(m_NTLM_stdout) == -1 || pipe(m_NTLM_stderr) == -1) {
 			ec_log_crit(std::string("Unable to create communication pipes for ntlm_auth: ") + strerror(errno));
 			return er;
 		}
-
 		/*
 		 * Why are we using vfork() ?
 		 *
@@ -1289,7 +1199,6 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 		 *
 		 * If vfork() is not available, or is broken on another platform, it is safe to simply replace it with fork(), but it will be quite slow!
 		 */
-
 		m_NTLM_pid = vfork();
 		if (m_NTLM_pid == -1) {
 			// broken
@@ -1297,23 +1206,17 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 			return er;
 		} else if (m_NTLM_pid == 0) {
 			// client
-			int j, k;
-
 			close(m_NTLM_stdin[1]);
 			close(m_NTLM_stdout[0]);
 			close(m_NTLM_stderr[0]);
-
 			dup2(m_NTLM_stdin[0], 0);
 			dup2(m_NTLM_stdout[1], 1);
 			dup2(m_NTLM_stderr[1], 2);
-
 			// close all other open file descriptors, so ntlm doesn't keep the kopano-server sockets open
-			j = getdtablesize();
-			for (k = 3; k < j; ++k)
+			auto j = getdtablesize();
+			for (int k = 3; k < j; ++k)
 				close(k);
-
-			execl("/bin/sh", "sh", "-c", "ntlm_auth -d0 --helper-protocol=squid-2.5-ntlmssp", NULL);
-
+			execlp("ntlm_auth", "-d0", "--helper-protocol=squid-2.5-ntlmssp", nullptr);
 			ec_log_crit(std::string("Cannot start ntlm_auth: ") + strerror(errno));
 			_exit(2);
 		} else {
@@ -1341,7 +1244,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	memset(buffer, 0, NTLMBUFFER);
 	pollfd[0].fd = m_stdout;
 	pollfd[1].fd = m_stderr;
-	pollfd[0].events = pollfd[1].events = POLLIN | POLLRDHUP;
+	pollfd[0].events = pollfd[1].events = POLLIN;
 retry:
 	pollfd[0].revents = pollfd[1].revents = 0;
 	int ret = poll(pollfd, 2, 10 * 1000); // timeout of 10 seconds before ntlm_auth can respond too large?
@@ -1351,7 +1254,6 @@ retry:
 		ec_log_err(std::string("Error while waiting for data from ntlm_auth: ") + strerror(errno));
 		return er;
 	}
-
 	if (ret == 0) {
 		// timeout
 		ec_log_err("Timeout while reading from ntlm_auth");
@@ -1359,7 +1261,7 @@ retry:
 	}
 
 	// stderr is optional, and always written first
-	if (pollfd[1].revents & (POLLIN | POLLRDHUP)) {
+	if (pollfd[1].revents & POLLIN) {
 		// log stderr of ntlm_auth to logfile (loop?)
 		bytes = read(m_stderr, buffer, NTLMBUFFER-1);
 		if (bytes < 0)
@@ -1418,19 +1320,16 @@ retry:
 		memcpy(lpOutput->__ptr, strDecoded.data(), strDecoded.length());
 
 		er = KCERR_SSO_CONTINUE;
-
 	} else if (buffer[0] == 'A' && buffer[1] == 'F') {
 		// Authentication Fine
 		// Samba default runs in UTF-8 and setting 'unix charset' to windows-1252 in the samba config will break ntlm_auth
 		// convert the username before we use it in Kopano
-		ECIConv iconv("windows-1252", "utf-8");
-		if (!iconv.canConvert()) {
-			ec_log_crit("Problem setting up windows-1252 to utf-8 converter");
+		try {
+			strAnswer = iconv_context<std::string, std::string>("windows-1252", "utf-8").convert(strAnswer);
+		} catch (const convert_exception &e) {
+			ec_log_crit("Problem setting up windows-1252 to utf-8 converter: %s", e.what());
 			return er;
 		}
-
-		strAnswer = iconv.convert(strAnswer);
-
 		ec_log_info("Found username (%s)", strAnswer.c_str());
 
 		// if the domain separator is not found, assume we only have the username (samba)
@@ -1439,7 +1338,6 @@ retry:
 			++pos;
 			strAnswer.assign(strAnswer, pos, strAnswer.length()-pos);
 		}
-
 		// Check whether user exists in the user database
 		er = m_lpUserManagement->ResolveObjectAndSync(ACTIVE_USER, (char *)strAnswer.c_str(), &m_ulUserID);
 		// don't check NONACTIVE, since those shouldn't be able to login
@@ -1457,11 +1355,10 @@ retry:
 			m_bValidated = true;
 			m_ulValidationMethod = METHOD_SSO;
 			er = erSuccess;
-			ec_log_info("Single Sign-On: User \"%s\" authenticated", strAnswer.c_str());
+			ec_log_debug("Single Sign-On: User \"%s\" authenticated", strAnswer.c_str());
 			ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate ok user='%s' from='%s' method='ntlm sso' program='%s'",
 				lpszName, soap->host, szClientApp);
 		}
-
 	} else if (buffer[0] == 'N' && buffer[1] == 'A') {
 		// Not Authenticated
 		ec_log_info("Requested user \"%s\" denied. Not authenticated: \"%s\"", lpszName, strAnswer.c_str());
@@ -1485,7 +1382,6 @@ ECRESULT ECAuthSession::ProcessImpersonation(const char* lpszImpersonateUser)
 		m_ulImpersonatorID = EC_NO_IMPERSONATOR;
 		return erSuccess;
 	}
-
 	m_ulImpersonatorID = m_ulUserID;
 	return m_lpUserManagement->ResolveObjectAndSync(OBJECTCLASS_USER,
 	       lpszImpersonateUser, &m_ulUserID);
@@ -1494,6 +1390,43 @@ ECRESULT ECAuthSession::ProcessImpersonation(const char* lpszImpersonateUser)
 size_t ECAuthSession::GetObjectSize()
 {
 	return sizeof(*this);
+}
+
+ECObjectLock::ECObjectLock(std::shared_ptr<ECLockManager> lm,
+    unsigned int objid, ECSESSIONID sid) :
+	m_ptrLockManager(lm), m_ulObjId(objid), m_sessionId(sid)
+{}
+
+ECObjectLock::ECObjectLock(ECObjectLock &&o) :
+	m_ptrLockManager(std::move(o.m_ptrLockManager)),
+	m_ulObjId(o.m_ulObjId), m_sessionId(o.m_sessionId)
+{
+	/*
+	 * Our Unlock routine depends on m_ptrLockManager being reset, but due
+	 * to LWG DR 2315, weak_ptr(weak_ptr&&) is not implemented in some
+	 * compiler versions and thus did not do that reset.
+	 */
+	o.m_ptrLockManager.reset();
+}
+
+ECObjectLock &ECObjectLock::operator=(ECObjectLock &&o)
+{
+	m_ptrLockManager = std::move(o.m_ptrLockManager);
+	o.m_ptrLockManager.reset();
+	m_ulObjId = o.m_ulObjId;
+	m_sessionId = o.m_sessionId;
+	return *this;
+}
+
+ECRESULT ECObjectLock::Unlock()
+{
+	auto lm = m_ptrLockManager.lock();
+	if (lm == nullptr)
+		return erSuccess;
+	auto er = lm->UnlockObject(m_ulObjId, m_sessionId);
+	if (er == erSuccess)
+		m_ptrLockManager.reset();
+	return er;
 }
 
 } /* namespace */

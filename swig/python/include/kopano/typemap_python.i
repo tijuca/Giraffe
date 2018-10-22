@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 // Python
 %include <python/std_basic_string.i>
 %include <python/cwstring.i>
@@ -229,9 +230,9 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
         PyErr_Clear();
         return hr;	// Early return
     } else {
-		if (check_call_from_python() == true)
+		if (check_call_from_python()) {
 			throw Swig::DirectorMethodException();	// Let the calling python interpreter handle the exception
-		else {
+		} else {
 			PyErr_Print();
 			PyErr_Clear();
 			return MAPI_E_CALL_FAILED;
@@ -438,7 +439,7 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 %typemap(directorin) (ULONG cbEntryID, LPENTRYID lpEntryID)
 {
   if ($1_name > 0 && $2_name != NULL)
-    $input = SWIG_FromCharPtrAndSize((char*)$2_name, $1_name);
+    $input = PyBytes_FromStringAndSize((char*)$2_name, $1_name);
 }
 
 %apply (ULONG, MAPIARRAY) {(ULONG cElements, LPREADSTATE lpReadState), (ULONG cNotif, LPNOTIFICATION lpNotifications)};

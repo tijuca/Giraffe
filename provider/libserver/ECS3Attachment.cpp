@@ -1,9 +1,16 @@
-#include "config.h"
+/*
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * Copyright 2016 Zarafa and its licensors
+ */
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
 #ifdef HAVE_LIBS3_H
 #include <kopano/platform.h>
 #include <algorithm>
 #include <chrono>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <cerrno>
@@ -19,6 +26,7 @@
 #include "ECS3Attachment.h"
 #include "StreamUtil.h"
 
+using namespace std::chrono_literals;
 using steady_clock = std::chrono::steady_clock;
 
 namespace KC {
@@ -29,8 +37,8 @@ namespace KC {
 /* Number of seconds to sleep before trying again */
 #define S3_SLEEP_DELAY 1
 
-#define now_positive() (std::chrono::steady_clock::now() + std::chrono::seconds(600))
-#define now_negative() (std::chrono::steady_clock::now() + std::chrono::seconds(60))
+#define now_positive() (steady_clock::now() + 600s)
+#define now_negative() (steady_clock::now() + 60s)
 
 /* callback data */
 struct s3_cd {
@@ -53,7 +61,7 @@ struct s3_cdw {
 
 /* This ought to be moved into ECS3Attachment, if and when that becomes a singleton. */
 
-ECRESULT ECS3Config::init(ECConfig *cfg)
+ECRESULT ECS3Config::init(std::shared_ptr<ECConfig> cfg)
 {
 	ec_log_info("S3: initializing attachment storage");
 	/* Copy strings, in case ECConfig gets reloaded and changes pointers */
@@ -327,7 +335,6 @@ void ECS3Attachment::response_complete(S3Status status,
 S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdata)
 {
 	auto data = static_cast<struct s3_cd *>(cbdata);
-	ECRESULT er;
 	/*
 	 * Check if we were able to acquire the memory. There are two cases
 	 * where this could go wrong: Either we ran out of memory, in which
@@ -347,7 +354,7 @@ S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdat
 	ec_log_debug("S3: Getting bytes from callback: Remaining bytes to get: %zu. Reading %d bytes",
 		data->size - data->processed, bufferSize);
 	if (data->sink != NULL) {
-		er = data->sink->Write(buffer, 1, bufferSize);
+		auto er = data->sink->Write(buffer, 1, bufferSize);
 		if (er != erSuccess) {
 			ec_log_err("S3: unable to write to serializer sink: %s (0x%x)",
 				GetMAPIErrorMessage(kcerr_to_mapierr(er)), er);
@@ -373,9 +380,6 @@ S3Status ECS3Attachment::get_obj(int bufferSize, const char *buffer, void *cbdat
 int ECS3Attachment::put_obj(int bufferSize, char *buffer, void *cbdata)
 {
 	auto data = static_cast<struct s3_cd *>(cbdata);
-	ECRESULT ret;
-	int toRead = 0, remaining = 0;
-
 	/*
 	 * Check if we have a data buffer or serializer to read from.
 	 */
@@ -385,18 +389,17 @@ int ECS3Attachment::put_obj(int bufferSize, char *buffer, void *cbdata)
 	/* Check if we are not trying to write outside the acquired memory scope, if so abort. */
 	if (data->processed > data->size)
 		return -1;
-
-	remaining = data->size - data->processed;
+	int remaining = data->size - data->processed;
 	if (remaining <= 0) {
 		ec_log_debug("S3: putting data using callback: Remaining bytes to put: %d - We processed all the data, but S3 expects more", remaining);
-		return toRead;
+		return 0;
 	}
-	toRead = remaining > bufferSize ? bufferSize : remaining;
+	auto toRead = std::min(remaining, bufferSize);
 	ec_log_debug("S3: Putting data using callback: "
 		"Remaining bytes to put: %d - Writing %d bytes in %d buffer",
 		remaining, toRead, bufferSize);
 	if (data->sink != NULL) {
-		ret = data->sink->Read(buffer, 1, toRead);
+		auto ret = data->sink->Read(buffer, 1, toRead);
 		if (ret != erSuccess) {
 			ec_log_err("S3: Unable to read from the serializer sink");
 			return -1;
@@ -546,7 +549,7 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(const ext_siid &ins_id,
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::SaveAttachmentInstance(const ext_siid &ins_id,
+ECRESULT ECS3Attachment::SaveAttachmentInstance(ext_siid &ins_id,
     ULONG propid, size_t size, unsigned char *data)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
@@ -602,7 +605,7 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(const ext_siid &ins_id,
  *
  * @return Kopano error code
  */
-ECRESULT ECS3Attachment::SaveAttachmentInstance(const ext_siid &ins_id,
+ECRESULT ECS3Attachment::SaveAttachmentInstance(ext_siid &ins_id,
     ULONG propid, size_t size, ECSerializer *source)
 {
 	ECRESULT ret = KCERR_NOT_FOUND;
@@ -661,7 +664,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ext_siid> &ls
 	ECRESULT ret = erSuccess;
 	int errors = 0;
 	for (const auto &del_id : lstDeleteInstances) {
-		ret = this->DeleteAttachmentInstance(del_id, bReplace);
+		ret = DeleteAttachmentInstance(del_id, bReplace);
 		if (ret != erSuccess)
 			++errors;
 	}

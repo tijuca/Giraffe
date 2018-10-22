@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <memory>
 #include <climits>
@@ -61,12 +49,9 @@ unsigned int rtf_decompress(char *lpDest, const char *lpSrc,
 {
 	auto lpHeader = reinterpret_cast<const struct RTFHeader *>(lpSrc);
 	auto lpStart = lpSrc;
-	unsigned int ulFlags = 0;
-	unsigned int ulFlagNr = 0;
-	unsigned char c1 = 0;
-	unsigned char c2 = 0;
-	unsigned int ulOffset = 0;
-	unsigned int ulSize = 0;
+	unsigned char c1 = 0, c2 = 0;
+	unsigned int ulFlags = 0, ulFlagNr = 0;
+	unsigned int ulOffset = 0, ulSize = 0;
 	const unsigned int prebufSize = strlen(lpPrebuf);
 
 	// Check if we have a full header
@@ -91,7 +76,7 @@ unsigned int rtf_decompress(char *lpDest, const char *lpSrc,
 		return UINT_MAX;
 	}
 	// Allocate a buffer to decompress into (uncompressed size plus prebuffered data)
-	std::unique_ptr<char[]> lpBuffer(new char[uncomp_size+prebufSize]);
+	auto lpBuffer = std::make_unique<char[]>(uncomp_size + prebufSize);
 	memcpy(lpBuffer.get(), lpPrebuf, prebufSize);
 
 	// Start writing just after the prebuffered data
@@ -143,9 +128,8 @@ unsigned int rtf_decompress(char *lpDest, const char *lpSrc,
 unsigned int rtf_compress(char **dstp, unsigned int *dst_size,
     const char *src, unsigned int src_size)
 {
-	char *dst;
 	*dst_size = src_size + sizeof(RTFHeader);
-	*dstp = dst = reinterpret_cast<char *>(malloc(*dst_size));
+	char *dst = *dstp = reinterpret_cast<char *>(malloc(*dst_size));
 	if (dst == nullptr)
 		return 1;
 	auto hdr = reinterpret_cast<RTFHeader *>(dst);

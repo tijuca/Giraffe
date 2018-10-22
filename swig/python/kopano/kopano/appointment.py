@@ -1,45 +1,70 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
 Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
 Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
+import codecs
 import datetime
+import struct
 import sys
 
 from MAPI import (
-    PT_SYSTIME,
+    PT_SYSTIME, MNID_ID, PT_BOOLEAN, MODRECIP_ADD,
+    KEEP_OPEN_READWRITE,
 )
 
 from MAPI.Tags import (
-    PR_MESSAGE_RECIPIENTS, PR_RESPONSE_REQUESTED,
+    PR_MESSAGE_RECIPIENTS, PR_RESPONSE_REQUESTED, PR_ENTRYID,
+    PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, PR_RECIPIENT_TYPE,
 )
 
+from MAPI.Struct import SPropValue
+
 from .attendee import Attendee
-from .errors import NotFoundError
+from .errors import NotFoundError, ArgumentError
 from .recurrence import Recurrence, Occurrence
 
 from .compat import (
-    benc as _benc, bdec as _bdec,
+    benc as _benc, bdec as _bdec, fake_unicode as _unicode,
+)
+from .defs import (
+    PSETID_Appointment, ASF_CANCELED, NR_COLOR, COLOR_NR
 )
 from .pidlid import (
     PidLidReminderSet, PidLidReminderDelta, PidLidAppointmentSubType,
-    PidLidBusyStatus, PidLidGlobalObjectId,
+    PidLidBusyStatus, PidLidGlobalObjectId, PidLidRecurring,
+    PidLidTimeZoneStruct, PidLidTimeZoneDescription, PidLidLocation,
+    PidLidAppointmentStateFlags, PidLidAppointmentColor,
 )
 if sys.hexversion >= 0x03000000:
     try:
         from . import utils as _utils
-    except ImportError:
+    except ImportError: # pragma: no cover
         _utils = sys.modules[__package__+'.utils']
-else:
+
+    from . import timezone as _timezone
+else: # pragma: no cover
     import utils as _utils
+    import timezone as _timezone
+
+ALL_DAY_NAME = (PSETID_Appointment, MNID_ID, 0x8215)
+START_NAME = (PSETID_Appointment, MNID_ID, 33293) # TODO use pidlid instead
+END_NAME = (PSETID_Appointment, MNID_ID, 33294)
+RECURRING_NAME = (PSETID_Appointment, MNID_ID, 33315)
 
 class Appointment(object):
     """Appointment mixin class"""
 
     @property
     def all_day(self):
-        return self.get(PidLidAppointmentSubType, False)
+        proptag = self.store._name_id(ALL_DAY_NAME) | PT_BOOLEAN
+        return self._get_fast(proptag)
+
+    @all_day.setter
+    def all_day(self, value):
+        self[PidLidAppointmentSubType] = value
 
     @property
     def show_as(self):
@@ -55,44 +80,50 @@ class Appointment(object):
             return u'unknown'
 
     @property
-    def start(self): # XXX optimize, guid
-        try:
-            return self.prop('common:34070').value
-        except NotFoundError:
-            pass
+    def start(self):
+        proptag = self.store._name_id(START_NAME) | PT_SYSTIME
+        return self._get_fast(proptag)
 
     @start.setter
-    def start(self, val):
+    def start(self, val): # TODO update/invalidate cache
         # XXX check if exists?
-        self.create_prop('common:34070', val, PT_SYSTIME)
+        self.create_prop('common:34070', val, PT_SYSTIME) # props are identical
         self.create_prop('appointment:33293', val, PT_SYSTIME)
+        if self.recurring:
+            self.recurrence._update_offsets()
 
     @property
-    def end(self): # XXX optimize, guid
-        try:
-            return self.prop('common:34071').value
-        except NotFoundError:
-            pass
+    def end(self):
+        proptag = self.store._name_id(END_NAME) | PT_SYSTIME
+        return self._get_fast(proptag)
 
     @end.setter
-    def end(self, val):
+    def end(self, val): # TODO update/invalidate cache
         # XXX check if exists?
-        self.create_prop('common:34071', val, PT_SYSTIME)
+        self.create_prop('common:34071', val, PT_SYSTIME) # props are identical
         self.create_prop('appointment:33294', val, PT_SYSTIME)
+        if self.recurring:
+            self.recurrence._update_offsets()
 
     @property
     def location(self):
-        try:
-            return self.prop('appointment:33288').value
-        except NotFoundError:
-            pass
+        return self.get(PidLidLocation)
+
+    @location.setter
+    def location(self, value):
+        self[PidLidLocation] = value
 
     @property
     def recurring(self):
-        try:
-            return self.prop('appointment:33315').value
-        except NotFoundError:
-            return False
+        proptag = self.store._name_id(RECURRING_NAME) | PT_BOOLEAN
+        return self._get_fast(proptag)
+
+    @recurring.setter
+    def recurring(self, value): # TODO update/invalidate cache
+        # TODO cleanup on False?
+        if value and not self.recurring:
+            Recurrence._init(self)
+        self[PidLidRecurring] = value
 
     @property
     def recurrence(self):
@@ -111,16 +142,7 @@ class Appointment(object):
 
     def occurrence(self, id_=None):
         if self.recurring:
-            if isinstance(id_, datetime.datetime):
-                # TODO optimize
-                for occ in self.occurrences():
-                    if occ.start == id_:
-                        return occ
-                        break
-                else:
-                    raise NotFoundError('no occurrence for date: %s' % id_)
-            else:
-                return self.recurrence.occurrence(id_)
+            return self.recurrence.occurrence(id_)
         else:
             # TODO check if matches args
             return Occurrence(self)
@@ -130,10 +152,18 @@ class Appointment(object):
         """Is reminder set."""
         return self.get(PidLidReminderSet, False)
 
+    @reminder.setter
+    def reminder(self, value): # TODO move to item, because common?
+        self[PidLidReminderSet] = value
+
     @property
     def reminder_minutes(self):
         """Reminder minutes before appointment."""
         return self.get(PidLidReminderDelta)
+
+    @reminder_minutes.setter
+    def reminder_minutes(self, value):
+        self[PidLidReminderDelta] = value
 
     @property
     def rrule(self): # XXX including timezone!
@@ -146,6 +176,28 @@ class Appointment(object):
     def attendees(self):
         for row in self.table(PR_MESSAGE_RECIPIENTS):
             yield Attendee(self.server, row)
+
+    def create_attendee(self, type_, address):
+        # TODO move to Attendee class
+
+        reciptype = {
+            'required': 1,
+            'optional': 2,
+            'resource': 3
+        }[type_]
+
+        table = self.table(PR_MESSAGE_RECIPIENTS)
+        names = []
+        pr_addrtype, pr_dispname, pr_email, pr_entryid = self._addr_props(address)
+        names.append([
+            SPropValue(PR_RECIPIENT_TYPE, reciptype),
+            SPropValue(PR_DISPLAY_NAME_W, pr_dispname),
+            SPropValue(PR_ADDRTYPE_W, _unicode(pr_addrtype)),
+            SPropValue(PR_EMAIL_ADDRESS_W, _unicode(pr_email)),
+            SPropValue(PR_ENTRYID, pr_entryid),
+        ])
+        self.mapiobj.ModifyRecipients(MODRECIP_ADD, names)
+        _utils._save(self.mapiobj)
 
     @property
     def response_requested(self):
@@ -164,3 +216,68 @@ class Appointment(object):
         # /events, so we need an identier which can be used for both.
         eid = _bdec(self.entryid)
         return _benc(b'\x00' + _utils.pack_short(len(eid)) + eid)
+
+    @property
+    def tzinfo(self):
+        tzdata = self.get(PidLidTimeZoneStruct)
+        if tzdata:
+            return _timezone.MAPITimezone(tzdata)
+
+    @property
+    def timezone(self):
+        return self.get(PidLidTimeZoneDescription)
+
+    @timezone.setter
+    def timezone(self, value):
+        self[PidLidTimeZoneDescription] = _unicode(value)
+        self[PidLidTimeZoneStruct] = _timezone._timezone_struct(value)
+
+    def accept(self, comment=None, tentative=False, respond=True):
+        # TODO update appointment itself
+
+        if respond:
+            if tentative:
+                message_class = 'IPM.Schedule.Meeting.Resp.Tent'
+            else:
+                message_class = 'IPM.Schedule.Meeting.Resp.Pos'
+            self._respond('Accepted', message_class, comment)
+
+    def decline(self, comment=None, respond=True):
+        # TODO update appointment itself
+
+        if respond:
+            message_class = 'IPM.Schedule.Meeting.Resp.Neg'
+            self._respond('Declined', message_class, comment)
+
+    # TODO merge with meetingrequest version
+    def _respond(self, subject_prefix, message_class, comment=None):
+        response = self.copy(self.store.outbox)
+        response.message_class = message_class
+
+        response.subject = subject_prefix + ': ' + self.subject
+        if comment:
+            response.text = comment
+        response.to = self.server.user(email=self.from_.email) # XXX
+        response.from_ = self.store.user # XXX slow?
+
+        response.send()
+
+    def cancel(self):
+        self[PidLidAppointmentStateFlags] |= ASF_CANCELED
+
+    @property
+    def canceled(self):
+        return bool(self[PidLidAppointmentStateFlags] & ASF_CANCELED)
+
+    @property
+    def color(self): # property used by old clients
+        nr = self.get(PidLidAppointmentColor, 0)
+        if nr != 0:
+            return NR_COLOR[nr]
+
+    @color.setter
+    def color(self, value):
+        try:
+            self[PidLidAppointmentColor] = COLOR_NR[value]
+        except KeyError:
+            raise ArgumentError('invalid color: %r' % value)

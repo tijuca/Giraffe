@@ -1,30 +1,20 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
 #include <kopano/mapi_ptr.h>
+#include <kopano/memory.hpp>
 #include "WSMessageStreamExporter.h"
 #include "WSSerializedMessage.h"
 #include "WSTransport.h"
 #include <kopano/charset/convert.h>
 #include "WSUtil.h"
 #include "soapKCmdProxy.h"
+
+using namespace KC;
 
 /**
  * Create a WSMessageStreamExporter instance.
@@ -35,24 +25,23 @@
  *                          could be less if those messages didn't exist anymore on the server. This makes sure the client can still
  *                          request those streams and an appropriate error can be returned.
  * @param[in]	streams		The streams (or actually the information about the streams).
- * @param[in]	lpTransport	Pointer to the parent transport. Used to get the streams from the network. This transport MUST be used 
+ * @param[in]	lpTransport	Pointer to the parent transport. Used to get the streams from the network. This transport MUST be used
  *                          exclusively by this WSMessageStreamExporter only.
  * @param[out]	lppStreamExporter	The new instance.
  */
 HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const messageStreamArray &streams, WSTransport *lpTransport, WSMessageStreamExporter **lppStreamExporter)
 {
-	HRESULT hr = hrSuccess;
-	convert_context converter;
+	KC::convert_context converter;
 	WSMessageStreamExporterPtr ptrStreamExporter(new(std::nothrow) WSMessageStreamExporter);
 	if (ptrStreamExporter == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	
+
 	for (gsoap_size_t i = 0; i < streams.__size; ++i) {
-		std::unique_ptr<StreamInfo> lpsi(new(std::nothrow) StreamInfo);
+		auto lpsi = make_unique_nt<StreamInfo>();
 		if (lpsi == nullptr)
 			return MAPI_E_NOT_ENOUGH_MEMORY;
 		lpsi->id.assign(streams.__ptr[i].sStreamData.xop__Include.id);
-		hr = MAPIAllocateBuffer(streams.__ptr[i].sPropVals.__size * sizeof(SPropValue), &~lpsi->ptrPropVals);
+		auto hr = MAPIAllocateBuffer(streams.__ptr[i].sPropVals.__size * sizeof(SPropValue), &~lpsi->ptrPropVals);
 		if (hr != hrSuccess)
 			return hr;
 		for (gsoap_size_t j = 0; j < streams.__ptr[i].sPropVals.__size; ++j) {
@@ -61,14 +50,12 @@ HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const mes
 				return hr;
 		}
 		lpsi->cbPropVals = streams.__ptr[i].sPropVals.__size;
-
 		ptrStreamExporter->m_mapStreamInfo[streams.__ptr[i].ulStep + ulOffset] = lpsi.release();
 	}
 
 	ptrStreamExporter->m_ulExpectedIndex = ulOffset;
 	ptrStreamExporter->m_ulMaxIndex = ulOffset + ulCount;
 	ptrStreamExporter->m_ptrTransport.reset(lpTransport);
-
 	*lppStreamExporter = ptrStreamExporter.release();
 	return hrSuccess;
 }
@@ -93,12 +80,9 @@ bool WSMessageStreamExporter::IsDone() const
  */
 HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerializedMessage **lppSerializedMessage)
 {
-	StreamInfoMap::const_iterator iStreamInfo;
-
 	if (ulIndex != m_ulExpectedIndex || lppSerializedMessage == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	iStreamInfo = m_mapStreamInfo.find(ulIndex);
+	auto iStreamInfo = m_mapStreamInfo.find(ulIndex);
 	if (iStreamInfo == m_mapStreamInfo.cend()) {
 		++m_ulExpectedIndex;
 		return SYNC_E_OBJECT_DELETED;
@@ -106,10 +90,10 @@ HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerialize
 	KC::object_ptr<WSSerializedMessage> ptrMessage(new(std::nothrow) WSSerializedMessage(m_ptrTransport->m_lpCmd->soap, iStreamInfo->second->id, iStreamInfo->second->cbPropVals, iStreamInfo->second->ptrPropVals.get()));
 	if (ptrMessage == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	AddChild(ptrMessage);
 
+	AddChild(ptrMessage);
 	++m_ulExpectedIndex;
-	*lppSerializedMessage = ptrMessage.release();	
+	*lppSerializedMessage = ptrMessage.release();
 	return hrSuccess;
 }
 
@@ -122,7 +106,6 @@ WSMessageStreamExporter::~WSMessageStreamExporter()
 		// messages that we'd just discard. Probably we will need to reconnect very soon after this call, to LogOff()
 		// the transport's session, but that's better than receiving unwanted data.
 		m_ptrTransport->m_lpCmd->soap->fshutdownsocket(m_ptrTransport->m_lpCmd->soap, m_ptrTransport->m_lpCmd->soap->socket, 0);
-
 	for (const auto &i : m_mapStreamInfo)
 		delete i.second;
 }

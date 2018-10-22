@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECICS_H
@@ -20,7 +8,6 @@
 
 #include <kopano/zcdefs.h>
 #include "ECSession.h"
-
 #include <set>
 
 struct soap;
@@ -31,13 +18,14 @@ namespace KC {
 // and have various ways of creating new SOURCEKEYs, including using a GUID and an ID, which is used for kopano-generated source keys.
 
 /* Variable size, but can also be prominently 22 bytes */
-class SOURCEKEY _kc_final {
+class SOURCEKEY final {
 public:
 	SOURCEKEY(void) : ulSize(0) {}
 	SOURCEKEY(const SOURCEKEY &s) : ulSize(s.ulSize)
 	{
 		if (ulSize > 0) {
 			lpData.reset(new char[s.ulSize]);
+			assert(s.lpData != nullptr);
 			memcpy(lpData.get(), s.lpData.get(), s.ulSize);
 		}
 	}
@@ -68,25 +56,26 @@ public:
 	{
 		if (ulSize > 0) {
 			lpData.reset(new char[ulSize]);
-			memcpy(this->lpData.get(), sourcekey.__ptr, sourcekey.__size);
+			assert(sourcekey.__ptr != nullptr);
+			memcpy(lpData.get(), sourcekey.__ptr, sourcekey.__size);
 		}
 	}
     SOURCEKEY&  operator= (const SOURCEKEY &s) {
-        if(&s == this) return *this; 
+        if(&s == this) return *this;
 		lpData.reset(new char[s.ulSize]);
 		ulSize = s.ulSize;
-		memcpy(lpData.get(), s.lpData.get(), ulSize);
-        return *this; 
+		if (ulSize > 0) {
+			assert(s.lpData != nullptr);
+			memcpy(lpData.get(), s.lpData.get(), ulSize);
+		}
+        return *this;
     }
-    
+
     bool operator == (const SOURCEKEY &s) const {
-        if(this == &s)
-            return true;
-        if(ulSize != s.ulSize)
-            return false;
-		return memcmp(lpData.get(), s.lpData.get(), s.ulSize) == 0;
+		return this == &s || (ulSize == s.ulSize &&
+		       memcmp(lpData.get(), s.lpData.get(), s.ulSize) == 0);
     }
-	
+
 	bool operator < (const SOURCEKEY &s) const {
 		if(this == &s)
 			return false;
@@ -100,11 +89,11 @@ public:
 			return (d == 0) ? true : (d < 0);			// If the compared part is equal, the shortes is less (this)
 		}
 	}
-    
+
 	operator unsigned char *(void) const { return reinterpret_cast<unsigned char *>(lpData.get()); }
 	operator std::string(void) const { return std::string(lpData.get(), ulSize); }
     unsigned int 	size() const { return ulSize; }
-	bool			empty() const { return ulSize == 0; } 
+	bool			empty() const { return ulSize == 0; }
 private:
 	unsigned int ulSize;
 	std::unique_ptr<char[]> lpData;

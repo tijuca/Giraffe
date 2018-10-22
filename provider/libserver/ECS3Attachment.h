@@ -1,14 +1,18 @@
 #ifndef EC_S3_ATTACHMENT
 #define EC_S3_ATTACHMENT
 
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
 #ifdef HAVE_LIBS3_H
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
 #include <libs3.h>
+#include <kopano/timeutil.hpp>
 #include "ECAttachmentStorage.h"
 
 struct soap;
@@ -27,7 +31,7 @@ struct s3_cache_entry {
 class ECS3Config final : public ECAttachmentConfig {
 	public:
 	virtual ~ECS3Config();
-	virtual ECRESULT init(ECConfig *) override;
+	virtual ECRESULT init(std::shared_ptr<ECConfig>) override;
 	virtual ECAttachmentStorage *new_handle(ECDatabase *) override;
 
 	private:
@@ -61,7 +65,7 @@ class ECS3Config final : public ECAttachmentConfig {
 	friend class ECS3Attachment;
 };
 
-class ECS3Attachment _kc_final : public ECAttachmentStorage {
+class ECS3Attachment final : public ECAttachmentStorage {
 	public:
 	ECS3Attachment(ECS3Config &, ECDatabase *);
 
@@ -71,8 +75,8 @@ class ECS3Attachment _kc_final : public ECAttachmentStorage {
 	/* Single Instance Attachment handlers */
 	virtual ECRESULT LoadAttachmentInstance(struct soap *, const ext_siid &, size_t *, unsigned char **) override;
 	virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *, ECSerializer *) override;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG, size_t, unsigned char *) override;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG, size_t, ECSerializer *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG, size_t, unsigned char *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG, size_t, ECSerializer *) override;
 	virtual ECRESULT DeleteAttachmentInstances(const std::list<ext_siid> &, bool replace) override;
 	virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) override;
 	virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *, bool * = nullptr) override;

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECSTRINGCOMPAT_H
@@ -39,7 +27,7 @@ class convert_context;
  * from the windows-1252 codepage encoded as UTF8. So the difference
  * with UTF8 is that is a string with true unicode code points.
  */
-class ECStringCompat _kc_final {
+class ECStringCompat final {
 public:
 	static char *WTF1252_to_WINDOWS1252(soap *lpsoap, const char *szWTF1252, convert_context *lpConverter = NULL);
 	static char *WTF1252_to_UTF8(struct soap *lpsoap, const char *szWTF1252, convert_context *lpConverter = NULL);
@@ -65,8 +53,8 @@ public:
 	/**
 	 * Convert the data from UTF8 to either UTF8 ot WTF1252. If culClientCaps
 	 * contains KOPANO_CAP_UNICODE, the output data will not be converted and
-	 * will be in UTF8. Otherwise the data will be encoded in WTF1252. 
-	 * 
+	 * will be in UTF8. Otherwise the data will be encoded in WTF1252.
+	 *
 	 *
 	 * @param[in]	szIn	The input data in UTF8.
 	 *
@@ -106,8 +94,6 @@ private:
 	bool m_fUnicode;
 };
 
-
-
 enum EncodingFixDirection { In, Out };
 
 ECRESULT FixPropEncoding(struct soap *soap, const ECStringCompat &stringCompat, enum EncodingFixDirection type, struct propVal *lpProp, bool bNoTagUpdate = false);
@@ -117,8 +103,6 @@ ECRESULT FixUserEncoding(struct soap *soap, const ECStringCompat &stringCompat, 
 ECRESULT FixGroupEncoding(struct soap *soap, const ECStringCompat &stringCompat, enum EncodingFixDirection type, struct group *lpGroup);
 ECRESULT FixCompanyEncoding(struct soap *soap, const ECStringCompat &stringCompat, enum EncodingFixDirection type, struct company *lpCompany);
 ECRESULT FixNotificationsEncoding(struct soap *soap, const ECStringCompat &stringCompat, struct notificationArray *notifications);
-
-
 
 // inlines
 inline char *ECStringCompat::to_UTF8(soap *lpsoap, const char *szIn) const

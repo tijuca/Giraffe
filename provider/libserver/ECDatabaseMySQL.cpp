@@ -1,29 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
-
 #include <iostream>
 #include <list>
+#include <memory>
 #include <string>
+#include <utility>
 #include <errmsg.h>
 #include "mysqld_error.h"
 #include <kopano/stringutil.h>
-
 #include <kopano/ECDefs.h>
 #include "ECDBDef.h"
 #include "ECUserManagement.h"
@@ -31,32 +19,27 @@
 #include <kopano/ECLogger.h>
 #include <kopano/MAPIErrors.h>
 #include <kopano/kcodes.h>
-
 #include <kopano/ecversion.h>
-
 #include <mapidefs.h>
 #include "ECDatabase.h"
 #include "SOAPUtils.h"
 #include "ECSearchFolders.h"
-
-#include "ECDatabaseUpdate.h"
-#include "ECStatsCollector.h"
+#include "StatsClient.h"
 
 namespace KC {
 
-#ifdef DEBUG
+#ifdef KNOB144
 #define DEBUG_SQL 0
 #define DEBUG_TRANSACTION 0
 #endif
 
 struct sUpdateList_t {
 	unsigned int ulVersion;
-	unsigned int ulVersionMin; // Version to start the update
 	const char *lpszLogComment;
 	ECRESULT (*lpFunction)(ECDatabase* lpDatabase);
 };
 
-class zcp_versiontuple _kc_final {
+class zcp_versiontuple final {
 	public:
 	zcp_versiontuple(unsigned int maj = 0, unsigned int min = 0,
 	    unsigned int mic = 0, unsigned int rev = 0, unsigned int dbs = 0) :
@@ -70,17 +53,144 @@ class zcp_versiontuple _kc_final {
 	unsigned int v_major, v_minor, v_micro, v_rev, v_schema;
 };
 
+bool searchfolder_restart_required; //HACK for rebuild the searchfolders with an upgrade
+
+static ECRESULT InsertServerGUID(ECDatabase *lpDatabase)
+{
+	GUID guid;
+	if (CoCreateGuid(&guid) != S_OK) {
+		ec_log_err("InsertServerGUID(): CoCreateGuid failed");
+		return KCERR_DATABASE_ERROR;
+	}
+	return lpDatabase->DoInsert("INSERT INTO `settings` VALUES ('server_guid', " + lpDatabase->EscapeBinary(reinterpret_cast<unsigned char *>(&guid), sizeof(GUID)) + ")");
+}
+
+static ECRESULT dbup64(ECDatabase *db)
+{
+	return db->DoUpdate(
+		"alter table `versions` "
+		"add column `micro` int(11) unsigned not null default 0 after `minor`, "
+		"drop primary key, "
+		"add primary key (`major`, `minor`, `micro`, `revision`, `databaserevision`)");
+}
+
+static ECRESULT dbup65(ECDatabase *db)
+{
+	return db->DoUpdate(
+		"alter table `changes` "
+		"modify change_type int(11) unsigned not null default 0");
+}
+
+static ECRESULT dbup66(ECDatabase *db)
+{
+	return db->DoUpdate(
+		"alter table `abchanges` "
+		"modify change_type int(11) unsigned not null default 0");
+}
+
+static ECRESULT dbup68(ECDatabase *db)
+{
+	auto ret = db->DoUpdate("ALTER TABLE `hierarchy` MODIFY COLUMN `owner` int(11) unsigned NOT NULL DEFAULT 0");
+	if (ret != erSuccess)
+		return KCERR_DATABASE_ERROR;
+	ret = db->DoUpdate("ALTER TABLE `stores` MODIFY COLUMN `id` int(11) unsigned NOT NULL auto_increment");
+	if (ret != erSuccess)
+		return KCERR_DATABASE_ERROR;
+	ret = db->DoUpdate("ALTER TABLE `stores` MODIFY COLUMN `user_id` int(11) unsigned NOT NULL DEFAULT 0");
+	if (ret != erSuccess)
+		return KCERR_DATABASE_ERROR;
+	ret = db->DoUpdate("ALTER TABLE `stores` MODIFY COLUMN `company` int(11) unsigned NOT NULL DEFAULT 0");
+	if (ret != erSuccess)
+		return KCERR_DATABASE_ERROR;
+	ret = db->DoUpdate("ALTER TABLE `users` MODIFY COLUMN `id` int(11) NOT NULL AUTO_INCREMENT");
+	if (ret != erSuccess)
+		return KCERR_DATABASE_ERROR;
+	return db->DoUpdate("ALTER TABLE `users` MODIFY COLUMN `company` int(11) NOT NULL DEFAULT 0");
+}
+
+static ECRESULT dbup69(ECDatabase *db)
+{
+	/*
+	 * Add new indexes first to see if that runs afoul of the dataset. The
+	 * operation is atomic; either both indexes will exist afterwards, or
+	 * neither.
+	 */
+	auto ret = db->DoUpdate("ALTER TABLE `names` ADD UNIQUE INDEX `gni` (`guid`(16), `nameid`), ADD UNIQUE INDEX `gns` (`guid`(16), `namestring`), DROP INDEX `guidnameid`, DROP INDEX `guidnamestring`");
+	if (ret == hrSuccess)
+		return hrSuccess;
+
+	ec_log_err("K-1216: Cannot update to schema v69, because the \"names\" table contains unexpected rows. Certain prior versions of the server erroneously allowed these duplicates to be added (KC-1108).");
+	DB_RESULT res;
+	unsigned long long ai = ~0ULL;
+	ret = db->DoSelect("SELECT MAX(id)+1 FROM names", &res);
+	if (ret == erSuccess) {
+		auto row = res.fetch_row();
+		if (row != nullptr && row[0] != nullptr)
+			ai = strtoull(row[0], nullptr, 0);
+	}
+	if (ai >= 31485)
+		ec_log_err("K-1219: It is possible that K-1216 has, in the past, led old clients to misplace data in the DB. This cannot be reliably detected and such data is effectively lost already.");
+	ec_log_err("K-1220: To fix the excess rows, use `kopano-dbadm k-1216`. Consult the manpage and preferably make a backup first.");
+	ec_log_err("K-1221: Alternatively, the server may be started with --ignore-da to forego the schema update.");
+	return KCERR_INVALID_VERSION; /* allow use of ignore-da */
+}
+
+/*
+ * ALTER statements are non-transacted. An update function using ALTER must not
+ * issue other modification statements.
+ */
+
 static const sUpdateList_t sUpdateList[] = {
 	// New in 7.2.2
-	{ Z_UPDATE_VERSIONTBL_MICRO, 0, "Add \"micro\" column to \"versions\" table", UpdateVersionsTbl },
-
+	{64, "Add \"micro\" column to \"versions\" table", dbup64},
 	// New in 8.1.0 / 7.2.4, MySQL 5.7 compatibility
-	{ Z_UPDATE_ABCHANGES_PKEY, 0, "Updating abchanges table", UpdateABChangesTbl },
-	{ Z_UPDATE_CHANGES_PKEY, 0, "Updating changes table", UpdateChangesTbl },
-	{Z_DROP_CLIENTUPDATESTATUS_PKEY, 0, "Drop clientupdatestatus table", DropClientUpdateStatusTbl},
-	{68, 0, "Perform column type upgrade missed in SVN r23897", db_update_68},
-	{69, 0, "Update \"names\" with uniqueness constraints", db_update_69},
-	{70, 0, "names.guid change from blob to binary(16); drop old indexes", db_update_70},
+	{65, "Updating abchanges table", dbup65},
+	{66, "Updating changes table", dbup66},
+	{67, "Drop clientupdatestatus table", [](ECDatabase *db) {
+		return db->DoUpdate("DROP TABLE IF EXISTS `clientupdatestatus`"); }},
+	{68, "Perform column type upgrade missed in SVN r23897", dbup68},
+	{69, "Update \"names\" with uniqueness constraints", dbup69},
+	{70, "names.guid change from blob to binary(16); drop old indexes", [](ECDatabase *db) {
+		return db->DoUpdate("ALTER TABLE `names` CHANGE COLUMN `guid` `guid` binary(16) NOT NULL"); }},
+	{71, "Add the \"filename\" column to \"singleinstances\"", [](ECDatabase *db) {
+		return db->DoUpdate("ALTER TABLE `singleinstances` ADD COLUMN `filename` VARCHAR(255) DEFAULT NULL"); }},
+	/*
+	 * The InnoDB Antelope (= COMPACT) row format has a limitation of 767
+	 * bytes, which interferes with utf8mb4*255 (only indexed fields).
+	 */
+	{73, "Shrink index key 2/5", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `receivefolder` MODIFY COLUMN `messageclass` VARCHAR(191) NOT NULL"); }},
+	{77, "utf8mb4 #1", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `acl` DEFAULT CHARSET utf8mb4"); }},
+	{78, "utf8mb4 #2", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `hierarchy` DEFAULT CHARSET utf8mb4"); }},
+	{80, "utf8mb4 #4", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `mvproperties` DEFAULT CHARSET utf8mb4"); }},
+	{81, "utf8mb4 #5", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `tproperties` MODIFY COLUMN `val_string` longtext CHARACTER SET utf8mb4 DEFAULT NULL"); }},
+	{82, "utf8mb4 #6", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `deferredupdate` DEFAULT CHARSET utf8mb4"); }},
+	{83, "utf8mb4 #7", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `properties` MODIFY COLUMN `val_string` longtext CHARACTER SET utf8mb4 DEFAULT NULL"); }},
+	{84, "utf8mb4 #8", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `receivefolder` DEFAULT CHARSET utf8mb4"); }},
+	{85, "utf8mb4 support 9/22", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `stores` CONVERT TO CHARSET utf8mb4"); }},
+	{86, "utf8mb4 support 10/22", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `users` CONVERT TO CHARSET utf8mb4"); }},
+	{87, "utf8mb4 #11", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `outgoingqueue` DEFAULT CHARSET utf8mb4"); }},
+	{88, "utf8mb4 #12", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `lob` DEFAULT CHARSET utf8mb4"); }},
+	{89, "utf8mb4 #13", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `singleinstances` MODIFY COLUMN `filename` varchar(255) DEFAULT NULL"); }},
+	{90, "utf8mb4 #14", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `object` DEFAULT CHARSET utf8mb4"); }},
+	{93, "utf8mb4 #17", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectrelation` DEFAULT CHARSET utf8mb4"); }},
+	{94, "utf8mb4 #18", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `versions` DEFAULT CHARSET utf8mb4"); }},
+	{95, "utf8mb4 #19", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `searchresults` DEFAULT CHARSET utf8mb4"); }},
+	{96, "utf8mb4 #20", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `changes` DEFAULT CHARSET utf8mb4"); }},
+	{97, "utf8mb4 #21", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `abchanges` DEFAULT CHARSET utf8mb4"); }},
+	{98, "utf8mb4 #22", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `syncs` DEFAULT CHARSET utf8mb4"); }},
+	{103, "utf8mb4 #23", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `names` DEFAULT CHARSET utf8mb4"); }},
+	{104, "utf8mb4 #24", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `names` MODIFY COLUMN `namestring` varchar(191) BINARY DEFAULT NULL"); }},
+	{105, "utf8mb4 #25", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectproperty` DEFAULT CHARSET utf8mb4"); }},
+	{106, "utf8mb4 #26", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectproperty` MODIFY COLUMN `propname` varchar(191) BINARY NOT NULL"); }},
+	{107, "utf8mb4 #27", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectproperty` MODIFY COLUMN `value` text CHARACTER SET utf8mb4 DEFAULT NULL"); }},
+	{108, "utf8mb4 #28", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectmvproperty` DEFAULT CHARSET utf8mb4"); }},
+	{109, "utf8mb4 #29", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectproperty` MODIFY COLUMN `propname` varchar(191) BINARY NOT NULL"); }},
+	{110, "utf8mb4 #30", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `objectproperty` MODIFY COLUMN `value` text CHARACTER SET utf8mb4 DEFAULT NULL"); }},
+	{111, "utf8mb4 #31", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `settings` DEFAULT CHARSET utf8mb4"); }},
+	{112, "utf8mb4 #32", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `settings` MODIFY COLUMN `name` varchar(191) BINARY NOT NULL"); }},
+	{113, "utf8mb4 #33", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `tproperties` DEFAULT CHARSET utf8mb4"); }},
+	{114, "utf8mb4 #34", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `properties` DEFAULT CHARSET utf8mb4"); }},
+	{115, "utf8mb4 #35", [](ECDatabase *d) { return d->DoUpdate("ALTER TABLE `singleinstances` DEFAULT CHARSET utf8mb4"); }},
 };
 
 static const char *const server_groups[] = {
@@ -89,8 +199,7 @@ static const char *const server_groups[] = {
 };
 
 struct STOREDPROCS {
-	const char *szName;
-	const char *szSQL;
+	const char *szName, *szSQL;
 };
 
 /**
@@ -98,7 +207,7 @@ struct STOREDPROCS {
  * Mode 1 = Best body only (RTF better than HTML) + plaintext
  * Mode 2 = Plaintext only
  */
- 
+
 static const char szGetProps[] =
 "CREATE PROCEDURE GetProps(IN hid integer, IN mode integer)\n"
 "BEGIN\n"
@@ -107,7 +216,7 @@ static const char szGetProps[] =
 "  IF mode = 1 THEN\n"
 "  	 call GetBestBody(hid, bestbody);\n"
 "  END IF;\n"
-  
+
 "  SELECT 0, tag, properties.type, val_ulong, val_string, val_binary, val_double, val_longint, val_hi, val_lo, 0, names.nameid, names.namestring, names.guid\n"
 "    FROM properties LEFT JOIN names ON properties.tag-34049=names.id WHERE hierarchyid=hid AND (tag <= 34048 OR names.id IS NOT NULL) AND (tag NOT IN (4105, 4115) OR mode = 0 OR (mode = 1 AND tag = bestbody))\n"
 "  UNION\n"
@@ -168,7 +277,7 @@ static const char szStreamObj[] =
 "  call GetProps(rootid, mode);\n"
 
 "  call PrepareGetProps(rootid);\n"
- 
+
 "  SELECT id,hierarchy.type FROM hierarchy WHERE parent=rootid;\n"
 
 "  OPEN cur_hierarchy;\n"
@@ -240,10 +349,10 @@ int zcp_versiontuple::compare(const zcp_versiontuple &rhs) const
 	return 0;
 }
 
-ECDatabase::ECDatabase(ECConfig *cfg) :
-    m_lpConfig(cfg)
+ECDatabase::ECDatabase(std::shared_ptr<ECConfig> c, std::shared_ptr<ECStatsCollector> sc) :
+	m_lpConfig(std::move(c)), m_stats(std::move(sc))
 {
-	auto s = cfg->GetSetting("mysql_database");
+	auto s = m_lpConfig->GetSetting("mysql_database");
 	if (s != nullptr)
 		/* used by db_update_69 */
 		m_dbname = s;
@@ -264,12 +373,10 @@ ECRESULT ECDatabase::InitLibrary(const char *lpDatabaseDir,
     	strDatabaseDir = "--datadir=";
     	strDatabaseDir+= lpDatabaseDir;
     }
-
     if(lpConfigFile) {
     	strConfigFile = "--defaults-file=";
     	strConfigFile+= lpConfigFile;
     }
-	
 	const char *server_args[] = {
 		"",		/* this string is not used */
 		strConfigFile.c_str(),
@@ -304,7 +411,6 @@ ECRESULT ECDatabase::InitializeDBStateInner(void)
 		auto er = DoUpdate(std::string("DROP PROCEDURE IF EXISTS ") + stored_procedures[i].szName);
 		if(er != erSuccess)
 			return er;
-			
 		er = DoUpdate(stored_procedures[i].szSQL);
 		if (er == erSuccess)
 			continue;
@@ -346,7 +452,7 @@ ECRESULT ECDatabase::Connect(void)
 	 * want to know when the connection is broken since this creates a new
 	 * MySQL session, and we want to set some session variables.
 	 */
-	auto er = KDatabase::Connect(m_lpConfig, false,
+	auto er = KDatabase::Connect(m_lpConfig.get(), false,
 	          CLIENT_MULTI_STATEMENTS, gcm);
 	if (er != erSuccess)
 		return er;
@@ -368,13 +474,11 @@ ECRESULT ECDatabase::Connect(void)
 			 */
 			Query("SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_UNSIGNED_SUBTRACTION'");
 	}
-
 exit:
 	if (er == erSuccess)
-		g_lpStatsCollector->Increment(SCN_DATABASE_CONNECTS);
+		m_stats->inc(SCN_DATABASE_CONNECTS);
 	else
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_CONNECTS);
-		
+		m_stats->inc(SCN_DATABASE_FAILED_CONNECTS);
 	return er;
 }
 
@@ -384,7 +488,7 @@ exit:
  * Sends a query to the MySQL server, and does a reconnect if the server connection is lost before or during
  * the SQL query. The reconnect is done only once. If the query fails after the reconnect, the entire call
  * fails.
- * 
+ *
  * It is up to the caller to get any result information from the query.
  *
  * @param[in] strQuery SQL query to perform
@@ -394,21 +498,18 @@ ECRESULT ECDatabase::Query(const std::string &strQuery)
 {
 	ECRESULT er = erSuccess;
 	int err = KDatabase::Query(strQuery);
-	
+
 	if(err && (mysql_errno(&m_lpMySQL) == CR_SERVER_LOST || mysql_errno(&m_lpMySQL) == CR_SERVER_GONE_ERROR)) {
 		ec_log_warn("SQL [%08lu] info: Try to reconnect", m_lpMySQL.thread_id);
-			
 		er = Close();
 		if(er != erSuccess)
 			return er;
 		er = Connect();
 		if(er != erSuccess)
 			return er;
-			
 		// Try again
 		err = mysql_real_query( &m_lpMySQL, strQuery.c_str(), strQuery.length() );
 	}
-
 	if(err) {
 		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
 			ec_log_err("SQL [%08lu] Failed: %s, Query Size: %zu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), strQuery.size(), strQuery.c_str());
@@ -421,10 +522,10 @@ ECRESULT ECDatabase::DoSelect(const std::string &strQuery,
     DB_RESULT *lppResult, bool fStreamResult)
 {
 	ECRESULT er = KDatabase::DoSelect(strQuery, lppResult, fStreamResult);
-	g_lpStatsCollector->Increment(SCN_DATABASE_SELECTS);
+	m_stats->inc(SCN_DATABASE_SELECTS);
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_SELECTS);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
@@ -434,28 +535,25 @@ ECRESULT ECDatabase::DoSelectMulti(const std::string &strQuery)
 	ECRESULT er = erSuccess;
 	assert(strQuery.length() != 0);
 	autolock alk(*this);
-		
+
 	if( Query(strQuery) != erSuccess ) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECDatabase::DoSelectMulti(): select failed");
 		goto exit;
 	}
-	
 	m_bFirstResult = true;
-
-	g_lpStatsCollector->Increment(SCN_DATABASE_SELECTS);
-	
+	m_stats->inc(SCN_DATABASE_SELECTS);
 exit:
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_SELECTS);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
 
 /**
  * Get next resultset from a multi-resultset query
- * 
+ *
  * @param[out] lppResult Resultset
  * @return result
  */
@@ -468,21 +566,17 @@ ECRESULT ECDatabase::GetNextResult(DB_RESULT *lppResult)
 
 	if(!m_bFirstResult)
 		ret = mysql_next_result( &m_lpMySQL );
-		
 	m_bFirstResult = false;
-		
 	if(ret < 0) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("SQL [%08lu] next_result failed: expected more results", m_lpMySQL.thread_id);
 		goto exit;
 	}
-	
 	if(ret > 0) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("SQL [%08lu] next_result of multi-resultset failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL));
 		goto exit;
-	}		
-
+	}
 	lpResult = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
 	if (lpResult == nullptr) {
    		// I think this can only happen on the first result set of a query since otherwise mysql_next_result() would already fail
@@ -490,13 +584,12 @@ ECRESULT ECDatabase::GetNextResult(DB_RESULT *lppResult)
 		ec_log_err("SQL [%08lu] result failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL));
 		goto exit;
    	}
-
 	if (lppResult)
 		*lppResult = std::move(lpResult);
 exit:
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_SELECTS);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
@@ -525,10 +618,10 @@ ECRESULT ECDatabase::DoUpdate(const std::string &strQuery,
     unsigned int *lpulAffectedRows)
 {
 	auto er = KDatabase::DoUpdate(strQuery, lpulAffectedRows);
-	g_lpStatsCollector->Increment(SCN_DATABASE_UPDATES);
+	m_stats->inc(SCN_DATABASE_UPDATES);
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_UPDATES);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_UPDATES);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
@@ -537,10 +630,10 @@ ECRESULT ECDatabase::DoInsert(const std::string &strQuery,
     unsigned int *lpulInsertId, unsigned int *lpulAffectedRows)
 {
 	auto er = KDatabase::DoInsert(strQuery, lpulInsertId, lpulAffectedRows);
-	g_lpStatsCollector->Increment(SCN_DATABASE_INSERTS);
+	m_stats->inc(SCN_DATABASE_INSERTS);
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_INSERTS);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_INSERTS);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
@@ -549,10 +642,10 @@ ECRESULT ECDatabase::DoDelete(const std::string &strQuery,
     unsigned int *lpulAffectedRows)
 {
 	auto er = KDatabase::DoDelete(strQuery, lpulAffectedRows);
-	g_lpStatsCollector->Increment(SCN_DATABASE_DELETES);
+	m_stats->inc(SCN_DATABASE_DELETES);
 	if (er != erSuccess) {
-		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_DELETES);
-		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
+		m_stats->inc(SCN_DATABASE_FAILED_DELETES);
+		m_stats->SetTime(SCN_DATABASE_LAST_FAILED, time(nullptr));
 	}
 	return er;
 }
@@ -562,57 +655,11 @@ ECRESULT ECDatabase::DoDelete(const std::string &strQuery,
 ECRESULT ECDatabase::DoSequence(const std::string &strSeqName,
     unsigned int ulCount, unsigned long long *lpllFirstId)
 {
-#ifdef DEBUG
-#if DEBUG_TRANSACTION
+#if defined(KNOB144) && DEBUG_TRANSACTION
 	if (m_ulTransactionState != 0)
 		assert(false);
 #endif
-#endif
 	return KDatabase::DoSequence(strSeqName, ulCount, lpllFirstId);
-}
-
-/** 
- * For some reason, MySQL only supports up to 3 bytes of UTF-8 data. This means
- * that data outside the BMP is not supported. This function filters the passed UTF-8 string
- * and removes the non-BMP characters. Since it should be extremely uncommon to have useful
- * data outside the BMP, this should be acceptable.
- *
- * Note: BMP stands for Basic Multilingual Plane (first 0x10000 code points in unicode)
- *
- * If somebody points out a useful use case for non-BMP characters in the future, then we'll
- * have to rethink this.
- *
- */
-std::string ECDatabase::FilterBMP(const std::string &strToFilter)
-{
-	const char *c = strToFilter.c_str();
-	std::string strFiltered;
-
-	for (size_t pos = 0; pos < strToFilter.size(); ) {
-		// Copy 1, 2, and 3-byte UTF-8 sequences
-		int len;
-		
-		if((c[pos] & 0x80) == 0)
-			len = 1;
-		else if((c[pos] & 0xE0) == 0xC0)
-			len = 2;
-		else if((c[pos] & 0xF0) == 0xE0)
-			len = 3;
-		else if((c[pos] & 0xF8) == 0xF0)
-			len = 4;
-		else if((c[pos] & 0xFC) == 0xF8)
-			len = 5;
-		else if((c[pos] & 0xFE) == 0xFC)
-			len = 6;
-		else
-			// Invalid UTF-8 ?
-			len = 1;
-		if (len < 4)
-			strFiltered.append(&c[pos], len);
-		pos += len;
-	}
-	
-	return strFiltered;
 }
 
 bool ECDatabase::SuppressLockErrorLogging(bool bSuppress)
@@ -621,11 +668,10 @@ bool ECDatabase::SuppressLockErrorLogging(bool bSuppress)
 	return bSuppress;
 }
 
-ECRESULT ECDatabase::Begin(void)
+kd_trans ECDatabase::Begin(ECRESULT &res)
 {
-	auto er = KDatabase::Begin();
-#ifdef DEBUG
-#if DEBUG_TRANSACTION
+	auto dtx = KDatabase::Begin(res);
+#if defined(KNOB144) && DEBUG_TRANSACTION
 	ec_log_debug("%08X: BEGIN", &m_lpMySQL);
 	if(m_ulTransactionState != 0) {
 		ec_log_debug("BEGIN ALREADY ISSUED");
@@ -633,16 +679,13 @@ ECRESULT ECDatabase::Begin(void)
 	}
 	m_ulTransactionState = 1;
 #endif
-#endif
-	
-	return er;
+	return dtx;
 }
 
 ECRESULT ECDatabase::Commit(void)
 {
 	auto er = KDatabase::Commit();
-#ifdef DEBUG
-#if DEBUG_TRANSACTION
+#if defined(KNOB144) && DEBUG_TRANSACTION
 	ec_log_debug("%08X: COMMIT", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
 		ec_log_debug("NO BEGIN ISSUED");
@@ -650,23 +693,19 @@ ECRESULT ECDatabase::Commit(void)
 	}
 	m_ulTransactionState = 0;
 #endif
-#endif
-
 	return er;
 }
 
 ECRESULT ECDatabase::Rollback(void)
 {
 	auto er = KDatabase::Rollback();
-#ifdef DEBUG
-#if DEBUG_TRANSACTION
+#if defined(KNOB144) && DEBUG_TRANSACTION
 	ec_log_debug("%08X: ROLLBACK", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
 		ec_log_debug("NO BEGIN ISSUED");
 		assert(("NO BEGIN ISSUED", false));
 	}
 	m_ulTransactionState = 0;
-#endif
 #endif
 	return er;
 }
@@ -683,10 +722,10 @@ void ECDatabase::ThreadEnd(void)
 
 ECRESULT ECDatabase::CreateDatabase(void)
 {
-	auto er = KDatabase::CreateDatabase(m_lpConfig, false);
+	auto er = KDatabase::CreateDatabase(m_lpConfig.get(), false);
 	if (er != erSuccess)
 		return er;
-	er = KDatabase::CreateTables(m_lpConfig);
+	er = KDatabase::CreateTables(m_lpConfig.get());
 	if (er != erSuccess)
 		return er;
 
@@ -712,7 +751,6 @@ ECRESULT ECDatabase::CreateDatabase(void)
 	er = InsertServerGUID(this);
 	if(er != erSuccess)
 		return er;
-
 	// Add the release id in the database
 	er = UpdateDatabaseVersion(Z_UPDATE_RELEASE_ID);
 	if(er != erSuccess)
@@ -765,13 +803,12 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 	if (er != erSuccess || lpResult.get_num_rows() == 0) {
 		// Ok, maybe < than version 5.10
 		// check version
-
 		strQuery = "SHOW COLUMNS FROM properties";
 		er = DoSelect(strQuery, &lpResult);
 		if(er != erSuccess)
 			return er;
 
-		for (lpDBRow = lpResult.fetch_row(); lpDBRow != nullptr; lpDBRow = lpResult.fetch_row()) {
+		while ((lpDBRow = lpResult.fetch_row()) != nullptr) {
 			if (lpDBRow[0] != NULL && strcasecmp(lpDBRow[0], "storeid") == 0) {
 				dbv->v_major  = 5;
 				dbv->v_minor  = 0;
@@ -789,7 +826,6 @@ ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 		ec_log_err("ECDatabase::GetDatabaseVersion(): NULL row or columns");
 		return KCERR_DATABASE_ERROR;
 	}
-
 	dbv->v_major  = strtoul(lpDBRow[0], NULL, 0);
 	dbv->v_minor  = strtoul(lpDBRow[1], NULL, 0);
 	dbv->v_micro  = strtoul(lpDBRow[2], NULL, 0);
@@ -815,18 +851,17 @@ ECRESULT ECDatabase::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
 	return erSuccess;
 }
 
-/** 
+/**
  * Update the database to the current version.
- * 
+ *
  * @param[in]  bForceUpdate possebly force upgrade
  * @param[out] strReport error message
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 {
-	bool			bUpdated = false;
-	bool			bSkipped = false;
+	bool bUpdated = false, bSkipped = false;
 	unsigned int	ulDatabaseRevisionMin = 0;
 	zcp_versiontuple stored_ver;
 	zcp_versiontuple program_ver(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_MICRO, PROJECT_VERSION_REVISION, Z_UPDATE_LAST);
@@ -860,8 +895,7 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 		return KCERR_INVALID_VERSION;
 	}
 
-	this->m_bForceUpdate = bForceUpdate;
-
+	m_bForceUpdate = bForceUpdate;
 	if (bForceUpdate)
 		ec_log_warn("Manually forced the database upgrade because the option \"--force-database-upgrade\" was given.");
 
@@ -870,13 +904,10 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 		if (stored_ver.v_schema >= sUpdateList[i].ulVersion)
 			// Update already done, next
 			continue;
-
 		ec_log_info("Start: %s", sUpdateList[i].lpszLogComment);
-
-		er = Begin();
+		auto dtx = Begin(er);
 		if(er != erSuccess)
 			return er;
-
 		bSkipped = false;
 		er = sUpdateList[i].lpFunction(this);
 		if (er == KCERR_IGNORE_ME) {
@@ -885,14 +916,12 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 		} else if (er == KCERR_USER_CANCEL) {
 			return er; // Reason should be logged in the update itself.
 		} else if (er != hrSuccess) {
-			Rollback();
 			return er;
 		}
-
 		er = UpdateDatabaseVersion(sUpdateList[i].ulVersion);
 		if(er != erSuccess)
 			return er;
-		er = Commit();
+		er = dtx.commit();
 		if(er != erSuccess)
 			return er;
 		ec_log_notice("%s: %s", bSkipped ? "Skipped" : "Done", sUpdateList[i].lpszLogComment);
@@ -900,7 +929,7 @@ ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 	}
 
 	// Ok, no changes for the database, but for update history we add a version record
-	if(bUpdated == false) {
+	if (!bUpdated) {
 		// Update version table
 		er = UpdateDatabaseVersion(Z_UPDATE_LAST);
 		if(er != erSuccess)
@@ -940,7 +969,6 @@ static constexpr const sSQLDatabase_t kcsrv_tables[] = {
 	{"properties", Z_TABLEDEF_PROPERTIES},
 	{"delayedupdate", Z_TABLEDEF_DELAYEDUPDATE},
 	{"receivefolder", Z_TABLEDEF_RECEIVEFOLDER},
-
 	{"stores", Z_TABLEDEF_STORES},
 	{"users", Z_TABLEDEF_USERS},
 	{"outgoingqueue", Z_TABLEDEF_OUTGOINGQUEUE},
@@ -951,12 +979,10 @@ static constexpr const sSQLDatabase_t kcsrv_tables[] = {
 	{"versions", Z_TABLEDEF_VERSIONS},
 	{"indexedproperties", Z_TABLEDEF_INDEXED_PROPERTIES},
 	{"settings", Z_TABLEDEF_SETTINGS},
-
 	{"object", Z_TABLEDEF_OBJECT},
 	{"objectproperty", Z_TABLEDEF_OBJECT_PROPERTY},
 	{"objectmvproperty", Z_TABLEDEF_OBJECT_MVPROPERTY},
 	{"objectrelation", Z_TABLEDEF_OBJECT_RELATION},
-
 	{"singleinstances", Z_TABLEDEF_REFERENCES},
 	{"abchanges", Z_TABLEDEF_ABCHANGES},
 	{"syncedmessages", Z_TABLEDEFS_SYNCEDMESSAGES},

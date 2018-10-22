@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 %{
 // Hack to get around OP_DELETE being an enum in perl\lib\core\opnames.h and EdkMdb.h
 namespace EdkMdb {
@@ -41,6 +42,17 @@ public:
 	virtual HRESULT UpdateState(IStream * lpStream) = 0;
 	%extend {
 		virtual ~IExchangeExportChanges() { self->Release(); }
+	}
+};
+
+class IECExportAddressbookChanges : public IUnknown {
+public:
+	virtual HRESULT Config(IStream * lpStream, ULONG ulFlags, IECImportAddressbookChanges *lpUnk);
+	virtual HRESULT Synchronize(ULONG* lpulSteps, ULONG *INOUT /*lpulProgress*/) = 0;
+	virtual HRESULT UpdateState(IStream * lpStream) = 0;
+
+	%extend {
+		~IECExportAddressbookChanges() { self->Release(); };
 	}
 };
 

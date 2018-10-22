@@ -1,46 +1,26 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
 #include <mapiutil.h>
-
 #include <fstream>
 #include <new>
 #include <string>
-#include <kopano/ECIConv.h>
 #include <kopano/ECLogger.h>
 #include "WSTransport.h"
 #include "ProviderUtil.h"
-#include "SymmetricCrypt.h"
 #include "soapH.h"
 #include "pcutil.hpp"
-
-// The header files we use for communication with the server
 #include <kopano/kcodes.h>
 #include "soapKCmdProxy.h"
 #include "KCmd.nsmap"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
-
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 #include <kopano/mapiext.h>
@@ -50,11 +30,9 @@
 #include "ECSessionGroupManager.h"
 #include <kopano/stringutil.h>
 #include "versions.h"
-
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
 #include <kopano/charset/convstring.h>
-
 #include "SOAPSock.h"
 #include <kopano/mapi_ptr.h>
 #include "WSMessageStreamExporter.h"
@@ -68,7 +46,7 @@ using namespace KC;
 /*
  *
  * This is the main WebServices transport object. All communications with the
- * web service server is done through this object. Also, this file is the 
+ * web service server is done through this object. Also, this file is the
  * coupling point between MAPI and our internal (network) formats, and
  * codes. This means that any classes communicating with this one either
  * use MAPI syntax (i.e. MAPI_E_NOT_ENOUGH_MEMORY) OR use the EC syntax
@@ -98,7 +76,7 @@ WSTransport::WSTransport(ULONG ulUIFlags) :
 WSTransport::~WSTransport()
 {
 	if (m_lpCmd != NULL)
-		this->HrLogOff();
+		HrLogOff();
 }
 
 HRESULT WSTransport::QueryInterface(REFIID refiid, void **lppInterface)
@@ -115,66 +93,37 @@ HRESULT WSTransport::Create(ULONG ulUIFlags, WSTransport **lppTransport)
 /* Creates a transport working on the same session and session group as this transport */
 HRESULT WSTransport::HrClone(WSTransport **lppTransport)
 {
-	HRESULT hr;
 	WSTransport *lpTransport = NULL;
-
-	hr = WSTransport::Create(m_ulUIFlags, &lpTransport);
+	auto hr = WSTransport::Create(m_ulUIFlags, &lpTransport);
 	if(hr != hrSuccess)
 		return hr;
 
 	hr = CreateSoapTransport(m_ulUIFlags, m_sProfileProps, &lpTransport->m_lpCmd);
 	if(hr != hrSuccess)
 		return hr;
-	
-	lpTransport->m_ecSessionId = this->m_ecSessionId;
-	lpTransport->m_ecSessionGroupId = this->m_ecSessionGroupId;
-
+	lpTransport->m_ecSessionId = m_ecSessionId;
+	lpTransport->m_ecSessionGroupId = m_ecSessionGroupId;
 	*lppTransport = lpTransport;
 	return hrSuccess;
-}
-
-HRESULT WSTransport::LockSoap()
-{
-	m_hDataLock.lock();
-	return erSuccess;
-}
-
-HRESULT WSTransport::UnLockSoap()
-{
-	//Clean up data create with soap_malloc
-	if (m_lpCmd && m_lpCmd->soap) {
-		soap_destroy(m_lpCmd->soap);
-		soap_end(m_lpCmd->soap);
-	}
-	m_hDataLock.unlock();
-	return erSuccess;
 }
 
 HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	unsigned int ulCapabilities = KOPANO_CAP_GIFN32;
-	unsigned int	ulLogonFlags = 0;
-	unsigned int	ulServerCapabilities = 0;
+	unsigned int ulCapabilities = KOPANO_CAP_GIFN32, ulLogonFlags = 0;
+	unsigned int ulServerCapabilities = 0, ulServerVersion = 0;
 	ECSESSIONID	ecSessionId = 0;
 	KCmdProxy *lpCmd = nullptr;
-	bool		bPipeConnection = false;
-	unsigned int	ulServerVersion = 0;
+	auto bPipeConnection = strncmp("file:", sProfileProps.strServerPath.c_str(), 5) == 0;
 	struct logonResponse sResponse;
 	struct xsd__base64Binary sLicenseRequest;
-	
+
 	convert_context	converter;
 	utf8string	strUserName = converter.convert_to<utf8string>(sProfileProps.strUserName);
 	utf8string	strPassword = converter.convert_to<utf8string>(sProfileProps.strPassword);
 	utf8string	strImpersonateUser = converter.convert_to<utf8string>(sProfileProps.strImpersonateUser);
-	
-	LockSoap();
-
-	if (strncmp("file:", sProfileProps.strServerPath.c_str(), 5) == 0)
-		bPipeConnection = true;
-	else
-		bPipeConnection = false;
+	soap_lock_guard spg(*this);
 
 	if (m_lpCmd != nullptr) {
 		lpCmd = m_lpCmd;
@@ -191,8 +140,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 
 	if (sizeof(ECSESSIONID) == 8)
 		ulCapabilities |= KOPANO_CAP_LARGE_SESSIONID;
-
-	if (bPipeConnection == false) {
+	if (!bPipeConnection) {
 		/*
 		 * All connections except pipes request compression. The server
 		 * can still reject the request.
@@ -213,7 +161,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	er = TrySSOLogon(lpCmd, GetServerNameFromPath(sProfileProps.strServerPath.c_str()).c_str(), strUserName, strImpersonateUser, ulCapabilities, m_ecSessionGroupId, (char *)GetAppName().c_str(), &ecSessionId, &ulServerCapabilities, &m_llFlags, &m_sServerGuid, sProfileProps.strClientAppVersion, sProfileProps.strClientAppMisc);
 	if (er == erSuccess)
 		goto auth;
-	
+
 	// Login with username and password
 	if (lpCmd->logon(strUserName.c_str(), strPassword.c_str(),
 	    strImpersonateUser.c_str(), PROJECT_VERSION, ulCapabilities,
@@ -235,7 +183,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	 * Version is retrieved but not analyzed because we want to be able to
 	 * connect to old servers for development.
 	 */
-	er = ParseKopanoVersion(sResponse.lpszVersion, &ulServerVersion);
+	er = ParseKopanoVersion(sResponse.lpszVersion, &m_server_version, &ulServerVersion);
 	if (er != erSuccess) {
 		hr = MAPI_E_VERSION;
 		goto exit;
@@ -273,7 +221,7 @@ auth: // User have a logon
 	m_lpCmd = lpCmd;
 
 exit:
-	UnLockSoap();
+	spg.unlock();
 	if (hr != hrSuccess && lpCmd != nullptr && lpCmd != m_lpCmd)
 	    // UGLY FIX: due to the ugly code above that does lpCmd = m_lpCmd
 	    // we need to check that we're not deleting our m_lpCmd. We also cannot
@@ -296,22 +244,20 @@ HRESULT WSTransport::HrLogon(const struct sGlobalProfileProps &in_props)
 
 HRESULT WSTransport::HrSetRecvTimeout(unsigned int ulSeconds)
 {
-	if (this->m_lpCmd == NULL)
+	if (m_lpCmd == nullptr)
 		return MAPI_E_NOT_INITIALIZED;
-
-	this->m_lpCmd->soap->recv_timeout = ulSeconds;
+	m_lpCmd->soap->recv_timeout = ulSeconds;
 	return hrSuccess;
 }
 
 HRESULT WSTransport::CreateAndLogonAlternate(LPCSTR szServer, WSTransport **lppTransport) const
 {
-	HRESULT				hr = hrSuccess;
-	object_ptr<WSTransport> lpTransport;
-	sGlobalProfileProps	sProfileProps = m_sProfileProps;
-
 	if (lppTransport == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = WSTransport::Create(m_ulUIFlags, &~lpTransport);
+
+	object_ptr<WSTransport> lpTransport;
+	sGlobalProfileProps	sProfileProps = m_sProfileProps;
+	auto hr = WSTransport::Create(m_ulUIFlags, &~lpTransport);
 	if (hr != hrSuccess)
 		return hr;
 	sProfileProps.strServerPath = szServer;
@@ -332,12 +278,11 @@ HRESULT WSTransport::CreateAndLogonAlternate(LPCSTR szServer, WSTransport **lppT
  */
 HRESULT WSTransport::CloneAndRelogon(WSTransport **lppTransport) const
 {
-	HRESULT				hr = hrSuccess;
-	object_ptr<WSTransport> lpTransport;
-
 	if (lppTransport == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = WSTransport::Create(m_ulUIFlags, &~lpTransport);
+
+	object_ptr<WSTransport> lpTransport;
+	auto hr = WSTransport::Create(m_ulUIFlags, &~lpTransport);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpTransport->HrLogon(m_sProfileProps);
@@ -356,7 +301,7 @@ HRESULT WSTransport::HrReLogon()
 	// Notify new session to listeners
 	scoped_rlock lock(m_mutexSessionReload);
 	for (const auto &p : m_mapSessionReload)
-		p.second.second(p.second.first, this->m_ecSessionId);
+		p.second.second(p.second.first, m_ecSessionId);
 	return hrSuccess;
 }
 
@@ -462,22 +407,15 @@ ECRESULT WSTransport::TrySSOLogon(KCmdProxy *lpCmd, const char *szServer,
 HRESULT WSTransport::HrGetPublicStore(ULONG ulFlags, ULONG *lpcbStoreID,
     ENTRYID **lppStoreID, std::string *lpstrRedirServer)
 {
+	if ((ulFlags & ~EC_OVERRIDE_HOMESERVER) != 0)
+		return MAPI_E_UNKNOWN_FLAGS;
+	if (lppStoreID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct getStoreResponse sResponse;
-
-	LockSoap();
-
-	if ((ulFlags & ~EC_OVERRIDE_HOMESERVER) != 0) {
-		hr = MAPI_E_UNKNOWN_FLAGS;
-		goto exitm;
-	}
-
-	if(lppStoreID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
-
+	soap_lock_guard spg(*this);
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->getPublicStore(m_ecSessionId, ulFlags, &sResponse) != SOAP_OK)
@@ -504,12 +442,10 @@ HRESULT WSTransport::HrGetPublicStore(ULONG ulFlags, ULONG *lpcbStoreID,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrGetStore(ULONG cbMasterID, ENTRYID *lpMasterID,
+HRESULT WSTransport::HrGetStore(ULONG cbMasterID, const ENTRYID *lpMasterID,
     ULONG *lpcbStoreID, ENTRYID **lppStoreID, ULONG *lpcbRootID,
     ENTRYID **lppRootID, std::string *lpstrRedirServer)
 {
@@ -519,8 +455,7 @@ HRESULT WSTransport::HrGetStore(ULONG cbMasterID, ENTRYID *lpMasterID,
 	struct getStoreResponse sResponse;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	if(lpMasterID) {
 		hr = UnWrapServerClientStoreEntry(cbMasterID, lpMasterID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
@@ -565,33 +500,29 @@ HRESULT WSTransport::HrGetStore(ULONG cbMasterID, ENTRYID *lpMasterID,
 	}
 
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::HrGetStoreName(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG ulFlags, LPTSTR *lppszStoreName)
+HRESULT WSTransport::HrGetStoreName(ULONG cbStoreID, const ENTRYID *lpStoreID,
+    ULONG ulFlags, TCHAR **lppszStoreName)
 {
+	if (lpStoreID == nullptr || lppszStoreName == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
-	HRESULT hr = hrSuccess;
 	entryId		sEntryId; // Do not free
 	struct getStoreNameResponse sResponse;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
-
-	LockSoap();
-
-	if(lpStoreID == NULL || lppszStoreName == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	// Remove the servername
-	hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
 	sEntryId.__ptr = reinterpret_cast<unsigned char *>(lpUnWrapStoreID.get());
 	sEntryId.__size = cbUnWrapStoreID;
-	
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->getStoreName(m_ecSessionId, sEntryId, &sResponse) != SOAP_OK)
@@ -603,33 +534,29 @@ HRESULT WSTransport::HrGetStoreName(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG 
 
 	hr = Utf8ToTString(sResponse.lpszStoreName, ulFlags, NULL, NULL, lppszStoreName);
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::HrGetStoreType(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG *lpulStoreType)
+HRESULT WSTransport::HrGetStoreType(ULONG cbStoreID, const ENTRYID *lpStoreID,
+    ULONG *lpulStoreType)
 {
+	if (lpStoreID == nullptr || lpulStoreType == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
-	HRESULT hr = hrSuccess;
 	entryId		sEntryId; // Do not free
 	struct getStoreTypeResponse sResponse;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
-
-	LockSoap();
-
-	if(lpStoreID == NULL || lpulStoreType == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	// Remove the servername
-	hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
 	sEntryId.__ptr = reinterpret_cast<unsigned char *>(lpUnWrapStoreID.get());
 	sEntryId.__size = cbUnWrapStoreID;
-	
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->getStoreType(m_ecSessionId, sEntryId, &sResponse) != SOAP_OK)
@@ -641,7 +568,6 @@ HRESULT WSTransport::HrGetStoreType(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG 
 
 	*lpulStoreType = sResponse.ulStoreType;
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
@@ -649,8 +575,7 @@ HRESULT WSTransport::HrLogOff()
 {
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	START_SOAP_CALL
 	{
@@ -664,8 +589,6 @@ HRESULT WSTransport::HrLogOff()
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hrSuccess; // NOTE hrSuccess, never fails since we don't really mind that it failed.
 }
 
@@ -673,8 +596,8 @@ HRESULT WSTransport::logoff_nd(void)
 {
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->logoff(m_ecSessionId, &er) != SOAP_OK)
@@ -684,24 +607,19 @@ HRESULT WSTransport::logoff_nd(void)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
 	return er;
 }
 
 HRESULT WSTransport::HrCheckExistObject(ULONG cbEntryID,
     const ENTRYID *lpEntryID, ULONG ulFlags)
 {
-	HRESULT		hr = hrSuccess;
+	if (cbEntryID == 0 || lpEntryID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT	er = erSuccess;
 	entryId sEntryId; // Do not free
-	LockSoap();
-
-	if(cbEntryID == 0 || lpEntryID == NULL) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exitm;
-	}
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
+	soap_lock_guard spg(*this);
+	auto hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
 	if(hr != hrSuccess)
 		goto exitm;
 
@@ -712,8 +630,6 @@ HRESULT WSTransport::HrCheckExistObject(ULONG cbEntryID,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -721,23 +637,21 @@ HRESULT WSTransport::HrOpenPropStorage(ULONG cbParentEntryID,
     const ENTRYID *lpParentEntryID, ULONG cbEntryID, const ENTRYID *lpEntryID,
     ULONG ulFlags, IECPropStorage **lppPropStorage)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<WSMAPIPropStorage> lpPropStorage;
 	ecmem_ptr<ENTRYID> lpUnWrapParentID, lpUnWrapEntryID;
-	ULONG		cbUnWrapParentID = 0;
-	ULONG		cbUnWrapEntryID = 0;
+	unsigned int cbUnWrapParentID = 0, cbUnWrapEntryID = 0;
 
 	if (lpParentEntryID) {
-		hr = UnWrapServerClientStoreEntry(cbParentEntryID, lpParentEntryID, &cbUnWrapParentID, &~lpUnWrapParentID);
+		auto hr = UnWrapServerClientStoreEntry(cbParentEntryID, lpParentEntryID, &cbUnWrapParentID, &~lpUnWrapParentID);
 		if(hr != hrSuccess)
 			return hr;
 	}
-	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapEntryID, &~lpUnWrapEntryID);
+	auto hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapEntryID, &~lpUnWrapEntryID);
 	if(hr != hrSuccess)
 		return hr;
 	hr = WSMAPIPropStorage::Create(cbUnWrapParentID, lpUnWrapParentID,
-	     cbUnWrapEntryID, lpUnWrapEntryID, ulFlags, m_lpCmd, m_hDataLock,
-	     m_ecSessionId, this->m_ulServerCapabilities, this, &~lpPropStorage);
+	     cbUnWrapEntryID, lpUnWrapEntryID, ulFlags, m_ecSessionId,
+	     m_ulServerCapabilities, this, &~lpPropStorage);
 	if(hr != hrSuccess)
 		return hr;
 	return lpPropStorage->QueryInterface(IID_IECPropStorage, (void **)lppPropStorage);
@@ -745,10 +659,8 @@ HRESULT WSTransport::HrOpenPropStorage(ULONG cbParentEntryID,
 
 HRESULT WSTransport::HrOpenParentStorage(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage, IECPropStorage **lppPropStorage)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<ECParentStorage> lpPropStorage;
-
-	hr = ECParentStorage::Create(lpParentObject, ulUniqueId, ulObjId, lpServerStorage, &~lpPropStorage);
+	auto hr = ECParentStorage::Create(lpParentObject, ulUniqueId, ulObjId, lpServerStorage, &~lpPropStorage);
 	if(hr != hrSuccess)
 		return hr;
 	return lpPropStorage->QueryInterface(IID_IECPropStorage,
@@ -758,16 +670,15 @@ HRESULT WSTransport::HrOpenParentStorage(ECGenericProp *lpParentObject, ULONG ul
 HRESULT WSTransport::HrOpenABPropStorage(ULONG cbEntryID,
     const ENTRYID *lpEntryID, IECPropStorage **lppPropStorage)
 {
-	HRESULT			hr = hrSuccess;
 	object_ptr<WSABPropStorage> lpPropStorage;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
 
-	hr = UnWrapServerClientABEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientABEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		return hr;
-	hr = WSABPropStorage::Create(cbUnWrapStoreID, lpUnWrapStoreID, m_lpCmd,
-	     m_hDataLock, m_ecSessionId, this, &~lpPropStorage);
+	hr = WSABPropStorage::Create(cbUnWrapStoreID, lpUnWrapStoreID,
+	     m_ecSessionId, this, &~lpPropStorage);
 	if(hr != hrSuccess)
 		return hr;
 	return lpPropStorage->QueryInterface(IID_IECPropStorage,
@@ -777,7 +688,6 @@ HRESULT WSTransport::HrOpenABPropStorage(ULONG cbEntryID,
 HRESULT WSTransport::HrOpenFolderOps(ULONG cbEntryID, const ENTRYID *lpEntryID,
     WSMAPIFolderOps **lppFolderOps)
 {
-	HRESULT hr = hrSuccess;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
 
@@ -785,76 +695,75 @@ HRESULT WSTransport::HrOpenFolderOps(ULONG cbEntryID, const ENTRYID *lpEntryID,
 //	hr = CheckEntryIDType(cbEntryID, lpEntryID, MAPI_FOLDER);
 //	if( hr != hrSuccess)
 		//return hr;
-	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		return hr;
-	return WSMAPIFolderOps::Create(m_lpCmd, m_hDataLock, m_ecSessionId,
-	       cbUnWrapStoreID, lpUnWrapStoreID, this, lppFolderOps);
-
+	return WSMAPIFolderOps::Create(m_ecSessionId, cbUnWrapStoreID,
+	       lpUnWrapStoreID, this, lppFolderOps);
 }
 
-HRESULT WSTransport::HrOpenTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableOps)
+HRESULT WSTransport::HrOpenTableOps(ULONG ulType, ULONG ulFlags,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ECMsgStore *lpMsgStore,
+    WSTableView **lppTableOps)
 {
 	/*
 	FIXME: Do a check ?
 	if (peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE)
 		return MAPI_E_INVALID_ENTRYID;
 	*/
-	return WSStoreTableView::Create(ulType, ulFlags, m_lpCmd, m_hDataLock,
-	       m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this,
-	       lppTableOps);
+	return WSStoreTableView::Create(ulType, ulFlags, m_ecSessionId,
+	       cbEntryID, lpEntryID, lpMsgStore, this, lppTableOps);
 }
 
-HRESULT WSTransport::HrOpenABTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECABLogon* lpABLogon, WSTableView **lppTableOps)
+HRESULT WSTransport::HrOpenABTableOps(ULONG ulType, ULONG ulFlags,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ECABLogon *lpABLogon,
+    WSTableView **lppTableOps)
 {
 	/*if (peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE)
 		return MAPI_E_INVALID_ENTRYID;
 	*/
-	return WSABTableView::Create(ulType, ulFlags, m_lpCmd, m_hDataLock,
-	       m_ecSessionId, cbEntryID, lpEntryID, lpABLogon, this,
-	       lppTableOps);
+	return WSABTableView::Create(ulType, ulFlags, m_ecSessionId, cbEntryID,
+	       lpEntryID, lpABLogon, this, lppTableOps);
 }
 
 HRESULT WSTransport::HrOpenMailBoxTableOps(ULONG ulFlags, ECMsgStore *lpMsgStore, WSTableView **lppTableView)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<WSTableMailBox> lpWSTable;
-	
-	hr = WSTableMailBox::Create(ulFlags, m_lpCmd, m_hDataLock,
-	     m_ecSessionId, lpMsgStore, this, &~lpWSTable);
+	auto hr = WSTableMailBox::Create(ulFlags, m_ecSessionId, lpMsgStore,
+	          this, &~lpWSTable);
 	if(hr != hrSuccess)
 		return hr;
 	return lpWSTable->QueryInterface(IID_ECTableView,
 	       reinterpret_cast<void **>(lppTableView));
 }
 
-HRESULT WSTransport::HrOpenTableOutGoingQueueOps(ULONG cbStoreEntryID, LPENTRYID lpStoreEntryID, ECMsgStore *lpMsgStore, WSTableOutGoingQueue **lppTableOutGoingQueueOps)
+HRESULT WSTransport::HrOpenTableOutGoingQueueOps(ULONG cbStoreEntryID,
+    const ENTRYID *lpStoreEntryID, ECMsgStore *lpMsgStore,
+    WSTableOutGoingQueue **lppTableOutGoingQueueOps)
 {
-	HRESULT hr = hrSuccess;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
 
 	// lpStoreEntryID == null for master queue
 	if(lpStoreEntryID) {
-		hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+		auto hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 		if(hr != hrSuccess)
 			return hr;
 	}
-	return WSTableOutGoingQueue::Create(m_lpCmd, m_hDataLock, m_ecSessionId,
+	return WSTableOutGoingQueue::Create(m_ecSessionId,
 	       cbUnWrapStoreID, lpUnWrapStoreID, lpMsgStore, this,
 	       lppTableOutGoingQueueOps);
 }
 
-HRESULT WSTransport::HrDeleteObjects(ULONG ulFlags, LPENTRYLIST lpMsgList, ULONG ulSyncId)
+HRESULT WSTransport::HrDeleteObjects(ULONG ulFlags, const ENTRYLIST *lpMsgList, ULONG ulSyncId)
 {
-	ECRESULT er = erSuccess;
-	HRESULT hr = hrSuccess;
-	struct entryList sEntryList;
+	if (lpMsgList->cValues == 0)
+		return hrSuccess;
 
-	LockSoap();
-	if(lpMsgList->cValues == 0)
-		goto exitm;
-	hr = CopyMAPIEntryListToSOAPEntryList(lpMsgList, &sEntryList);
+	ECRESULT er = erSuccess;
+	struct entryList sEntryList;
+	soap_lock_guard spg(*this);
+	auto hr = CopyMAPIEntryListToSOAPEntryList(lpMsgList, &sEntryList);
 	if(hr != hrSuccess)
 		goto exitm;
 	START_SOAP_CALL
@@ -864,28 +773,22 @@ HRESULT WSTransport::HrDeleteObjects(ULONG ulFlags, LPENTRYLIST lpMsgList, ULONG
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	FreeEntryList(&sEntryList, false);
 
 	return hr;
 }
 
-HRESULT WSTransport::HrNotify(LPNOTIFICATION lpNotification)
+HRESULT WSTransport::HrNotify(const NOTIFICATION *lpNotification)
 {
+	/* FIMXE: also notify other types? */
+	if (lpNotification == nullptr || lpNotification->ulEventType != fnevNewMail)
+		return MAPI_E_NO_ACCESS;
+
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
-	struct notification	sNotification; 
+	struct notification sNotification;
 	int ulSize = 0;
-
-	LockSoap();
-
-	//FIMXE: also notify other types ?
-	if(lpNotification == NULL || lpNotification->ulEventType != fnevNewMail)
-	{
-		hr = MAPI_E_NO_ACCESS;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sNotification.ulConnection = 0;// The connection id should be calculate on the server side
 
@@ -900,7 +803,7 @@ HRESULT WSTransport::HrNotify(LPNOTIFICATION lpNotification)
 	hr = CopyMAPIEntryIdToSOAPEntryId(lpNotification->info.newmail.cbParentID, (LPENTRYID)lpNotification->info.newmail.lpParentID, &sNotification.newmail->pParentId);
 	if(hr != hrSuccess)
 		goto exitm;
-	
+
 	if(lpNotification->info.newmail.lpszMessageClass){
 		utf8string strMessageClass = convstring(lpNotification->info.newmail.lpszMessageClass, lpNotification->info.newmail.ulFlags);
 		ulSize = strMessageClass.size() + 1;
@@ -916,8 +819,7 @@ HRESULT WSTransport::HrNotify(LPNOTIFICATION lpNotification)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeNotificationStruct(&sNotification, false);
 
 	return hr;
@@ -928,13 +830,12 @@ HRESULT WSTransport::HrSubscribe(ULONG cbKey, LPBYTE lpKey, ULONG ulConnection, 
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	notifySubscribe notSubscribe;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	notSubscribe.ulConnection = ulConnection;
 	notSubscribe.sKey.__size = cbKey;
 	notSubscribe.sKey.__ptr = lpKey;
-	notSubscribe.ulEventMask = ulEventMask;			
+	notSubscribe.ulEventMask = ulEventMask;
 
 	START_SOAP_CALL
 	{
@@ -943,8 +844,6 @@ HRESULT WSTransport::HrSubscribe(ULONG cbKey, LPBYTE lpKey, ULONG ulConnection, 
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -953,13 +852,12 @@ HRESULT WSTransport::HrSubscribe(ULONG ulSyncId, ULONG ulChangeId, ULONG ulConne
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	notifySubscribe notSubscribe;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	notSubscribe.ulConnection = ulConnection;
 	notSubscribe.sSyncState.ulSyncId = ulSyncId;
 	notSubscribe.sSyncState.ulChangeId = ulChangeId;
-	notSubscribe.ulEventMask = ulEventMask;			
+	notSubscribe.ulEventMask = ulEventMask;
 
 	START_SOAP_CALL
 	{
@@ -968,26 +866,22 @@ HRESULT WSTransport::HrSubscribe(ULONG ulSyncId, ULONG ulChangeId, ULONG ulConne
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrSubscribeMulti(const ECLISTSYNCADVISE &lstSyncAdvises, ULONG ulEventMask)
 {
-	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	notifySubscribeArray notSubscribeArray;
 	unsigned	i = 0;
-	
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	notSubscribeArray.__size = lstSyncAdvises.size();
-	hr = MAPIAllocateBuffer(notSubscribeArray.__size * sizeof *notSubscribeArray.__ptr, (void**)&notSubscribeArray.__ptr);
+	auto hr = MAPIAllocateBuffer(notSubscribeArray.__size * sizeof(*notSubscribeArray.__ptr), reinterpret_cast<void **>(&notSubscribeArray.__ptr));
 	if (hr != hrSuccess)
 		goto exitm;
 	memset(notSubscribeArray.__ptr, 0, notSubscribeArray.__size * sizeof *notSubscribeArray.__ptr);
-	
+
 	for (const auto &adv : lstSyncAdvises) {
 		notSubscribeArray.__ptr[i].ulConnection = adv.ulConnection;
 		notSubscribeArray.__ptr[i].sSyncState.ulSyncId = adv.sSyncState.ulSyncId;
@@ -1004,8 +898,6 @@ HRESULT WSTransport::HrSubscribeMulti(const ECLISTSYNCADVISE &lstSyncAdvises, UL
 	END_SOAP_CALL
  exitm:
 	MAPIFreeBuffer(notSubscribeArray.__ptr);
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -1013,8 +905,7 @@ HRESULT WSTransport::HrUnSubscribe(ULONG ulConnection)
 {
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	START_SOAP_CALL
 	{
@@ -1023,8 +914,6 @@ HRESULT WSTransport::HrUnSubscribe(ULONG ulConnection)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -1037,7 +926,8 @@ HRESULT WSTransport::HrUnSubscribeMulti(const ECLISTCONNECTION &lstConnections)
 
 	ulConnArray.__size = lstConnections.size();
 	ulConnArray.__ptr = s_alloc<unsigned int>(nullptr, ulConnArray.__size);
-	LockSoap();
+
+	soap_lock_guard spg(*this);
 	for (const auto &p : lstConnections)
 		ulConnArray.__ptr[i++] = p.second;
 
@@ -1048,7 +938,7 @@ HRESULT WSTransport::HrUnSubscribeMulti(const ECLISTCONNECTION &lstConnections)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
+	spg.unlock();
 	s_free(nullptr, ulConnArray.__ptr);
 	return hr;
 }
@@ -1073,22 +963,17 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags,
     ULONG ulChanges, const SPropTagArray *lpsProps,
     WSMessageStreamExporter **lppsStreamExporter)
 {
+	if (lpChanges == nullptr || lpsProps == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if ((m_ulServerCapabilities & KOPANO_CAP_ENHANCED_ICS) == 0)
+		return MAPI_E_NO_SUPPORT;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	memory_ptr<sourceKeyPairArray> ptrsSourceKeyPairs;
 	WSMessageStreamExporterPtr ptrStreamExporter;
 	propTagArray sPropTags = {0, 0};
 	exportMessageChangesAsStreamResponse sResponse;
-
-	if (lpChanges == NULL || lpsProps == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
-
-	if ((m_ulServerCapabilities & KOPANO_CAP_ENHANCED_ICS) == 0) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exitm;
-	}
 
 	hr = CopyICSChangeToSOAPSourceKeys(ulChanges, lpChanges + ulStart, &~ptrsSourceKeyPairs);
 	if (hr != hrSuccess)
@@ -1120,14 +1005,17 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags,
 	return hr;
 }
 
-HRESULT WSTransport::HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSMessageStreamImporter **lppStreamImporter)
+HRESULT WSTransport::HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG cbFolderEntryID,
+    const ENTRYID *lpFolderEntryID, bool bNewMessage,
+    const SPropValue *lpConflictItems,
+    WSMessageStreamImporter **lppStreamImporter)
 {
-	HRESULT hr;
 	WSMessageStreamImporterPtr ptrStreamImporter;
 
 	if ((m_ulServerCapabilities & KOPANO_CAP_ENHANCED_ICS) == 0)
 		return MAPI_E_NO_SUPPORT;
-	hr = WSMessageStreamImporter::Create(ulFlags, ulSyncId, cbEntryID, lpEntryID, cbFolderEntryID, lpFolderEntryID, bNewMessage, lpConflictItems, this, &~ptrStreamImporter);
+	auto hr = WSMessageStreamImporter::Create(ulFlags, ulSyncId, cbEntryID, lpEntryID, cbFolderEntryID, lpFolderEntryID, bNewMessage, lpConflictItems, this, &~ptrStreamImporter);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -1137,23 +1025,20 @@ HRESULT WSTransport::HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, U
 
 HRESULT WSTransport::HrGetIDsFromNames(LPMAPINAMEID *lppPropNames, ULONG cNames, ULONG ulFlags, ULONG **lpServerIDs)
 {
-	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct namedPropArray sNamedProps;
 	struct getIDsFromNamesResponse sResponse;
-	unsigned int i=0;
 	convert_context convertContext;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	// Convert our data into a structure that the server can take
 	sNamedProps.__size = cNames;
-	er = ECAllocateBuffer(sizeof(struct namedProp) * cNames, reinterpret_cast<void **>(&sNamedProps.__ptr));
+	auto er = ECAllocateBuffer(sizeof(struct namedProp) * cNames, reinterpret_cast<void **>(&sNamedProps.__ptr));
 	if (er != erSuccess)
 		goto exitm;
 	memset(sNamedProps.__ptr, 0 , sizeof(struct namedProp) * cNames);
 
-	for (i = 0; i < cNames; ++i) {	
+	for (unsigned int i = 0; i < cNames; ++i) {
 		switch(lppPropNames[i]->ulKind) {
 		case MNID_ID:
 			er = ECAllocateMore(sizeof(unsigned int), sNamedProps.__ptr, reinterpret_cast<void **>(&sNamedProps.__ptr[i].lpId));
@@ -1208,8 +1093,7 @@ HRESULT WSTransport::HrGetIDsFromNames(LPMAPINAMEID *lppPropNames, ULONG cNames,
 		goto exitm;
 	memcpy(*lpServerIDs, sResponse.lpsPropTags.__ptr, sizeof(ULONG) * sResponse.lpsPropTags.__size);
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	if(sNamedProps.__ptr)
 		ECFreeBuffer(sNamedProps.__ptr);
 
@@ -1229,8 +1113,7 @@ HRESULT WSTransport::HrGetNamesFromIDs(SPropTagArray *lpsPropTags,
 	sPropTags.__size = lpsPropTags->cValues;
 	sPropTags.__ptr = (unsigned int *)&lpsPropTags->aulPropTag[0];
 
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->getNamesFromIDs(m_ecSessionId, &sPropTags, &sResponse) != SOAP_OK)
@@ -1277,8 +1160,6 @@ HRESULT WSTransport::HrGetNamesFromIDs(SPropTagArray *lpsPropTags,
 	*lpcResolved = sResponse.lpsNames.__size;
 	*lpppNames = lppNames;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -1287,19 +1168,16 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags,
 {
 	struct receiveFolderTableResponse sReceiveFolders;
 	ECRESULT	er = erSuccess;
-	HRESULT		hr = hrSuccess;
 	LPSRowSet	lpsRowSet = NULL;
-	ULONG		ulRowId = 0;
+	ULONG ulRowId = 0, cbUnWrapStoreID = 0;
 	int			nLen = 0;
 	entryId sEntryId; // Do not free
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
-	ULONG		cbUnWrapStoreID = 0;
 	std::wstring unicode;
 	convert_context converter;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
-
-	hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
 	sEntryId.__ptr = reinterpret_cast<unsigned char *>(lpUnWrapStoreID.get());
@@ -1328,7 +1206,7 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags,
 			goto exitm;
 		++lpsRowSet->cRows;
 		memset(lpsRowSet->aRow[i].lpProps, 0, sizeof(SPropValue)*NUM_RFT_PROPS);
-		
+
 		lpsRowSet->aRow[i].lpProps[RFT_ROWID].ulPropTag = PR_ROWID;
 		lpsRowSet->aRow[i].lpProps[RFT_ROWID].Value.ul = ulRowId;
 
@@ -1340,7 +1218,7 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags,
 			goto exitm;
 		memset(lpsRowSet->aRow[i].lpProps[RFT_INST_KEY].Value.bin.lpb, 0, lpsRowSet->aRow[i].lpProps[RFT_INST_KEY].Value.bin.cb);
 		memcpy(lpsRowSet->aRow[i].lpProps[RFT_INST_KEY].Value.bin.lpb, &ulRowId, sizeof(ulRowId));
-		
+
 		lpsRowSet->aRow[i].lpProps[RFT_ENTRYID].ulPropTag = PR_ENTRYID;
 		lpsRowSet->aRow[i].lpProps[RFT_ENTRYID].Value.bin.cb = sReceiveFolders.sFolderArray.__ptr[i].sEntryId.__size;
 		er = ECAllocateMore(lpsRowSet->aRow[i].lpProps[RFT_ENTRYID].Value.bin.cb, lpsRowSet->aRow[i].lpProps,
@@ -1372,12 +1250,11 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags,
 			if (er != erSuccess)
 				goto exitm;
 			memcpy(lpsRowSet->aRow[i].lpProps[RFT_MSG_CLASS].Value.lpszA, sReceiveFolders.sFolderArray.__ptr[i].lpszAExplicitClass, nLen);
-		}	
+		}
 	}
 
 	*lppsRowSet = lpsRowSet;
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
@@ -1388,15 +1265,12 @@ HRESULT WSTransport::HrGetReceiveFolder(ULONG cbStoreEntryID,
 	struct receiveFolderResponse sReceiveFolderTable;
 
 	ECRESULT	er = erSuccess;
-	HRESULT		hr = hrSuccess;
 	entryId sEntryId; // Do not free
-	ULONG		cbEntryID = 0;
+	ULONG cbEntryID = 0, cbUnWrapStoreID = 0;
 	ecmem_ptr<ENTRYID> lpEntryID, lpUnWrapStoreID;
-	ULONG		cbUnWrapStoreID = 0;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
-
-	hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbStoreEntryID, lpStoreEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
 	sEntryId.__ptr = reinterpret_cast<unsigned char *>(lpUnWrapStoreID.get());
@@ -1435,8 +1309,6 @@ HRESULT WSTransport::HrGetReceiveFolder(ULONG cbStoreEntryID,
 	*lppEntryID = lpEntryID.release();
 	*lpcbEntryID = cbEntryID;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -1444,16 +1316,14 @@ HRESULT WSTransport::HrSetReceiveFolder(ULONG cbStoreID,
     const ENTRYID *lpStoreID, const utf8string &strMessageClass,
     ULONG cbEntryID, const ENTRYID *lpEntryID)
 {
-	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	unsigned int result;
 	entryId sStoreId, sEntryId; // Do not free
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
-
-	hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+	auto hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
 	sStoreId.__ptr = reinterpret_cast<unsigned char *>(lpUnWrapStoreID.get());
@@ -1472,11 +1342,11 @@ HRESULT WSTransport::HrSetReceiveFolder(ULONG cbStoreID,
 	}
 	END_SOAP_CALL
  exitm:
-    UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::HrSetReadFlag(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG ulSyncId)
+HRESULT WSTransport::HrSetReadFlag(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG ulFlags, ULONG ulSyncId)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
@@ -1490,8 +1360,7 @@ HRESULT WSTransport::HrSetReadFlag(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG u
 	sEntryList.__size = 1;
 	sEntryList.__ptr = &sEntryId;
 
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->setReadFlags(m_ecSessionId, ulFlags, nullptr, &sEntryList, ulSyncId, &er) != SOAP_OK)
@@ -1499,20 +1368,16 @@ HRESULT WSTransport::HrSetReadFlag(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG u
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
-
 }
 
-HRESULT WSTransport::HrSubmitMessage(ULONG cbMessageID, LPENTRYID lpMessageID, ULONG ulFlags)
+HRESULT WSTransport::HrSubmitMessage(ULONG cbMessageID,
+    const ENTRYID *lpMessageID, ULONG ulFlags)
 {
-	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	entryId sEntryId; // Do not free
-	LockSoap();
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbMessageID, lpMessageID, &sEntryId, true);
+	soap_lock_guard spg(*this);
+	auto hr = CopyMAPIEntryIdToSOAPEntryId(cbMessageID, lpMessageID, &sEntryId, true);
 	if(hr != hrSuccess)
 		goto exitm;
 
@@ -1523,23 +1388,19 @@ HRESULT WSTransport::HrSubmitMessage(ULONG cbMessageID, LPENTRYID lpMessageID, U
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrFinishedMessage(ULONG cbEntryID,
     const ENTRYID *lpEntryID, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	entryId sEntryId; // Do not free
-	LockSoap();
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
+	soap_lock_guard spg(*this);
+	auto hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
 	if(hr != hrSuccess)
 		goto exitm;
-	
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->finishedMessage(m_ecSessionId, sEntryId, ulFlags, &er) != SOAP_OK)
@@ -1547,19 +1408,15 @@ HRESULT WSTransport::HrFinishedMessage(ULONG cbEntryID,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrAbortSubmit(ULONG cbEntryID, const ENTRYID *lpEntryID)
 {
-	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	entryId sEntryId; // Do not free
-	LockSoap();
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
+	soap_lock_guard spg(*this);
+	auto hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, true);
 	if(hr != hrSuccess)
 		goto exitm;
 
@@ -1570,24 +1427,20 @@ HRESULT WSTransport::HrAbortSubmit(ULONG cbEntryID, const ENTRYID *lpEntryID)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrResolveStore(const GUID *lpGuid, ULONG *lpulUserID,
     ULONG *lpcbStoreID, ENTRYID **lppStoreID)
 {
+	if (lpGuid == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct resolveUserStoreResponse sResponse;
 	struct xsd__base64Binary sStoreGuid;
-	LockSoap();
-
-	if (!lpGuid){
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sStoreGuid.__ptr = (unsigned char*)lpGuid;
 	sStoreGuid.__size = sizeof(GUID);
@@ -1611,23 +1464,18 @@ HRESULT WSTransport::HrResolveStore(const GUID *lpGuid, ULONG *lpulUserID,
 			goto exitm;
 	}
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrResolveUserStore(const utf8string &strUserName, ULONG ulFlags, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID, std::string *lpstrRedirServer)
 {
+	if (strUserName.empty())
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct resolveUserStoreResponse sResponse;
-
-	LockSoap();
-
-	if(strUserName.empty()){
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	START_SOAP_CALL
 	{
@@ -1654,15 +1502,12 @@ HRESULT WSTransport::HrResolveUserStore(const utf8string &strUserName, ULONG ulF
 	if (lpulUserID != nullptr)
 		*lpulUserID = sResponse.ulUserId;
 	if(lpcbStoreID && lppStoreID) {
-
 		// Create a client store entry, add the servername
 		hr = WrapServerClientStoreEntry(sResponse.lpszServerPath ? sResponse.lpszServerPath : m_sProfileProps.strServerPath.c_str(), &sResponse.sStoreId, lpcbStoreID, lppStoreID);
 		if(hr != hrSuccess)
 			goto exitm;
 	}
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -1680,17 +1525,14 @@ HRESULT WSTransport::HrResolveUserStore(const utf8string &strUserName, ULONG ulF
  */
 HRESULT WSTransport::HrResolveTypedStore(const utf8string &strUserName, ULONG ulStoreType, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
 {
+	/* Currently, only archive stores are supported. */
+	if (ulStoreType != ECSTORE_TYPE_ARCHIVE || lpcbStoreID == nullptr || lppStoreID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct resolveUserStoreResponse sResponse;
-
-	LockSoap();
-
-	// Currently only archive stores are supported.
-	if (ulStoreType != ECSTORE_TYPE_ARCHIVE || lpcbStoreID == NULL || lppStoreID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	START_SOAP_CALL
 	{
@@ -1710,14 +1552,12 @@ HRESULT WSTransport::HrResolveTypedStore(const utf8string &strUserName, ULONG ul
 			goto exitm;
 	}
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Create a new user.
- * 
+ *
  * @param[in]	lpECUser	Pointer to an ECUSER object that contains the details of the user
  * @param[in]	ulFlags		MAPI_UNICODE, values in user struct will be PT_UNICODE, otherwise in PT_STRING8
  * @param[out]	lpcbUserId	The size in bytes of the entryid
@@ -1727,18 +1567,15 @@ HRESULT WSTransport::HrResolveTypedStore(const utf8string &strUserName, ULONG ul
 HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
     ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
+	if (lpECUser == nullptr || lpcbUserId == nullptr || lppUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct user sUser;
 	struct setUserResponse sResponse;
 	convert_context converter;
-
-	LockSoap();
-
-	if(lpECUser == NULL || lpcbUserId == NULL || lppUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sUser.lpszUsername		= TO_UTF8_DEF((char *)lpECUser->lpszUsername);
 	sUser.lpszPassword		= TO_UTF8_DEF((char *)lpECUser->lpszPassword);
@@ -1768,8 +1605,7 @@ HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sUserId, sResponse.ulUserId, lpcbUserId, lppUserId);
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sUser.lpsPropmap, sUser.lpsMVPropmap);
 
 	return hr;
@@ -1777,7 +1613,7 @@ HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
 
 /**
  * Get user struct on a specific user, or the user you're connected as.
- * 
+ *
  * @param[in]	cbUserID	Length as lpUserID
  * @param[in]	lpUserID	EntryID of a user, use NULL to retrieve 'yourself'
  * @param[in]	ulFlags		MAPI_UNICODE, return values in user struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -1787,19 +1623,16 @@ HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
 HRESULT WSTransport::HrGetUser(ULONG cbUserID, const ENTRYID *lpUserID,
     ULONG ulFlags, ECUSER **lppECUser)
 {
+	if (lppECUser == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct getUserResponse	sResponse;
 	ecmem_ptr<ECUSER> lpECUser;
 	entryId	sUserId;
 	ULONG ulUserId = 0;
-
-	LockSoap();
-
-	if (lppECUser == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	if (lpUserID)
 		ulUserId = ABEID_ID(lpUserID);
@@ -1822,7 +1655,6 @@ HRESULT WSTransport::HrGetUser(ULONG cbUserID, const ENTRYID *lpUserID,
 		goto exitm;
 	*lppECUser = lpECUser.release();
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
@@ -1830,25 +1662,22 @@ HRESULT WSTransport::HrGetUser(ULONG cbUserID, const ENTRYID *lpUserID,
  * Update an existing user.
  *
  * This function can create a new user on an offline server.
- * 
+ *
  * @param[in]	lpECUser	Pointer to an ECUSER object that contains the details of the user
  * @param[in]	ulFlags		MAPI_UNICODE, values in user struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
 HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
 {
+	if (lpECUser == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct user sUser;
 	unsigned int result = 0;
 	convert_context	converter;
-
-	LockSoap();
-
-	if(lpECUser == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sUser.lpszUsername		= TO_UTF8_DEF(lpECUser->lpszUsername);
 	sUser.lpszPassword		= TO_UTF8_DEF(lpECUser->lpszPassword);
@@ -1878,17 +1707,16 @@ HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sUser.lpsPropmap, sUser.lpsMVPropmap);
 
 	return hr;
 }
 
-/** 
+/**
  * Creates a new store. This can be a store for a user or the public
  * store (for a company or everyone).
- * 
+ *
  * @param ulStoreType ECSTORE_TYPE_PRIVATE or ECSTORE_TYPE_PUBLIC
  * @param cbUserID Number of bytes in lpUserID
  * @param lpUserID EntryID of a user, everyone (public) or a company (public)
@@ -1900,7 +1728,7 @@ HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
  *        	@arg @c EC_OVERRIDE_HOMESERVER   Allow the store to be created on
  *                                               another server than the users
  *                                               homeserver.
- * 
+ *
  * @return MAPI error code
  * @retval MAPI_E_NOT_FOUND User described in lpUserID does not exist
  * @retval MAPI_E_COLLISION Store already exists
@@ -1909,15 +1737,13 @@ HRESULT WSTransport::HrCreateStore(ULONG ulStoreType, ULONG cbUserID,
     const ENTRYID *lpUserID, ULONG cbStoreID, const ENTRYID *lpStoreID,
     ULONG cbRootID, const ENTRYID *lpRootID, ULONG ulFlags)
 {
+	if (lpUserID == nullptr || lpStoreID == nullptr || lpRootID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	entryId sUserId, sStoreId, sRootId;
-	LockSoap();
-
-	if(lpUserID == NULL || lpStoreID == NULL || lpRootID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserID, lpUserID, &sUserId, true);
 	if(hr != hrSuccess)
@@ -1936,24 +1762,20 @@ HRESULT WSTransport::HrCreateStore(ULONG ulStoreType, ULONG cbUserID,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrHookStore(ULONG ulStoreType, ULONG cbUserId,
     const ENTRYID *lpUserId, const GUID *lpGuid, ULONG ulSyncId)
 {
+	if (cbUserId == 0 || lpUserId == nullptr || lpGuid == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	entryId sUserId;
 	struct xsd__base64Binary sStoreGuid;
-	LockSoap();
-
-	if (cbUserId == 0 || lpUserId == NULL || lpGuid == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if(hr != hrSuccess)
@@ -1961,7 +1783,7 @@ HRESULT WSTransport::HrHookStore(ULONG ulStoreType, ULONG cbUserId,
 
 	sStoreGuid.__ptr = (unsigned char*)lpGuid;
 	sStoreGuid.__size = sizeof(GUID);
-	
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->hookStore(m_ecSessionId, ulStoreType, sUserId, sStoreGuid, ulSyncId, &er) != SOAP_OK)
@@ -1969,23 +1791,19 @@ HRESULT WSTransport::HrHookStore(ULONG ulStoreType, ULONG cbUserId,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrUnhookStore(ULONG ulStoreType, ULONG cbUserId,
     const ENTRYID *lpUserId, ULONG ulSyncId)
 {
+	if (cbUserId == 0 || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	entryId sUserId;
-	LockSoap();
-
-	if (cbUserId == 0 || lpUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if(hr != hrSuccess)
@@ -1998,26 +1816,22 @@ HRESULT WSTransport::HrUnhookStore(ULONG ulStoreType, ULONG cbUserId,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrRemoveStore(const GUID *lpGuid, ULONG ulSyncId)
 {
+	if (lpGuid == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	struct xsd__base64Binary sStoreGuid;
-	LockSoap();
-
-	if (lpGuid == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sStoreGuid.__ptr = (unsigned char*)lpGuid;
 	sStoreGuid.__size = sizeof(GUID);
-	
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->removeStore(m_ecSessionId, sStoreGuid, ulSyncId, &er) != SOAP_OK)
@@ -2025,22 +1839,18 @@ HRESULT WSTransport::HrRemoveStore(const GUID *lpGuid, ULONG ulSyncId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT WSTransport::HrDeleteUser(ULONG cbUserId, const ENTRYID *lpUserId)
 {
+	if (cbUserId < CbNewABEID("") || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sUserId;
-	LockSoap();
-	
-	if(cbUserId < CbNewABEID("") || lpUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2053,14 +1863,12 @@ HRESULT WSTransport::HrDeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Get the list of users for a specific company.
- * 
+ *
  * @param[in]	cbCompanyId		The size in bytes of the entryid of the company
  * @param[in]	lpCompanyId		Pointer to the entryid of the company
  * @param[in]	ulFlags			MAPI_UNICODE, return values in user struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2072,17 +1880,14 @@ HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId,
     const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcUsers,
     ECUSER **lppsUsers)
 {
+	if (lpcUsers == nullptr || lppsUsers == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sCompanyId;
 	struct userListResponse sResponse;
-
-	LockSoap();
-
-	if(lpcUsers == NULL || lppsUsers == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	if (cbCompanyId > 0 && lpCompanyId != NULL)
 	{
@@ -2105,16 +1910,13 @@ HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
-	
 	return hr;
 }
 
 // IECServiceAdmin group functions
 /**
  * Create a new group.
- * 
+ *
  * @param[in]	lpECGroup	Pointer to an ECGROUP object that contains the details of the group
  * @param[in]	ulFlags		MAPI_UNICODE, values in group struct will be PT_UNICODE, otherwise in PT_STRING8
  * @param[out]	lpcbUserId	The size in bytes of the entryid
@@ -2124,18 +1926,15 @@ HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId,
 HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
     ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
+	if (lpECGroup == nullptr || lpcbGroupId == nullptr || lppGroupId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct group sGroup;
 	struct setGroupResponse sResponse;
 	convert_context converter;
-
-	LockSoap();
-
-	if(lpECGroup == NULL || lpcbGroupId == NULL || lppGroupId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sGroup.ulGroupId = 0;
 	sGroup.lpszGroupname = TO_UTF8_DEF(lpECGroup->lpszGroupname);
@@ -2156,14 +1955,12 @@ HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
-
 	}
 	END_SOAP_CALL
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sGroupId, sResponse.ulGroupId, lpcbGroupId, lppGroupId);
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sGroup.lpsPropmap, sGroup.lpsMVPropmap);
 
 	return hr;
@@ -2173,24 +1970,22 @@ HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
  * Update an existing group.
  *
  * This function can create a new group on an offline server.
- * 
+ *
  * @param[in]	lpECGroup	Pointer to an ECGROUP object that contains the details of the group
  * @param[in]	ulFlags		MAPI_UNICODE, values in group struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
 HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 {
+	if (lpECGroup == nullptr || lpECGroup->lpszGroupname == nullptr ||
+	    lpECGroup->lpszFullname == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	convert_context converter;
 	struct group sGroup;
-
-	LockSoap();
-
-	if(lpECGroup == NULL || lpECGroup->lpszGroupname == NULL || lpECGroup->lpszFullname == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sGroup.lpszFullname = TO_UTF8_DEF(lpECGroup->lpszFullname);
 	sGroup.lpszGroupname = TO_UTF8_DEF(lpECGroup->lpszGroupname);
@@ -2214,8 +2009,7 @@ HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sGroup.lpsPropmap, sGroup.lpsMVPropmap);
 
 	return hr;
@@ -2223,7 +2017,7 @@ HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 
 /**
  * Get group struct on a specific group.
- * 
+ *
  * @param[in]	cbGroupID	Length as lpGroupID
  * @param[in]	lpGroupID	EntryID of a group
  * @param[in]	ulFlags		MAPI_UNICODE, return values in group struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2233,19 +2027,15 @@ HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 HRESULT WSTransport::HrGetGroup(ULONG cbGroupID, const ENTRYID *lpGroupID,
     ULONG ulFlags, ECGROUP **lppECGroup)
 {
+	if (lpGroupID == nullptr || lppECGroup == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	ECGROUP *lpGroup = NULL;
 	entryId sGroupId;
 	struct getGroupResponse sResponse;
-	
-	LockSoap();
-
-	if (lpGroupID == NULL || lppECGroup == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbGroupID, lpGroupID, &sGroupId, true);
 	if (hr != hrSuccess)
@@ -2265,22 +2055,18 @@ HRESULT WSTransport::HrGetGroup(ULONG cbGroupID, const ENTRYID *lpGroupID,
 		goto exitm;
 	*lppECGroup = lpGroup;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
+HRESULT WSTransport::HrDeleteGroup(ULONG cbGroupId, const ENTRYID *lpGroupId)
 {
+	if (cbGroupId < CbNewABEID("") || lpGroupId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sGroupId;
-	LockSoap();
-	
-	if(cbGroupId < CbNewABEID("") || lpGroupId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbGroupId, lpGroupId, &sGroupId, true);
 	if (hr != hrSuccess)
@@ -2293,8 +2079,6 @@ HRESULT WSTransport::HrDeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -2308,19 +2092,18 @@ HRESULT WSTransport::HrDeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
  * @param[out]	lppSenders	Array of ECUSER objects.
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, const ENTRYID *lpUserId,
     ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders)
 {
+	if (cbUserId < CbNewABEID("") || lpUserId == nullptr ||
+	    lpcSenders == nullptr || lppSenders == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct userListResponse sResponse;
 	entryId sUserId;
-	LockSoap();
-	
-	if(cbUserId < CbNewABEID("") || lpUserId == NULL || lpcSenders == NULL || lppSenders == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2339,23 +2122,20 @@ HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrAddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
+HRESULT WSTransport::HrAddSendAsUser(ULONG cbUserId, const ENTRYID *lpUserId,
+    ULONG cbSenderId, const ENTRYID *lpSenderId)
 {
+	if (cbUserId < CbNewABEID("") || lpUserId == nullptr ||
+	    cbSenderId < CbNewABEID("") || lpSenderId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sUserId, sSenderId;
-	LockSoap();
-
-	if (cbUserId < CbNewABEID("") || lpUserId == NULL || cbSenderId < CbNewABEID("") || lpSenderId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2368,27 +2148,23 @@ HRESULT WSTransport::HrAddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG c
 	{
 		if (m_lpCmd->addSendAsUser(m_ecSessionId, ABEID_ID(lpUserId), sUserId, ABEID_ID(lpSenderId), sSenderId, &er) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
-	
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
+HRESULT WSTransport::HrDelSendAsUser(ULONG cbUserId, const ENTRYID *lpUserId,
+    ULONG cbSenderId, const ENTRYID *lpSenderId)
 {
+	if (cbUserId < CbNewABEID("") || lpUserId == nullptr ||
+	    cbSenderId < CbNewABEID("") || lpSenderId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sUserId, sSenderId;
-	LockSoap();
-
-	if (cbUserId < CbNewABEID("") || lpUserId == NULL || cbSenderId < CbNewABEID("") || lpSenderId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2404,58 +2180,18 @@ HRESULT WSTransport::HrDelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG c
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrGetUserClientUpdateStatus(ULONG cbUserId,
-    LPENTRYID lpUserId, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS)
+HRESULT WSTransport::HrRemoveAllObjects(ULONG cbUserId, const ENTRYID *lpUserId)
 {
-	ECRESULT er = erSuccess;
-	HRESULT hr = hrSuccess;
-	entryId sUserId;
-	struct userClientUpdateStatusResponse sResponse;
+	if (cbUserId < CbNewABEID("") || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
-    LockSoap();
-
-    if (cbUserId < CbNewABEID("") || lpUserId == NULL) {
-        hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-    }
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
-	if (hr != hrSuccess)
-		goto exitm;
-
-	START_SOAP_CALL
-	{
-		if (m_lpCmd->getUserClientUpdateStatus(m_ecSessionId, sUserId, &sResponse) != SOAP_OK)
-			er = KCERR_NETWORK_ERROR;
-	}
-	END_SOAP_CALL
-
-	hr = CopyUserClientUpdateStatusFromSOAP(sResponse, ulFlags, lppECUCUS);
-	if (hr != hrSuccess)
-		goto exitm;
- exitm:
-	UnLockSoap();
-
-	return hr;
-}
-
-HRESULT WSTransport::HrRemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
-{
     ECRESULT er = erSuccess;
     HRESULT hr = hrSuccess;
 	entryId sUserId;
-    LockSoap();
-    
-	if (cbUserId < CbNewABEID("") || lpUserId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2468,8 +2204,6 @@ HRESULT WSTransport::HrRemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -2484,16 +2218,13 @@ HRESULT WSTransport::HrRemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
  */
 HRESULT WSTransport::HrResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
+	if (lpszUserName == nullptr || lpcbUserId == nullptr || lppUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct resolveUserResponse sResponse;
-
-	LockSoap();
-
-	if(lpszUserName == NULL || lpcbUserId == NULL || lppUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	//Resolve userid from username
 	START_SOAP_CALL
@@ -2509,8 +2240,6 @@ HRESULT WSTransport::HrResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULON
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sUserId, sResponse.ulUserId, lpcbUserId, lppUserId);
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -2525,16 +2254,13 @@ HRESULT WSTransport::HrResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULON
  */
 HRESULT WSTransport::HrResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
+	if (lpszGroupName == nullptr || lpcbGroupId == nullptr || lppGroupId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct resolveGroupResponse sResponse;
-
-	LockSoap();
-
-	if(lpszGroupName == NULL || lpcbGroupId == NULL || lppGroupId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	//Resolve groupid from groupname
 	START_SOAP_CALL
@@ -2550,14 +2276,12 @@ HRESULT WSTransport::HrResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, UL
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sGroupId, sResponse.ulGroupId, lpcbGroupId, lppGroupId);
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Get the list of groups for a specific company.
- * 
+ *
  * @param[in]	cbCompanyId		The size in bytes of the entryid of the company
  * @param[in]	lpCompanyId		Pointer to the entryid of the company
  * @param[in]	ulFlags			MAPI_UNICODE, return values in group struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2569,22 +2293,20 @@ HRESULT WSTransport::HrGetGroupList(ULONG cbCompanyId,
     const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcGroups,
     ECGROUP **lppsGroups)
 {
+	if (lpcGroups == nullptr || lppsGroups == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
 
  	struct groupListResponse sResponse;
 	entryId sCompanyId;
-	LockSoap();
+	soap_lock_guard spg(*this);
 
-	if(lpcGroups == NULL || lppsGroups == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
-	
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
 		goto exitm;
-	
+
 	*lpcGroups = 0;
 
 	START_SOAP_CALL
@@ -2600,22 +2322,19 @@ HRESULT WSTransport::HrGetGroupList(ULONG cbCompanyId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT WSTransport::HrDeleteGroupUser(ULONG cbGroupId,
+    const ENTRYID *lpGroupId, ULONG cbUserId, const ENTRYID *lpUserId)
 {
+	if (lpGroupId == nullptr || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sGroupId, sUserId;
-	LockSoap();
-
-	if (!lpGroupId || !lpUserId) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbGroupId, lpGroupId, &sGroupId, true);
 	if (hr != hrSuccess)
@@ -2632,22 +2351,19 @@ HRESULT WSTransport::HrDeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULO
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrAddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT WSTransport::HrAddGroupUser(ULONG cbGroupId, const ENTRYID *lpGroupId,
+    ULONG cbUserId, const ENTRYID *lpUserId)
 {
+	if (lpGroupId == nullptr || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sGroupId, sUserId;
-	LockSoap();
-
-	if (!lpGroupId || !lpUserId) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbGroupId, lpGroupId, &sGroupId, true);
 	if (hr != hrSuccess)
@@ -2664,14 +2380,12 @@ HRESULT WSTransport::HrAddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG 
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Get the list of users in a specific group.
- * 
+ *
  * @param[in]	cbGroupId		The size in bytes of the entryid of the group
  * @param[in]	lpGroupId		Pointer to the entryid of the group
  * @param[in]	ulFlags			MAPI_UNICODE, return values in user struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2679,19 +2393,18 @@ HRESULT WSTransport::HrAddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG 
  * @param[out]	lppsUsers		Array of ECUSER objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
-    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
+HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId,
+    const ENTRYID *lpGroupId, ULONG ulFlags, ULONG *lpcUsers,
+    ECUSER **lppsUsers)
 {
+	if (lpGroupId == nullptr || lpcUsers == nullptr || lppsUsers == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct userListResponse sResponse;
 	entryId sGroupId;
-	LockSoap();
-
-	if(lpGroupId == NULL || lpcUsers == NULL || lppsUsers == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbGroupId, lpGroupId, &sGroupId, true);
 	if (hr != hrSuccess)
@@ -2711,14 +2424,12 @@ HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Get the list of groups of which a specifi user is a member.
- * 
+ *
  * @param[in]	cbUserId		The size in bytes of the entryid of the user
  * @param[in]	cbUserId		Pointer to the entryid of the user
  * @param[in]	ulFlags			MAPI_UNICODE, return values in group struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2726,19 +2437,18 @@ HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
  * @param[out]	lppsGroups		Array of ECGROUP objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
-    ULONG ulFlags, ULONG *lpcGroup, ECGROUP **lppsGroups)
+HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG ulFlags, ULONG *lpcGroup,
+    ECGROUP **lppsGroups)
 {
+	if (lpcGroup == nullptr || lpUserId == nullptr || lppsGroups == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct groupListResponse sResponse;
 	entryId sUserId;
-	LockSoap();
-
-	if(lpcGroup == NULL || lpUserId == NULL || lppsGroups == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -2758,14 +2468,12 @@ HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 /**
  * Create a new company.
- * 
+ *
  * @param[in]	lpECCompany		Pointer to an ECCOMPANY object that contains the details of the company
  * @param[in]	ulFlags			MAPI_UNICODE, values in company struct will be PT_UNICODE, otherwise in PT_STRING8
  * @param[out]	lpcbCompanyId	The size in bytes of the entryid
@@ -2775,18 +2483,15 @@ HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
 HRESULT WSTransport::HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
     ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
+	if (lpECCompany == nullptr || lpcbCompanyId == nullptr || lppCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct company sCompany;
 	struct setCompanyResponse sResponse;
 	convert_context	converter;
-
-	LockSoap();
-
-	if(lpECCompany == NULL || lpcbCompanyId == NULL || lppCompanyId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sCompany.ulAdministrator = 0;
 	sCompany.lpszCompanyname = TO_UTF8_DEF(lpECCompany->lpszCompanyname);
@@ -2805,30 +2510,26 @@ HRESULT WSTransport::HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
-
 	}
 	END_SOAP_CALL
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sCompanyId, sResponse.ulCompanyId, MAPI_ABCONT, lpcbCompanyId, lppCompanyId);
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sCompany.lpsPropmap, sCompany.lpsMVPropmap);
 
 	return hr;
 }
 
-HRESULT WSTransport::HrDeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrDeleteCompany(ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
+	if (cbCompanyId < CbNewABEID("") || lpCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sCompanyId;
-	LockSoap();
-	
-	if(cbCompanyId < CbNewABEID("") || lpCompanyId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -2841,8 +2542,6 @@ HRESULT WSTransport::HrDeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -2850,24 +2549,21 @@ HRESULT WSTransport::HrDeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
  * Update an existing company.
  *
  * This function can create a new comapyn on an offline server.
- * 
+ *
  * @param[in]	lpECCompany	Pointer to an ECCOMPANY object that contains the details of the company
  * @param[in]	ulFlags		MAPI_UNICODE, values in company struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
 HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 {
+	if (lpECCompany == nullptr || lpECCompany->lpszCompanyname == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct company sCompany;
 	convert_context converter;
-
-	LockSoap();
-
-	if(lpECCompany == NULL || lpECCompany->lpszCompanyname == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	sCompany.lpszCompanyname = TO_UTF8_DEF(lpECCompany->lpszCompanyname);
 
@@ -2896,8 +2592,7 @@ HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	FreeABProps(sCompany.lpsPropmap, sCompany.lpsMVPropmap);
 
 	return hr;
@@ -2905,7 +2600,7 @@ HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 
 /**
  * Get company struct on a specific company.
- * 
+ *
  * @param[in]	cbCompanyId		Length as lpCompanyId
  * @param[in]	lpCompanyId		EntryID of a company
  * @param[in]	ulFlags			MAPI_UNICODE, return values in company struct will be PT_UNICODE, otherwise in PT_STRING8
@@ -2915,18 +2610,15 @@ HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
     ULONG ulFlags, ECCOMPANY **lppECCompany)
 {
+	if (lpCompanyId == nullptr || lppECCompany == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	ECCOMPANY *lpCompany = NULL;
 	struct getCompanyResponse sResponse;
 	entryId sCompanyId;
-	LockSoap();
-
-	if (lpCompanyId == NULL || lppECCompany == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -2944,11 +2636,9 @@ HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
 	hr = SoapCompanyToCompany(sResponse.lpsCompany, ulFlags, &lpCompany);
 	if (hr != hrSuccess)
 		goto exitm;
-	
+
 	*lppECCompany = lpCompany;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -2963,16 +2653,14 @@ HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, const ENTRYID *lpCompanyId,
  */
 HRESULT WSTransport::HrResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
+	if (lpszCompanyName == nullptr || lpcbCompanyId == nullptr ||
+	    lppCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct resolveCompanyResponse sResponse;
-
-	LockSoap();
-
-	if(lpszCompanyName == NULL || lpcbCompanyId == NULL || lppCompanyId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	//Resolve companyid from companyname
 	START_SOAP_CALL
@@ -2983,14 +2671,11 @@ HRESULT WSTransport::HrResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
-
 	}
 	END_SOAP_CALL
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sCompanyId, sResponse.ulCompanyId, MAPI_ABCONT, lpcbCompanyId, lppCompanyId);
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -3005,16 +2690,13 @@ HRESULT WSTransport::HrResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags
 HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
     ECCOMPANY **lppsCompanies)
 {
+	if (lpcCompanies == nullptr || lppsCompanies == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct companyListResponse sResponse;
-
-	LockSoap();
-
-	if(lpcCompanies == NULL || lppsCompanies == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	*lpcCompanies = 0;
 
@@ -3024,7 +2706,6 @@ HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
-
 	}
 	END_SOAP_CALL
 
@@ -3032,23 +2713,20 @@ HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrAddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrAddCompanyToRemoteViewList(ULONG cbSetCompanyId,
+    const ENTRYID *lpSetCompanyId, ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId)
 {
+	if (lpSetCompanyId == nullptr || lpCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sSetCompanyId, sCompanyId;
-	LockSoap();
-
-	if (lpSetCompanyId == NULL || lpCompanyId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbSetCompanyId, lpSetCompanyId, &sSetCompanyId, true);
 	if (hr != hrSuccess)
@@ -3064,23 +2742,20 @@ HRESULT WSTransport::HrAddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYI
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrDelCompanyFromRemoteViewList(ULONG cbSetCompanyId,
+    const ENTRYID *lpSetCompanyId, ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId)
 {
+	if (lpSetCompanyId == nullptr || lpCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sSetCompanyId, sCompanyId;
-	LockSoap();
-
-	if (lpSetCompanyId == NULL || lpCompanyId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbSetCompanyId, lpSetCompanyId, &sSetCompanyId, true);
 	if (hr != hrSuccess)
@@ -3096,8 +2771,6 @@ HRESULT WSTransport::HrDelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTR
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -3112,19 +2785,18 @@ HRESULT WSTransport::HrDelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTR
  * @return		HRESULT			MAPI error code.
  */
 HRESULT WSTransport::HrGetRemoteViewList(ULONG cbCompanyId,
-    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies,
+    const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies,
     ECCOMPANY **lppsCompanies)
 {
+	if (lpcCompanies == nullptr || lpCompanyId == nullptr ||
+	    lppsCompanies == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct companyListResponse sResponse;
 	entryId sCompanyId;
-	LockSoap();
-
-	if(lpcCompanies == NULL || lpCompanyId == NULL || lppsCompanies == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -3145,23 +2817,19 @@ HRESULT WSTransport::HrGetRemoteViewList(ULONG cbCompanyId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrAddUserToRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrAddUserToRemoteAdminList(ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
+	if (lpUserId == nullptr || lpCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId	sUserId, sCompanyId;
-	LockSoap();
-
-	if (lpUserId == NULL || lpCompanyId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3177,23 +2845,19 @@ HRESULT WSTransport::HrAddUserToRemoteAdminList(ULONG cbUserId, LPENTRYID lpUser
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrDelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrDelUserFromRemoteAdminList(ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
+	if (lpUserId == nullptr || lpCompanyId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId	sUserId, sCompanyId;
-	LockSoap();
-
-	if (lpUserId == NULL || lpCompanyId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3209,8 +2873,6 @@ HRESULT WSTransport::HrDelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUs
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -3225,18 +2887,17 @@ HRESULT WSTransport::HrDelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUs
  * @return		HRESULT			MAPI error code.
  */
 HRESULT WSTransport::HrGetRemoteAdminList(ULONG cbCompanyId,
-    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
+    const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcUsers,
+    ECUSER **lppsUsers)
 {
+	if (lpcUsers == nullptr || lpCompanyId == nullptr || lppsUsers == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	struct userListResponse sResponse;
 	entryId sCompanyId;
-	LockSoap();
-
-	if(lpcUsers == NULL || lpCompanyId == NULL || lppsUsers == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -3257,15 +2918,16 @@ HRESULT WSTransport::HrGetRemoteAdminList(ULONG cbCompanyId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
-    LPENTRYID lpEntryID, ULONG *lpcPermissions,
+    const ENTRYID *lpEntryID, ULONG *lpcPermissions,
     ECPERMISSION **lppECPermissions)
 {
+	if (lpcPermissions == nullptr || lppECPermissions == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT		er = erSuccess;
 	HRESULT			hr = hrSuccess;
 	entryId sEntryId; // Do not free
@@ -3274,13 +2936,7 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
 	ULONG			cbUnWrapStoreID = 0;
 
 	struct rightsResponse sRightResponse;
-
-	LockSoap();
-
-	if(lpcPermissions == NULL || lppECPermissions == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	// Remove servername, always
 	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
@@ -3296,7 +2952,6 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sRightResponse.er;
-
 	}
 	END_SOAP_CALL
 
@@ -3318,7 +2973,6 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
 	*lpcPermissions = sRightResponse.pRightsArray->__size;
 	lpECPermissions = NULL;
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
@@ -3326,6 +2980,9 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID,
     const ENTRYID *lpEntryID, ULONG cPermissions,
     const ECPERMISSION *lpECPermissions)
 {
+	if (cPermissions == 0 || lpECPermissions == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT		er = erSuccess;
 	HRESULT			hr = hrSuccess;
 	entryId sEntryId; // Do not free
@@ -3334,15 +2991,9 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID,
 					nItem;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG			cbUnWrapStoreID = 0;
-	
-	struct rightsArray rArray;
-	
-	LockSoap();
 
-	if(cPermissions == 0 || lpECPermissions == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	struct rightsArray rArray;
+	soap_lock_guard spg(*this);
 
 	// Remove servername, always
 	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
@@ -3382,26 +3033,22 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::HrGetOwner(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbOwnerId, LPENTRYID *lppOwnerId)
+HRESULT WSTransport::HrGetOwner(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    ULONG *lpcbOwnerId, ENTRYID **lppOwnerId)
 {
+	if (lpcbOwnerId == nullptr || lppOwnerId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId	sEntryId; // Do not free
 	struct getOwnerResponse sResponse;
 	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
 	ULONG		cbUnWrapStoreID = 0;
-
-	LockSoap();
-
-	if (lpcbOwnerId == NULL || lppOwnerId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	// Remove servername, always
 	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
@@ -3422,8 +3069,6 @@ HRESULT WSTransport::HrGetOwner(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpc
 
 	hr = CopySOAPEntryIdToMAPIEntryId(&sResponse.sOwner, sResponse.ulOwner, lpcbOwnerId, lppOwnerId);
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -3450,8 +3095,7 @@ HRESULT WSTransport::HrResolveNames(const SPropTagArray *lpPropTagArray,
 	struct flagArray aFlags;
 	struct abResolveNamesResponse sResponse;
 	convert_context	converter;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	aPropTag.__ptr = (unsigned int *)&lpPropTagArray->aulPropTag; // just a reference
 	aPropTag.__size = lpPropTagArray->cValues;
@@ -3471,7 +3115,7 @@ HRESULT WSTransport::HrResolveNames(const SPropTagArray *lpPropTagArray,
 			er = sResponse.er;
 	}
 	END_SOAP_CALL
-	
+
 	assert(sResponse.aFlags.__size == lpFlagList->cFlags);
 	assert(static_cast<ULONG>(sResponse.sRowSet.__size) == lpAdrList->cEntries);
 	for (gsoap_size_t i = 0; i < sResponse.aFlags.__size; ++i) {
@@ -3485,7 +3129,7 @@ HRESULT WSTransport::HrResolveNames(const SPropTagArray *lpPropTagArray,
 			     reinterpret_cast<void **>(&lpAdrList->aEntries[i].rgPropVals));
 			if (hr != hrSuccess)
 				goto exitm;
-			hr = CopySOAPRowToMAPIRow(&sResponse.sRowSet.__ptr[i], lpAdrList->aEntries[i].rgPropVals, (void*)lpAdrList->aEntries[i].rgPropVals, &converter);
+			hr = CopySOAPRowToMAPIRow(&sResponse.sRowSet.__ptr[i], lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].rgPropVals, &converter);
 			if(hr != hrSuccess)
 				goto exitm;
 
@@ -3493,26 +3137,24 @@ HRESULT WSTransport::HrResolveNames(const SPropTagArray *lpPropTagArray,
 		}else { // MAPI_AMBIGUOUS or MAPI_UNRESOLVED
 			// only set the flag, do nothing with the row
 			lpFlagList->ulFlag[i] = sResponse.aFlags.__ptr[i];
-		}		
+		}
 	}
  exitm:
-	UnLockSoap();
-
+	spg.unlock();
 	if(lpsRowSet)
 		FreeRowSet(lpsRowSet, true);
 
 	return hr;
 }
 
-HRESULT WSTransport::HrSyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT WSTransport::HrSyncUsers(ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	unsigned int sResponse;
 	entryId sCompanyId;
 	ULONG ulCompanyId = 0;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	if (lpCompanyId)
 	{
@@ -3531,25 +3173,21 @@ HRESULT WSTransport::HrSyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT WSTransport::GetQuota(ULONG cbUserId, const ENTRYID *lpUserId,
     bool bGetUserDefault, ECQUOTA **lppsQuota)
 {
+	if (lppsQuota == nullptr || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
 	struct quotaResponse	sResponse;
 	ECQUOTA *lpsQuota =  NULL;
 	entryId sUserId;
-	LockSoap();
-	
-	if(lppsQuota == NULL || lpUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3575,25 +3213,21 @@ HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
 
 	*lppsQuota = lpsQuota;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT WSTransport::SetQuota(ULONG cbUserId, const ENTRYID *lpUserId,
     ECQUOTA *lpsQuota)
 {
+	if (lpsQuota == nullptr || lpUserId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
 	unsigned int			sResponse;
 	struct quota			sQuota;
 	entryId sUserId;
-	LockSoap();
-
-	if(lpsQuota == NULL || lpUserId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3614,23 +3248,20 @@ HRESULT WSTransport::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
+HRESULT WSTransport::AddQuotaRecipient(ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId, ULONG cbRecipientId,
+    const ENTRYID *lpRecipientId, ULONG ulType)
 {
+	if (lpCompanyId == nullptr || lpRecipientId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId	sCompanyId, sRecipientId;
-	LockSoap();
-
-	if (lpCompanyId == NULL || lpRecipientId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -3646,22 +3277,20 @@ HRESULT WSTransport::AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
+HRESULT WSTransport::DeleteQuotaRecipient(ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId, ULONG cbRecipientId,
+    const ENTRYID *lpRecipientId, ULONG ulType)
 {
+	if (lpCompanyId == nullptr || lpRecipientId == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	entryId sCompanyId, sRecipientId;
-	LockSoap();
-
-	if (lpCompanyId == NULL || lpRecipientId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbCompanyId, lpCompanyId, &sCompanyId, true);
 	if (hr != hrSuccess)
@@ -3677,25 +3306,20 @@ HRESULT WSTransport::DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompany
 	}
 	END_SOAP_CALL
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, const ENTRYID *lpUserId,
     ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
+	if (lpcUsers == nullptr || lppsUsers == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
 	entryId sUserId;
 	struct userListResponse sResponse;
-
-	LockSoap();
-
-	if(lpcUsers == NULL || lppsUsers == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3716,25 +3340,21 @@ HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, const ENTRYID *lpUserId,
     ECQUOTASTATUS **lppsQuotaStatus)
 {
+	if (lppsQuotaStatus == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
 	struct quotaStatus		sResponse;
 	ECQUOTASTATUS *lpsQuotaStatus =  NULL;
 	entryId sUserId;
-	LockSoap();
-
-	if(lppsQuotaStatus == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbUserId, lpUserId, &sUserId, true);
 	if (hr != hrSuccess)
@@ -3757,8 +3377,6 @@ HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
 
 	*lppsQuotaStatus = lpsQuotaStatus;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
@@ -3766,9 +3384,8 @@ HRESULT WSTransport::HrPurgeSoftDelete(ULONG ulDays)
 {
     HRESULT						hr = hrSuccess;
     ECRESULT					er = erSuccess;
-    
-    LockSoap();
-    
+	soap_lock_guard spg(*this);
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->purgeSoftDelete(m_ecSessionId, ulDays, &er) != SOAP_OK)
@@ -3776,8 +3393,6 @@ HRESULT WSTransport::HrPurgeSoftDelete(ULONG ulDays)
 	}
 	END_SOAP_CALL
  exitm:
-    UnLockSoap();
-    
     return hr;
 }
 
@@ -3785,9 +3400,8 @@ HRESULT WSTransport::HrPurgeCache(ULONG ulFlags)
 {
     HRESULT						hr = hrSuccess;
     ECRESULT					er = erSuccess;
-    
-    LockSoap();
-    
+	soap_lock_guard spg(*this);
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->purgeCache(m_ecSessionId, ulFlags, &er) != SOAP_OK)
@@ -3795,8 +3409,6 @@ HRESULT WSTransport::HrPurgeCache(ULONG ulFlags)
 	}
 	END_SOAP_CALL
  exitm:
-    UnLockSoap();
-    
     return hr;
 }
 
@@ -3805,28 +3417,27 @@ HRESULT WSTransport::HrPurgeDeferredUpdates(ULONG *lpulRemaining)
     HRESULT						hr = hrSuccess;
     ECRESULT					er = erSuccess;
     struct purgeDeferredUpdatesResponse sResponse;
-    
-    LockSoap();
-    
+	soap_lock_guard spg(*this);
+
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->purgeDeferredUpdates(m_ecSessionId, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
         else
             er = sResponse.er;
-            
+
         *lpulRemaining = sResponse.ulDeferredRemaining;
-        
 	}
 	END_SOAP_CALL
  exitm:
-    UnLockSoap();
-    
     return hr;
 }
 
 HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszServerPath, bool *lpbIsPeer)
 {
+	if (lpszPseudoUrl == nullptr || lppszServerPath == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT						er = erSuccess;
 	HRESULT							hr = hrSuccess;
 	struct resolvePseudoUrlResponse sResponse;
@@ -3834,9 +3445,6 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 	unsigned int					ulLen = 0;
 	ECsResolveResult				*lpCachedResult = NULL;
 	ECsResolveResult				cachedResult;
-
-	if (lpszPseudoUrl == NULL || lppszServerPath == NULL)
-		return MAPI_E_INVALID_PARAMETER;
 
 	// First try the cache
 	ulock_rec l_cache(m_ResolveResultCacheMutex);
@@ -3857,8 +3465,7 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 	l_cache.unlock();
 
 	// Cache failed. Try the server
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->resolvePseudoUrl(m_ecSessionId, lpszPseudoUrl, &sResponse) != SOAP_OK)
@@ -3876,7 +3483,7 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 
 	{
 		scoped_rlock lock(m_ResolveResultCacheMutex);
-		m_ResolveResultCache.AddCacheItem(lpszPseudoUrl, cachedResult);
+		m_ResolveResultCache.AddCacheItem(lpszPseudoUrl, std::move(cachedResult));
 	}
 
 	ulLen = strlen(sResponse.lpszServerPath) + 1;
@@ -3888,26 +3495,21 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 	*lppszServerPath = lpszServerPath;
 	*lpbIsPeer = sResponse.bIsPeer;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSTransport::HrGetServerDetails(ECSVRNAMELIST *lpServerNameList,
     ULONG ulFlags, ECSERVERLIST **lppsServerList)
 {
+	if (lpServerNameList == nullptr || lppsServerList == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ECRESULT						er = erSuccess;
 	HRESULT							hr = hrSuccess;
 	struct getServerDetailsResponse sResponse;
 	ecmem_ptr<struct mv_string8> lpsSvrNameList;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
-
-	if (lpServerNameList == NULL || lppsServerList == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
 	hr = SvrNameListToSoapMvString8(lpServerNameList, ulFlags & MAPI_UNICODE, &~lpsSvrNameList);
 	if (hr != hrSuccess)
 		goto exitm;
@@ -3925,23 +3527,25 @@ HRESULT WSTransport::HrGetServerDetails(ECSVRNAMELIST *lpServerNameList,
 	if (hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
-HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, ULONG ulChangeId, ULONG ulSyncType, ULONG ulFlags, LPSRestriction lpsRestrict, ULONG *lpulMaxChangeId, ULONG* lpcChanges, ICSCHANGE **lppChanges){
+HRESULT WSTransport::HrGetChanges(const std::string &sourcekey, ULONG ulSyncId,
+    ULONG ulChangeId, ULONG ulSyncType, ULONG ulFlags,
+    const SRestriction *lpsRestrict, ULONG *lpulMaxChangeId, ULONG *lpcChanges,
+    ICSCHANGE **lppChanges)
+{
 	HRESULT						hr = hrSuccess;
 	ECRESULT					er = erSuccess;
 	struct icsChangeResponse	sResponse;
 	ecmem_ptr<ICSCHANGE> lpChanges;
 	struct xsd__base64Binary	sSourceKey;
 	struct restrictTable		*lpsSoapRestrict = NULL;
-	
+
 	sSourceKey.__ptr = (unsigned char *)sourcekey.c_str();
 	sSourceKey.__size = sourcekey.size();
 
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	if(lpsRestrict) {
     	hr = CopyMAPIRestrictionToSOAPRestriction(&lpsSoapRestrict, lpsRestrict);
     	if(hr != hrSuccess)
@@ -3974,7 +3578,7 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 			lpChanges[i].sSourceKey.cb = sResponse.sChangesArray.__ptr[i].sSourceKey.__size;
 			memcpy(lpChanges[i].sSourceKey.lpb, sResponse.sChangesArray.__ptr[i].sSourceKey.__ptr, sResponse.sChangesArray.__ptr[i].sSourceKey.__size);
 		}
-		
+
 		if(sResponse.sChangesArray.__ptr[i].sParentSourceKey.__size > 0) {
 			er = ECAllocateMore( sResponse.sChangesArray.__ptr[i].sParentSourceKey.__size,
 			     lpChanges, reinterpret_cast<void **>(&lpChanges[i].sParentSourceKey.lpb));
@@ -3983,15 +3587,13 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 			lpChanges[i].sParentSourceKey.cb = sResponse.sChangesArray.__ptr[i].sParentSourceKey.__size;
 			memcpy(lpChanges[i].sParentSourceKey.lpb, sResponse.sChangesArray.__ptr[i].sParentSourceKey.__ptr, sResponse.sChangesArray.__ptr[i].sParentSourceKey.__size);
 		}
-		
 	}
-	
+
 	*lpulMaxChangeId = sResponse.ulMaxChangeId;
 	*lpcChanges = sResponse.sChangesArray.__size;
 	*lppChanges = lpChanges.release();
  exitm:
-	UnLockSoap();
-	
+	spg.unlock();
 	if(lpsSoapRestrict)
 	    FreeRestrictTable(lpsSoapRestrict);
 	return hr;
@@ -4002,12 +3604,11 @@ HRESULT WSTransport::HrSetSyncStatus(const std::string& sourcekey, ULONG ulSyncI
 	ECRESULT			er = erSuccess;
 	struct setSyncStatusResponse sResponse;
 	struct xsd__base64Binary sSourceKey;
-	
+
 	sSourceKey.__size = sourcekey.size();
 	sSourceKey.__ptr = (unsigned char *)sourcekey.c_str();
 
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	START_SOAP_CALL
 	{
 		if (m_lpCmd->setSyncStatus(m_ecSessionId, sSourceKey, ulSyncId, ulChangeId, ulSyncType, ulFlags, &sResponse) != SOAP_OK)
@@ -4019,13 +3620,17 @@ HRESULT WSTransport::HrSetSyncStatus(const std::string& sourcekey, ULONG ulSyncI
 
 	*lpulSyncId = sResponse.ulSyncId;
  exitm:
-	UnLockSoap();
-
 	return hr;
 }
 
-HRESULT WSTransport::HrEntryIDFromSourceKey(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG ulFolderSourceKeySize, BYTE * lpFolderSourceKey, ULONG ulMessageSourceKeySize, BYTE * lpMessageSourceKey, ULONG * lpcbEntryID, LPENTRYID * lppEntryID)
+HRESULT WSTransport::HrEntryIDFromSourceKey(ULONG cbStoreID,
+    const ENTRYID *lpStoreID, ULONG ulFolderSourceKeySize,
+    BYTE *lpFolderSourceKey, ULONG ulMessageSourceKeySize,
+    BYTE *lpMessageSourceKey, ULONG *lpcbEntryID, ENTRYID **lppEntryID)
 {
+	if (ulFolderSourceKeySize == 0 || lpFolderSourceKey == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	entryId		sStoreId;
@@ -4035,15 +3640,9 @@ HRESULT WSTransport::HrEntryIDFromSourceKey(ULONG cbStoreID, LPENTRYID lpStoreID
 	struct xsd__base64Binary	folderSourceKey;
 	struct xsd__base64Binary	messageSourceKey;
 
-	struct getEntryIDFromSourceKeyResponse sResponse;	
-	
+	struct getEntryIDFromSourceKeyResponse sResponse;
+	soap_lock_guard spg(*this);
 
-	LockSoap();
-
-	if(ulFolderSourceKeySize == 0 || lpFolderSourceKey == NULL){
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitm;
-	}
 	hr = UnWrapServerClientStoreEntry(cbStoreID, lpStoreID, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exitm;
@@ -4070,7 +3669,6 @@ HRESULT WSTransport::HrEntryIDFromSourceKey(ULONG cbStoreID, LPENTRYID lpStoreID
 	if(hr != hrSuccess)
 		goto exitm;
  exitm:
-	UnLockSoap();
 	return hr;
 }
 
@@ -4083,8 +3681,7 @@ HRESULT WSTransport::HrGetSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCST
 	SSyncState						sSyncState = {0};
 
 	assert(lplstSyncState != NULL);
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	if (lstSyncId.empty())
 		goto exitm;
 	ulaSyncId.__ptr = s_alloc<unsigned int>(nullptr, lstSyncId.size());
@@ -4106,7 +3703,7 @@ HRESULT WSTransport::HrGetSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCST
 		lplstSyncState->emplace_back(std::move(sSyncState));
 	}
  exitm:
-	UnLockSoap();
+	spg.unlock();
 	s_free(nullptr, ulaSyncId.__ptr);
 	return hr;
 }
@@ -4125,14 +3722,14 @@ HRESULT WSTransport::HrOpenMultiStoreTable(const ENTRYLIST *lpMsgList,
     ULONG ulFlags, ULONG cbEntryID, const ENTRYID *lpEntryID,
     ECMsgStore *lpMsgStore, WSTableView **lppTableView)
 {
+	if (lpMsgList == nullptr || lpMsgList->cValues == 0)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	object_ptr<WSTableMultiStore> lpMultiStoreTable;
 
-	if (lpMsgList == nullptr || lpMsgList->cValues == 0)
-		return MAPI_E_INVALID_PARAMETER;
-	hr = WSTableMultiStore::Create(ulFlags, m_lpCmd, m_hDataLock,
-	     m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this,
-	     &~lpMultiStoreTable);
+	hr = WSTableMultiStore::Create(ulFlags, m_ecSessionId, cbEntryID,
+	     lpEntryID, lpMsgStore, this, &~lpMultiStoreTable);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpMultiStoreTable->HrSetEntryIDs(lpMsgList);
@@ -4142,18 +3739,20 @@ HRESULT WSTransport::HrOpenMultiStoreTable(const ENTRYLIST *lpMsgList,
 	       reinterpret_cast<void **>(lppTableView));
 }
 
-HRESULT WSTransport::HrOpenMiscTable(ULONG ulTableType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableView)
+HRESULT WSTransport::HrOpenMiscTable(ULONG ulTableType, ULONG ulFlags,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ECMsgStore *lpMsgStore,
+    WSTableView **lppTableView)
 {
+	if (ulTableType != TABLETYPE_STATS_SYSTEM && ulTableType != TABLETYPE_STATS_SESSIONS &&
+	    ulTableType != TABLETYPE_STATS_USERS && ulTableType != TABLETYPE_STATS_COMPANY &&
+	    ulTableType != TABLETYPE_USERSTORES && ulTableType != TABLETYPE_STATS_SERVERS)
+		return MAPI_E_INVALID_PARAMETER;
+
 	HRESULT hr = hrSuccess;
 	object_ptr<WSTableMisc> lpMiscTable;
 
-	if (ulTableType != TABLETYPE_STATS_SYSTEM && ulTableType != TABLETYPE_STATS_SESSIONS &&
-		ulTableType != TABLETYPE_STATS_USERS && ulTableType != TABLETYPE_STATS_COMPANY  &&
-		ulTableType != TABLETYPE_USERSTORES && ulTableType != TABLETYPE_STATS_SERVERS)
-		return MAPI_E_INVALID_PARAMETER;
-	hr = WSTableMisc::Create(ulTableType, ulFlags, m_lpCmd, m_hDataLock,
-	     m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this,
-	     &~lpMiscTable);
+	hr = WSTableMisc::Create(ulTableType, ulFlags, m_ecSessionId,
+	     cbEntryID, lpEntryID, lpMsgStore, this, &~lpMiscTable);
 	if (hr != hrSuccess)
 		return hr;
 	return lpMiscTable->QueryInterface(IID_ECTableView,
@@ -4168,9 +3767,7 @@ HRESULT WSTransport::HrSetLockState(ULONG cbEntryID, const ENTRYID *lpEntryID, b
 
 	if ((m_ulServerCapabilities & KOPANO_CAP_MSGLOCK) == 0)
 		return hrSuccess;
-
-	LockSoap();
-
+	soap_lock_guard spg(*this);
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &eidMessage, true);
 	if (hr != hrSuccess)
 		goto exitm;
@@ -4183,8 +3780,6 @@ HRESULT WSTransport::HrSetLockState(ULONG cbEntryID, const ENTRYID *lpEntryID, b
 	}
 	END_SOAP_CALL
  exitm:
-    UnLockSoap();
-    
 	return hr;
 }
 
@@ -4192,8 +3787,7 @@ HRESULT WSTransport::HrCheckCapabilityFlags(ULONG ulFlags, BOOL *lpbResult)
 {
 	if (lpbResult == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	*lpbResult = ((m_ulServerCapabilities & ulFlags) == ulFlags) ? TRUE : FALSE;
+	*lpbResult = (m_ulServerCapabilities & ulFlags) == ulFlags;
 	return hrSuccess;
 }
 
@@ -4203,12 +3797,11 @@ HRESULT WSTransport::HrTestPerform(const char *szCommand, unsigned int ulArgs,
     HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
     struct testPerformArgs sTestPerform;
-    
+
     sTestPerform.__size = ulArgs;
     sTestPerform.__ptr = lpszArgs;
-    
-    LockSoap();
-    
+
+	soap_lock_guard spg(*this);
     START_SOAP_CALL
     {
 		if (m_lpCmd->testPerform(m_ecSessionId, szCommand, sTestPerform, &er) != SOAP_OK)
@@ -4216,8 +3809,6 @@ HRESULT WSTransport::HrTestPerform(const char *szCommand, unsigned int ulArgs,
     }
     END_SOAP_CALL;
  exitm:
-    UnLockSoap();    
-    
     return hr;
 }
 
@@ -4225,9 +3816,8 @@ HRESULT WSTransport::HrTestSet(const char *szName, const char *szValue)
 {
     HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
-    
-    LockSoap();
-    
+	soap_lock_guard spg(*this);
+
     START_SOAP_CALL
     {
 		if (m_lpCmd->testSet(m_ecSessionId, szName, szValue, &er) != SOAP_OK)
@@ -4235,8 +3825,6 @@ HRESULT WSTransport::HrTestSet(const char *szName, const char *szValue)
     }
     END_SOAP_CALL
  exitm:
-    UnLockSoap();
-    
     return hr;
 }
 
@@ -4247,9 +3835,8 @@ HRESULT WSTransport::HrTestGet(const char *szName, char **lpszValue)
     ECRESULT er = erSuccess;
     char *szValue = NULL;
     struct testGetResponse sResponse;
-    
-    LockSoap();
-    
+	soap_lock_guard spg(*this);
+
     START_SOAP_CALL
     {
 		if (m_lpCmd->testGet(m_ecSessionId, szName, &sResponse) != SOAP_OK)
@@ -4258,17 +3845,16 @@ HRESULT WSTransport::HrTestGet(const char *szName, char **lpszValue)
                 er = sResponse.er;
     }
     END_SOAP_CALL
-    
+
     hr = MAPIAllocateBuffer(strlen(sResponse.szValue)+1, (void **)&szValue);
     if(hr != hrSuccess)
 		goto exitm;
-        
+
     strcpy(szValue, sResponse.szValue);
 
     *lpszValue = szValue;
  exitm:
-    UnLockSoap();
-    return hr;    
+	return hr;
 }
 
 HRESULT WSTransport::HrGetSessionId(ECSESSIONID *lpSessionId, ECSESSIONGROUPID *lpSessionGroupId)
@@ -4335,7 +3921,7 @@ HRESULT WSTransport::HrCancelIO()
 	 * any blocking recv() call will return with an error immediately.
 	 *
 	 * Please note though, that this last part (shutdown() on a socket will cause other threads
-	 * with a blocking recv() on the socket to return with an error), is not 100% portable. 
+	 * with a blocking recv() on the socket to return with an error), is not 100% portable.
 	 * Apparently (and this is untested), some UNIX variants don't return until some data
 	 * is received on the socket. Bummer. It works in Linux though.
 	 */
@@ -4358,8 +3944,7 @@ HRESULT WSTransport::HrGetNotify(struct notificationArray **lppsArrayNotificatio
 	ECRESULT	er = erSuccess;
 
 	struct notifyResponse sNotifications;
-	
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	if (m_lpCmd->notifyGetItems(m_ecSessionId, &sNotifications) != SOAP_OK)
 		er = KCERR_NETWORK_ERROR;
@@ -4377,8 +3962,7 @@ HRESULT WSTransport::HrGetNotify(struct notificationArray **lppsArrayNotificatio
 		*lppsArrayNotifications = NULL;
 
 exit:
-	UnLockSoap();
-
+	spg.unlock();
 	if(m_lpCmd->soap) {
 		soap_destroy(m_lpCmd->soap);
 		soap_end(m_lpCmd->soap);
@@ -4393,7 +3977,6 @@ std::string WSTransport::GetAppName()
 		return m_strAppName;
 	std::string procpath = "/proc/" + stringify(getpid()) + "/cmdline";
 	std::string s;
-
 	std::ifstream in(procpath.c_str());	
 
 	if (!getline(in, s))
@@ -4403,14 +3986,14 @@ std::string WSTransport::GetAppName()
     return m_strAppName;
 }
 
-HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
+HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId,
+    const ENTRYID *lpEntryId, ULONG *lpulUpdates)
 {
 	HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
 	entryId eidFolder;
 	resetFolderCountResponse sResponse;
-
-	LockSoap();
+	soap_lock_guard spg(*this);
 
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &eidFolder, true);
 	if (hr != hrSuccess)
@@ -4429,7 +4012,5 @@ HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, UL
 		*lpulUpdates = sResponse.ulUpdates;
 
  exitm:
-    UnLockSoap();
-    
 	return hr;
 }

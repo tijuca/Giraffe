@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECTAGS_H
@@ -41,6 +29,7 @@
 #define PR_EC_SSLKEY_PASS			PROP_TAG(PT_STRING8, 0x6706)
 #define PR_EC_LAST_CONNECTIONTYPE		PROP_TAG(PT_LONG, 0x6709)
 #define PR_EC_CONNECTION_TIMEOUT		PROP_TAG(PT_LONG, 0x670A)
+#define PR_EC_SERVER_VERSION			PROP_TAG(PT_TSTRING, 0x6716)
 
 // Used for proxy settings
 #define PR_EC_PROXY_HOST			PROP_TAG(PT_STRING8, 0x670B)
@@ -48,10 +37,6 @@
 #define PR_EC_PROXY_USERNAME			PROP_TAG(PT_STRING8, 0x670D)
 #define PR_EC_PROXY_PASSWORD			PROP_TAG(PT_STRING8, 0x670E)
 #define PR_EC_PROXY_FLAGS			PROP_TAG(PT_LONG, 0x670F)
-
-#define PR_EC_OFFLINE_PATH			PROP_TAG(PT_TSTRING, 0x6710) /* same as PR_EC_CONTACT_ENTRYID, but on different objects! */
-#define PR_EC_OFFLINE_PATH_A			PROP_TAG(PT_STRING8, 0x6710) /* same as PR_EC_CONTACT_ENTRYID, but on different objects! */
-#define PR_EC_OFFLINE_PATH_W			PROP_TAG(PT_UNICODE, 0x6710) /* same as PR_EC_CONTACT_ENTRYID, but on different objects! */
 
 #define PR_EC_SERVERNAME			PROP_TAG(PT_TSTRING, 0x6711) /* same as PR_EC_HIERARCHYID, but on archive store profile sections! */
 #define PR_EC_SERVERNAME_A			PROP_TAG(PT_STRING8, 0x6711) /* same as PR_EC_HIERARCHYID, but on archive store profile sections! */
@@ -215,11 +200,8 @@
 
 // notification based syncronization
 #define PR_EC_CHANGE_ADVISOR			PROP_TAG(PT_OBJECT, 0x6789)
-#define PR_EC_CHANGE_ONL_STATE			PROP_TAG(PT_BINARY, 0x678A)
-#define PR_EC_CHANGE_OFFL_STATE			PROP_TAG(PT_BINARY, 0x678B)
 
 // server path to home server of a user
-#define PR_EC_SERVERPATH			PROP_TAG(PT_STRING8, 0x67C0)
 #define PR_EC_HOMESERVER_NAME			PROP_TAG(PT_TSTRING, 0x67C1)
 #define PR_EC_HOMESERVER_NAME_A			PROP_TAG(PT_STRING8, 0x67C1)
 #define PR_EC_HOMESERVER_NAME_W			PROP_TAG(PT_UNICODE, 0x67C1)
@@ -235,11 +217,6 @@
 #define PR_EC_SEARCHFOLDER_STATUS		PROP_TAG(PT_LONG, 0x6790)
 #define PR_EC_BODY_FILTERED			PROP_TAG(PT_BINARY, 0x6791)
 
-#define PR_EC_OFFLINE_SYNC_STATUS		PROP_TAG(PT_BINARY, 0x67A0)
-#define PR_EC_ONLINE_SYNC_STATUS		PROP_TAG(PT_BINARY, 0x67A1)
-#define PR_EC_AB_SYNC_STATUS			PROP_TAG(PT_BINARY, 0x67A2)
-#define PR_EC_SYNC_WAIT_TIME			PROP_TAG(PT_LONG, 0x67A3)
-#define PR_EC_SYNC_ON_NOTIFY			PROP_TAG(PT_LONG, 0x67A4)
 #define PR_EC_RESYNC_ID				PROP_TAG(PT_LONG, 0x67A5)
 #define PR_EC_STORED_SERVER_UID			PROP_TAG(PT_BINARY, 0x67A6)
 #define PR_EC_AB_HIDDEN				PROP_TAG(PT_BOOLEAN, 0x67A7)
@@ -249,7 +226,6 @@
 #define PR_EC_NONACTIVE				PROP_TAG(PT_BOOLEAN, 0x67B0)
 #define PR_EC_ADMINISTRATOR			PROP_TAG(PT_LONG, 0x67B1) // Maps to 'ulIsAdmin' in ECUser
 
-#define PR_EC_MGR_ORG_ENTRYID			PROP_TAG(PT_BINARY, 0x67B2) //this property will store original entry id of a migrated message
 #define PR_EC_ENABLED_FEATURES			PROP_TAG(PT_MV_TSTRING, 0x67B3)
 #define PR_EC_ENABLED_FEATURES_A		PROP_TAG(PT_MV_STRING8, 0x67B3)
 #define PR_EC_ENABLED_FEATURES_W		PROP_TAG(PT_MV_UNICODE, 0x67B3)

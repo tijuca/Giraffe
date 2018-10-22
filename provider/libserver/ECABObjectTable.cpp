@@ -1,46 +1,32 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <list>
 #include <memory>
 #include <new>
 #include "kcore.hpp"
-#include <kopano/lockhelper.hpp>
 #include <kopano/kcodes.h>
 #include <kopano/tie.hpp>
-
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <kopano/mapiext.h>
-
 #include <kopano/EMSAbTag.h>
 #include <kopano/Util.h>
 #include "SOAPUtils.h"
 #include "ECABObjectTable.h"
 #include "ECSecurity.h"
-
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include <kopano/stringutil.h>
 
 namespace KC {
 
-ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, ulABType, ulFlags, locale)
+ECABObjectTable::ECABObjectTable(ECSession *ses, unsigned int ulABId,
+    unsigned int ulABType, unsigned int ulABParentId,
+    unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) :
+	ECGenericObjectTable(ses, ulABType, ulFlags, locale)
 {
 	auto lpODAB = new ECODAB;
 	lpODAB->ulABId = ulABId;
@@ -98,7 +84,7 @@ ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 {
 	auto lpODAB = static_cast<const ECODAB *>(m_lpObjectData);
 	assert(lplstProps != NULL);
-	
+
 	//List always empty
 	lplstProps->clear();
 
@@ -225,7 +211,7 @@ ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId,
 	 * 1. When working in a non-hosted environment.
 	 * 2. When the company does not have enough permissions to view any other company spaces.
 	 * 3. There's only one company.
-	 * 
+	 *
 	 * Having a Global Address Book _and_ a container for the company will only look strange and
 	 * confusing for the user. So lets delete the entry altogether for everybody except SYSTEM
 	 * and SYSADMIN users.
@@ -257,7 +243,6 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId,
 		lpObjects->emplace_back(KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST);
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
 			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_LISTS);
-
 	} else if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_BOOK) {
 		/*
 		 * Global Address Book
@@ -351,18 +336,18 @@ ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId,
 ECRESULT ECABObjectTable::Load()
 {
 	auto lpODAB = static_cast<const ECODAB *>(m_lpObjectData);
-	sObjectTableKey sRowItem;
 
 	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects;
 	std::list<unsigned int> lstObjects;
-	unsigned int ulObjectId = 0;
-	unsigned int ulObjectFilter = 0;
+	unsigned int ulObjectId = 0, ulObjectFilter = 0;
 	objectid_t objectid;
 
 	// If the GAB is disabled, don't show any entries except the top-level object
 	auto sesmgr = lpSession->GetSessionManager();
 	auto sec = lpSession->GetSecurity();
-	if (lpODAB->ulABParentId != 0 && parseBool(sesmgr->GetConfig()->GetSetting("enable_gab")) == false && sec->GetAdminLevel() == 0)
+	if (lpODAB->ulABParentId != 0 &&
+	    !parseBool(sesmgr->GetConfig()->GetSetting("enable_gab")) &&
+	    sec->GetAdminLevel() == 0)
 		return erSuccess;
 	auto er = sec->IsUserObjectVisible(lpODAB->ulABParentId);
 	if (er != erSuccess)

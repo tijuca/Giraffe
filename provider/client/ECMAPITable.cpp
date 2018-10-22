@@ -1,42 +1,25 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <new>
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
 #include <mapicode.h>
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <mapiguid.h>
 #include <mapiutil.h>
-
 #include "Mem.h"
 #include "ECMAPITable.h"
 #include <edkguid.h>
 #include <kopano/ECGuid.h>
 #include <kopano/Util.h>
 
-#include <kopano/ECDebug.h>
-
 using namespace KC;
 
 ECMAPITable::ECMAPITable(const std::string &strName, ECNotifyClient *nc,
     ULONG f) :
-	ECUnknown("IMAPITable"), lpNotifyClient(nc), ulFlags(f),
-	m_strName(strName)
+	ECUnknown("IMAPITable"), lpNotifyClient(nc), m_strName(strName)
 {}
 
 HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
@@ -44,11 +27,9 @@ HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
 	auto hr = lpTableOps->HrOpenTable();
 	if(hr != hrSuccess)
 		return hr;
-
 	// No deferred calls -> nothing to do
 	if (!IsDeferred())
-		return hr;
-        
+		return hrSuccess;
 	hr = lpTableOps->HrMulti(m_ulDeferredFlags, m_lpSetColumns, m_lpRestrict, m_lpSortTable, m_ulRowCount, m_ulFlags, lppRowSet);
 
 	// Reset deferred items
@@ -70,7 +51,7 @@ BOOL ECMAPITable::IsDeferred()
 
 ECMAPITable::~ECMAPITable()
 {
-	// Remove all advises	
+	// Remove all advises
 	auto iterMapInt = m_ulConnectionList.cbegin();
 	while (iterMapInt != m_ulConnectionList.cend()) {
 		auto iterMapIntDel = iterMapInt;
@@ -103,20 +84,19 @@ HRESULT ECMAPITable::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *l
 
 HRESULT ECMAPITable::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG * lpulConnection)
 {
-	scoped_rlock lock(m_hLock);
+	if (lpulConnection == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
+	scoped_rlock lock(m_hLock);
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
 	if (lpNotifyClient == NULL)
 		return MAPI_E_NO_SUPPORT;
-	if (lpulConnection == NULL)
-		return MAPI_E_INVALID_PARAMETER;
 
 	// FIXME: if a reconnection happens in another thread during the following call, the ulTableId sent here will be incorrect. The reconnection
 	// code will not yet know about this connection since we don't insert it until later, so you may end up getting an Advise() on completely the wrong
-	// table. 
-
+	// table.
 	hr = lpNotifyClient->Advise(4, (BYTE *)&lpTableOps->ulTableId, ulEventMask, lpAdviseSink, lpulConnection);
 	if(hr != hrSuccess)
 		return hr;
@@ -130,7 +110,6 @@ HRESULT ECMAPITable::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, UL
 HRESULT ECMAPITable::Unadvise(ULONG ulConnection)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
@@ -147,12 +126,9 @@ HRESULT ECMAPITable::Unadvise(ULONG ulConnection)
 // @fixme Do we need to lock here or just update the status?
 HRESULT ECMAPITable::GetStatus(ULONG *lpulTableStatus, ULONG *lpulTableType)
 {
-	HRESULT hr = hrSuccess;
-
 	*lpulTableStatus = TBLSTAT_COMPLETE;
 	*lpulTableType = TBLTYPE_DYNAMIC;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMAPITable::SetColumns(const SPropTagArray *lpPropTagArray,
@@ -162,14 +138,12 @@ HRESULT ECMAPITable::SetColumns(const SPropTagArray *lpPropTagArray,
 		return MAPI_E_INVALID_PARAMETER;
 
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpPropTagArray->cValues), &~m_lpSetColumns);
 	if (hr != hrSuccess)
 		return hr;
-        
+
     m_lpSetColumns->cValues = lpPropTagArray->cValues;
     memcpy(&m_lpSetColumns->aulPropTag, &lpPropTagArray->aulPropTag, lpPropTagArray->cValues * sizeof(ULONG));
-
 	if (!(ulFlags & TBL_BATCH))
 		hr = FlushDeferred();
 	return hr;
@@ -178,47 +152,41 @@ HRESULT ECMAPITable::SetColumns(const SPropTagArray *lpPropTagArray,
 HRESULT ECMAPITable::QueryColumns(ULONG ulFlags, LPSPropTagArray *lppPropTagArray)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-
 	// FIXME if the client has done SetColumns, we can handle this
 	// call locally instead of querying the server (unless TBL_ALL_COLUMNS has been
 	// specified)
-	return this->lpTableOps->HrQueryColumns(ulFlags, lppPropTagArray);
+	return lpTableOps->HrQueryColumns(ulFlags, lppPropTagArray);
 }
 
 HRESULT ECMAPITable::GetRowCount(ULONG ulFlags, ULONG *lpulCount)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
 	ULONG ulRow = 0; // discarded
-	return this->lpTableOps->HrGetRowCount(lpulCount, &ulRow);
+	return lpTableOps->HrGetRowCount(lpulCount, &ulRow);
 }
 
 HRESULT ECMAPITable::SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRowsSought)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if (hr != hrSuccess)
 		return hr;
-	return this->lpTableOps->HrSeekRow(bkOrigin, lRowCount, lplRowsSought);
+	return lpTableOps->HrSeekRow(bkOrigin, lRowCount, lplRowsSought);
 }
 
 HRESULT ECMAPITable::SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-	ULONG ulRows = 0;
-	ULONG ulCurrent = 0;
+	ULONG ulRows = 0, ulCurrent = 0;
 	hr = lpTableOps->HrGetRowCount(&ulRows, &ulCurrent);
 	if(hr != hrSuccess)
 		return hr;
@@ -228,20 +196,17 @@ HRESULT ECMAPITable::SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator)
 HRESULT ECMAPITable::QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *lpulDenominator)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-	ULONG ulRows = 0;
-	ULONG ulCurrentRow = 0;
+	ULONG ulRows = 0, ulCurrentRow = 0;
 	hr = lpTableOps->HrGetRowCount(&ulRows, &ulCurrentRow);
 	if(hr != hrSuccess)
 		return hr;
-
 	*lpulRow = ulCurrentRow;
 	*lpulNumerator = ulCurrentRow;
 	*lpulDenominator = (ulRows == 0)?1:ulRows;
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMAPITable::FindRow(const SRestriction *lpRestriction,
@@ -254,20 +219,18 @@ HRESULT ECMAPITable::FindRow(const SRestriction *lpRestriction,
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-	return this->lpTableOps->HrFindRow(lpRestriction, bkOrigin, ulFlags);
+	return lpTableOps->HrFindRow(lpRestriction, bkOrigin, ulFlags);
 }
 
 HRESULT ECMAPITable::Restrict(const SRestriction *lpRestriction, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
-
 	scoped_rlock lock(m_hLock);
+
     if(lpRestriction) {
         if ((hr = MAPIAllocateBuffer(sizeof(SRestriction), &~m_lpRestrict)) != hrSuccess)
 			return hr;
-        
         hr = Util::HrCopySRestriction(m_lpRestrict, lpRestriction, m_lpRestrict);
-
 		m_ulDeferredFlags &= ~TABLE_MULTI_CLEAR_RESTRICTION;
     } else {
 		// setting the restriction to NULL is not the same as not setting the restriction at all
@@ -282,21 +245,19 @@ HRESULT ECMAPITable::Restrict(const SRestriction *lpRestriction, ULONG ulFlags)
 HRESULT ECMAPITable::CreateBookmark(BOOKMARK* lpbkPosition)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-	return this->lpTableOps->CreateBookmark(lpbkPosition);
+	return lpTableOps->CreateBookmark(lpbkPosition);
 }
 
 HRESULT ECMAPITable::FreeBookmark(BOOKMARK bkPosition)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-	return this->lpTableOps->FreeBookmark(bkPosition);
+	return lpTableOps->FreeBookmark(bkPosition);
 }
 
 HRESULT ECMAPITable::SortTable(const SSortOrderSet *lpSortCriteria,
@@ -321,7 +282,6 @@ HRESULT ECMAPITable::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 {
 	memory_ptr<SSortOrderSet> lpSortCriteria;
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
@@ -377,7 +337,6 @@ HRESULT ECMAPITable::CollapseRow(ULONG cbInstanceKey, LPBYTE pbInstanceKey, ULON
 HRESULT ECMAPITable::WaitForCompletion(ULONG ulFlags, ULONG ulTimeout, ULONG *lpulTableStatus)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
@@ -399,11 +358,9 @@ HRESULT ECMAPITable::GetCollapseState(ULONG ulFlags, ULONG cbInstanceKey, LPBYTE
 HRESULT ECMAPITable::SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBYTE pbCollapseState, BOOKMARK *lpbkLocation)
 {
 	scoped_rlock lock(m_hLock);
-
 	HRESULT hr = FlushDeferred();
 	if(hr != hrSuccess)
 		return hr;
-
 	hr = lpTableOps->HrSetCollapseState(pbCollapseState, cbCollapseState, lpbkLocation);
 	if(lpbkLocation)
 		*lpbkLocation = BOOKMARK_BEGINNING;
@@ -412,46 +369,35 @@ HRESULT ECMAPITable::SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBY
 
 HRESULT ECMAPITable::HrSetTableOps(WSTableView *ops, bool fLoad)
 {
-	HRESULT hr;
-
 	lpTableOps.reset(ops);
 	// Open the table on the server, ready for reading ..
 	if(fLoad) {
-		hr = lpTableOps->HrOpenTable();
+		auto hr = lpTableOps->HrOpenTable();
 		if (hr != hrSuccess)
 			return hr;
 	}
-
 	lpTableOps->SetReloadCallback(Reload, this);
 	return hrSuccess;
 }
 
 HRESULT ECMAPITable::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppRows)
 {
-	HRESULT hr = hrSuccess;
-
 	scoped_rlock lock(m_hLock);
-
-	if(IsDeferred()) {
-	    m_ulRowCount = lRowCount;
-	    m_ulFlags = ulFlags;
-	    
-	    hr = FlushDeferred(lppRows);
-    } else {
-        
-        // Send the request to the TableOps object, which will send the request to the server.
-        hr = this->lpTableOps->HrQueryRows(lRowCount, ulFlags, lppRows);
-    }
-	return hr;
+	if (!IsDeferred())
+		/* Send the request to the TableOps object, which will send the request to the server. */
+		return lpTableOps->HrQueryRows(lRowCount, ulFlags, lppRows);
+	m_ulRowCount = lRowCount;
+	m_ulFlags = ulFlags;
+	return FlushDeferred(lppRows);
 }
 
 HRESULT ECMAPITable::Reload(void *lpParam)
 {
 	auto lpThis = static_cast<ECMAPITable *>(lpParam);
 
-	// Locking m_hLock is not allowed here since when we are called, the SOAP transport in lpTableOps  
-	// will be locked. Since normally m_hLock is locked before SOAP, locking m_hLock *after* SOAP here  
-	// would be a lock-order violation causing deadlocks.  
+	// Locking m_hLock is not allowed here since when we are called, the SOAP transport in lpTableOps
+	// will be locked. Since normally m_hLock is locked before SOAP, locking m_hLock *after* SOAP here
+	// would be a lock-order violation causing deadlocks.
 
 	scoped_rlock lock(lpThis->m_hMutexConnectionList);
 

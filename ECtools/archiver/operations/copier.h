@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef copier_INCLUDED
 #define copier_INCLUDED
 
 #include <memory>
-#include <kopano/memory.hpp>
 #include <kopano/zcdefs.h>
 #include "operations.h"
 #include "postsaveaction.h"
@@ -32,15 +19,16 @@
 namespace KC {
 
 class ECConfig;
+class ECLogger;
 
 namespace operations {
 
 /**
  * Performs the copy part of the archive operation.
  */
-class _kc_export Copier _kc_final : public ArchiveOperationBaseEx {
+class _kc_export Copier final : public ArchiveOperationBaseEx {
 public:
-	_kc_hidden Copier(ArchiverSessionPtr, ECConfig *, ECArchiverLogger *, const ObjectEntryList &archives, const SPropTagArray *exclprop, int age, bool process_unread);
+	_kc_hidden Copier(ArchiverSessionPtr, ECConfig *, std::shared_ptr<ECArchiverLogger>, const ObjectEntryList &archives, const SPropTagArray *exclprop, int age, bool process_unread);
 	_kc_hidden ~Copier(void);
 
 	/**
@@ -63,7 +51,7 @@ public:
 
 	class _kc_export Helper { // For lack of a better name
 	public:
-		Helper(ArchiverSessionPtr, ECLogger *, const InstanceIdMapperPtr &, const SPropTagArray *exclprop, LPMAPIFOLDER folder);
+		Helper(ArchiverSessionPtr, std::shared_ptr<ECLogger>, const InstanceIdMapperPtr &, const SPropTagArray *exclprop, LPMAPIFOLDER folder);
 
 		/**
 		 * Create a copy of a message in the archive, effectively archiving the message.
@@ -107,15 +95,15 @@ public:
 		ArchiveFolderMap m_mapArchiveFolders;
 
 		ArchiverSessionPtr m_ptrSession;
-		object_ptr<ECLogger> m_lpLogger;
+		std::shared_ptr<ECLogger> m_lpLogger;
 		const SPropTagArray *m_lpExcludeProps;
 		MAPIFolderPtr m_ptrFolder;
 		InstanceIdMapperPtr m_ptrMapper;
 	};
 
 private:
-	_kc_hidden HRESULT EnterFolder(LPMAPIFOLDER) _kc_override;
-	_kc_hidden HRESULT LeaveFolder(void) _kc_override;
+	_kc_hidden HRESULT EnterFolder(IMAPIFolder *) override;
+	_kc_hidden HRESULT LeaveFolder() override;
 	_kc_hidden HRESULT DoProcessEntry(const SRow &proprow) override;
 
 	/**

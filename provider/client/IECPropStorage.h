@@ -1,22 +1,9 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 // Interface for writing and reading properties to disk (which does the actual transfer and save)
-// 
+//
 // Strategy is to load most of the small (ie not much data) properties at load-time. This saves
 // a lot of overhead if the properties were to be acquired one-by-one over the network. However, a
 // complete list of properties is also read through HrReadProps(), so the local system also knows
@@ -26,11 +13,10 @@
 // and HrWriteProps. HrWriteProps changes and/or adds any new or modified properties, while HrDeleteProps
 // removes any properties that have been completely removed.
 //
-// This keeps the overall performance high, by having relatively low latency problems as most message 
+// This keeps the overall performance high, by having relatively low latency problems as most message
 // accesses will be kept down to about 1 to 5 network accesses, and have low bandwidth requirements as
 // large data is only loaded on demand.
 //
-
 #ifndef IECPROPSTORAGE_H
 #define IECPROPSTORAGE_H
 
@@ -53,7 +39,6 @@ struct MAPIOBJECT {
 
 	bool operator < (const MAPIOBJECT &other) const {
 		std::pair<unsigned int, unsigned int> me(ulObjType, ulUniqueId), him(other.ulObjType, other.ulUniqueId);
-		
 		return me < him;
 	};
 
@@ -72,9 +57,9 @@ struct MAPIOBJECT {
 		ulObjId(s.ulObjId), ulObjType(s.ulObjType)
 	{
 		KC::Util::HrCopyEntryId(s.cbInstanceID, reinterpret_cast<const ENTRYID *>(s.lpInstanceID),
-							&this->cbInstanceID, (LPENTRYID *)&this->lpInstanceID);
+			&cbInstanceID, reinterpret_cast<ENTRYID **>(&lpInstanceID));
 		for (const auto &i : s.lstChildren)
-			this->lstChildren.emplace(new MAPIOBJECT(*i));
+			lstChildren.emplace(new MAPIOBJECT(*i));
 	};
 
 	void operator=(const MAPIOBJECT &) = delete;
@@ -99,16 +84,12 @@ typedef std::set<MAPIOBJECT*, MAPIOBJECT::CompareMAPIOBJECT>	ECMapiObjects;
 
 class IECPropStorage : public virtual IUnknown {
 public:
-
 	// Get a single (large) property from an object
 	virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue) = 0;
-
 	// Save a complete object to the server
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpSavedObjects) = 0;
-
 	// Load a complete object from the server
 	virtual HRESULT HrLoadObject(MAPIOBJECT **lppSavedObjects) = 0;
-
 	// Returns the correct storage which can connect to the server
 	virtual IECPropStorage* GetServerStorage() = 0;
 };

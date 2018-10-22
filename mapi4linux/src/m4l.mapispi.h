@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef __M4L_MAPISPI_IMPL_H
 #define __M4L_MAPISPI_IMPL_H
 
 #include <kopano/memory.hpp>
-#include <kopano/zcdefs.h>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -30,13 +17,9 @@
 #include <edkmdb.h>
 
 struct M4LSUPPORTADVISE {
-	M4LSUPPORTADVISE(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink)
-	{
-		this->lpKey = lpKey;
-		this->ulEventMask = ulEventMask;
-		this->ulFlags = ulFlags;
-		this->lpAdviseSink = lpAdviseSink;
-	}
+	M4LSUPPORTADVISE(NOTIFKEY *k, ULONG m, ULONG f, IMAPIAdviseSink *s) :
+		lpKey(k), ulEventMask(m), ulFlags(f), lpAdviseSink(s)
+	{}
 
 	LPNOTIFKEY lpKey;
 	ULONG ulEventMask;
@@ -54,8 +37,8 @@ public:
 	M4LMAPIGetSession(LPMAPISESSION new_session);
 
 	// IMAPIGetSession
-	virtual HRESULT GetMAPISession(LPUNKNOWN *lppSession) _kc_override;
-	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
+	virtual HRESULT GetMAPISession(IUnknown **ses) override;
+	virtual HRESULT QueryInterface(const IID &, void **) override;
 };
 
 class M4LMAPISupport : public M4LUnknown, public IMAPISupport {
@@ -113,7 +96,7 @@ public:
 
 	virtual HRESULT IStorageFromStream(LPUNKNOWN lpUnkIn, LPCIID lpInterface, ULONG ulFlags, LPSTORAGE *lppStorageOut);
 	virtual HRESULT GetSvcConfigSupportObj(ULONG ulFlags, LPMAPISUP *lppSvcSupport);
-	virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
+	virtual HRESULT QueryInterface(const IID &, void **) override;
 };
 
 

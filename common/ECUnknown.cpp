@@ -1,28 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
+#include <algorithm>
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiguid.h>
-
-#include <kopano/ECUnknown.h>
+#include <kopano/ECABEntryID.h>
 #include <kopano/ECGuid.h>
+#include <kopano/ECUnknown.h>
+#include "ECCache.h"
+#include "../provider/include/kcore.hpp"
 
 namespace KC {
 
@@ -72,13 +61,11 @@ HRESULT ECUnknown::AddChild(ECUnknown *lpChild) {
 }
 
 HRESULT ECUnknown::RemoveChild(ECUnknown *lpChild) {
-	std::list<ECUnknown *>::iterator iterChild;
 	ulock_normal locker(mutex);
+	auto iterChild = lstChildren.end();
 
 	if (lpChild != NULL)
-		for (iterChild = lstChildren.begin(); iterChild != lstChildren.end(); ++iterChild)
-			if(*iterChild == lpChild)
-				break;
+		iterChild = std::find(lstChildren.begin(), lstChildren.end(), lpChild);
 	if (iterChild == lstChildren.end())
 		return MAPI_E_NOT_FOUND;
 	lstChildren.erase(iterChild);
@@ -98,11 +85,11 @@ HRESULT ECUnknown::SetParent(ECUnknown *parent)
 	return hrSuccess;
 }
 
-/** 
+/**
  * Returns whether this object is the parent of passed object
- * 
+ *
  * @param lpObject Possible child object
- * 
+ *
  * @return this is a parent of lpObject, or not
  */
 BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) const
@@ -114,11 +101,11 @@ BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) const
 	return FALSE;
 }
 
-/** 
+/**
  * Returns whether this object is a child of passed object
- * 
+ *
  * @param lpObject IUnknown object which may be a child of this
- * 
+ *
  * @return lpObject is a parent of this, or not
  */
 BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) const
@@ -132,7 +119,7 @@ BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) const
 }
 
 // We kill the local object if there are no external (AddRef()) and no internal
-// (AddChild) objects depending on us. 
+// (AddChild) objects depending on us.
 
 HRESULT ECUnknown::Suicide() {
 	auto parent = lpParent;
@@ -142,15 +129,73 @@ HRESULT ECUnknown::Suicide() {
 	lpParent = nullptr;
 	delete this;
 
-	// WARNING: The child list of our parent now contains a pointer to this 
+	// WARNING: The child list of our parent now contains a pointer to this
 	// DELETED object. We must make sure that nobody ever follows pointer references
 	// in this list during this interval. The list is, therefore PRIVATE to this object,
 	// and may only be access through functions in ECUnknown.
-
 	// Now, tell our parent to delete this object
 	if (parent != nullptr)
 		parent->RemoveChild(self);
 	return hrSuccess;
+}
+
+static ABEID g_sDefaultEid(MAPI_MAILUSER, MUIDECSAB, 0);
+unsigned char *g_lpDefaultEid = (unsigned char*)&g_sDefaultEid;
+const unsigned int g_cbDefaultEid = sizeof(g_sDefaultEid);
+
+static ABEID g_sEveryOneEid(MAPI_DISTLIST, MUIDECSAB, 1);
+unsigned char *g_lpEveryoneEid = (unsigned char*)&g_sEveryOneEid;
+const unsigned int g_cbEveryoneEid = sizeof(g_sEveryOneEid);
+
+static ABEID g_sSystemEid(MAPI_MAILUSER, MUIDECSAB, 2);
+unsigned char *g_lpSystemEid = (unsigned char*)&g_sSystemEid;
+const unsigned int g_cbSystemEid = sizeof(g_sSystemEid);
+
+static HRESULT CheckEntryId(unsigned int eid_size, const ENTRYID *eid,
+    unsigned int id, unsigned int type, bool *res)
+{
+	if (eid_size < sizeof(ABEID) || eid == nullptr || res == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
+	*res = true;
+	auto ab = reinterpret_cast<const ABEID *>(eid);
+	if (ab->ulId != id)
+		*res = false;
+	else if (ab->ulType != type)
+		*res = false;
+	else if (ab->ulVersion == 1 && ab->szExId[0])
+		*res = false;
+	return hrSuccess;
+}
+
+HRESULT EntryIdIsEveryone(unsigned int eid_size, const ENTRYID *eid, bool *res)
+{
+	return CheckEntryId(eid_size, eid, 1, MAPI_DISTLIST, res);
+}
+
+HRESULT GetNonPortableObjectType(unsigned int eid_size,
+    const ENTRYID *eid, unsigned int *obj_type)
+{
+	if (eid_size < sizeof(ABEID) || eid == nullptr || obj_type == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	*obj_type = reinterpret_cast<const ABEID *>(eid)->ulType;
+	return hrSuccess;
+}
+
+ECCacheBase::ECCacheBase(const std::string &name, size_type size, long age) :
+	m_strCachename(name), m_ulMaxSize(size), m_lMaxAge(age)
+{}
+
+ECCacheStat ECCacheBase::get_stats() const
+{
+	ECCacheStat s;
+	s.name = m_strCachename;
+	s.items = ItemCount();
+	s.size = Size();
+	s.maxsize = m_ulMaxSize;
+	s.req = HitCount();
+	s.hit = ValidCount();
+	return s;
 }
 
 } /* namespace */

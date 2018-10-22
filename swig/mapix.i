@@ -1,8 +1,10 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 %module mapix
 %include "typemaps.i"
 
 %{
 #include <mapix.h>
+#include <kopano/ECLogger.h>
 %}
 
 
@@ -245,3 +247,4 @@ public:
 
 HRESULT kc_session_save(IMAPISession *ses, std::string &serout);
 HRESULT kc_session_restore(const std::string &a, IMAPISession **s);
+void ec_log(unsigned int level, const char *msg);

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef RECURRENCE_H
@@ -24,7 +12,7 @@
 #include <mapix.h>
 #include <kopano/Util.h>
 #include <list>
-#include "TimeUtil.h"
+#include <kopano/timeutil.hpp>
 #include "freebusy.h"
 #include "freebusyutil.h"
 
@@ -33,7 +21,7 @@ namespace KC {
 class _kc_export recurrence _kc_final {
 public:
 	HRESULT HrLoadRecurrenceState(const char *data, size_t len, ULONG flags) { return m_sRecState.ParseBlob(data, len, flags); }
-	HRESULT HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, void *base = NULL);
+	HRESULT HrGetRecurrenceState(char **lppData, size_t *lpulLen, void *base = NULL);
 	void HrGetHumanReadableString(std::string *);
 	HRESULT HrGetItems(time_t start, time_t end, const TIMEZONE_STRUCT &ttZinfo, ULONG ulBusyStatus, OccrInfo **lppFbBlock, ULONG *lpcValues, bool last = false);
 	enum freq_type { DAILY, WEEKLY, MONTHLY, YEARLY };

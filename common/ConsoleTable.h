@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef __CONSOLE_TABLE_H
@@ -30,7 +18,6 @@ public:
 	ConsoleTable(size_t rows, size_t columns);
 	_kc_hidden void Clear(void);
 	void Resize(size_t rows, size_t columns);
-
 	bool SetHeader(size_t col, const std::string& entry);
 	void set_lead(const char *lead) { m_lead = lead; }
 	bool AddColumn(size_t col, const std::string& entry);
@@ -39,9 +26,7 @@ public:
 	void DumpTable();
 
 private:
-	size_t m_nRow = 0;
-	size_t m_iRows;
-	size_t m_iColumns;
+	size_t m_nRow = 0, m_iRows, m_iColumns;
 	std::string m_lead = "\t";
 	std::vector<std::wstring> m_vHeader;
 	std::vector<std::vector<std::wstring> > m_vTable;

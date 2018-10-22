@@ -1,6 +1,7 @@
 dist_sbin_SCRIPTS = kopano-search kopano-search-xapian-compact.py kopano-search-upgrade-findroots.py
 
 EXTRA_DIST = setup.py		\
+	setup.cfg \
 	kopano_search/__init__.py \
 	kopano_search/plaintext.py \
 	kopano_search/magic.py \
@@ -11,7 +12,7 @@ EXTRA_DIST = setup.py		\
 install-exec-local:
 	rm -Rf staging
 	${MKDIR_P} staging
-	cp -a ${srcdir}/setup.py ${srcdir}/kopano_search staging/
+	cp -a ${srcdir}/setup.py ${srcdir}/setup.cfg ${srcdir}/kopano_search staging/
 	cp -a kopano_search/version.py staging/kopano_search/
 	cd staging/ && ${PYTHON} setup.py \
 		build --build-base="${abs_builddir}/build" \
@@ -24,4 +25,4 @@ install-data-local:
 
 uninstall-local:
 	rm -Rf ${DESTDIR}${pythondir}/kopano_search \
-		${DESTDIR}${pythondir}/kopano_search-0*.egg-info
+		${DESTDIR}${pythondir}/kopano_search-*.egg-info

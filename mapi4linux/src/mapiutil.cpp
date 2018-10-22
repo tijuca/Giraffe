@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
@@ -27,18 +14,15 @@
 #include <mapix.h>
 #include <mapiutil.h>
 #include <mapidefs.h>
-
-#include <kopano/ECDebug.h>
 #include <kopano/ECTags.h>
 #include <kopano/memory.hpp>
 #include <kopano/stringutil.h>
+#include <kopano/tie.hpp>
+#include <kopano/timeutil.hpp>
 #include <kopano/Util.h>
-
 #include "ECMemStream.h"
 #include <kopano/mapiguidext.h>
-
 #include "rtf.h"
-
 #include <kopano/charset/convstring.h>
 
 using namespace KC;
@@ -66,9 +50,6 @@ HRESULT WrapStoreEntryID(ULONG ulFlags, const TCHAR *lpszDLLName,
     ULONG cbOrigEntry, const ENTRYID *lpOrigEntry, ULONG *lpcbWrappedEntry,
     ENTRYID **lppWrappedEntry)
 {
-	HRESULT hr = hrSuccess;
-	ULONG cbDLLName = 0;
-	ULONG cbPad = 0;
 	std::string strDLLName = convstring(lpszDLLName, ulFlags);
 
 	if (lpszDLLName == nullptr || lpOrigEntry == nullptr ||
@@ -83,11 +64,11 @@ HRESULT WrapStoreEntryID(ULONG ulFlags, const TCHAR *lpszDLLName,
 	// - then the dll name + termination char + padding to 32 bits
 	// - then the entry id
 
-	cbDLLName = strDLLName.size() + 1;
-	cbPad = (4 - ((4+sizeof(GUID)+2+cbDLLName) & 0x03)) & 0x03;
+	unsigned int cbDLLName = strDLLName.size() + 1;
+	unsigned int cbPad = (4 - ((4 + sizeof(GUID) + 2 + cbDLLName) & 0x03)) & 0x03;
 
 	*lpcbWrappedEntry = 4+sizeof(GUID)+2+cbDLLName+cbPad+cbOrigEntry;
-	hr = MAPIAllocateBuffer(*lpcbWrappedEntry, (void**)lppWrappedEntry);
+	auto hr = MAPIAllocateBuffer(*lpcbWrappedEntry, reinterpret_cast<void **>(lppWrappedEntry));
 	if (hr != hrSuccess)
 		return hr;
 	memset(*lppWrappedEntry, 0, *lpcbWrappedEntry);
@@ -126,29 +107,20 @@ HRESULT HrAllocAdviseSink(LPNOTIFCALLBACK lpFunction, void *lpContext,
 // This is called when a user calls Commit() on a wrapped (uncompressed) RTF Stream
 static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 {
-	HRESULT hr = hrSuccess;
 	auto lpCompressedStream = static_cast<IStream *>(lpData);
 	STATSTG sStatStg;
-	std::unique_ptr<char[]> lpUncompressed;
-	char *lpReadPtr = NULL;
-	ULONG ulRead = 0;
-	ULONG ulWritten = 0;
-	unsigned int ulCompressedSize;
-	char *lpCompressed = NULL;
+	unsigned int ulRead = 0, ulWritten = 0, ulCompressedSize;
+	std::unique_ptr<char, cstdlib_deleter> lpCompressed;
 	ULARGE_INTEGER zero = {{0,0}};
 	LARGE_INTEGER front = {{0,0}};
 
-	hr = lpUncompressedStream->Stat(&sStatStg, STATFLAG_NONAME);
-
+	auto hr = lpUncompressedStream->Stat(&sStatStg, STATFLAG_NONAME);
 	if(hr != hrSuccess)
-		goto exit;
-	lpUncompressed.reset(new(std::nothrow) char[sStatStg.cbSize.LowPart]);
-	if(lpUncompressed == NULL) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
-	lpReadPtr = lpUncompressed.get();
+		return hr;
+	auto lpUncompressed = make_unique_nt<char[]>(sStatStg.cbSize.LowPart);
+	if (lpUncompressed == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	auto lpReadPtr = lpUncompressed.get();
 	while(1) {
 		hr = lpUncompressedStream->Read(lpReadPtr, 1024, &ulRead);
 
@@ -159,31 +131,21 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 	}
 
 	// We now have the complete uncompressed data in lpUncompressed
-	if (rtf_compress(&lpCompressed, &ulCompressedSize, lpUncompressed.get(), sStatStg.cbSize.LowPart) != 0) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
-
+	if (rtf_compress(&unique_tie(lpCompressed), &ulCompressedSize, lpUncompressed.get(), sStatStg.cbSize.LowPart) != 0)
+		return MAPI_E_CALL_FAILED;
 	// lpCompressed is the compressed RTF stream, write it to lpCompressedStream
-
-	lpReadPtr = lpCompressed;
-
+	lpReadPtr = lpCompressed.get();
 	lpCompressedStream->SetSize(zero);
 	lpCompressedStream->Seek(front,SEEK_SET,NULL);
 
 	while(ulCompressedSize) {
-		hr = lpCompressedStream->Write(lpReadPtr, ulCompressedSize > 16384 ? 16384 : ulCompressedSize, &ulWritten);
-
+		hr = lpCompressedStream->Write(lpReadPtr, std::min(ulCompressedSize, 16384U), &ulWritten);
 		if(hr != hrSuccess)
-			break;
-
+			return hr;
 		lpReadPtr += ulWritten;
 		ulCompressedSize -= ulWritten;
 	}
-
-exit:
-	free(lpCompressed);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WrapCompressedRTFStream(LPSTREAM lpCompressedRTFStream, ULONG ulFlags,
@@ -198,15 +160,11 @@ HRESULT WrapCompressedRTFStream(LPSTREAM lpCompressedRTFStream, ULONG ulFlags,
 	// therefore is quite memory-hungry.
 
 	STATSTG sStatStg;
-	HRESULT hr = hrSuccess;
 	std::unique_ptr<char[]> lpCompressed, lpUncompressed;
-	char *lpReadPtr = NULL;
-	ULONG ulRead = 0;
+	unsigned int ulRead = 0, ulUncompressedLen = 0;
 	object_ptr<ECMemStream> lpUncompressedStream;
-	ULONG ulUncompressedLen = 0;
 	
-	hr = lpCompressedRTFStream->Stat(&sStatStg, STATFLAG_NONAME);
-
+	auto hr = lpCompressedRTFStream->Stat(&sStatStg, STATFLAG_NONAME);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -216,7 +174,7 @@ HRESULT WrapCompressedRTFStream(LPSTREAM lpCompressedRTFStream, ULONG ulFlags,
 			return MAPI_E_NOT_ENOUGH_MEMORY;
 
         	// Read in the whole compressed data buffer
-        	lpReadPtr = lpCompressed.get();
+			auto lpReadPtr = lpCompressed.get();
         	while(1) {
         		hr = lpCompressedRTFStream->Read(lpReadPtr, 1024, &ulRead);
 
@@ -321,12 +279,11 @@ BOOL FPropExists(LPMAPIPROP lpMapiProp, ULONG ulPropTag)
 HRESULT CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease,
     IStream **lppStream)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<ECMemStream> lpStream;
 	
 	if (hGlobal != nullptr || fDeleteOnRelease != TRUE)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = ECMemStream::Create(nullptr, 0, STGM_WRITE, nullptr, nullptr, nullptr, &~lpStream); // NULLs: no callbacks and custom data
+	auto hr = ECMemStream::Create(nullptr, 0, STGM_WRITE, nullptr, nullptr, nullptr, &~lpStream); // NULLs: no callbacks and custom data
 	if(hr != hrSuccess) 
 		return hr;
 	return lpStream->QueryInterface(IID_IStream, reinterpret_cast<void **>(lppStream));
@@ -334,8 +291,7 @@ HRESULT CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease,
 
 #pragma pack(push, 1)
 struct CONVERSATION_INDEX { /* 22 bytes */
-	char ulReserved1;
-	char ftTime[5];
+	char ulReserved1, ftTime[5];
 	GUID guid;
 };
 #pragma pack(pop)
@@ -343,28 +299,25 @@ struct CONVERSATION_INDEX { /* 22 bytes */
 HRESULT ScCreateConversationIndex(ULONG cbParent, LPBYTE lpbParent,
     ULONG *lpcbConvIndex, LPBYTE *lppbConvIndex)
 {
-	HRESULT hr;
 	ULONG cbConvIndex = 0;
 	BYTE *pbConvIndex = NULL;
 
 	if(cbParent == 0) {
-		FILETIME ft;
-		if ((hr = MAPIAllocateBuffer(sizeof(CONVERSATION_INDEX), (void **)&pbConvIndex)) != hrSuccess)
+		auto hr = MAPIAllocateBuffer(sizeof(CONVERSATION_INDEX), reinterpret_cast<void **>(&pbConvIndex));
+		if (hr != hrSuccess)
 			return hr;
 		cbConvIndex = sizeof(CONVERSATION_INDEX);
 		auto ci = reinterpret_cast<CONVERSATION_INDEX *>(pbConvIndex);
 		ci->ulReserved1 = 1;
-		ft = UnixTimeToFileTime(time(nullptr));
+		auto ft = UnixTimeToFileTime(time(nullptr));
 		uint32_t tmp = cpu_to_le32(ft.dwLowDateTime);
 		memcpy(ci->ftTime, &tmp, sizeof(tmp));
 		ci->ftTime[4] = ft.dwHighDateTime;
 		CoCreateGuid(&ci->guid);
 	} else {
-		FILETIME now;
 		FILETIME parent;
-		FILETIME diff;
-
-		if ((hr = MAPIAllocateBuffer(cbParent + 5, (void **)&pbConvIndex)) != hrSuccess)
+		auto hr = MAPIAllocateBuffer(cbParent + 5, reinterpret_cast<void **>(&pbConvIndex));
+		if (hr != hrSuccess)
 			return hr;
 		cbConvIndex = cbParent+5;
 		memcpy(pbConvIndex, lpbParent, cbParent);
@@ -373,9 +326,8 @@ HRESULT ScCreateConversationIndex(ULONG cbParent, LPBYTE lpbParent,
 		memcpy(&parent.dwLowDateTime, &ci->ftTime, sizeof(DWORD));
 		parent.dwLowDateTime = le32_to_cpu(parent.dwLowDateTime);
 		parent.dwHighDateTime = lpbParent[4];
-		now = UnixTimeToFileTime(time(nullptr));
-
-		diff = FtSubFt(now, parent);
+		auto now = UnixTimeToFileTime(time(nullptr));
+		auto diff = FtSubFt(now, parent);
 		diff.dwLowDateTime = cpu_to_le32(diff.dwLowDateTime);
 		diff.dwHighDateTime = cpu_to_le32(diff.dwHighDateTime);
 		memcpy(pbConvIndex + sizeof(CONVERSATION_INDEX), &diff.dwLowDateTime, 4);
@@ -387,7 +339,7 @@ HRESULT ScCreateConversationIndex(ULONG cbParent, LPBYTE lpbParent,
 	return hrSuccess;
 }
 
-FILETIME FtSubFt(FILETIME Minuend, FILETIME Subtrahend)
+FILETIME FtSubFt(const FILETIME &Minuend, const FILETIME &Subtrahend)
 {
 	FILETIME ft;
 	unsigned long long l = ((unsigned long long)Minuend.dwHighDateTime << 32) + Minuend.dwLowDateTime;

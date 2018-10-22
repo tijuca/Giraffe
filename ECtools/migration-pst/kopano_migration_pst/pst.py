@@ -1,4 +1,5 @@
 #! /usr/bin/python
+# SPDX-License-Identifier: BSD-3-Clause
 #
 # Copyright (c) 2014, Dionach Ltd.
 # All rights reserved.
@@ -2162,9 +2163,9 @@ def set_log(log, stats):
 
 def log_error(e):
     global error_log_list
-    error_log_list.append(e.message)
-    LOG.error(e.message)
-    LOG.error(traceback.format_exc(e))
+    error_log_list.append(str(e))
+    LOG.error(str(e))
+    LOG.error(traceback.format_exc())
     STATS['errors'] += 1
 #    sys.stderr.write(e.message+'\n')
 

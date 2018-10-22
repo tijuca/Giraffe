@@ -1,32 +1,45 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECARCHIVEAWAREMESSAGE_H
 #define ECARCHIVEAWAREMESSAGE_H
 
 #include <kopano/zcdefs.h>
 #include <kopano/memory.hpp>
+#include "ECAttach.h"
 #include "ECMessage.h"
+#include "ECMsgStore.h"
 #include <kopano/CommonUtil.h>
+#include <kopano/ECGuid.h>
+#include <kopano/Util.h>
+#include <list>
+#include <map>
 #include <string>
+#include <vector>
 
-class ECArchiveAwareMsgStore;
+class _kc_export_dycast ECArchiveAwareMsgStore final : public ECMsgStore {
+	public:
+	_kc_hidden ECArchiveAwareMsgStore(const char *profname, IMAPISupport *, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store);
+	_kc_hidden static HRESULT Create(const char *profname, IMAPISupport *, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store, ECMsgStore **ret);
+	_kc_hidden virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **);
+	_kc_hidden virtual HRESULT OpenItemFromArchive(LPSPropValue propstore_eids, LPSPropValue propitem_eids, ECMessage **ret);
 
-class _kc_export_dycast ECArchiveAwareMessage _kc_final : public ECMessage {
+	private:
+	typedef std::list<SBinary *> BinaryList;
+	typedef BinaryList::iterator BinaryListIterator;
+	typedef KC::object_ptr<ECMsgStore> ECMsgStorePtr;
+	typedef std::vector<BYTE> EntryID;
+	typedef std::map<EntryID, ECMsgStorePtr> MsgStoreMap;
+
+	_kc_hidden HRESULT CreateCacheBasedReorderedList(SBinaryArray b_store_eids, SBinaryArray b_item_eids, BinaryList *store_eids, BinaryList *item_eids);
+	_kc_hidden HRESULT GetArchiveStore(LPSBinary store_eid, ECMsgStore **ret);
+
+	MsgStoreMap m_mapStores;
+	ALLOC_WRAP_FRIEND;
+};
+
+class _kc_export_dycast ECArchiveAwareMessage final : public ECMessage {
 protected:
 	/**
 	 * \param lpMsgStore	The store owning this message.
@@ -52,19 +65,19 @@ public:
 	 * \return hrSuccess on success.
 	 */
 	_kc_hidden static HRESULT Create(ECArchiveAwareMsgStore *store, BOOL fNew, BOOL modify, ULONG flags, ECMessage **);
-	_kc_hidden virtual HRESULT HrLoadProps(void);
-	_kc_hidden virtual HRESULT HrSetRealProp(const SPropValue *);
-	_kc_hidden virtual HRESULT OpenProperty(ULONG proptag, LPCIID lpiid, ULONG iface_opts, ULONG flags, LPUNKNOWN *);
-	_kc_hidden virtual HRESULT OpenAttach(ULONG atnum, LPCIID iface, ULONG flags, LPATTACH *ret);
-	_kc_hidden virtual HRESULT CreateAttach(LPCIID iface, ULONG flags, ULONG *atnum, LPATTACH *ret);
-	_kc_hidden virtual HRESULT DeleteAttach(ULONG atnum, ULONG ui_param, LPMAPIPROGRESS, ULONG flags);
-	_kc_hidden virtual HRESULT ModifyRecipients(ULONG flags, const ADRLIST *mods);
-	_kc_hidden virtual HRESULT SaveChanges(ULONG flags);
+	_kc_hidden virtual HRESULT HrLoadProps() override;
+	_kc_hidden virtual HRESULT HrSetRealProp(const SPropValue *) override;
+	_kc_hidden virtual HRESULT OpenProperty(ULONG proptag, const IID *intf, ULONG iface_opts, ULONG flags, IUnknown **) override;
+	_kc_hidden virtual HRESULT OpenAttach(ULONG atnum, const IID *iface, ULONG flags, IAttach **) override;
+	_kc_hidden virtual HRESULT CreateAttach(const IID *intf, ULONG flags, ULONG *atnum, IAttach **) override;
+	_kc_hidden virtual HRESULT DeleteAttach(ULONG atnum, ULONG ui_param, IMAPIProgress *, ULONG flags) override;
+	_kc_hidden virtual HRESULT ModifyRecipients(ULONG flags, const ADRLIST *mods) override;
+	_kc_hidden virtual HRESULT SaveChanges(ULONG flags) override;
 	_kc_hidden static HRESULT SetPropHandler(ULONG proptag, void *prov, const SPropValue *, void *param);
 	_kc_hidden bool IsLoading(void) const { return m_bLoading; }
 
 protected:
-	_kc_hidden virtual HRESULT HrDeleteRealProp(ULONG proptag, BOOL overwrite_ro);
+	_kc_hidden virtual HRESULT HrDeleteRealProp(ULONG proptag, BOOL overwrite_ro) override;
 
 private:
 	_kc_hidden HRESULT MapNamedProps(void);
@@ -72,9 +85,7 @@ private:
 	_kc_hidden std::string CreateErrorBodyUtf8(HRESULT);
 	_kc_hidden std::string CreateOfflineWarnBodyUtf8(void);
 
-	bool	m_bLoading;
-
-	bool	m_bNamedPropsMapped;
+	bool	m_bLoading, m_bNamedPropsMapped;
 	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)
@@ -83,8 +94,7 @@ private:
 	PROPMAP_DEF_NAMED_ID(ORIGINAL_SOURCE_KEY)
 
 	typedef KC::memory_ptr<SPropValue> SPropValuePtr;
-	SPropValuePtr	m_ptrStoreEntryIDs;
-	SPropValuePtr	m_ptrItemEntryIDs;
+	SPropValuePtr m_ptrStoreEntryIDs, m_ptrItemEntryIDs;
 
 	enum eMode {
 		MODE_UNARCHIVED,	// Not archived
@@ -98,9 +108,27 @@ private:
 	ALLOC_WRAP_FRIEND;
 };
 
-class ECArchiveAwareMessageFactory _kc_final : public IMessageFactory {
+class ECArchiveAwareMessageFactory final : public IMessageFactory {
 public:
 	HRESULT Create(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root, ECMessage **) const;
+};
+
+class ECArchiveAwareAttach final : public ECAttach {
+	protected:
+	ECArchiveAwareAttach(ECMsgStore *, ULONG obj_type, BOOL modify, ULONG attach_num, const ECMAPIProp *root);
+
+	public:
+	static HRESULT Create(ECMsgStore *, ULONG obj_type, BOOL modify, ULONG attach_num, const ECMAPIProp *root, ECAttach **);
+	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
+
+	private:
+	const ECArchiveAwareMessage *m_lpRoot;
+	ALLOC_WRAP_FRIEND;
+};
+
+class ECArchiveAwareAttachFactory final : public IAttachFactory {
+	public:
+	HRESULT Create(ECMsgStore *, ULONG obj_type, BOOL modify, ULONG attach_num, const ECMAPIProp *root, ECAttach **) const;
 };
 
 #endif // ndef ECARCHIVEAWAREMESSAGE_H

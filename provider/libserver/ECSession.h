@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // ECSession.h: interface for the ECSession class.
@@ -30,20 +18,18 @@
 #include <memory>
 #include <mutex>
 #include <pthread.h>
-
 #include "soapH.h"
 #include <kopano/kcodes.h>
 #include "ECNotification.h"
 #include "ECTableManager.h"
-
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
+#include <kopano/timeutil.hpp>
 #include "ECDatabaseFactory.h"
 #include "ECPluginFactory.h"
 #include "ECSessionGroup.h"
 #include "ECLockManager.h"
 #include "kcore.hpp"
-
 #ifdef HAVE_GSSAPI
 #include <gssapi/gssapi.h>
 #endif
@@ -77,11 +63,11 @@ public:
 	_kc_hidden virtual ~BTSession(void) = default;
 	_kc_hidden virtual ECRESULT Shutdown(unsigned int timeout);
 	_kc_hidden virtual ECRESULT ValidateOriginator(struct soap *);
-	_kc_hidden virtual ECSESSIONID GetSessionId(void) const _kc_final { return m_sessionID; }
-	_kc_hidden virtual time_t GetSessionTime(void) const _kc_final { return m_sessionTime + m_ulSessionTimeout; }
+	_kc_hidden virtual ECSESSIONID GetSessionId() const final { return m_sessionID; }
+	_kc_hidden virtual time_t GetSessionTime() const final { return m_sessionTime + m_ulSessionTimeout; }
 	_kc_hidden virtual void UpdateSessionTime(void);
-	_kc_hidden virtual unsigned int GetCapabilities(void) const _kc_final { return m_ulClientCapabilities; }
-	_kc_hidden virtual ECSessionManager *GetSessionManager(void) const _kc_final { return m_lpSessionManager; }
+	_kc_hidden virtual unsigned int GetCapabilities() const final { return m_ulClientCapabilities; }
+	_kc_hidden virtual ECSessionManager *GetSessionManager() const final { return m_lpSessionManager; }
 	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const = 0;
 	virtual ECRESULT GetDatabase(ECDatabase **);
 	_kc_hidden virtual ECRESULT GetAdditionalDatabase(ECDatabase **);
@@ -90,59 +76,51 @@ public:
 	_kc_hidden virtual void SetClientMeta(const char *cl_vers, const char *cl_misc);
 	_kc_hidden virtual void GetClientApplicationVersion(std::string *);
 	_kc_hidden virtual void GetClientApplicationMisc(std::string *);
-	virtual void Lock(void);
-	virtual void Unlock(void);
-	_kc_hidden virtual bool IsLocked(void) const _kc_final { return m_ulRefCount > 0; }
+	virtual void lock();
+	virtual void unlock();
+	_kc_hidden virtual bool IsLocked() const final { return m_ulRefCount > 0; }
 	_kc_hidden virtual void RecordRequest(struct soap *);
 	_kc_hidden virtual unsigned int GetRequests(void);
-	_kc_hidden virtual void GetClientPort(unsigned int *);
-	_kc_hidden virtual void GetRequestURL(std::string *);
-	_kc_hidden virtual void GetProxyHost(std::string *);
+	_kc_hidden virtual unsigned int GetClientPort();
+	_kc_hidden virtual std::string GetRequestURL();
+	_kc_hidden virtual std::string GetProxyHost();
 	_kc_hidden size_t GetInternalObjectSize(void);
 	_kc_hidden virtual size_t GetObjectSize(void) = 0;
-	_kc_hidden time_t GetIdleTime(void);
+	_kc_hidden time_t GetIdleTime() const;
 	_kc_hidden const std::string &GetSourceAddr(void) const { return m_strSourceAddr; }
 
 	enum AUTHMETHOD {
 	    METHOD_NONE, METHOD_USERPASSWORD, METHOD_SOCKET, METHOD_SSO, METHOD_SSL_CERT
 	};
+
 protected:
 	std::atomic<unsigned int> m_ulRefCount{0};
 	std::string		m_strSourceAddr;
 	ECSESSIONID		m_sessionID;
-	bool			m_bCheckIP;
-
+	bool m_bCheckIP = true;
 	time_t			m_sessionTime;
-	unsigned int		m_ulSessionTimeout;
-
+	unsigned int m_ulSessionTimeout = 300, m_ulClientCapabilities;
+	unsigned int m_ulRequests = 0, m_ulLastRequestPort = 0;
 	ECDatabaseFactory	*m_lpDatabaseFactory;
 	ECSessionManager	*m_lpSessionManager;
-	unsigned int		m_ulClientCapabilities;
-
 	/*
 	 * Protects the object from deleting while a thread is running on a
 	 * method in this object.
 	 */
 	std::condition_variable m_hThreadReleased;
-	std::mutex m_hThreadReleasedMutex;	
-	
-	std::mutex m_hRequestStats;
-	unsigned int		m_ulRequests;
-	std::string		m_strLastRequestURL;
-	std::string		m_strProxyHost;
-	unsigned int		m_ulLastRequestPort;
-
+	std::mutex m_hThreadReleasedMutex, m_hRequestStats;
+	std::string m_strLastRequestURL, m_strProxyHost;
 	std::string		m_strClientApplicationVersion, m_strClientApplicationMisc;
 };
 
 /*
   Normal session
 */
-class _kc_export_dycast ECSession _kc_final : public BTSession {
+class _kc_export_dycast ECSession final : public BTSession {
 public:
 	_kc_hidden ECSession(const char *addr, ECSESSIONID, ECSESSIONGROUPID, ECDatabaseFactory *, ECSessionManager *, unsigned int caps, AUTHMETHOD, int pid, const std::string &cl_vers, const std::string &cl_app, const std::string &cl_app_ver, const std::string &cl_app_misc);
-	_kc_hidden virtual ECSESSIONGROUPID GetSessionGroupId(void) const _kc_final { return m_ecSessionGroupId; }
-	_kc_hidden virtual int GetConnectingPid(void) const _kc_final { return m_ulConnectingPid; }
+	_kc_hidden virtual ECSESSIONGROUPID GetSessionGroupId() const final { return m_ecSessionGroupId; }
+	_kc_hidden virtual int GetConnectingPid() const final { return m_ulConnectingPid; }
 	_kc_hidden virtual ~ECSession(void);
 	_kc_hidden virtual ECRESULT Shutdown(unsigned int timeout);
 	_kc_hidden virtual ECUserManagement *GetUserManagement(void) const override final { return m_lpUserManagement.get(); }
@@ -158,7 +136,7 @@ public:
 	_kc_hidden ECRESULT GetObjectFromEntryId(const entryId *, unsigned int *obj_id, unsigned int *eid_flags = nullptr);
 	_kc_hidden ECRESULT LockObject(unsigned int obj_id);
 	_kc_hidden ECRESULT UnlockObject(unsigned int obj_id);
-	
+
 	/* for ECStatsSessionTable */
 	_kc_hidden void AddBusyState(pthread_t, const char *state, const struct timespec &threadstart, const KC::time_point &start);
 	_kc_hidden void UpdateBusyState(pthread_t, int state);
@@ -181,10 +159,8 @@ private:
 	AUTHMETHOD		m_ulAuthMethod;
 	int			m_ulConnectingPid;
 	ECSESSIONGROUPID m_ecSessionGroupId;
-	std::string		m_strClientVersion;
+	std::string m_strClientVersion, m_strClientApp, m_strUsername;
 	unsigned int		m_ulClientVersion;
-	std::string		m_strClientApp;
-	std::string		m_strUsername;
 
 	typedef std::map<unsigned int, ECObjectLock>	LockMap;
 	std::mutex m_hLocksLock;
@@ -194,11 +170,10 @@ private:
 	std::unique_ptr<ECTableManager> m_lpTableManager;
 };
 
-
 /*
   Authentication session
 */
-class _kc_export_dycast ECAuthSession _kc_final : public BTSession {
+class _kc_export_dycast ECAuthSession final : public BTSession {
 public:
 	_kc_hidden ECAuthSession(const char *addr, ECSESSIONID, ECDatabaseFactory *, ECSessionManager *, unsigned int caps);
 	_kc_hidden virtual ~ECAuthSession(void);

@@ -1,25 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include "vfreebusy.h"
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
+#include <kopano/timeutil.hpp>
 #include "nameids.h"
 
 namespace KC {
@@ -114,11 +102,13 @@ HRESULT HrFbBlock2ICal(FBBlock_1 *lpsFbblk, LONG ulBlocks, time_t tDtStart, time
 	icalcomponent_add_property(lpFbComp, lpicProp);
 	
 	//UID
-	lpicProp = icalproperty_new(ICAL_UID_PROPERTY);
-	if (lpicProp == NULL)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	icalproperty_set_uid(lpicProp, strUID.c_str());
-	icalcomponent_add_property(lpFbComp, lpicProp);
+	if (strUID.size() > 0) {
+		lpicProp = icalproperty_new(ICAL_UID_PROPERTY);
+		if (lpicProp == NULL)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
+		icalproperty_set_uid(lpicProp, strUID.c_str());
+		icalcomponent_add_property(lpFbComp, lpicProp);
+	}
 
 	//ORGANIZER
 	lpicProp = icalproperty_new(ICAL_ORGANIZER_PROPERTY);

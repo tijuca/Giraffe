@@ -1,28 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <utility>
 #include <cstdio>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapicode.h>
-
 #include <kopano/stringutil.h>
 #include <kopano/RecurrenceState.h>
 #include <kopano/charset/convert.h>
@@ -42,25 +27,11 @@
 
 namespace KC {
 
-class BinReader _kc_final {
+class BinReader final {
 public:
-    BinReader(const char *lpData, unsigned int ulLen) {
-        this->m_lpData = lpData;
-        this->m_ulLen = ulLen;
-        this->m_ulCursor = 0;
-    };
-    
-    int ReadByte(unsigned int *lpData) {
-        if(m_ulCursor + 1 > m_ulLen)
-            return -1;
-            
-		DEBUGPRINT("%s ", bin2hex(1, m_lpData + m_ulCursor).c_str());
-        *lpData = m_lpData[m_ulCursor];
-        m_ulCursor+=1;
-        
-        DEBUGPRINT("%10u %08X ", *lpData, *lpData);
-        return 1;
-    };
+	BinReader(const char *lpData, size_t ulLen) :
+		m_lpData(lpData), m_ulLen(ulLen)
+	{}
     
     int ReadShort(unsigned int *lpData) {
         if(m_ulCursor + 2 > m_ulLen)
@@ -90,14 +61,14 @@ public:
         return 4;
     };
 
-    int ReadString(std::string *lpData, unsigned int len) {
-        unsigned int reallen = len > m_ulLen - m_ulCursor ? m_ulLen - m_ulCursor : len;
-        
+	int ReadString(std::string *lpData, size_t len)
+	{
+		auto reallen = std::min(len, m_ulLen - m_ulCursor);
         if(m_ulCursor + reallen > m_ulLen)
             return -1;
 
-        if(reallen)      
-			DEBUGPRINT("%s ", bin2hex(len > m_ulLen - m_ulCursor ? m_ulLen - m_ulCursor : len, m_lpData+m_ulCursor).c_str());
+		if (reallen != 0)
+			DEBUGPRINT("%s ", bin2hex(reallen, m_lpData+m_ulCursor).c_str());
         
         lpData->assign(&m_lpData[m_ulCursor], reallen);
         
@@ -112,13 +83,13 @@ public:
     
 private:
 	const char *m_lpData;
-    unsigned int m_ulLen;
-    unsigned int m_ulCursor;
+	size_t m_ulLen, m_ulCursor = 0;
 };
 
-class BinWriter _kc_final {
+class BinWriter final {
 public:
-    void GetData(char **lppData, unsigned int *lpulLen, void *base) {
+	void GetData(char **lppData, size_t *lpulLen, void *base)
+	{
         char *lpData;
 		auto hr = MAPIAllocateMore(m_strData.size(), base, reinterpret_cast<void **>(&lpData));
 	if (hr == hrSuccess)
@@ -145,7 +116,8 @@ public:
         return 4;
     }
     
-    int WriteString(const char *data, unsigned int len) {
+	int WriteString(const char *data, size_t len)
+	{
         std::string s(data, len);
         
         m_strData += s;
@@ -200,18 +172,16 @@ private:
  * @param[in]	ulLen	length of lpData
  * @param[in]	ulFlags	possible task flag
  */
-HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
+HRESULT RecurrenceState::ParseBlob(const char *lpData, size_t ulLen,
     ULONG ulFlags)
 {
     HRESULT hr = hrSuccess;
-    unsigned int ulReservedBlock1Size;
-    unsigned int ulReservedBlock2Size;
+    unsigned int ulReservedBlock1Size, ulReservedBlock2Size;
     bool bReadValid = false; // Read is valid if first set of exceptions was read ok
 	bool bExtended = false;	 // false if we need to sync extended data from "normal" data
 	convert_context converter;
 
     BinReader data(lpData, ulLen);
-    unsigned int i;
 
 	lstDeletedInstanceDates.clear();
 	lstModifiedInstanceDates.clear();
@@ -242,16 +212,14 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
     READLONG(ulOccurrenceCount);
     READLONG(ulFirstDOW);
     READLONG(ulDeletedInstanceCount);
-
-    for (i = 0; i < ulDeletedInstanceCount; ++i) {
+	for (unsigned int i = 0; i < ulDeletedInstanceCount; ++i) {
         unsigned int ulDeletedInstanceDate;
         READLONG(ulDeletedInstanceDate);
 		lstDeletedInstanceDates.emplace_back(ulDeletedInstanceDate);
     }
     
     READLONG(ulModifiedInstanceCount);
-    
-    for (i = 0; i < ulModifiedInstanceCount; ++i) {
+	for (unsigned int i = 0; i < ulModifiedInstanceCount; ++i) {
         unsigned int ulModifiedInstanceDate;
         READLONG(ulModifiedInstanceDate);
 		lstModifiedInstanceDates.emplace_back(ulModifiedInstanceDate);
@@ -269,13 +237,9 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
     READLONG(ulEndTimeOffset);
 
     READSHORT(ulExceptionCount);
-    
-    for (i = 0; i < ulExceptionCount; ++i) {
-        unsigned int ulSubjectLength;
-        unsigned int ulSubjectLength2;
-        unsigned int ulLocationLength;
-        unsigned int ulLocationLength2;
-        
+	for (unsigned int i = 0; i < ulExceptionCount; ++i) {
+		unsigned int ulSubjectLength, ulSubjectLength2;
+		unsigned int ulLocationLength, ulLocationLength2;
         Exception sException;
         
         READLONG(sException.ulStartDateTime);
@@ -317,10 +281,7 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
 
     for (auto &exc : lstExceptions) {
         ExtendedException sExtendedException;
-        unsigned int ulReservedBlock1Size;
-        unsigned int ulReservedBlock2Size;
-        unsigned int ulWideCharSubjectLength;
-        unsigned int ulWideCharLocationLength;
+		unsigned int ulWideCharSubjectLength, ulWideCharLocationLength;
         unsigned int ulChangeHighlightSize;
         
         if(ulWriterVersion2 >= 0x00003009) {
@@ -368,10 +329,8 @@ HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
 
     DEBUGPRINT("%d Bytes left\n", ulLen - data.GetCursorPos());
     
-    if(ulLen - data.GetCursorPos() != 0) {
-        hr = MAPI_E_NOT_FOUND;
-    }
-    
+	if (ulLen - data.GetCursorPos() != 0)
+		hr = MAPI_E_NOT_FOUND;
 exit:
 	if (hr == hrSuccess || !bReadValid)
 		return hr;
@@ -410,7 +369,7 @@ exit:
  * @param[out]	lpulLen	lenght of lppData
  * @parampin]	base	base pointer for allocation, may be NULL to start new chainn of MAPIAllocateBuffer
  */
-HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *base)
+HRESULT RecurrenceState::GetBlob(char **lppData, size_t *lpulLen, void *base)
 {
     BinWriter data;
     std::vector<Exception>::const_iterator j = lstExceptions.begin();

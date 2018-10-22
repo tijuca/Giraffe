@@ -1,45 +1,27 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <list>
 #include <memory>
 #include <new>
 #include <string>
 #include <utility>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include "m4l.mapidefs.h"
 #include "m4l.mapix.h"
-#include <kopano/ECDebug.h>
 #include <kopano/Util.h>
 #include <kopano/ECMemTable.h>
 #include <kopano/charset/convert.h>
 #include <kopano/ustringutil.h>
-
 #include <mapi.h>
 #include <mapicode.h>
 #include <mapiguid.h>
 #include <mapix.h>
 #include <mapiutil.h>
-
 #include <kopano/ECConfig.h>
 #include <kopano/CommonUtil.h>
-
 #include <set>
 
 using namespace KC;
@@ -70,7 +52,6 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 	std::list<SPropValue *>::const_iterator i;
 	ULONG c;
 	memory_ptr<SPropValue> props;
-	HRESULT hr = hrSuccess;
 	SPropValue sConvert;
 	convert_context converter;
 	std::wstring unicode;
@@ -79,7 +60,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 
 	if (!lpPropTagArray) {
 		// all properties are requested
-		hr = MAPIAllocateBuffer(sizeof(SPropValue)*properties.size(), &~props);
+		auto hr = MAPIAllocateBuffer(sizeof(SPropValue) * properties.size(), &~props);
 		if (hr != hrSuccess)
 			return hr;
 
@@ -100,8 +81,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 			} else {
 				lpCopy = *i;
 			}
-
-			hr = Util::HrCopyProperty(&props[c], lpCopy, (void *)props);
+			hr = Util::HrCopyProperty(&props[c], lpCopy, props);
 			if (hr != hrSuccess)
 				return hr;
 		}
@@ -110,7 +90,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 		return hr;
 	}
 
-	hr = MAPIAllocateBuffer(sizeof(SPropValue)*lpPropTagArray->cValues, &~props);
+	auto hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpPropTagArray->cValues, &~props);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -149,12 +129,12 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 				hr = MAPIAllocateMore((*i)->Value.MVszA.cValues * sizeof(WCHAR*), props, (void**)&sConvert.Value.MVszW.lppszW);
 				if (hr != hrSuccess)
 					return hr;
-				for (ULONG c = 0; c < (*i)->Value.MVszA.cValues; ++c) {
-					unicode = converter.convert_to<std::wstring>((*i)->Value.MVszA.lppszA[c]);
-					hr = MAPIAllocateMore(unicode.length() * sizeof(WCHAR) + sizeof(WCHAR), props, (void**)&sConvert.Value.MVszW.lppszW[c]);
+				for (ULONG d = 0; d < (*i)->Value.MVszA.cValues; ++d) {
+					unicode = converter.convert_to<std::wstring>((*i)->Value.MVszA.lppszA[d]);
+					hr = MAPIAllocateMore(unicode.length() * sizeof(wchar_t) + sizeof(WCHAR), props, reinterpret_cast<void **>(&sConvert.Value.MVszW.lppszW[d]));
 					if (hr != hrSuccess)
 						return hr;
-					wcscpy(sConvert.Value.MVszW.lppszW[c], unicode.c_str());
+					wcscpy(sConvert.Value.MVszW.lppszW[d], unicode.c_str());
 				}
 				lpCopy = &sConvert;
 			}
@@ -168,19 +148,19 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 				hr = MAPIAllocateMore((*i)->Value.MVszW.cValues * sizeof(char*), props, (void**)&sConvert.Value.MVszA.lppszA);
 				if (hr != hrSuccess)
 					return hr;
-				for (ULONG c = 0; c < (*i)->Value.MVszW.cValues; ++c) {
-					ansi = converter.convert_to<std::string>((*i)->Value.MVszW.lppszW[c]);
-					hr = MAPIAllocateMore(ansi.length() + 1, props, (void**)&sConvert.Value.MVszA.lppszA[c]);
+				for (ULONG d = 0; d < (*i)->Value.MVszW.cValues; ++d) {
+					ansi = converter.convert_to<std::string>((*i)->Value.MVszW.lppszW[d]);
+					hr = MAPIAllocateMore(ansi.length() + 1, props, reinterpret_cast<void **>(&sConvert.Value.MVszA.lppszA[d]));
 					if (hr != hrSuccess)
 						return hr;
-					strcpy(sConvert.Value.MVszA.lppszA[c], ansi.c_str());
+					strcpy(sConvert.Value.MVszA.lppszA[d], ansi.c_str());
 				}
 				lpCopy = &sConvert;
 			} else {
 				// memory property is requested property
 				lpCopy = *i;
 			}
-			hr = Util::HrCopyProperty(&props[c], lpCopy, (void *)props);
+			hr = Util::HrCopyProperty(&props[c], lpCopy, props);
 			if (hr != hrSuccess)
 				return hr;
 			break;
@@ -189,7 +169,7 @@ HRESULT M4LMAPIProp::GetProps(const SPropTagArray *lpPropTagArray,
 		if (i != properties.cend())
 			continue;
 		// Not found
-		props[c].ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(lpPropTagArray->aulPropTag[c]));
+		props[c].ulPropTag = CHANGE_PROP_TYPE(lpPropTagArray->aulPropTag[c], PT_ERROR);
 		props[c].Value.err = MAPI_E_NOT_FOUND;
 		hr = MAPI_W_ERRORS_RETURNED;
 	}
@@ -210,8 +190,6 @@ HRESULT M4LMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfa
 HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
     SPropProblemArray **lppProblems)
 {
-	std::list<SPropValue *>::iterator i, del;
-	ULONG c;
 	LPSPropValue pv = NULL;
 
 	// Validate input
@@ -222,13 +200,13 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
 		//       the array and its cValues member is set to zero.		
 
     // remove possible old properties
-	for (c = 0; c < cValues; ++c) {
-		for(i = properties.begin(); i != properties.end(); ) {
+	for (unsigned int c = 0; c < cValues; ++c) {
+		for (auto i = properties.begin(); i != properties.end(); ) {
 			if ( PROP_ID((*i)->ulPropTag) == PROP_ID(lpPropArray[c].ulPropTag) && 
 				(*i)->ulPropTag != PR_NULL && 
 				PROP_TYPE((*i)->ulPropTag) != PT_ERROR)
 			{
-				del = i++;
+				auto del = i++;
 				MAPIFreeBuffer(*del);
 				properties.erase(del);
 				break;
@@ -239,7 +217,7 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
 	}
 
     // set new properties
-	for (c = 0; c < cValues; ++c) {
+	for (unsigned int c = 0; c < cValues; ++c) {
 		// Ignore PR_NULL property tag and all properties with a type of PT_ERROR
 		if(PROP_TYPE(lpPropArray[c].ulPropTag) == PT_ERROR || 
 			lpPropArray[c].ulPropTag == PR_NULL)
@@ -248,7 +226,7 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
 		if (hr != hrSuccess)
 			return hr;
 		memset(pv, 0, sizeof(SPropValue));
-		hr = Util::HrCopyProperty(pv, &lpPropArray[c], (void *)pv);
+		hr = Util::HrCopyProperty(pv, &lpPropArray[c], pv);
 		if (hr != hrSuccess) {
 			MAPIFreeBuffer(pv);
 			return hr;
@@ -320,11 +298,6 @@ HRESULT M4LMAPIProp::QueryInterface(REFIID refiid, void **lpvoid) {
 // ---
 // IProfSect
 // ---
-
-M4LProfSect::M4LProfSect(BOOL bGlobalProf) {
-	this->bGlobalProf = bGlobalProf;
-}
-
 HRESULT M4LProfSect::ValidateState(ULONG ulUIParam, ULONG ulFlags) {
 	return MAPI_E_NO_SUPPORT;
 }
@@ -480,14 +453,9 @@ HRESULT M4LMAPITable::QueryInterface(REFIID refiid, void **lpvoid) {
 // IProviderAdmin
 // ---
 M4LProviderAdmin::M4LProviderAdmin(M4LMsgServiceAdmin *new_msa,
-    const char *szService) :
-	msa(new_msa)
-{
-	if(szService)
-		this->szService = strdup(szService);
-	else
-		this->szService = NULL;
-}
+    const char *serv) :
+	msa(new_msa), szService(serv != nullptr ? strdup(serv) : nullptr)
+{}
 
 M4LProviderAdmin::~M4LProviderAdmin() {
 	free(szService);
@@ -499,7 +467,6 @@ HRESULT M4LProviderAdmin::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERR
 }
 
 HRESULT M4LProviderAdmin::GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable) {
-	HRESULT hr = hrSuccess;
 	ULONG cValues = 0;
 	object_ptr<ECMemTable> lpTable;
 	object_ptr<ECMemTableView> lpTableView;
@@ -513,7 +480,7 @@ HRESULT M4LProviderAdmin::GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable)
 		PR_RESOURCE_TYPE, PR_PROVIDER_UID}};
 
 	Util::proptag_change_unicode(ulFlags, sptaProviderCols);
-	hr = ECMemTable::Create(sptaProviderCols, PR_ROWID, &~lpTable);
+	auto hr = ECMemTable::Create(sptaProviderCols, PR_ROWID, &~lpTable);
 	if(hr != hrSuccess)
 		return hr;
 	
@@ -562,11 +529,8 @@ HRESULT M4LProviderAdmin::CreateProvider(const TCHAR *lpszProvider,
 {
 	SPropValue sProps[10];
 	ULONG nProps = 0;
-	const SPropValue *lpResource = nullptr;
 	memory_ptr<SPropValue> lpsPropValProfileName;
 	std::unique_ptr<providerEntry> entry;
-	serviceEntry* lpService = NULL;
-	SVCProvider* lpProvider = NULL;
 	ULONG cProviderProps = 0;
 	LPSPropValue lpProviderProps = NULL;
 	HRESULT hr = hrSuccess;
@@ -574,10 +538,10 @@ HRESULT M4LProviderAdmin::CreateProvider(const TCHAR *lpszProvider,
 
 	if (szService == nullptr)
 		return MAPI_E_NO_ACCESS;
-	lpService = msa->findServiceAdmin((LPTSTR)szService);
+	auto lpService = msa->findServiceAdmin(reinterpret_cast<TCHAR *>(szService));
 	if (lpService == nullptr)
 		return MAPI_E_NO_ACCESS;
-	lpProvider = lpService->service->GetProvider(lpszProvider, ulFlags);
+	auto lpProvider = lpService->service->GetProvider(lpszProvider, ulFlags);
 	if (lpProvider == nullptr)
 		return MAPI_E_NO_ACCESS;
 	entry.reset(new(std::nothrow) providerEntry);
@@ -617,7 +581,7 @@ HRESULT M4LProviderAdmin::CreateProvider(const TCHAR *lpszProvider,
 	sProps[nProps].Value.bin.cb = sizeof(GUID);
 	++nProps;
 
-	lpResource = PCpropFindProp(lpProviderProps, cProviderProps, PR_RESOURCE_TYPE);
+	auto lpResource = PCpropFindProp(lpProviderProps, cProviderProps, PR_RESOURCE_TYPE);
 	if (!lpResource || lpResource->Value.ul == MAPI_STORE_PROVIDER) {
 		sProps[nProps].ulPropTag = PR_OBJECT_TYPE;
 		sProps[nProps].Value.ul = MAPI_STORE;
@@ -652,29 +616,24 @@ HRESULT M4LProviderAdmin::CreateProvider(const TCHAR *lpszProvider,
 
 HRESULT M4LProviderAdmin::DeleteProvider(const MAPIUID *lpUID)
 {
-	HRESULT hr = MAPI_E_NOT_FOUND;	
-	decltype(msa->providers)::iterator i;
-	
-	for (i = msa->providers.begin(); i != msa->providers.end(); ++i) {
+	for (auto i = msa->providers.begin(); i != msa->providers.end(); ++i) {
 		if(memcmp(&(*i)->uid, lpUID, sizeof(MAPIUID)) == 0) {
 			msa->providers.erase(i);
-			hr = hrSuccess;
-			break;
+			return hrSuccess;
 		}
 	}
-    return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 HRESULT M4LProviderAdmin::OpenProfileSection(const MAPIUID *lpUID,
     const IID *lpInterface, ULONG ulFlags, IProfSect **lppProfSect)
 {
-	providerEntry *provider = NULL;
 	scoped_rlock l_srv(msa->m_mutexserviceadmin);
 
 	// Special ID: the global guid opens the profile's global profile section instead of a local profile
 	if (memcmp(lpUID, &pbGlobalProfileSectionGuid, sizeof(*lpUID)) == 0)
 		return msa->OpenProfileSection(lpUID, lpInterface, ulFlags, lppProfSect);
-	provider = msa->findProvider(lpUID);
+	auto provider = msa->findProvider(lpUID);
 	if (provider == nullptr)
 		return MAPI_E_NOT_FOUND;
 	return provider->profilesection->QueryInterface(lpInterface != nullptr ?
@@ -697,14 +656,8 @@ HRESULT M4LProviderAdmin::QueryInterface(REFIID refiid, void **lpvoid) {
 // 
 // IMAPIAdviseSink
 // 
-
-M4LMAPIAdviseSink::M4LMAPIAdviseSink(LPNOTIFCALLBACK lpFn, void *lpContext) {
-	this->lpContext = lpContext;
-	this->lpFn = lpFn;
-}
-
 ULONG M4LMAPIAdviseSink::OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifications) {
-	return this->lpFn(this->lpContext, cNotif, lpNotifications);
+	return lpFn(lpContext, cNotif, lpNotifications);
 }
 
 HRESULT M4LMAPIAdviseSink::QueryInterface(REFIID refiid, void **lpvoid) {
@@ -737,7 +690,9 @@ HRESULT M4LMAPIContainer::OpenEntry(ULONG eid_size, const ENTRYID *eid,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPIContainer::SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags) {
+HRESULT M4LMAPIContainer::SetSearchCriteria(const SRestriction *,
+    const ENTRYLIST *container, ULONG flags)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
@@ -746,7 +701,6 @@ HRESULT M4LMAPIContainer::GetSearchCriteria(ULONG ulFlags, LPSRestriction* lppRe
 }
 
 HRESULT M4LMAPIContainer::QueryInterface(REFIID refiid, void **lpvoid) {
-	HRESULT hr = hrSuccess;
 	if (refiid == IID_IMAPIContainer) {
 		AddRef();
 		*lpvoid = static_cast<IMAPIContainer *>(this);
@@ -757,9 +711,8 @@ HRESULT M4LMAPIContainer::QueryInterface(REFIID refiid, void **lpvoid) {
 		AddRef();
 		*lpvoid = static_cast<IUnknown *>(this);
 	} else
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-	return hr;
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
+	return hrSuccess;
 }
 
 // 
@@ -775,11 +728,14 @@ HRESULT M4LABContainer::CreateEntry(ULONG eid_size, const ENTRYID *eid,
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LABContainer::CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) {
+HRESULT M4LABContainer::CopyEntries(const ENTRYLIST *, ULONG ui_param,
+    IMAPIProgress *, ULONG flags)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LABContainer::DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags) {
+HRESULT M4LABContainer::DeleteEntries(const ENTRYLIST *, ULONG flags)
+{
 	return MAPI_E_NO_SUPPORT;
 }
 
@@ -798,10 +754,8 @@ HRESULT M4LABContainer::ResolveNames(const SPropTagArray *, ULONG flags,
  * @return 
  */
 HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) {
-	HRESULT hr = hrSuccess;
 	object_ptr<ECMemTable> lpTable;
 	object_ptr<ECMemTableView> lpTableView;
-	ULONG n = 0;
 
 	// make a list of all hierarchy tables, and create the combined column list
 	std::list<object_ptr<IMAPITable>> lHierarchies;
@@ -814,7 +768,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 		object_ptr<IMAPITable> lpABHierarchy;
 		memory_ptr<SPropTagArray> lpPropArray;
 
-		hr = abe.lpABLogon->OpenEntry(0, nullptr, &IID_IABContainer, 0,
+		auto hr = abe.lpABLogon->OpenEntry(0, nullptr, &IID_IABContainer, 0,
 		     &ulObjType, &~lpABContainer);
 		if (hr != hrSuccess)
 			continue;
@@ -831,7 +785,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 
 	// remove key row
 	stProps.erase(PR_ROWID);
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(stProps.size() + 1), &~lpColumns);
+	auto hr = MAPIAllocateBuffer(CbNewSPropTagArray(stProps.size() + 1), &~lpColumns);
 	if (hr != hrSuccess)
 		return hr;
 	lpColumns->cValues = stProps.size();
@@ -844,7 +798,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 	// get enough columns from queryrows to add the PR_ROWID
 	++lpColumns->cValues;
 
-	n = 0;
+	unsigned int n = 0;
 	for (const auto &mt : lHierarchies) {
 		hr = mt->SetColumns(lpColumns, 0);
 		if (hr != hrSuccess)

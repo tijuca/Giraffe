@@ -9,11 +9,12 @@
 # that this string can contain any characters, so take heed to correct
 # quoting.
 
-if [ -f @sysconfdir@/sysconfig/kopano ]; then
-  . @sysconfdir@/sysconfig/kopano
-elif [ -f @sysconfdir@/default/kopano ]; then
-  . @sysconfdir@/default/kopano
-fi
-PKGLIBEXECDIR=@PKGLIBEXECDIR@
 KOPANO_USER_SCRIPTS=@USERSCRIPTDIR@/deleteuser.d
-. @USERSCRIPTDIR@/users_common.sh
+PATH=/bin:/usr/local/bin:/usr/bin
+export PATH
+if [ -z "${KOPANO_USER}" -a -z "${KOPANO_STOREGUID}" ] ; then
+    exec >&2
+    echo "KOPANO_USER and KOPANO_STOREGUID is not set."
+    exit 1
+fi
+exec "@pkglibexecdir@/kscriptrun" @uscriptlibdir@/deleteuser.d @uscriptconfdir@/deleteuser.d

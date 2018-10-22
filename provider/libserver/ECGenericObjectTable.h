@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECGENERIC_OBJECTTABLE_H
@@ -23,10 +11,8 @@
 #include <kopano/zcdefs.h>
 #include <mutex>
 #include "soapH.h"
-
 #include <list>
 #include <map>
-
 #include "ECSubRestriction.h"
 #include <kopano/ECKeyTable.h>
 #include "ECDatabase.h"
@@ -43,13 +29,10 @@ namespace KC {
  * sort the table once on loading, and simply use that keyset when the rows are actually
  * required. The actual data is always loaded directly from the database.
  */
-
-
 typedef std::list<unsigned int>				ECListInt;
 typedef std::list<unsigned int>::const_iterator ECListIntIterator;
 
 #define RESTRICT_MAX_DEPTH 16
-
 #define OBJECTTABLE_NOTIFY		1
 
 class ECSession;
@@ -57,36 +40,27 @@ class ECCacheManager;
 
 typedef std::map<ECTableRow, sObjectTableKey> ECSortedCategoryMap;
 
-class ECCategory _kc_final {
+class ECCategory final {
 public:
     ECCategory(unsigned int ulCategory, struct propVal *lpProps, unsigned int cProps, unsigned int nProps, ECCategory *lpParent, unsigned int ulDepth, bool fExpanded, const ECLocale &locale);
     virtual ~ECCategory();
-
-    void IncLeaf();
-    void DecLeaf();
-    void IncUnread();
-    void DecUnread();
-    
+	void IncLeaf() { ++m_ulLeafs; }
+	void DecLeaf() { --m_ulLeafs; }
+	void IncUnread() { ++m_ulUnread; }
+	void DecUnread() { --m_ulUnread; }
 	unsigned int GetCount(void) const { return m_ulLeafs; }
-    
-    ECCategory* GetParent();
-    
     ECRESULT GetProp(struct soap* soap, unsigned int ulPropTag, struct propVal *lpPropVal);
     ECRESULT SetProp(unsigned int i, struct propVal *lpPropVal);
     ECRESULT UpdateMinMax(const sObjectTableKey &sKey, unsigned int i, struct propVal *lpPropVal, bool fMax, bool *lpfModified);
     ECRESULT UpdateMinMaxRemove(const sObjectTableKey &sKey, unsigned int i, bool fMax, bool *lpfModified);
-	
 	size_t GetObjectSize(void) const;
 
     struct propVal *m_lpProps;
-    unsigned int m_cProps;
     ECCategory *m_lpParent;
-    unsigned int m_ulDepth;
-    unsigned int m_ulCategory;
-    bool m_fExpanded;
+	unsigned int m_cProps, m_ulDepth, m_ulCategory;
 	unsigned int m_ulUnread = 0, m_ulLeafs = 0;
+	bool m_fExpanded;
 	const ECLocale& m_locale;
-
 	std::map<sObjectTableKey, struct propVal *> m_mapMinMax;
 	ECSortedCategoryMap::iterator iSortedCategory;
 	sObjectTableKey m_sCurMinMax;
@@ -127,7 +101,6 @@ typedef ECRESULT (*QueryRowDataCallBack)(ECGenericObjectTable *, struct soap *, 
  *
  * @todo Support more then one multi-value instance property. (Never saw this from Outlook)
  */
-
 class ECGenericObjectTable : public ECUnknown {
 public:
 	ECGenericObjectTable(ECSession *lpSession, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale);
@@ -137,7 +110,7 @@ public:
 	 * An enumeration for the table reload type.
 	 * The table reload type determines how it should changed
 	 */
-	enum enumReloadType { 
+	enum enumReloadType {
 		RELOAD_TYPE_SETCOLUMNS,		/**< Reload table because changed columns */
 		RELOAD_TYPE_SORTORDER		/**< Reload table because changed sort order */
 	};
@@ -157,7 +130,6 @@ public:
 	ECRESULT	CollapseRow(xsd__base64Binary sInstanceKey, unsigned int ulFlags, unsigned int *lpulRows);
 	ECRESULT	GetCollapseState(struct soap *soap, struct xsd__base64Binary sBookmark, struct xsd__base64Binary *lpsCollapseState);
 	ECRESULT	SetCollapseState(struct xsd__base64Binary sCollapseState, unsigned int *lpulBookmark);
-
 	virtual ECRESULT GetColumnsAll(ECListInt* lplstProps);
 	virtual ECRESULT ReloadTableMVData(ECObjectTableList* lplistRows, ECListInt* lplistMVPropTag);
 
@@ -172,18 +144,15 @@ public:
 	virtual ECRESULT	UpdateRow(unsigned int ulType, unsigned int ulObjId, unsigned int ulFlags);
 	virtual ECRESULT	UpdateRows(unsigned int ulType, std::list<unsigned int> *lstObjId, unsigned int ulFlags, bool bInitialLoad);
 	virtual ECRESULT	LoadRows(std::list<unsigned int> *lstObjId, unsigned int ulFlags);
-
-	static ECRESULT	GetRestrictPropTagsRecursive(struct restrictTable *lpsRestrict, std::list<ULONG> *lpPropTags, ULONG ulLevel);
-	static ECRESULT	GetRestrictPropTags(struct restrictTable *lpsRestrict, std::list<ULONG> *lpPrefixTags, struct propTagArray **lppPropTags);
-	static ECRESULT	MatchRowRestrict(ECCacheManager *, struct propValArray *, struct restrictTable *, const SUBRESTRICTIONRESULTS *, const ECLocale &, bool *match, unsigned int *nsubr = nullptr);
+	static ECRESULT	GetRestrictPropTagsRecursive(const struct restrictTable *, std::list<ULONG> *tags, ULONG level);
+	static ECRESULT	GetRestrictPropTags(const struct restrictTable *, std::list<ULONG> *tags, struct propTagArray **);
+	static ECRESULT	MatchRowRestrict(ECCacheManager *, struct propValArray *, const struct restrictTable *, const SUBRESTRICTIONRESULTS *, const ECLocale &, bool *match, unsigned int *nsubr = nullptr);
 	virtual ECRESULT GetComputedDepth(struct soap *soap, ECSession *lpSession, unsigned int ulObjId, struct propVal *lpProp);
 
 	bool IsMVSet();
 	void SetTableId(unsigned int ulTableId);
-	
 	virtual	ECRESULT	GetPropCategory(struct soap *soap, unsigned int ulPropTag, sObjectTableKey sKey, struct propVal *lpPropVal);
-	virtual unsigned int GetCategories();
-
+	virtual unsigned int GetCategories() { return m_ulCategories; }
 	virtual size_t GetObjectSize(void);
 
 protected:
@@ -204,17 +173,14 @@ protected:
 	virtual ECRESULT GetMVRowCount(std::list<unsigned int> &&ids, std::map<unsigned int, unsigned int> &count);
 	virtual ECRESULT ReloadTable(enumReloadType eType);
 	virtual ECRESULT	Load();
-
-	virtual ECRESULT	CheckPermissions(unsigned int ulObjId); // normally overridden by subclass
-
+	virtual ECRESULT CheckPermissions(unsigned int objid) { return hrSuccess; } /* normally overridden by subclass */
 	const ECLocale &GetLocale() const { return m_locale; }
 
 	// Constants
 	ECSession*					lpSession;
-	ECKeyTable*					lpKeyTable;
+	std::unique_ptr<ECKeyTable> lpKeyTable;
 	unsigned int m_ulTableId = -1; /* id of the table from ECTableManager */
 	const void *m_lpObjectData = nullptr;
-
 	std::recursive_mutex m_hLock; /* Lock for locked internals */
 
 	// Locked internals
@@ -228,16 +194,15 @@ protected:
 	unsigned int				m_ulObjType;
 	unsigned int				m_ulFlags;			//< flags from client
 	QueryRowDataCallBack m_lpfnQueryRowData = nullptr;
-	
+
 	virtual ECRESULT			AddRowKey(ECObjectTableList* lpRows, unsigned int *lpulLoaded, unsigned int ulFlags, bool bInitialLoad, bool bOverride, struct restrictTable *lpOverrideRestrict);
     virtual ECRESULT			AddCategoryBeforeAddRow(sObjectTableKey sObjKey, struct propVal *lpProps, unsigned int cProps, unsigned int ulFlags, bool fUnread, bool *lpfHidden, ECCategory **lppCategory);
     virtual ECRESULT			RemoveCategoryAfterRemoveRow(sObjectTableKey sObjKey, unsigned int ulFlags);
-	
+
 	ECCategoryMap				m_mapCategories;	// Map between instance key of category and category struct
 	ECSortedCategoryMap			m_mapSortedCategories; // Map between category sort keys and instance key. This is where we track which categories we have
 	ECLeafMap					m_mapLeafs;			// Map between object instance key and LEAFINFO (contains unread flag and category pointer)
-	unsigned int m_ulCategory = 1, m_ulCategories = 0;
-	unsigned int m_ulExpanded = 0;
+	unsigned int m_ulCategory = 1, m_ulCategories = 0, m_ulExpanded = 0;
 	bool m_bPopulated = false;
 	ECLocale					m_locale;
 };

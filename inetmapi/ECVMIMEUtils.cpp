@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <exception>
 #include <memory>
@@ -25,11 +12,10 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECRestriction.h>
+#include <kopano/MAPIErrors.h>
 #include <kopano/memory.hpp>
 #include <kopano/charset/convert.h>
-
 #include <kopano/stringutil.h>
-
 #include <mapi.h>
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -41,6 +27,8 @@
 #include <kopano/mapi_ptr.h>
 #include <vmime/base.hpp>
 
+using namespace std::string_literals;
+
 namespace KC {
 
 class mapiTimeoutHandler : public vmime::net::timeoutHandler {
@@ -48,10 +36,9 @@ public:
 	virtual ~mapiTimeoutHandler(void) = default;
 
 	// @todo add logging
-	virtual bool isTimeOut() _kc_override { return getTime() >= (m_last + 5*60); };
-	virtual void resetTimeOut() _kc_override { m_last = getTime(); };
-	virtual bool handleTimeOut() _kc_override { return false; };
-
+	virtual bool isTimeOut() override { return getTime() >= (m_last + 5*60); };
+	virtual void resetTimeOut() override { m_last = getTime(); };
+	virtual bool handleTimeOut() override { return false; };
 	const unsigned int getTime() const {
 		return vmime::platform::getHandler()->getUnixTime();
 	}
@@ -121,12 +108,12 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 		if (lpGroupName == nullptr || lpGroupEntryID == nullptr)
 			return MAPI_E_NOT_FOUND;
 	
-		if (bAllowEveryone == false) {
+		if (!bAllowEveryone) {
 			bool bEveryone = false;
 			
 			if (EntryIdIsEveryone(lpGroupEntryID->Value.bin.cb, (LPENTRYID)lpGroupEntryID->Value.bin.lpb, &bEveryone) == hrSuccess && bEveryone) {
 				ec_log_err("Denying send to Everyone");
-				error = std::wstring(L"You are not allowed to send to the 'Everyone' group");
+				error = L"You are not allowed to send to the \"Everyone\" group"s;
 				return MAPI_E_NO_ACCESS;
 			}
 		}
@@ -140,8 +127,9 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 				hr = hrSuccess;
 			} else if (hr != hrSuccess) {
 				// e.g. MAPI_E_NOT_FOUND
-				ec_log_err("Error while expanding group. Group: %ls, error: 0x%08x", lpGroupName->Value.lpszW, hr);
-				error = std::wstring(L"Error in group '") + lpGroupName->Value.lpszW + L"', unable to send e-mail";
+				ec_log_err("Error while expanding group \"%ls\": %s (%x)",
+					lpGroupName->Value.lpszW, GetMAPIErrorMessage(hr), hr);
+				error = L"Error in group \""s + lpGroupName->Value.lpszW + L"\", unable to send e-mail";
 				return hr;
 			}
 		} else if (setRecips.find(strEmail) == setRecips.end()) {
@@ -335,9 +323,7 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 		// to the generic send() function.
 		std::ostringstream oss;
 		vmime::utility::outputStreamAdapter ossAdapter(oss);
-
-		vmMessage->generate(ossAdapter);
-
+		vmMessage->generate(imopt_default_genctx(), ossAdapter);
 		/*
 		 * This would be the place for spooler's
 		 * log_raw_message_stage2, but this so deep in inetmapi…
@@ -417,6 +403,21 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage,
 		return MAPI_E_NETWORK_ERROR;
 	}
 	return hr;
+}
+
+vmime::parsingContext imopt_default_parsectx()
+{
+	vmime::parsingContext c;
+	c.setInternationalizedEmailSupport(true);
+	return c;
+}
+
+vmime::generationContext imopt_default_genctx()
+{
+	vmime::generationContext c;
+	/* Outlook gets confused by "Content-Id: \n<...>" */
+	c.setWrapMessageId(false);
+	return c;
 }
 
 } /* namespace */

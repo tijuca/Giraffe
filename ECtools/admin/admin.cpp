@@ -1,22 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
+#include <algorithm>
+#include <exception>
 #include <iostream>
 #include <list>
 #include <set>
@@ -46,6 +34,7 @@
 #include <kopano/stringutil.h>
 #include <kopano/ecversion.h>
 #include <kopano/mapiext.h>
+#include <kopano/timeutil.hpp>
 #include <kopano/Util.h>
 #include <kopano/ECRestriction.h>
 #include <kopano/charset/convert.h>
@@ -55,12 +44,10 @@
 #include "ECACL.h"
 #include "charset/localeutil.h"
 #include <kopano/MAPIErrors.h>
-
 #include <edkmdb.h>
 #include <edkguid.h>
 #include <libintl.h>
 #include "Archiver.h"
-
 #include <kopano/MAPIErrors.h> // for declaration of GetMAPIErrorMessage()
 
 using namespace KC;
@@ -396,20 +383,6 @@ static int parse_yesno(const char *opt)
 	return opt[0] == 'y' || opt[0] == '1';
 }
 
-static std::string UnixtimeToString(time_t timestamp)
-{
-
-	tm local;
-	char d[64];
-
-	memset(d, 0, sizeof(d));
-
-	localtime_r(&timestamp, &local);
-	strftime(d, sizeof(d), "%c", &local);
-
-	return d;
-}
-
 /**
  * Print quota levels and/or store size.
  *
@@ -500,7 +473,7 @@ static HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid,
 	if(hr != hrSuccess) {
 		cerr << "Unable to request updated quota information: " <<
 			GetMAPIErrorMessage(hr) << " (" <<
-			stringify(hr, true) << ")" << endl;
+			stringify_hex(hr) << ")" << endl;
 		return hr;
 	}
 	cout << "New quota settings:" << endl;
@@ -560,7 +533,7 @@ static string getMapiPropertyString(ULONG ulPropTag)
 		 PROP_TO_STRING(PR_EC_ARCHIVE_SERVERS);
 		 PROP_TO_STRING(PR_EC_ARCHIVE_COUPLINGS);
 		 default:
-		 return stringify(ulPropTag, true);
+		 return stringify_hex(ulPropTag);
 	}
 }
 
@@ -811,13 +784,13 @@ static void adm_oof_status(const SPropValue *const prop)
  */
 static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
     bool bAutoAccept, bool bDeclineConflict, bool bDeclineRecur,
-    const ArchiveList &lstArchives, const ECUSERCLIENTUPDATESTATUS *lpECUCUS)
+    const ArchiveList &lstArchives)
 {
 	memory_ptr<SPropValue> lpProps;
-	static constexpr const SizedSPropTagArray(5, sptaProps) =
-		{5, {PR_LAST_LOGON_TIME, PR_LAST_LOGOFF_TIME,
+	static constexpr const SizedSPropTagArray(6, sptaProps) =
+		{6, {PR_LAST_LOGON_TIME, PR_LAST_LOGOFF_TIME,
 		PR_EC_OUTOFOFFICE, PR_EC_OUTOFOFFICE_FROM,
-		PR_EC_OUTOFOFFICE_UNTIL}};
+		PR_EC_OUTOFOFFICE_UNTIL, CHANGE_PROP_TYPE(PR_EC_SERVER_VERSION, PT_STRING8)}};
 	ULONG cValues = 0;
 
 	if (lpStore)
@@ -859,6 +832,8 @@ static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
 			strftime(d, sizeof(d), "%x %X", localtime(&logoff));
 			cout << "Last logoff:\t\t" << d << std::endl;
 		}
+		if (lpProps[5].ulPropTag == sptaProps.aulPropTag[5])
+			cout << "Server version:\t\t" << lpProps[5].Value.lpszA << endl;
 	}
 
 	print_extra_settings(&lpECUser->sPropmap, &lpECUser->sMVPropmap);
@@ -880,24 +855,6 @@ static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
 			cout << endl;
 		}
 	}
-
-	if (lpECUCUS == nullptr || lpECUCUS->ulTrackId <= 0)
-		return;
-
-	cout << "Client update Information:" << endl;
-	cout << " Trackid:\t\t" << ((lpECUCUS->ulTrackId != 0 ) ? stringify(lpECUCUS->ulTrackId, true).c_str() : "-" ) << endl;
-	cout << " Last update:\t\t" << ( (lpECUCUS->tUpdatetime>0) ? UnixtimeToString(lpECUCUS->tUpdatetime) : "-" ) << endl;
-	cout << " From version:\t\t" << ( (lpECUCUS->lpszCurrentversion) ? (LPSTR)lpECUCUS->lpszCurrentversion : "-" ) << endl;
-	cout << " To version:\t\t" << ( (lpECUCUS->lpszLatestversion) ? (LPSTR)lpECUCUS->lpszLatestversion : "-" ) << endl;
-	cout << " Computername:\t\t" << ( (lpECUCUS->lpszComputername) ? (LPSTR)lpECUCUS->lpszComputername : "-" ) << endl;
-	if (lpECUCUS->ulStatus == UPDATE_STATUS_SUCCESS)
-		cout << " Update:\t\tSuccess" << endl;
-	else if (lpECUCUS->ulStatus == UPDATE_STATUS_PENDING)
-		cout << " Update:\t\tPending" << endl;
-	else if (lpECUCUS->ulStatus == UPDATE_STATUS_UNKNOWN)
-		cout << " Update: \t\tUnknown" << endl;
-	else
-		cout << " Update:\t\tFailed" << endl;
 }
 
 /**
@@ -977,7 +934,6 @@ static HRESULT print_details(LPMAPISESSION lpSession,
 	memory_ptr<ENTRYID> lpObjectId;
 	ArchiveManagePtr ptrArchiveManage;
 	ArchiveList lstArchives;
-	memory_ptr<ECUSERCLIENTUPDATESTATUS> lpECUCUS;
 	convert_context converter;
 	HRESULT hr = hrSuccess;
 
@@ -1108,14 +1064,7 @@ static HRESULT print_details(LPMAPISESSION lpSession,
 				hr = hrSuccess; /* Don't make error fatal */
 			}
 		}
-		hr = lpServiceAdmin->GetUserClientUpdateStatus(cbObjectId, lpObjectId, 0, &~lpECUCUS);
-		if (hr != hrSuccess) {
-			cerr << "Unable to get auto update status: " <<
-				GetMAPIErrorMessage(hr) << " (" <<
-				stringify(hr, true) << ")" << endl;
-			hr = hrSuccess;
-		}
-		print_user_settings(lpStore, lpECUser, bAutoAccept, bDeclineConflict, bDeclineRecurring, lstArchives, lpECUCUS);
+		print_user_settings(lpStore, lpECUser, bAutoAccept, bDeclineConflict, bDeclineRecurring, lstArchives);
 		break;
 	}
 
@@ -1190,7 +1139,7 @@ static HRESULT print_details(LPMAPISESSION lpSession,
 			cerr << "Unable to access node '" <<
 				(LPSTR)lpArchiveServers->lpszValues[i] <<
 				"': " << GetMAPIErrorMessage(hr) <<
-				"(" << stringify(hrTmp, true) <<
+				"(" << stringify_hex(hrTmp) <<
 				")" << endl;
 			continue;
 		}
@@ -1453,7 +1402,7 @@ static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 			cerr << "Failed to force resync for user " <<
 				ptrRows[i].lpProps[0].Value.lpszA <<
 				": " << GetMAPIErrorMessage(hr) <<
-				" (" << stringify(hr, true) << ")" <<
+				" (" << stringify_hex(hr) << ")" <<
 				endl;
 			bFail = true;
 		}
@@ -1478,7 +1427,7 @@ static HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore,
 			continue;
 		cerr << "Failed to force resync for user " <<
 			user << ": " << GetMAPIErrorMessage(hr) <<
-			" (" << stringify(hr, true) << ")" << endl;
+			" (" << stringify_hex(hr) << ")" << endl;
 		bFail = true;
 	}
 
@@ -1579,7 +1528,7 @@ static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 		ct.SetColumn(0, COL_AVAILABLE, "-");
 	} else {
 		ct.SetColumn(0, COL_ALLOWED, stringify(ulLicensedUsers));
-		ct.SetColumn(0, COL_AVAILABLE, stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true));
+		ct.SetColumn(0, COL_AVAILABLE, stringify_signed(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive));
 	}
 
 	ct.SetColumn(1, 0, "Non-active");
@@ -1591,12 +1540,12 @@ static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 		ct.SetColumn(1, COL_ALLOWED, "no limit");
 		ct.SetColumn(1, COL_AVAILABLE, "-");
 	} else {
-		ct.SetColumn(1, COL_ALLOWED, stringify(ulMaxTotal - ulLicensedUsers, false, true));
+		ct.SetColumn(1, COL_ALLOWED, stringify_signed(ulMaxTotal - ulLicensedUsers));
 		if (ulNonActiveTotal > ulNonActiveLow)
-			ct.SetColumn(1, COL_AVAILABLE, "0 (+" + stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true) + ")");
+			ct.SetColumn(1, COL_AVAILABLE, "0 (+" + stringify_signed(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive) + ")");
 		else
-			ct.SetColumn(1, COL_AVAILABLE, stringify(ulNonActiveLow - ulNonActiveTotal, false, true) +
-					" (+" + stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true) + ")");
+			ct.SetColumn(1, COL_AVAILABLE, stringify_signed(ulNonActiveLow - ulNonActiveTotal) +
+					" (+" + stringify_signed(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive) + ")");
 	}
 
 	if (ulNonActiveUsers != (ULONG)-1) {
@@ -1732,7 +1681,7 @@ class InputValidator {
 			wstring strInput;
 
 			if (szInput == nullptr || TryConvert(szInput, strInput) != hrSuccess ||
-			    std::find_if_not(strInput.cbegin(), strInput.cend(), iswprint) != strInput.cend())
+			    !std::all_of(strInput.cbegin(), strInput.cend(), iswprint))
 				return NULL;
 			m_bFailure = false;
 			return szInput;
@@ -1784,7 +1733,7 @@ static int fexec(const std::string &admin, std::vector<std::string> &&cmd)
 		cmd[0] = admin.substr(0, pos + 1) + cmd[0];
 	cerr << "The selected option is deprecated in this utility.\n";
 	cerr << "\e[1;33m""Forwarding call to: `" << kc_join(cmd, " ") << "`.\e[0m\n";
-	std::unique_ptr<const char *[]> argv(new(std::nothrow) const char *[cmd.size()+1]);
+	auto argv = make_unique_nt<const char *[]>(cmd.size() + 1);
 	int argc = 0;
 	if (argv == nullptr) {
 		perror("new");
@@ -1832,93 +1781,50 @@ static int clearcache(const char *arg0, const char *path, const char *s_mode)
 	return fexech(arg0, {"kopano-srvadm", "--clear-cache", kc_join(v, ",").c_str()}, path);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char **argv) try
 {
 	AutoMAPI mapiinit;
 	object_ptr<IMAPISession> lpSession;
-	object_ptr<IMsgStore> lpMsgStore;
+	object_ptr<IMsgStore> lpMsgStore, lpUserStore;
 	object_ptr<IECServiceAdmin> lpServiceAdmin;
-	ULONG cbUserId = 0;
+	unsigned int cbUserId = 0, cbEntryID = 0;
 	memory_ptr<ENTRYID> lpUserId, lpSenderId, lpGroupId, lpCompanyId;
 	memory_ptr<ENTRYID> lpSetCompanyId, lpEntryID, lpUnWrappedEntry;
-	memory_ptr<ENTRYID> lpStoreId, lpRootId;
-	ULONG cbGroupId = 0;
-	ULONG cbSenderId = 0;
-	ULONG cbCompanyId = 0;
-	ULONG cbSetCompanyId = 0;
-	memory_ptr<SPropValue> lpPropValue;
-	memory_ptr<GUID> lpGUID;
-
+	unsigned int cbGroupId = 0, cbSenderId = 0, cbCompanyId = 0, cbSetCompanyId = 0;
 	ECUSER sECUser;
 	memory_ptr<ECUSER> lpECUser, lpSenders;
 	ECGROUP		sECGroup;
-	memory_ptr<ECGROUP> lpECGroups;
-	ULONG		cCompanies = 0;
-	ULONG		cUsers = 0;
-
-	ECCOMPANY sECCompany;
-	ECCOMPANY *lpECCompanies = NULL;
-	memory_ptr<ECQUOTASTATUS> lpsQuotaStatus;
-	memory_ptr<ECQUOTA> lpsQuota;
-	memory_ptr<ECSVRNAMELIST> lpsServer;
-	memory_ptr<ECSERVERLIST> lpServerDetails;
-	ULONG cSenders = 0;
+	unsigned int cCompanies = 0, cUsers = 0, cSenders = 0;
+	ECCOMPANY sECCompany, *lpECCompanies = nullptr;
 	objectclass_t ulClass = OBJECTCLASS_UNKNOWN;
-	const char *detailstype = NULL;
-	char *username = NULL;
-	char *groupname = NULL;
-	char *companyname = NULL;
-	char *set_companyname = NULL;
-	char *password = NULL;
-	char *emailadr = NULL;
-	char *fullname = NULL;
-	char *new_username = NULL;
-	char *storeguid = NULL;
-	const char *path = NULL;
-	char *lang = NULL;
-	char *feature = NULL;
-	char *node = NULL;
-	bool bFeature = true;
+	const char *detailstype = nullptr, *path = nullptr;
+	char *username = nullptr, *groupname = nullptr, *new_username = nullptr;
+	char *companyname = nullptr, *set_companyname = nullptr;
+	char *password = nullptr, *emailadr = nullptr, *fullname = nullptr;
+	char *storeguid = nullptr, *lang = nullptr, *feature = nullptr;
+	char *node = nullptr, *sendas_user = nullptr;
+	bool bFeature = true, bCopyToPublic = false, bExplicitConfig = false;
 	std::set<std::string, strcasecmp_comparison> sEnabled, sDisabled;
-	int quota = -1;
-	long long quotahard = -1;
-	long long quotasoft = -1;
-	long long quotawarn = -1;
-	int ud_quota = -1;
-	long long ud_quotahard = -1;
-	long long ud_quotasoft = -1;
-	long long ud_quotawarn = -1;
-	int isadmin = -1;
-	int isnonactive = -1;
-	int mr_accept = -1;
-	int mr_decline_conflict = -1;
-	int mr_decline_recurring = -1;
-	char *sendas_user = NULL;
-	int sendas_action = -1;
+	int quota = -1, ud_quota = -1, isadmin = -1, isnonactive = -1;
+	long long quotahard = -1, quotasoft = -1, quotawarn = -1;
+	long long ud_quotahard = -1, ud_quotasoft = -1, ud_quotawarn = -1;
+	int mr_accept = -1, mr_decline_conflict = -1, mr_decline_recurring = -1;
+	int sendas_action = -1, passprompt = 0;
 	modes mode = MODE_INVALID;
-	int passprompt = 0;
-	bool bCopyToPublic = false;
 	std::list<std::string> lstUsernames;
 
 	bool bAutoAccept = false, bDeclineConflict = false, bDeclineRecurring = false;
-	ULONG cbEntryID = 0;
-	object_ptr<IMsgStore> lpPublicStore, lpUserStore;
 	object_ptr<IExchangeManageStore> lpIEMS;
-	wstring strUsername;
-	wstring strStorename;
-	wstring strStorenameTMP;
-	wstring strCompanyName;
-	object_ptr<IMAPIFolder> lpDeletedStoresFolder, lpRootFolder;
 	unsigned int loglevel = EC_LOGLEVEL_NONE;
-	object_ptr<ECLogger> lpLogger;
+	std::shared_ptr<ECLogger> lpLogger;
 	const configsetting_t lpDefaults[] = {
+		{"default_store_locale", ""}, /* ignored here; creation is in storeadm */
 		{ "server_socket", "default:" },
 		{ "sslkey_file", "" },
 		{ "sslkey_pass", "", CONFIGSETTING_EXACT },
 		{ NULL, NULL },
 	};
 	std::unique_ptr<ECConfig> lpsConfig(ECConfig::Create(lpDefaults));
-	bool bExplicitConfig = false;
 	ConsoleTable ct(0,0);
 	const char *szConfig = ECConfig::GetDefaultPath("admin.cfg");
 
@@ -2364,11 +2270,11 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	if (mode == MODE_HOOK_STORE && (storeguid == NULL || (username == NULL && bCopyToPublic == false) ) ) {
+	if (mode == MODE_HOOK_STORE && (storeguid == nullptr || (username == nullptr && !bCopyToPublic))) {
 		cerr << "Missing information to hook store:";
 		if (storeguid == NULL)
 			cerr << " store GUID (--hook-store)";
-		if (username == NULL && bCopyToPublic == false)
+		if (username == nullptr && !bCopyToPublic)
 			cerr << " username (-u)";
 		cerr << endl;
 		return 1;
@@ -2498,10 +2404,7 @@ int main(int argc, char* argv[])
 	}
 
 	if (lang && mode != MODE_CREATE_STORE) {
-		cerr << "You can only use the --lang option in combination with --create-store. If you" << endl;
-		cerr << "wish to create a store in this language, you must edit the 00createstore" << endl;
-		cerr << "script, which is probably in /etc/kopano/userscripts/createuser.d and" << endl;
-		cerr << "specify the --lang option there." << endl;
+		cerr << "You can only use the --lang option in combination with --create-store." << endl;
 		return 1;
 	}
 
@@ -2550,7 +2453,7 @@ int main(int argc, char* argv[])
 	if ((!bHaveConfig && bExplicitConfig) || (bHaveConfig && !bExplicitConfig && lpsConfig->HasErrors())) {
 		cerr << "Error while reading configuration file " << szConfig << endl;
 		// create fatal logger without a timestamp to stderr
-		lpLogger.reset(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
+		lpLogger.reset(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false));
 		ec_log_set(lpLogger);
 		LogConfigErrors(lpsConfig.get());
 		return 1;
@@ -2568,9 +2471,9 @@ int main(int argc, char* argv[])
 	if (loglevel > EC_LOGLEVEL_DEBUG)
 		loglevel = EC_LOGLEVEL_ALWAYS;
 	if (loglevel > EC_LOGLEVEL_NONE)
-		lpLogger.reset(new ECLogger_File(loglevel, 0, "-", false), false);
+		lpLogger.reset(new ECLogger_File(loglevel, 0, "-", false));
 	else
-		lpLogger.reset(new ECLogger_Null, false);
+		lpLogger.reset(new ECLogger_Null);
 
 	ec_log_set(lpLogger);
 
@@ -2600,7 +2503,7 @@ int main(int argc, char* argv[])
 	if(hr != hrSuccess) {
 		cerr << "Unable to open Admin session: " <<
 			GetMAPIErrorMessage(hr) << " (" <<
-			stringify(hr, true) << ")" << endl;
+			stringify_hex(hr) << ")" << endl;
 		switch (hr) {
 		case MAPI_E_NETWORK_ERROR:
 			cerr << "The server is not running, or not accessible";
@@ -2622,7 +2525,7 @@ int main(int argc, char* argv[])
 	if(hr != hrSuccess) {
 		cerr << "Unable to open Admin store: " <<
 			GetMAPIErrorMessage(hr) << " (" <<
-			stringify(hr,true) << ")" << endl;
+			stringify_hex(hr) << ")" << endl;
 		goto exit;
 	}
 
@@ -2633,7 +2536,7 @@ int main(int argc, char* argv[])
 		if (hr != hrSuccess) {
 			cerr << "Unable to connect to node '" << node << "':" <<
 				GetMAPIErrorMessage(hr) << " (" <<
-				stringify(hr, true) << ")" << endl;
+				stringify_hex(hr) << ")" << endl;
 			switch (hr) {
 			case MAPI_E_NETWORK_ERROR:
 				cerr << "The server is not running, or not accessible." << endl;
@@ -2806,7 +2709,7 @@ int main(int argc, char* argv[])
 		// happy compiler
 		break;
 	case MODE_HOOK_STORE:
-		if (bCopyToPublic == true)
+		if (bCopyToPublic)
 			return fexech(argv[0], {"kopano-storeadm", "-A", storeguid, "-p"}, path);
 		return fexech(argv[0], {"kopano-storeadm", "-A", storeguid, "-n", username}, path);
 	case MODE_UNHOOK_STORE:
@@ -3382,5 +3285,6 @@ exit:
 	     << "give more hints." << endl;
 
 	return 1;
+} catch (...) {
+	std::terminate();
 }
-

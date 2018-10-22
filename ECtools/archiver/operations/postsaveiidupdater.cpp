@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <kopano/Util.h>
 #include "postsaveiidupdater.h"
@@ -29,19 +16,15 @@ TaskBase::TaskBase(const AttachPtr &ptrSourceAttach, const MessagePtr &ptrDestMs
 { }
 
 HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper) {
-	HRESULT hr;
-	SPropValuePtr ptrSourceServerUID;
-	ULONG cbSourceInstanceID = 0;
-	EntryIdPtr ptrSourceInstanceID;
+	SPropValuePtr ptrSourceServerUID, ptrDestServerUID;
+	EntryIdPtr ptrSourceInstanceID, ptrDestInstanceID;
 	MAPITablePtr ptrTable;
 	SRowSetPtr ptrRows;
 	AttachPtr ptrAttach;
-	SPropValuePtr ptrDestServerUID;
-	ULONG cbDestInstanceID = 0;
-	EntryIdPtr ptrDestInstanceID;
+	unsigned int cbSourceInstanceID = 0, cbDestInstanceID = 0;
 	static constexpr const SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
-	
-	hr = GetUniqueIDs(m_ptrSourceAttach, &~ptrSourceServerUID, &cbSourceInstanceID, &~ptrSourceInstanceID);
+
+	auto hr = GetUniqueIDs(m_ptrSourceAttach, &~ptrSourceServerUID, &cbSourceInstanceID, &~ptrSourceInstanceID);
 	if (hr != hrSuccess)
 		return hr;
 	hr = m_ptrDestMsg->GetAttachmentTable(MAPI_DEFERRED_ERRORS, &~ptrTable);
@@ -72,13 +55,12 @@ HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper)
 
 HRESULT TaskBase::GetUniqueIDs(IAttach *lpAttach, LPSPropValue *lppServerUID, ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID)
 {
-	HRESULT hr;
 	SPropValuePtr ptrServerUID;
 	object_ptr<IECSingleInstance> ptrInstance;
 	ULONG cbInstanceID = 0;
 	EntryIdPtr ptrInstanceID;
 
-	hr = HrGetOneProp(lpAttach, PR_EC_SERVER_UID, &~ptrServerUID);
+	auto hr = HrGetOneProp(lpAttach, PR_EC_SERVER_UID, &~ptrServerUID);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpAttach->QueryInterface(iid_of(ptrInstance), &~ptrInstance);
@@ -129,16 +111,9 @@ PostSaveInstanceIdUpdater::PostSaveInstanceIdUpdater(ULONG ulPropTag, const Inst
 
 HRESULT PostSaveInstanceIdUpdater::Execute()
 {
-	HRESULT hr = hrSuccess;
-	bool bFailure = false;
-
-	for (const auto &i : m_lstDeferred) {
-		hr = i->Execute(m_ulPropTag, m_ptrMapper);
-		if (hr != hrSuccess)
-			bFailure = true;
-	}
-
-	return bFailure ? MAPI_W_ERRORS_RETURNED : hrSuccess;
+	return std::any_of(m_lstDeferred.begin(), m_lstDeferred.end(),
+	       [&](const auto &i) { return i->Execute(m_ulPropTag, m_ptrMapper) != hrSuccess; }) ?
+	       MAPI_W_ERRORS_RETURNED : hrSuccess;
 }
 
 }} /* namespace */

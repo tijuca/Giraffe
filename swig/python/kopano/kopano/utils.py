@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -5,12 +6,17 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
+import binascii
+import calendar
 import datetime
+import os
 import struct
 import sys
+import time
 
 from MAPI import (
     WrapCompressedRTFStream, PT_UNICODE, ROW_ADD, MAPI_MODIFY,
+    KEEP_OPEN_READWRITE,
 )
 from MAPI.Defs import (
     PROP_TYPE
@@ -23,18 +29,24 @@ from MAPI.Tags import (
 )
 from MAPI.Struct import (
     MAPIErrorNotFound, MAPIErrorInterfaceNotSupported, SPropValue, ROWENTRY,
-    MAPIErrorNoAccess
+    MAPIErrorNoAccess, MAPIErrorDiskError
 )
 
-from .compat import unhex as _unhex, hex as _hex
-from .errors import Error, NotFoundError
+TESTING = False
+if os.getenv('PYKO_TESTING'): # env variable used in testset
+    TESTING = True
+
+MAX_SAVE_RETRIES = int(os.getenv('PYKO_MAPI_SAVE_MAX_RETRIES', 3))
+
+from .compat import bdec as _bdec
+from .errors import Error, NotFoundError, ArgumentError
 
 if sys.hexversion >= 0x03000000:
     from . import table as _table
     from . import permission as _permission
     from . import user as _user
     from . import group as _group
-else:
+else: # pragma: no cover
     import table as _table
     import permission as _permission
     import user as _user
@@ -119,7 +131,7 @@ def permission(obj, member, create):
                 memberid = member.groupid
             else:
                 memberid = member.companyid
-            acl_table.ModifyTable(0, [ROWENTRY(ROW_ADD, [SPropValue(PR_MEMBER_ENTRYID, _unhex(memberid)), SPropValue(PR_MEMBER_RIGHTS, 0)])])
+            acl_table.ModifyTable(0, [ROWENTRY(ROW_ADD, [SPropValue(PR_MEMBER_ENTRYID, _bdec(memberid)), SPropValue(PR_MEMBER_RIGHTS, 0)])])
             return obj.permission(member)
         else:
             raise NotFoundError("no permission entry for '%s'" % member.name)
@@ -130,7 +142,7 @@ def bytes_to_human(b):
     i = 0
     len_suffixes = len(suffixes) - 1
     while b >= 1024 and i < len_suffixes:
-        b /= 1024
+        b //= 1024
         i += 1
     f = ('%.2f' % b).rstrip('0').rstrip('.')
     return '%s %s' % (f, suffixes[i])
@@ -146,7 +158,10 @@ def human_to_bytes(s):
     while s and s[0:1].isdigit() or s[0:1] == '.':
         num += s[0]
         s = s[1:]
-    num = float(num)
+    try:
+        num = float(num)
+    except ValueError:
+        raise ArgumentError('invalid size: %r' % init)
     letter = s.strip()
     for sset in [('b', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y'),
                  ('b', 'kb', 'mb', 'gb', 'tb', 'pb', 'eb', 'zb', 'yb'),
@@ -154,55 +169,11 @@ def human_to_bytes(s):
         if letter in sset:
             break
     else:
-        raise ValueError("can't interpret %r" % init)
+        raise ArgumentError('invalid size: %r' % init)
     prefix = {sset[0]: 1}
     for i, s in enumerate(sset[1:]):
         prefix[s] = 1 << (i + 1) * 10
     return int(num * prefix[letter])
-
-def _in_dst(date, dststartmonth, dststartweek, dststarthour, dstendmonth, dstendweek, dstendhour):
-    dststart = datetime.datetime(date.year, dststartmonth, 1) + \
-        datetime.timedelta(seconds=dststartweek*7*24*60*60 + dststarthour*60*60)
-
-    dstend = datetime.datetime(date.year, dstendmonth, 1) + \
-        datetime.timedelta(seconds=dstendweek*7*24*60*60 + dstendhour*60*60)
-
-    if dststart <= dstend:
-        if dststart < date < dstend:
-            return True
-    else:
-        if data < dstend or data > dststart:
-            return True
-
-    return False
-
-# XXX check doc for exact format, check php version
-def _get_timezone(date, tz_data, align_dst=False):
-    if tz_data is None:
-        return 0
-
-    timezone, _, timezonedst, _, dstendmonth, dstendweek, dstendhour, _, _, _, dststartmonth, dststartweek, dststarthour, _, _ = struct.unpack('<lllllHHllHlHHlH', tz_data)
-    if dststartmonth == 0:
-        return timezone
-
-    dst = _in_dst(date, dststartmonth, dststartweek, dststarthour, dstendmonth, dstendweek, dstendhour)
-
-    # TODO use DST-aware datetimes?
-    if align_dst and _in_dst(datetime.datetime.now(),
-       dststartmonth, dststartweek, dststarthour,
-       dstendmonth, dstendweek, dstendhour) != dst:
-        dst = not dst
-
-    if dst:
-        return timezone + timezonedst
-    else:
-        return timezone
-
-def _from_gmt(date, tz_data):
-    return date - datetime.timedelta(minutes=_get_timezone(date, tz_data))
-
-def _to_gmt(date, tz_data, align_dst=False):
-    return date + datetime.timedelta(minutes=_get_timezone(date, tz_data, align_dst=align_dst))
 
 def arg_objects(arg, supported_classes, method_name):
     if isinstance(arg, supported_classes):
@@ -211,9 +182,31 @@ def arg_objects(arg, supported_classes, method_name):
         try:
             objects = list(arg)
         except TypeError:
-            raise Error('invalid argument to %s' % method_name)
+            raise ArgumentError('invalid argument to %s' % method_name)
 
     if [o for o in objects if not isinstance(o, supported_classes)]:
-        raise Error('invalid argument to %s' % method_name)
+        raise ArgumentError('invalid argument to %s' % method_name)
     return objects
 
+def _bdec_eid(entryid):
+    try:
+        return _bdec(entryid)
+    except (TypeError, AttributeError, binascii.Error):
+        raise ArgumentError("invalid entryid: %r" % entryid)
+
+def _save(mapiobj):
+    # retry on deadlock or other temporary issue
+    t = 0.1
+    retry = 0
+    while True:
+        try:
+            if TESTING and os.getenv('PYKO_TEST_DISK_ERROR'): # test coverage
+                raise MAPIErrorDiskError()
+            mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+            break
+        except MAPIErrorDiskError:
+            if retry >= MAX_SAVE_RETRIES:
+                raise Error('could not save object')
+            else:
+                retry += 1
+                time.sleep(t)

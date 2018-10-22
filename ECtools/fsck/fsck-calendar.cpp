@@ -1,22 +1,8 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -29,17 +15,19 @@
 #include <mapix.h>
 #include <kopano/namedprops.h>
 #include <kopano/charset/convert.h>
-
 #include <kopano/RecurrenceState.h>
+#include <kopano/timeutil.hpp>
 #include "fsck.h"
 
 using namespace KC;
 
+static time_t operator-(const FILETIME &a, const FILETIME &b)
+{
+	return FileTimeToUnixTime(a) - FileTimeToUnixTime(b);
+}
+
 HRESULT FsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 {
-	memory_ptr<SPropValue> lpPropertyArray;
-	memory_ptr<SPropTagArray> lpPropertyTagArray;
-	memory_ptr<MAPINAMEID *> lppTagArray;
 
 	enum {
 		E_REMINDER,
@@ -47,28 +35,29 @@ HRESULT FsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 		TAG_COUNT
 	};
 
+	memory_ptr<SPropValue> lpPropertyArray;
+	memory_ptr<SPropTagArray> lpPropertyTagArray;
+	memory_ptr<MAPINAMEID *> ta;
 	std::string strTagName[TAG_COUNT];
-
 	/*
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~ta);
 	if (hr != hrSuccess)
 		return hr;
 
-	lppTagArray[E_REMINDER]->lpguid = (LPGUID)&PSETID_Common;
-	lppTagArray[E_REMINDER]->ulKind = MNID_ID;
-	lppTagArray[E_REMINDER]->Kind.lID = dispidReminderSet;
-
-	lppTagArray[E_ALLDAYEVENT]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_ALLDAYEVENT]->ulKind = MNID_ID;
-	lppTagArray[E_ALLDAYEVENT]->Kind.lID = dispidAllDayEvent;
+	ta[E_REMINDER]->lpguid = const_cast<GUID *>(&PSETID_Common);
+	ta[E_REMINDER]->ulKind = MNID_ID;
+	ta[E_REMINDER]->Kind.lID = dispidReminderSet;
+	ta[E_ALLDAYEVENT]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_ALLDAYEVENT]->ulKind = MNID_ID;
+	ta[E_ALLDAYEVENT]->Kind.lID = dispidAllDayEvent;
 
 	strTagName[E_REMINDER] = "dispidReminderSet";
 	strTagName[E_ALLDAYEVENT] = "dispidAllDayEvent";
 
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, ta,
 	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
 		return hr;
@@ -91,7 +80,7 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 {
 	memory_ptr<SPropValue> lpPropertyArray;
 	memory_ptr<SPropTagArray> lpPropertyTagArray;
-	memory_ptr<MAPINAMEID *> lppTagArray;
+	memory_ptr<MAPINAMEID *> ta;
 	const FILETIME *lpStart, *lpEnd, *lpCommonStart, *lpCommonEnd;
 
 	enum {
@@ -106,35 +95,30 @@ HRESULT FsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~ta);
 	if (hr != hrSuccess)
 		return hr;
 
-	lppTagArray[E_START]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_START]->ulKind = MNID_ID;
-	lppTagArray[E_START]->Kind.lID = dispidApptStartWhole;
+	ta[E_START]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_START]->ulKind = MNID_ID;
+	ta[E_START]->Kind.lID = dispidApptStartWhole;
+	ta[E_END]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_END]->ulKind = MNID_ID;
+	ta[E_END]->Kind.lID = dispidApptEndWhole;
+	ta[E_CSTART]->lpguid = const_cast<GUID *>(&PSETID_Common);
+	ta[E_CSTART]->ulKind = MNID_ID;
+	ta[E_CSTART]->Kind.lID = dispidCommonStart;
+	ta[E_CEND]->lpguid = const_cast<GUID *>(&PSETID_Common);
+	ta[E_CEND]->ulKind = MNID_ID;
+	ta[E_CEND]->Kind.lID = dispidCommonEnd;
+	ta[E_DURATION]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_DURATION]->ulKind = MNID_ID;
+	ta[E_DURATION]->Kind.lID = dispidApptDuration;
 
-	lppTagArray[E_END]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_END]->ulKind = MNID_ID;
-	lppTagArray[E_END]->Kind.lID = dispidApptEndWhole;
-
-	lppTagArray[E_CSTART]->lpguid = (LPGUID)&PSETID_Common;
-	lppTagArray[E_CSTART]->ulKind = MNID_ID;
-	lppTagArray[E_CSTART]->Kind.lID = dispidCommonStart;
-
-	lppTagArray[E_CEND]->lpguid = (LPGUID)&PSETID_Common;
-	lppTagArray[E_CEND]->ulKind = MNID_ID;
-	lppTagArray[E_CEND]->Kind.lID = dispidCommonEnd;
-
-	lppTagArray[E_DURATION]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_DURATION]->ulKind = MNID_ID;
-	lppTagArray[E_DURATION]->Kind.lID = dispidApptDuration;
-
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, ta,
 	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
 		return hr;
-
 	/*
 	 * Validate parameters:
 	 * If E_START is missing it can be substituted with E_CSTART and vice versa
@@ -268,8 +252,8 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	BOOL bRecurring = FALSE;
 	LONG ulType = 0;
 	memory_ptr<char> lpData;
-	memory_ptr<MAPINAMEID *> lppTagArray;
-	unsigned int ulLen = 0;
+	memory_ptr<MAPINAMEID *> ta;
+	size_t ulLen = 0;
 
 	enum {
 		E_RECURRENCE,
@@ -282,34 +266,30 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	auto hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
+	auto hr = allocNamedIdList(TAG_COUNT, &~ta);
 	if (hr != hrSuccess)
 		return hr;
 
-	lppTagArray[E_RECURRENCE]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_RECURRENCE]->ulKind = MNID_ID;
-	lppTagArray[E_RECURRENCE]->Kind.lID = dispidRecurring;
+	ta[E_RECURRENCE]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_RECURRENCE]->ulKind = MNID_ID;
+	ta[E_RECURRENCE]->Kind.lID = dispidRecurring;
+	ta[E_RECURRENCE_TYPE]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_RECURRENCE_TYPE]->ulKind = MNID_ID;
+	ta[E_RECURRENCE_TYPE]->Kind.lID = dispidRecurrenceType;
+	ta[E_RECURRENCE_PATTERN]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_RECURRENCE_PATTERN]->ulKind = MNID_ID;
+	ta[E_RECURRENCE_PATTERN]->Kind.lID = dispidRecurrencePattern;
+	ta[E_RECURRENCE_STATE]->lpguid = const_cast<GUID *>(&PSETID_Appointment);
+	ta[E_RECURRENCE_STATE]->ulKind = MNID_ID;
+	ta[E_RECURRENCE_STATE]->Kind.lID = dispidRecurrenceState;
 
-	lppTagArray[E_RECURRENCE_TYPE]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_RECURRENCE_TYPE]->ulKind = MNID_ID;
-	lppTagArray[E_RECURRENCE_TYPE]->Kind.lID = dispidRecurrenceType;
-
-	lppTagArray[E_RECURRENCE_PATTERN]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_RECURRENCE_PATTERN]->ulKind = MNID_ID;
-	lppTagArray[E_RECURRENCE_PATTERN]->Kind.lID = dispidRecurrencePattern;
-
-	lppTagArray[E_RECURRENCE_STATE]->lpguid = (LPGUID)&PSETID_Appointment;
-	lppTagArray[E_RECURRENCE_STATE]->ulKind = MNID_ID;
-	lppTagArray[E_RECURRENCE_STATE]->Kind.lID = dispidRecurrenceState;
-
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, ta,
 	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
 		return hr;
 
 	if (PROP_TYPE(lpPropertyArray[E_RECURRENCE].ulPropTag) == PT_ERROR) {
 		__UPV Value;
-
 		/*
 		 * Check if the recurrence type is set, and if this is the case,
 		 * if the type indicates recurrence.
@@ -349,7 +329,6 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	if (!bRecurring && ulType > 0) {
 		__UPV Value;
 		Value.l = 0;
-
 		hr = ReplaceProperty(lpMessage, "dispidRecurrenceType",
 				     CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE_TYPE], PT_LONG),
 				     "No recurrence, but recurrence type is > 0.",
@@ -359,7 +338,6 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	} else if (bRecurring && ulType == 0) {
 		__UPV Value;
 		Value.b = false;
-
 		hr = ReplaceProperty(lpMessage, "dispidRecurring",
 				     CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE], PT_BOOLEAN),
 				     "Recurrence has been set, but type indicates no recurrence.",
@@ -372,7 +350,6 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 		if (bRecurring) {
 			Value.b = false;
 			bRecurring = false;
-
 			hr = ReplaceProperty(lpMessage, "dispidRecurring",
 					     CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE], PT_BOOLEAN),
 					     "Invalid recurrence type, disabling recurrence.",
@@ -383,7 +360,6 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 
 		Value.l = 0;
 		ulType = 0;
-
 		hr = ReplaceProperty(lpMessage, "dispidRecurrenceType",
 				     CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_RECURRENCE], PT_LONG),
 				     "Invalid recurrence type, disabling recurrence.",
@@ -395,7 +371,7 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	if ((PROP_TYPE(lpPropertyArray[E_RECURRENCE_PATTERN].ulPropTag) == PT_ERROR ||
 	    strcmp(lpPropertyArray[E_RECURRENCE_PATTERN].Value.lpszA, "") == 0) && bRecurring) {
 		__UPV Value;
-	
+
 		switch (ulType) {
 		case 1:
 			Value.lpszA = const_cast<char *>("Daily");
@@ -503,7 +479,6 @@ HRESULT FsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 HRESULT FsckCalendar::ValidateItem(LPMESSAGE lpMessage,
     const std::string &strClass)
 {
-	HRESULT hr;
 	bool bChanged = false;
 
 	if (strClass != "IPM.Appointment") {
@@ -511,7 +486,7 @@ HRESULT FsckCalendar::ValidateItem(LPMESSAGE lpMessage,
 		return E_INVALIDARG;
 	}
 
-	hr = ValidateMinimalNamedFields(lpMessage);
+	auto hr = ValidateMinimalNamedFields(lpMessage);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ValidateTimestamps(lpMessage);
@@ -522,4 +497,3 @@ HRESULT FsckCalendar::ValidateItem(LPMESSAGE lpMessage,
 		return hr;
 	return ValidateRecursiveDuplicateRecipients(lpMessage, bChanged);
 }
-

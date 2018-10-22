@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // -*- Mode: c++ -*-
@@ -25,7 +13,6 @@
 #include <kopano/zcdefs.h>
 #include <kopano/ECDefs.h>
 #include <kopano/pcuser.hpp>
-
 #include <list>
 #include <map>
 #include <memory>
@@ -54,11 +41,9 @@ class ECStatsCollector;
  * sync. This way ECUserManagement can cache things like the
  * object details without constantly accessing the plugin.
  */
-class objectsignature_t _kc_final {
+class objectsignature_t final {
 public:
 	/**
-	 * Constructor for combining objectid and signature
-	 *
 	 * @param[in]	i
 	 *					The unique objectid
 	 * @param[in]	s
@@ -67,7 +52,7 @@ public:
     objectsignature_t(const objectid_t &i, const std::string &s) : id(i), signature(s) {};
 
 	/**
-	 * Default constructor, creates empty objectid with empty signature
+	 * Creates an empty objectid with empty signature
 	 */
 	objectsignature_t(void) = default;
 
@@ -141,7 +126,7 @@ public:
 	 *
 	 * @throw std::exception
 	 */
-	virtual void InitPlugin() = 0;
+	virtual void InitPlugin(std::shared_ptr<ECStatsCollector>) = 0;
 
 	/**
 	 * Resolve name and company to objectsignature
@@ -426,7 +411,7 @@ protected:
 	/**
 	 * Pointer to statscollector
 	 */
-	ECStatsCollector *m_lpStatsCollector;
+	std::shared_ptr<ECStatsCollector> m_lpStatsCollector;
 
 	/**
 	 * Boolean to indicate if multi-company features are enabled
@@ -442,7 +427,7 @@ protected:
 /**
  * Exception which is thrown when no object was found during a search
  */
-class _kc_export_throw objectnotfound _kc_final : public std::runtime_error {
+class _kc_export_throw objectnotfound final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -460,7 +445,7 @@ public:
  * Exception which is thrown when too many objects where returned in
  * a search.
  */
-class _kc_export_throw toomanyobjects _kc_final : public std::runtime_error {
+class _kc_export_throw toomanyobjects final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -478,7 +463,7 @@ public:
  * Exception which is thrown when an object is being created
  * while it already existed.
  */
-class _kc_export_throw collision_error _kc_final : public std::runtime_error {
+class _kc_export_throw collision_error final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -496,7 +481,7 @@ public:
  * Exception which is thrown when a problem has been found with
  * the data read from the plugin backend.
  */
-class _kc_export_throw data_error _kc_final : public std::runtime_error {
+class _kc_export_throw data_error final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -514,7 +499,7 @@ public:
  * Exception which is thrown when the function was not
  * implemented by the plugin.
  */
-class _kc_export_throw notimplemented _kc_final : public std::runtime_error {
+class _kc_export_throw notimplemented final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -534,7 +519,7 @@ public:
  * or multi-server function is called while this feature is
  * disabled.
  */
-class _kc_export_throw notsupported _kc_final : public std::runtime_error {
+class _kc_export_throw notsupported final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -551,7 +536,7 @@ public:
 /**
  * Exception which is thrown when a user could not be logged in
  */
-class _kc_export_throw login_error _kc_final : public std::runtime_error {
+class _kc_export_throw login_error final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -568,7 +553,7 @@ public:
 /**
  * Exception which is thrown when LDAP returns errors
  */
-class _kc_export_throw ldap_error _kc_final : public std::runtime_error {
+class _kc_export_throw ldap_error final : public std::runtime_error {
 	int m_ldaperror;
 public:
 	/**

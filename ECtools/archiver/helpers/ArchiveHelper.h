@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ARCHIVEHELPER_H_INCLUDED
@@ -50,11 +38,11 @@ enum AttachType {
  * The ArchiveHelper class is a utility class that operates on a message store that's used as
  * an archive.
  */
-class _kc_export ArchiveHelper _kc_final {
+class _kc_export ArchiveHelper final {
 public:
 	_kc_hidden static HRESULT Create(LPMDB arc_store, const tstring &folder, const char *server_path, ArchiveHelperPtr *);
 	_kc_hidden static HRESULT Create(LPMDB arc_store, LPMAPIFOLDER arc_folder, const char *server_path, ArchiveHelperPtr *);
-	static HRESULT Create(ArchiverSessionPtr ptrSession, const SObjectEntry &archiveEntry, ECLogger *lpLogger, ArchiveHelperPtr *lpptrArchiveHelper);
+	static HRESULT Create(ArchiverSessionPtr ptrSession, const SObjectEntry &archiveEntry, std::shared_ptr<ECLogger>, ArchiveHelperPtr *lpptrArchiveHelper);
 	_kc_hidden HRESULT GetAttachedUser(abentryid_t *user_eid);
 	_kc_hidden HRESULT SetAttachedUser(const abentryid_t &user_eid);
 	_kc_hidden HRESULT GetArchiveEntry(bool create, SObjectEntry *obj_entry);

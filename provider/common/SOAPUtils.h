@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef SOAPUTILS_H
@@ -23,13 +11,14 @@
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
 #include <kopano/pcuser.hpp>
+#include <kopano/timeutil.hpp>
 #include <kopano/ustringutil.h>
-
 #include <list>
 #include <string>
 
 namespace KC {
 
+extern std::string FilterBMP(const std::string &strToFilter);
 // SortOrderSets
 extern void FreeSortOrderArray(struct sortOrderArray *lpsSortOrder);
 extern int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1, const struct sortOrderArray *lpsSortOrder2);
@@ -62,8 +51,8 @@ extern ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1, const struct pr
 
 size_t PropSize(const struct propVal *);
 ECRESULT			FreePropVal(struct propVal *lpProp, bool bBasePointerDel);
-ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst, struct soap *soap = NULL, bool bTruncate = false);
-ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst, struct soap *soap = NULL, bool bTruncate = false); /* allocates new lpDst and calls other version */
+extern ECRESULT CopyPropVal(const struct propVal *src, struct propVal *dst, struct soap * = nullptr, bool truncate = false);
+extern ECRESULT CopyPropVal(const struct propVal *src, struct propVal **dst, struct soap * = nullptr, bool truncate = false); /* allocates new lpDst and calls other version */
 
 // EntryList
 ECRESULT			CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryList **lppDst);
@@ -76,7 +65,6 @@ ECRESULT			FreeEntryId(entryId* lpEntryId, bool bFreeBase);
 // Notification
 ECRESULT			FreeNotificationStruct(notification *lpNotification, bool bFreeBase=true);
 ECRESULT			CopyNotificationStruct(struct soap *, const notification *from, notification &to);
-
 ECRESULT			FreeNotificationArrayStruct(notificationArray *lpNotifyArray, bool bFreeBase);
 ECRESULT			CopyNotificationArrayStruct(notificationArray *lpNotifyArrayFrom, notificationArray *lpNotifyArrayTo);
 
@@ -95,11 +83,9 @@ ECRESULT			CopyCompanyDetailsToSoap(unsigned int ulId, entryId *lpCompanyEid, un
 											 const objectdetails_t &details, bool bCopyBinary, struct soap *soap, struct company *lpCompany);
 ECRESULT			CopyCompanyDetailsFromSoap(struct company *lpCompany, std::string *lpstrExternId, unsigned int ulAdmin,
 											   objectdetails_t *details, struct soap *soap);
-
 ULONG 				NormalizePropTag(ULONG ulPropTag);
 
 const char *GetSourceAddr(struct soap *soap);
-
 size_t SearchCriteriaSize(const struct searchCriteria *);
 size_t RestrictTableSize(const struct restrictTable *);
 size_t PropValArraySize(const struct propValArray *);
@@ -109,16 +95,14 @@ size_t NotificationStructSize(const notification *);
 size_t PropTagArraySize(const struct propTagArray *);
 size_t SortOrderArraySize(const struct sortOrderArray *);
 
-class DynamicPropValArray _kc_final {
+class DynamicPropValArray final {
 public:
     DynamicPropValArray(struct soap *soap, unsigned int ulHint = 10);
     ~DynamicPropValArray();
-    
     // Copies the passed propVal
     ECRESULT AddPropVal(struct propVal &propVal);
-    
     // Return a propvalarray of all properties passed
-    ECRESULT GetPropValArray(struct propValArray *lpPropValArray);
+    ECRESULT GetPropValArray(struct propValArray *lpPropValArray, bool release = true);
 
 private:
     ECRESULT Resize(unsigned int ulSize);
@@ -129,12 +113,11 @@ private:
 	unsigned int m_ulPropCount = 0;
 };
 
-class DynamicPropTagArray _kc_final {
+class DynamicPropTagArray final {
 public:
     DynamicPropTagArray(struct soap *soap);
     ECRESULT AddPropTag(unsigned int ulPropTag);
     BOOL HasPropTag(unsigned int ulPropTag) const;
-    
     ECRESULT GetPropTagArray(struct propTagArray *lpPropTagArray);
     
 private:
@@ -155,7 +138,17 @@ struct SOAPINFO {
 	const char *szFname;
 };
 
+class ec_soap_deleter {
+	public:
+	void operator()(struct soap *);
+};
+
 static inline struct SOAPINFO *soap_info(struct soap *s)
+{
+	return static_cast<struct SOAPINFO *>(s->user);
+}
+
+static inline struct SOAPINFO *soap_info(const std::unique_ptr<struct soap, ec_soap_deleter> &s)
 {
 	return static_cast<struct SOAPINFO *>(s->user);
 }

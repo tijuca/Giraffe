@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // -*- Mode: c++ -*-
@@ -22,8 +10,7 @@
 #include <mutex>
 #include <string>
 #include <kopano/zcdefs.h>
-#include <kopano/ECIConv.h>
-
+#include <kopano/charset/convert.h>
 #include <set>
 #include <ldap.h>
 #include "plugin.h"
@@ -34,6 +21,7 @@
  * @ingroup userplugin
  * @{
  */
+namespace KC { class ECStatsCollector; }
 using namespace KC;
 
 /** 
@@ -74,7 +62,7 @@ public:
 	 *
 	 * @throw std::exception
 	 */
-	virtual void InitPlugin();
+	virtual void InitPlugin(std::shared_ptr<KC::ECStatsCollector>) override;
 
 	/**
 	 * Resolve name and company to objectsignature
@@ -144,7 +132,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw runtime_error When the LDAP query failed
 	 *
-	 * @remarks The methode returns a whole set of objectdetails but user may be missing if the user
+	 * @remarks The method returns a whole set of objectdetails but user may be missing if the user
 	 * 			details cannot be retrieved for some reason.
 	 */
 	virtual std::map<objectid_t, objectdetails_t> getObjectDetails(const std::list<objectid_t> &objectids) override;
@@ -353,14 +341,9 @@ protected:
 	LDAP *m_ldap;
 
 	/**
-	 * converter FROM ldap TO kopano-server
+	 * converter FROM ldap TO kopano-server and vice-versa
 	 */
-	std::unique_ptr<ECIConv> m_iconv;
-
-	/**
-	 * converter FROM kopano-server TO ldap
-	 */
-	std::unique_ptr<ECIConv> m_iconvrev;
+	std::unique_ptr<KC::iconv_context<std::string, std::string>> m_iconv, m_iconvrev;
 
 	static std::unique_ptr<LDAPCache> m_lpCache;
 	struct timeval m_timeout;
@@ -443,7 +426,7 @@ private:
 	 * @return LDAP pointer
 	 * @throw ldap_error When no connection could be established
 	 */
-	LDAP *ConnectLDAP(const char *bind_dn, const char *bind_pw);
+	LDAP *ConnectLDAP(const char *bind_dn, const char *bind_pw, bool starttls);
 
 	/**
 	 * Authenticate by user bind

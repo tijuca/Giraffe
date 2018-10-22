@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -12,22 +13,20 @@ from MAPI.Struct import (
     ECGROUP, MAPIErrorNotFound, MAPIErrorInvalidParameter,
     MAPIErrorCollision
 )
-from MAPI.Defs import bin2hex
-
 from .properties import Properties
 from .errors import NotFoundError, DuplicateError
-from .compat import fake_unicode as _unicode
+from .compat import fake_unicode as _unicode, benc as _benc
 
 if sys.hexversion >= 0x03000000:
     try:
         from . import server as _server
-    except ImportError:
-        _server = sys.modules[__package__+'.server']
+    except ImportError: # pragma: no cover
+        _server = sys.modules[__package__ + '.server']
     try:
         from . import user as _user
-    except ImportError:
-        _user = sys.modules[__package__+'.user']
-else:
+    except ImportError: # pragma: no cover
+        _user = sys.modules[__package__ + '.user']
+else: # pragma: no cover
     import server as _server
     import user as _user
 
@@ -54,7 +53,7 @@ class Group(Properties):
     def groupid(self):
         """Group identifier."""
 
-        return bin2hex(self._ecgroup.GroupID)
+        return _benc(self._ecgroup.GroupID)
 
     def users(self): # XXX recurse?
         """Return all :class:`users <User>` in group."""

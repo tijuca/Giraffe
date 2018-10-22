@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -20,7 +21,9 @@ from MAPI.Tags import (
     PR_EMAIL_ADDRESS_W, PR_DISPLAY_NAME_W, PR_EC_ENABLED_FEATURES_W,
     PR_EC_DISABLED_FEATURES_W, PR_EC_COMPANY_NAME_W,
     PR_MAPPING_SIGNATURE, PR_EC_ARCHIVE_SERVERS,
-    EMS_AB_ADDRESS_LOOKUP
+    EMS_AB_ADDRESS_LOOKUP, PR_GIVEN_NAME_W, PR_SURNAME_W,
+    PR_MOBILE_TELEPHONE_NUMBER_W, PR_OFFICE_LOCATION_W,
+    PR_TITLE_W, PR_EMS_AB_THUMBNAIL_PHOTO,
 )
 
 from .store import Store
@@ -32,13 +35,14 @@ from .defs import (
 )
 from .errors import Error, NotFoundError, NotSupportedError, DuplicateError
 from .compat import (
-    fake_unicode as _unicode, benc as _benc, bdec as _bdec, benc as _benc,
+    fake_unicode as _unicode, benc as _benc, bdec as _bdec,
 )
+from .picture import Picture
 
 if sys.hexversion >= 0x03000000:
     from . import server as _server
     from . import company as _company
-else:
+else: # pragma: no cover
     import server as _server
     import company as _company
 
@@ -46,20 +50,21 @@ class User(Properties):
     """User class"""
 
     def __init__(self, name=None, server=None, email=None, ecuser=None,
-        userid=None
-    ):
+                 userid=None):
         self.server = server or _server.Server()
+        self._ecuser = None
+        self._name = None
 
         if ecuser:
             self._ecuser = ecuser
-            self._name = ecuser.Username
+
         elif userid:
             try:
                 self._ecuser = self.server.sa.GetUser(_bdec(userid), MAPI_UNICODE)
             except MAPIErrorNotFound:
                 raise NotFoundError("no user found with userid '%s'" % userid)
-            self._name = self._ecuser.Username
-        else:
+
+        elif email or name:
             if email:
                 try:
                     self._name = _unicode(self.server.gab.ResolveNames([PR_EMAIL_ADDRESS_W], MAPI_UNICODE | EMS_AB_ADDRESS_LOOKUP, [[SPropValue(PR_DISPLAY_NAME_W, _unicode(email))]], [MAPI_UNRESOLVED])[0][0][1].Value)
@@ -72,6 +77,10 @@ class User(Properties):
                 self._ecuser = self.server.sa.GetUser(self.server.sa.ResolveUserName(self._name, MAPI_UNICODE), MAPI_UNICODE)
             except (MAPIErrorNotFound, MAPIErrorInvalidParameter): # multi-tenant, but no '@' in username..
                 raise NotFoundError("no such user: '%s'" % self.name)
+
+        if self._ecuser:
+            self._name = self._ecuser.Username
+            self._userid = _benc(self._ecuser.UserID)
 
         self._mapiobj = None
 
@@ -140,6 +149,13 @@ class User(Properties):
     def password(self, value):
         self._update(password=_unicode(value))
 
+    # TODO uniformize with contact.photo.. class Picture (filename, dimensions..)?
+    @property
+    def photo(self):
+        data = self.get(PR_EMS_AB_THUMBNAIL_PHOTO)
+        if data is not None:
+            return Picture(data=data)
+
     @property
     def features(self):
         """ Enabled features (pop3/imap/mobile) """
@@ -200,8 +216,7 @@ class User(Properties):
     @property
     def userid(self):
         """ Userid """
-
-        return _benc(self._ecuser.UserID)
+        return self._userid
 
     @property
     def company(self):
@@ -211,6 +226,31 @@ class User(Properties):
             return _company.Company(HrGetOneProp(self.mapiobj, PR_EC_COMPANY_NAME_W).Value, self.server)
         except MAPIErrorNoSupport:
             return _company.Company(u'Default', self.server)
+
+    @property
+    def first_name(self):
+        """ First Name """
+        return self.get(PR_GIVEN_NAME_W, u'')
+
+    @property
+    def job_title(self):
+        """ Job Title """
+        return self.get(PR_TITLE_W, u'')
+
+    @property
+    def mobile_phone(self):
+        """ Mobile Phone Number """
+        return self.get(PR_MOBILE_TELEPHONE_NUMBER_W, u'')
+
+    @property
+    def office_location(self):
+        """ Office Location """
+        return self.get(PR_OFFICE_LOCATION_W, u'')
+
+    @property
+    def last_name(self):
+        """ Lastname """
+        return self.get(PR_SURNAME_W, u'')
 
     @property # XXX
     def local(self):
@@ -321,7 +361,7 @@ class User(Properties):
         return not self == u
 
     def __unicode__(self):
-        return u"User('%s')" % self._name
+        return u"User(%s)" % (self._name or u'')
 
     def _update(self, **kwargs):
         username = kwargs.get('username', self.name)

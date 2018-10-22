@@ -1,27 +1,14 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECEXCHANGEIMPORTCONTENTSCHANGES_H
 #define ECEXCHANGEIMPORTCONTENTSCHANGES_H
 
-#include <kopano/zcdefs.h>
+#include <memory>
+#include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include "ECMAPIFolder.h"
-
 #include <kopano/ECUnknown.h>
 #include <kopano/IECInterfaces.hpp>
 
@@ -29,17 +16,15 @@ namespace KC {
 class ECLogger;
 }
 
-using namespace KC;
-
-class ECExchangeImportContentsChanges _kc_final :
-    public ECUnknown, public IECImportContentsChanges {
+class ECExchangeImportContentsChanges final :
+    public KC::ECUnknown, public KC::IECImportContentsChanges {
 protected:
 	ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder);
 public:
 	static	HRESULT Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges);
 
 	// IUnknown
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual HRESULT QueryInterface(const IID &, void **) override;
 
 	// IExchangeImportContentsChanges
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
@@ -64,17 +49,15 @@ private:
 	HRESULT CreateConflictFolder(LPTSTR lpszName, LPSPropValue lpAdditionalREN, ULONG ulMVPos, LPMAPIFOLDER lpParentFolder, LPMAPIFOLDER * lppConflictFolder);
 
 	HRESULT ImportMessageCreateAsStream(ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter);
-	HRESULT ImportMessageUpdateAsStream(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter);
-
+	HRESULT ImportMessageUpdateAsStream(ULONG eid_size, const ENTRYID *eid, ULONG nvals, const SPropValue *, WSMessageStreamImporter **);
 	static HRESULT HrUpdateSearchReminders(LPMAPIFOLDER lpRootFolder, const SPropValue *);
+	HRESULT zlog(const char *, HRESULT = 0);
 	friend class ECExchangeImportHierarchyChanges;
 
 	IStream *m_lpStream = nullptr;
-	ULONG m_ulFlags = 0;
-	ULONG m_ulSyncId = 0;
-	ULONG m_ulChangeId = 0;
+	unsigned int m_ulFlags = 0, m_ulSyncId = 0, m_ulChangeId = 0;
 	KC::memory_ptr<SPropValue> m_lpSourceKey;
-	KC::object_ptr<ECLogger> m_lpLogger;
+	std::shared_ptr<KC::ECLogger> m_lpLogger;
 	KC::object_ptr<ECMAPIFolder> m_lpFolder;
 };
 

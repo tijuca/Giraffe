@@ -1,26 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <memory>
+#include <utility>
 #include <kopano/tie.hpp>
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
-
 #include "ECServerEntrypoint.h"
 
 namespace KC {
@@ -28,17 +15,17 @@ namespace KC {
 // The ECDatabaseFactory creates database objects connected to the server database. Which
 // database is returned is chosen by the database_engine configuration setting.
 
-ECDatabaseFactory::ECDatabaseFactory(ECConfig *lpConfig)
-{
-	this->m_lpConfig = lpConfig;
-}
+ECDatabaseFactory::ECDatabaseFactory(std::shared_ptr<ECConfig> c,
+    std::shared_ptr<ECStatsCollector> s) :
+	m_stats(std::move(s)), m_lpConfig(std::move(c))
+{}
 
 ECRESULT ECDatabaseFactory::GetDatabaseFactory(ECDatabase **lppDatabase)
 {
 	const char *szEngine = m_lpConfig->GetSetting("database_engine");
 
 	if(strcasecmp(szEngine, "mysql") == 0) {
-		*lppDatabase = new ECDatabase(m_lpConfig);
+		*lppDatabase = new ECDatabase(m_lpConfig, m_stats);
 	} else {
 		ec_log_crit("ECDatabaseFactory::GetDatabaseFactory(): database not mysql");
 		return KCERR_DATABASE_ERROR;
@@ -94,7 +81,7 @@ ECRESULT GetThreadLocalDatabase(ECDatabaseFactory *lpFactory, ECDatabase **lppDa
 
 	// database_key is defined in ECServer.cpp, and allocated in the running_server routine
 	auto lpDatabase = static_cast<ECDatabase *>(pthread_getspecific(database_key));
-	
+
 	if(lpDatabase == NULL) {
 		auto er = lpFactory->CreateDatabaseObject(&lpDatabase, error);
 		if(er != erSuccess) {
@@ -102,11 +89,10 @@ ECRESULT GetThreadLocalDatabase(ECDatabaseFactory *lpFactory, ECDatabase **lppDa
 			lpDatabase = NULL;
 			return er;
 		}
-		
+
 		// Add database into a list, for close all database connections
 		AddDatabaseObject(lpDatabase);
-
-		pthread_setspecific(database_key, (void *)lpDatabase);
+		pthread_setspecific(database_key, lpDatabase);
 	}
 
 	*lppDatabase = lpDatabase;

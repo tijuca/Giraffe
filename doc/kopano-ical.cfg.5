@@ -66,35 +66,20 @@ Include and process
 Example: !include common.cfg
 .RE
 .SH "EXPLANATION OF EACH PARAMETER"
-.SS server_bind
+.SS ical_listen
 .PP
-IP address to bind to. Leave empty to bind to all addresses.
+A space-separated list of address:port specifiers for where the server should
+listen for HTTP/CalDAV connections. IPv6 addresses need to
+be enclosed in brackets (as in \fB[2001:db8::1]:236\fP), and the asterisk is
+the multi-protocol address wildcard.
 .PP
-Default: (empty)
-.SS ical_enable
+Default: \fI*:8080\fP
+.SS icals_listen
+A space-separated list of address:port spcifiers for implicit-SSL CalDAV/HTTPS
+connections, similar to \fBical_listen\fP. Previous versions of ZCP/KC
+suggested port 8443.
 .PP
-Enable iCal/CalDAV service with value yes. All other values disable the service.
-.PP
-Default:
-\fIyes\fR
-.SS ical_port
-.PP
-The iCal/CalDAV service will listen on this port for incoming connections.
-.PP
-Default:
-\fI8080\fR
-.SS icals_enable
-.PP
-Enable SSL iCal/CalDAV service with value yes. All other values disable the service.
-.PP
-Default:
-\fIyes\fR
-.SS icals_port
-.PP
-The SSL iCal/CalDAV service will listen on this port for incoming connections.
-.PP
-Default:
-\fI8443\fR
+Default: \fI(none)\fP
 .SS server_socket
 .PP
 The http address of the storage server.
@@ -126,6 +111,12 @@ Change directory to this path when running in daemonize mode. When using the \-F
 .PP
 Default:
 \fI/\fR
+.SS coredump_enabled
+.PP
+When a crash occurs or an assertion fails, a coredump file can be generated.
+This file should be sent along with the crash report. It is turned on by
+default in Kopano, but your system may have it disabled. For details, see the
+\fBkopano\-coredump\fP(5) manpage.
 .SS process_model
 .PP
 You can change the process model between
@@ -167,46 +158,54 @@ The path with the files to verify the clients certificates with.
 Default: value not set.
 .SS ssl_protocols
 .PP
-Disabled or enabled protocol names. Supported protocol names are
-\fISSLv3\fR
-and
-\fITLSv1\fR. If Kopano was linked against OpenSSL 1.0.1 or later there is additional support for the new protocols
-\fITLSv1.1\fR
-and
-\fITLSv1.2\fR. To exclude both SSLv3 and TLSv1, set
-\fBserver_ssl_protocols\fR
-to
-\fI!SSLv3 !TLSv1\fR.
+A space-separated list of disabled or enabled protocol names. Supported
+protocol names depend on the system's SSL library; depending on version, one or
+more of the following are available: \fBTLSv1.3\fP, \fBTLSv1.2\fP,
+\fBTLSv1.1\fP, \fBSSLv3\fP, \fBSSLv2\fP. To disable a protocol, prefix the name
+with an exclamation mark.
 .PP
-Default: SSLv2 being disabled
+Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
 .SS ssl_ciphers
 .PP
-SSL ciphers to use, set to
-\fIALL\fR
-for backward compatibility.
+A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
+names depend on the system's SSL library, and are generally plentiful. To
+disable a cipher or cipher group, prefix the name with a minus or exclamation
+mark. Details and meaning of the syntax are described in ciphers(1).
 .PP
 Default:
-\fIALL:!LOW:!SSLv2:!EXP:!aNULL\fR
+\fIDEFAULT:!LOW:!SSLv2:!SSLv3:!TLSv1.0:!TLSv1.1:!EXPORT:!DH:!PSK:!kRSA:!aDSS:!aNULL:+AES\fP
 .SS ssl_prefer_server_ciphers
 .PP
-Prefer the server\*(Aqs order of SSL ciphers over client\*(Aqs.
+In SSLv3 and newer, the server side gets to make the ultimate cipher pick out
+of the set that both ends support. In doing so, it can either use the client
+preference list, or, if this directive is set to "yes", its own list (as
+determined by \fBssl_cipher\fP).
+.PP
+Default: \fIyes\fP
+.SS ssl_curves
+.PP
+ECDH curves to use for SSL
 .PP
 Default:
-\fIno\fR
+\fIX25519:P-521:P-384:P-256\fP
 .SS log_method
 .PP
 The method which should be used for logging. Valid values are:
 .TP
-\fIsyslog\fR
-Use the Linux system log. All messages will be written to the mail facility. See also
-\fBsyslog.conf\fR(5).
+\fBsyslog\fR
+Use the syslog service. Messages will be sent using the "mail" facility tag. See also
+\fBjournald.conf\fP(5) or \fBsyslog.conf\fP(5).
 .TP
-\fIfile\fP
+\fBfile\fP
 Log to a file. The filename will be specified in
 \fBlog_file\fR.
+.TP
+\fBauto\fP
+Autoselect mode: If \fBlog_file\fP is set, that will be used.
+Else, syslog will be used if it looks like it is available.
+Else, stderr.
 .PP
-Default:
-\fIfile\fR
+Default: \fIauto\fP
 .SS log_file
 .PP
 When logging to a file, specify the filename in this parameter. Use

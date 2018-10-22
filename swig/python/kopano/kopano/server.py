@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano.
 
@@ -18,22 +19,26 @@ from MAPI import (
     MAPI_UNICODE, MDB_WRITE, RELOP_EQ,
     TBL_BATCH, ECSTORE_TYPE_PRIVATE, MAPI_DEFERRED_ERRORS
 )
-from MAPI.Util import GetDefaultStore, OpenECSession
-from MAPI.Defs import HrGetOneProp, bin2hex
+from MAPI.Util import (
+    GetDefaultStore, OpenECSession
+)
+from MAPI.Defs import (
+    HrGetOneProp,
+)
+
 from MAPI.Struct import (
     SPropertyRestriction, SPropValue, ECCOMPANY, ECGROUP, ECUSER,
     MAPIErrorNotFound, MAPIErrorNoSupport, MAPIErrorCollision,
     MAPIErrorLogonFailed, MAPIErrorNetworkError, MAPIErrorDiskError
 )
 from MAPI.Tags import (
-    PR_ACCOUNT_W, PURGE_CACHE_ALL, PR_DISPLAY_NAME_W,
-    PR_ENTRYID, PR_STORE_RECORD_KEY,
-    PR_MAPPING_SIGNATURE, PR_CONTAINER_CONTENTS,
-    PR_EC_STATSTABLE_SYSTEM, PR_EC_STATSTABLE_SESSIONS,
+    PR_ACCOUNT_W, PURGE_CACHE_ALL, PR_DISPLAY_NAME_W, PR_ENTRYID,
+    PR_STORE_RECORD_KEY, PR_SMTP_ADDRESS_W, PR_MAPPING_SIGNATURE,
+    PR_CONTAINER_CONTENTS, PR_EC_STATSTABLE_SYSTEM, PR_EC_STATSTABLE_SESSIONS,
     PR_EC_STATSTABLE_USERS, PR_EC_STATSTABLE_COMPANY,
     PR_EC_STATSTABLE_SERVERS, PR_EC_STATS_SERVER_HTTPSURL,
     PR_STORE_ENTRYID, EC_PROFILE_FLAGS_NO_UID_AUTH,
-    EC_PROFILE_FLAGS_NO_NOTIFICATIONS, EC_PROFILE_FLAGS_OIDC
+    EC_PROFILE_FLAGS_NO_NOTIFICATIONS, EC_PROFILE_FLAGS_OIDC,
 )
 from MAPI.Tags import (
     IID_IMsgStore, IID_IMAPITable, IID_IExchangeManageStore,
@@ -44,37 +49,38 @@ from .errors import (
     Error, NotFoundError, DuplicateError, NotSupportedError,
     LogonError
 )
+from .log import LOG
 
 from .parser import parser
 from .table import Table
 from .company import Company
 from .group import Group
-from .property_ import _proptag_to_name
+from .query import _query_to_restriction
 
 from .compat import (
-    unhex as _unhex, repr as _repr, is_str as _is_str,
-    fake_unicode as _unicode, lru_cache as _lru_cache
+    repr as _repr, is_str as _is_str, benc as _benc,
+    bdec as _bdec, fake_unicode as _unicode, lru_cache as _lru_cache
 )
 
 if sys.hexversion >= 0x03000000:
     try:
         from . import user as _user
-    except ImportError:
-        _user = sys.modules[__package__+'.user']
+    except ImportError: # pragma: no cover
+        _user = sys.modules[__package__ + '.user']
     try:
         from . import config as _config
-    except ImportError:
-        _config = sys.modules[__package__+'.config']
+    except ImportError: # pragma: no cover
+        _config = sys.modules[__package__ + '.config']
     from . import ics as _ics
     try:
         from . import store as _store
-    except ImportError:
-        _store = sys.modules[__package__+'.store']
+    except ImportError: # pragma: no cover
+        _store = sys.modules[__package__ + '.store']
     try:
         from . import utils as _utils
-    except ImportError:
-        _utils = sys.modules[__package__+'.utils']
-else:
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
     import user as _user
     import config as _config
     import ics as _ics
@@ -136,20 +142,37 @@ def instance_method_lru_cache(*cache_args, **cache_kwargs):
 #
 # https://bugs.python.org/issue9072
 #
-# this seems to cause arbitrary stuff kept in memory (referenced by these
-# modules), in our case causing non-zero reference counts on the C side,
-# finally making valgrind go nuts.
+# also, for the tests we've seen SWIG objects end up here:
 #
-# so for now we just clear all server/store internals, to try and clean up all
-# open mapi stores before final shutdown, but only in development mode, as it's
-# just a shutdown issue.
+# https://docs.python.org/2/library/gc.html#gc.garbage
 #
-# TODO investigate further; check python3
+# in both cases, store objects are not finalized, so the associated memory
+# on the C side is not released, causing valgrind to report many leaks.
+#
+# to avoid valgrind going nuts, we manually clean up references at shutdown.
+# for the second case, this may only be a work-around as it may be too late.
+#
+# for python3, both problems may have been solved already:
+#
+# https://www.python.org/dev/peps/pep-0442/
+#
+# and if not, python3 provides a work-around we could use, so manual
+# clearing can be done each collection:
+#
+# https://docs.python.org/3/library/gc.html#gc.callbacks
+#
+# of course we might also try to prevent cycles in the first place.
+#
+# TODO valgrind python3
 
 def _cleanup_mapistores():
     for obj in gc.get_objects():
         if isinstance(obj, (Server, _store.Store)):
             obj.__dict__.clear()
+        elif hasattr(obj, '__class__') and obj.__class__.__name__ in ('IMAPISession', 'IMsgStore', 'IECServiceAdmin', 'IExchangeManageStore'):
+            obj.__dict__.clear()
+
+    del gc.garbage[:]
     gc.collect()
 
 if os.getenv('ZCPSRCDIR'):
@@ -173,7 +196,6 @@ class Server(object):
         :param config: path of configuration file containing common server options, for example ``/etc/kopano/admin.cfg``
         :param auth_user: username to user for user authentication
         :param auth_pass: password to use for user authentication
-        :param log: logger object to receive useful (debug) information
         :param options: OptionParser instance to get settings from (see :func:`parser`)
         :param parse_args: set this True if cli arguments should be parsed
         """
@@ -183,7 +205,12 @@ class Server(object):
         self.sslkey_pass = sslkey_pass
         self.server_socket = server_socket
         self.service = service
-        self.log = log
+        if log: # TODO deprecate?
+            self.log = log
+        elif service:
+            self.log = service.log
+        else:
+            self.log = LOG
         self.mapisession = mapisession
         self.store_cache = store_cache
 
@@ -223,10 +250,11 @@ class Server(object):
             self.sslkey_pass = sslkey_pass or getattr(self.options, 'sslkey_pass', None) or self.sslkey_pass
 
             # make actual connection. in case of service, wait until this succeeds.
-            self.auth_user = auth_user or getattr(self.options, 'auth_user', None) or 'SYSTEM' # XXX override with args
+            self.auth_user = auth_user or getattr(self.options, 'auth_user', None) or ''
             self.auth_pass = auth_pass or getattr(self.options, 'auth_pass', None) or ''
 
             flags = 0
+            self.notifications = notifications
             if not notifications:
                 flags |= EC_PROFILE_FLAGS_NO_NOTIFICATIONS
 
@@ -237,6 +265,8 @@ class Server(object):
 
             if oidc:
                 flags |= EC_PROFILE_FLAGS_OIDC
+            elif not self.auth_user:
+                self.auth_user = "SYSTEM"
 
             while True:
                 try:
@@ -244,7 +274,7 @@ class Server(object):
                     break
                 except (MAPIErrorNetworkError, MAPIErrorDiskError):
                     if service:
-                        service.log.warn("could not connect to server at '%s', retrying in 5 sec" % self.server_socket)
+                        self.log.warn("could not connect to server at '%s', retrying in 5 sec" % self.server_socket)
                         time.sleep(5)
                     else:
                         raise Error("could not connect to server at '%s'" % self.server_socket)
@@ -313,13 +343,15 @@ class Server(object):
             except MAPIErrorNotFound:
                 pass
 
-    def gab_table(self): # XXX separate addressbook class? useful to add to self.tables?
+    def gab_table(self, restriction=None, columns=None): # XXX separate addressbook class? useful to add to self.tables?
         ct = self.gab.GetContentsTable(MAPI_DEFERRED_ERRORS)
         return Table(
             self,
             self.mapistore,
             ct,
             PR_CONTAINER_CONTENTS,
+            restriction=restriction,
+            columns=columns,
         )
 
     @property
@@ -343,7 +375,7 @@ class Server(object):
     @property
     def guid(self):
         """Server GUID."""
-        return bin2hex(HrGetOneProp(self.mapistore, PR_MAPPING_SIGNATURE).Value)
+        return _benc(HrGetOneProp(self.mapistore, PR_MAPPING_SIGNATURE).Value)
 
     def user(self, name=None, email=None, create=False, userid=None):
         """Return :class:`user <User>` with given name or email address.
@@ -368,27 +400,53 @@ class Server(object):
             pass
 
     def users(self, remote=False, system=False, parse=True, page_start=None,
-            page_limit=None, order=None
-        ):
+              page_limit=None, order=None, hidden=True, inactive=True): # TODO hidden, inactive default False?
         """Return all :class:`users <User>` on server.
 
         :param remote: include users on remote server nodes
         :param system: include system users
         """
+        pos = 0
+        count = 0
         if parse and getattr(self.options, 'users', None):
             for username in self.options.users:
-                yield _user.User(username, self)
+                if page_start is None or pos >= page_start:
+                    yield _user.User(username, self)
+                    count += 1
+                if page_limit is not None and count >= page_limit:
+                    return
+                pos += 1
             return
         try:
             for name in self._companylist():
-                for user in Company(name, self).users(): # XXX remote/system check
-                    yield user
+                for user in Company(name, self).users(): # TODO filter for args?
+                    if page_start is None or pos >= page_start:
+                        yield user
+                        count += 1
+                    if page_limit is not None and count >= page_limit:
+                        return
+                    pos += 1
         except MAPIErrorNoSupport:
             for ecuser in self.sa.GetUserList(None, MAPI_UNICODE):
-                username = ecuser.Username
-                if system or username != u'SYSTEM':
-                    if remote or ecuser.Servername in (self.name, ''):
-                        yield _user.User(server=self, ecuser=ecuser)
+                user = _user.User(server=self, ecuser=ecuser)
+                if ((system or user.name != u'SYSTEM') and
+                    (remote or ecuser.Servername in (self.name, '')) and
+                    (hidden or not user.hidden) and
+                    (inactive or user.active)):
+                    if page_start is None or pos >= page_start:
+                        yield user
+                        count += 1
+                    if page_limit is not None and count >= page_limit:
+                        return
+                    pos += 1
+
+    def _user_query(self, query): # TODO merge as .users('..')?
+        store = _store.Store(mapiobj=self.mapistore, server=self)
+        restriction = _query_to_restriction(query, 'user', store)
+        columns = [PR_ENTRYID, PR_DISPLAY_NAME_W, PR_SMTP_ADDRESS_W]
+        table = self.gab_table(restriction=restriction, columns=columns)
+        for row in table.rows():
+            yield self.user(userid=_benc(row[0].value))
 
     def create_user(self, name, email=None, password=None, company=None, fullname=None, create_store=True):
         """Create a new :class:`user <User>` on the server.
@@ -401,8 +459,8 @@ class Server(object):
         :param create_store: should a store be created for the new user
         :return: :class:`<User>`
         """
+        fullname = _unicode(fullname or name or '')
         name = _unicode(name)
-        fullname = _unicode(fullname or '')
         if email:
             email = _unicode(email)
         else:
@@ -424,7 +482,7 @@ class Server(object):
             user = self.user(name)
         if create_store:
             try:
-                self.sa.CreateStore(ECSTORE_TYPE_PRIVATE, _unhex(user.userid))
+                self.sa.CreateStore(ECSTORE_TYPE_PRIVATE, _bdec(user.userid))
             except MAPIErrorCollision:
                 pass # create-user userscript may already create store
         return user
@@ -518,11 +576,11 @@ class Server(object):
             raise NotSupportedError("cannot create company in single-tenant mode")
         return self.company(name)
 
-    def _store(self, guid):
+    def _store(self, guid): # TODO move guid checks to caller
         if len(guid) != 32:
             raise Error("invalid store id: '%s'" % guid)
         try:
-            storeid = _unhex(guid)
+            storeid = _bdec(guid)
         except:
             raise Error("invalid store id: '%s'" % guid)
         table = self.ems.GetMailboxTable(None, 0) # XXX merge with Store.__init__
@@ -534,13 +592,13 @@ class Server(object):
 
     @instance_method_lru_cache(128) # backend doesn't like too many open stores
     def _store_cached(self, storeid):
-        return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore,MDB_WRITE)
+        return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore, MDB_WRITE)
 
     def _store2(self, storeid): # TODO max lifetime?
         if self.store_cache:
             return self._store_cached(storeid)
         else:
-            return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore,MDB_WRITE)
+            return self.mapisession.OpenMsgStore(0, storeid, IID_IMsgStore, MDB_WRITE)
 
     def groups(self):
         """Return all :class:`groups <Group>` on server."""
@@ -648,12 +706,13 @@ class Server(object):
         table.SetColumns([PR_DISPLAY_NAME_W, PR_ENTRYID], 0)
         for row in table.QueryRows(-1, 0):
             store = _store.Store(mapiobj=self._store2(row[1].Value), server=self)
-            if system or store.public or (store.user and store.user.name != 'SYSTEM'):
-                yield store
+            if not system and store.user and store.user.name == 'SYSTEM':
+                continue
+            yield store
 
     def remove_store(self, store):
         try:
-            self.sa.RemoveStore(_unhex(store.guid))
+            self.sa.RemoveStore(_bdec(store.guid))
         except MAPIErrorCollision:
             raise Error("cannot remove store with GUID '%s'" % store.guid)
 
@@ -675,7 +734,7 @@ class Server(object):
     def _pubhelper(self):
         try:
             self.sa.GetCompanyList(MAPI_UNICODE)
-            raise Error('request for server-wide public store in multi-tenant setup')
+            raise NotSupportedError('request for server-wide public store in multi-tenant setup')
         except MAPIErrorNoSupport:
             return next(self.companies())
 
@@ -712,7 +771,12 @@ class Server(object):
         :log: logger instance to receive important warnings/errors
         """
         importer.store = None
-        return _ics.sync(self, self.mapistore, importer, state, log or self.log, max_changes, window=window, begin=begin, end=end, stats=stats)
+        return _ics.sync(self, self.mapistore, importer, state, max_changes, window=window, begin=begin, end=end, stats=stats)
+
+    def sync_gab(self, importer, state=None):
+        if state is None:
+            state = _benc(8 * b'\0')
+        return _ics.sync_gab(self, self.mapistore, importer, state)
 
     @_timed_cache(minutes=60)
     def _resolve_email(self, entryid=None):
@@ -721,14 +785,6 @@ class Server(object):
             return self.user(HrGetOneProp(mailuser, PR_ACCOUNT_W).Value).email # XXX PR_SMTP_ADDRESS_W from mailuser?
         except (Error, MAPIErrorNotFound): # XXX deleted user
             return '' # XXX groups
-
-    def id_to_name(self, proptag):
-        """Give the name representation of an property id. For example 0x80710003 => 'task:33025'.
-
-        :param proptag: the property identifier
-        """
-
-        return _proptag_to_name(proptag, self.admin_store)
 
     def __unicode__(self):
         return u'Server(%s)' % self.server_socket

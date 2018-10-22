@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -5,13 +6,15 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file)
 Copyright 2016 - Kopano and its licensors (see LICENSE file)
 """
 
+import sys
+
 from MAPI import (
     KEEP_OPEN_READWRITE,
 )
 
 from MAPI.Tags import (
     PR_ATTACHMENT_CONTACTPHOTO, PR_GIVEN_NAME_W, PR_MIDDLE_NAME_W,
-    PR_SURNAME_W, PR_NICKNAME_W, PR_GENERATION_W, PR_TITLE_W, PR_GENERATION_W,
+    PR_SURNAME_W, PR_NICKNAME_W, PR_TITLE_W, PR_GENERATION_W,
     PR_COMPANY_NAME_W, PR_MOBILE_TELEPHONE_NUMBER_W, PR_CHILDRENS_NAMES_W,
     PR_BIRTHDAY, PR_SPOUSE_NAME_W, PR_INITIALS_W, PR_DISPLAY_NAME_PREFIX_W,
     PR_DEPARTMENT_NAME_W, PR_OFFICE_LOCATION_W, PR_PROFESSION_W,
@@ -27,10 +30,13 @@ from MAPI.Tags import (
 
 from .pidlid import (
     PidLidEmail1AddressType, PidLidEmail1DisplayName, PidLidEmail1EmailAddress,
-    PidLidEmail1OriginalEntryId, PidLidYomiFirstName, PidLidYomiLastName,
-    PidLidYomiCompanyName, PidLidFileUnder, PidLidInstantMessagingAddress,
-    PidLidWorkAddressStreet, PidLidWorkAddressCity, PidLidWorkAddressState,
-    PidLidWorkAddressPostalCode, PidLidWorkAddressCountry,
+    PidLidEmail1OriginalEntryId, PidLidEmail2AddressType, PidLidEmail2DisplayName,
+    PidLidEmail2EmailAddress, PidLidEmail2OriginalEntryId, PidLidYomiFirstName,
+    PidLidEmail3AddressType, PidLidEmail3DisplayName, PidLidEmail3EmailAddress,
+    PidLidEmail3OriginalEntryId, PidLidYomiLastName, PidLidYomiCompanyName,
+    PidLidFileUnder, PidLidInstantMessagingAddress, PidLidWorkAddressStreet,
+    PidLidWorkAddressCity, PidLidWorkAddressState, PidLidWorkAddressPostalCode,
+    PidLidWorkAddressCountry,
 )
 
 from .compat import repr as _repr
@@ -40,6 +46,16 @@ from .errors import NotFoundError
 from .compat import (
     fake_unicode as _unicode,
 )
+from .picture import Picture
+
+if sys.hexversion >= 0x03000000:
+    try:
+        from . import utils as _utils
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
+    import utils as _utils
+
 
 class PhysicalAddress(object):
     def __init__(self, item, proptags):
@@ -102,10 +118,69 @@ class Contact(object):
         yield self.address1
 
     @property
+    def email2(self):
+        if self.address1:
+            return self.address2.email
+
+    @email2.setter
+    def email2(self, addr):  # TODO should be email address?
+        self.address2 = addr
+
+    @property
+    def address2(self):
+        return Address(
+            self.server,
+            self.get(PidLidEmail2AddressType),
+            self.get(PidLidEmail2DisplayName),
+            self.get(PidLidEmail2EmailAddress),
+            self.get(PidLidEmail2OriginalEntryId),
+        )
+
+    @address2.setter
+    def address2(self, addr):
+        pr_addrtype, pr_dispname, pr_email, pr_entryid = \
+            self._addr_props(addr)
+
+        self[PidLidEmail2AddressType] = _unicode(pr_addrtype)
+        self[PidLidEmail2DisplayName] = pr_dispname
+        self[PidLidEmail2EmailAddress] = pr_email
+        self[PidLidEmail2OriginalEntryId] = pr_entryid
+
+    @property
+    def email3(self):
+        if self.address3:
+            return self.address3.email
+
+    @email3.setter
+    def email3(self, addr):  # TODO should be email address?
+        self.address3 = addr
+
+    @property
+    def address3(self):
+        return Address(
+            self.server,
+            self.get(PidLidEmail3AddressType),
+            self.get(PidLidEmail3DisplayName),
+            self.get(PidLidEmail3EmailAddress),
+            self.get(PidLidEmail3OriginalEntryId),
+        )
+
+    @address3.setter
+    def address3(self, addr):
+        pr_addrtype, pr_dispname, pr_email, pr_entryid = \
+            self._addr_props(addr)
+
+        self[PidLidEmail3AddressType] = _unicode(pr_addrtype)
+        self[PidLidEmail3DisplayName] = pr_dispname
+        self[PidLidEmail3EmailAddress] = pr_email
+        self[PidLidEmail3OriginalEntryId] = pr_entryid
+
+    # XXX uniformize with user.photo? class Picture?
+    @property
     def photo(self):
         for attachment in self.attachments():
             if attachment.get(PR_ATTACHMENT_CONTACTPHOTO):
-                return attachment
+                return Picture(data=attachment.data, name=attachment.name, mimetype=attachment.mimetype)
 
     def set_photo(self, name, data, mimetype):
         for attachment in self.attachments():
@@ -114,7 +189,7 @@ class Contact(object):
         attachment = self.create_attachment(name, data)
         attachment[PR_ATTACHMENT_CONTACTPHOTO] = True
         attachment.mimetype = mimetype
-        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.mapiobj)
         return attachment
 
     @property

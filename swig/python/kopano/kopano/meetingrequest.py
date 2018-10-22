@@ -1,24 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """
 Part of the high-level python bindings for Kopano
 
 Copyright 2017 - Kopano and its licensors (see LICENSE file for details)
 """
 
-from calendar import timegm
 import datetime
+import random
 import struct
 import sys
+import time
 
 import libfreebusy
 
 from MAPI import (
     MAPI_UNICODE, MODRECIP_MODIFY, KEEP_OPEN_READWRITE, RELOP_EQ,
     MODRECIP_ADD, MAPI_TO, MAPI_BCC, SUPPRESS_RECEIPT, MSGFLAG_READ,
-    MSGFLAG_UNSENT, MODRECIP_REMOVE,
+    MSGFLAG_UNSENT, MODRECIP_REMOVE, PT_BINARY
 )
 
 from MAPI.Tags import (
-    PT_BOOLEAN, PR_RECIPIENT_TRACKSTATUS, PR_MESSAGE_RECIPIENTS,
+    PR_RECIPIENT_TRACKSTATUS, PR_MESSAGE_RECIPIENTS,
     PR_MESSAGE_CLASS_W, PR_ENTRYID, PR_SENT_REPRESENTING_ENTRYID, PR_ROWID,
     PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, PR_SMTP_ADDRESS_W, PR_PROCESSED,
     IID_IMAPITable, IID_IMessage, PR_RECIPIENT_TRACKSTATUS_TIME,
@@ -30,8 +32,9 @@ from MAPI.Tags import (
     PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W,
     PR_RECIPIENT_DISPLAY_NAME_W, PR_SENT_REPRESENTING_ADDRTYPE_W,
     PR_SENT_REPRESENTING_SEARCH_KEY, PR_ACCOUNT_W, PR_DISPLAY_TYPE_EX,
-    PR_SUBJECT_W, PR_MESSAGE_FLAGS, recipSendable, recipOrganizer,
-    recipOriginal, respTentative, respAccepted, respDeclined,
+    PR_SUBJECT_W, PR_MESSAGE_FLAGS, PR_RESPONSE_REQUESTED,
+    recipSendable, recipOrganizer, recipOriginal, respTentative, respAccepted,
+    respDeclined, PR_START_DATE, PR_END_DATE,
 )
 
 from MAPI.Defs import (
@@ -42,6 +45,12 @@ from MAPI.Struct import (
     SPropValue, SPropertyRestriction, MAPIErrorUnknownEntryid,
 )
 
+from MAPI.Time import NANOSECS_BETWEEN_EPOCH
+
+from .defs import (
+    ASF_MEETING, ASF_RECEIVED, ASF_CANCELED
+)
+
 from .compat import repr as _repr
 from .errors import Error
 from .restriction import Restriction
@@ -49,12 +58,15 @@ from .restriction import Restriction
 if sys.hexversion >= 0x03000000:
     try:
         from . import utils as _utils
-    except ImportError:
-        _utils = sys.modules[__package__+'.utils']
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+
     from . import property_ as _prop
-else:
+    from . import timezone as _timezone
+else: # pragma: no cover
     import utils as _utils
     import property_ as _prop
+    import timezone as _timezone
 
 # XXX move all pidlids into separate definition file, plus short description of their meanings
 
@@ -73,10 +85,10 @@ from .pidlid import (
     PidLidAppointmentReplyTime, PidLidRecurring, PidLidIntendedBusyStatus,
     PidLidExceptionReplaceTime, PidLidFInvited, PidLidAppointmentReplyName,
     PidLidRecurrencePattern, PidLidTimeZoneStruct, PidLidTimeZoneDescription,
-    PidLidClipStart, PidLidClipEnd, PidLidToAttendeesString,
-    PidLidCcAttendeesString, PidLidAppointmentProposedStartWhole,
-    PidLidAppointmentProposedEndWhole, PidLidAppointmentProposedDuration,
-    PidLidAppointmentCounterProposal, PidLidSendAsIcal,
+    PidLidToAttendeesString, PidLidCcAttendeesString,
+    PidLidAppointmentProposedStartWhole, PidLidAppointmentProposedEndWhole,
+    PidLidAppointmentProposedDuration, PidLidAppointmentCounterProposal,
+    PidLidSendAsIcal,
 )
 
 # all of the above # TODO redundant
@@ -95,10 +107,10 @@ PROPTAGS = [
     PidLidAppointmentReplyTime, PidLidRecurring, PidLidIntendedBusyStatus,
     PidLidExceptionReplaceTime, PidLidFInvited, PidLidAppointmentReplyName,
     PidLidRecurrencePattern, PidLidTimeZoneStruct, PidLidTimeZoneDescription,
-    PidLidClipStart, PidLidClipEnd, PidLidToAttendeesString,
-    PidLidCcAttendeesString, PidLidAppointmentProposedStartWhole,
-    PidLidAppointmentProposedEndWhole, PidLidAppointmentProposedDuration,
-    PidLidAppointmentCounterProposal, PidLidSendAsIcal,
+    PidLidToAttendeesString, PidLidCcAttendeesString,
+    PidLidAppointmentProposedStartWhole, PidLidAppointmentProposedEndWhole,
+    PidLidAppointmentProposedDuration, PidLidAppointmentCounterProposal,
+    PidLidSendAsIcal,
 ]
 
 RECIP_PROPS = [
@@ -131,7 +143,7 @@ def _organizer_props(cal_item, item):
             break
 
     if not has_organizer:
-        return [
+        orgprops = [
             SPropValue(PR_ENTRYID, item.prop(PR_SENT_REPRESENTING_ENTRYID).value),
             SPropValue(PR_DISPLAY_NAME_W, item.prop(PR_SENT_REPRESENTING_NAME_W).value),
             SPropValue(PR_EMAIL_ADDRESS_W, item.prop(PR_SENT_REPRESENTING_EMAIL_ADDRESS_W).value),
@@ -140,8 +152,11 @@ def _organizer_props(cal_item, item):
             SPropValue(PR_ADDRTYPE_W, item.prop(PR_SENT_REPRESENTING_ADDRTYPE_W).value), # XXX php
             SPropValue(PR_RECIPIENT_TRACKSTATUS, 0),
             SPropValue(PR_RECIPIENT_FLAGS, (recipOrganizer | recipSendable)),
-            SPropValue(PR_SEARCH_KEY, item.prop(PR_SENT_REPRESENTING_SEARCH_KEY).value),
         ]
+        repr_search_key = item.get(PR_SENT_REPRESENTING_SEARCH_KEY) # TODO not in exception message?
+        if repr_search_key:
+            orgprops.append(SPropValue(PR_SEARCH_KEY, repr_search_key))
+        return orgprops
 
 def _copytags(mapiobj):
     copytags = [_prop._name_to_proptag(tag, mapiobj)[0] for tag in PROPTAGS]
@@ -155,6 +170,117 @@ def _copytags(mapiobj):
         PR_RCVD_REPRESENTING_NAME_W,
     ])
     return copytags
+
+# TODO: in MAPI.Time?
+def mapi_time(t):
+    return int(t) * 10000000 + NANOSECS_BETWEEN_EPOCH
+
+def _generate_goid():
+    """
+    Generate a meeting request Global Object ID.
+
+    The Global Object ID is a MAPI property that any MAPI client uses to
+    correlate meeting updates and responses with a particular meeting on
+    the calendar. The Global Object ID is the same across all copies of the
+    item.
+
+    The Global Object ID consists of the following data:
+
+    * byte array id (16 bytes) - identifiers the BLOB as a GLOBAL Object ID.
+    * year (YH + YL) - original year of the instance represented by the
+    exception. The value is in big-endian format.
+    * M (byte) - original month of the instance represented by the exception.
+    * D (byte) - original day of the instance represented by the exception.
+    * Creation time - 8 byte date
+    * X - reversed byte array of size 8.
+    * size - LONG, the length of the data field.
+    * data - a byte array (16 bytes) that uniquely identifers the meeting object.
+    """
+
+    # byte array id
+    goid = b'\x04\x00\x00\x00\x82\x00\xe0\x00t\xc5\xb7\x10\x1a\x82\xe0\x08'
+    # YEARHIGH, YEARLOW, MONTH, DATE
+    goid += struct.pack('>H2B', 0, 0, 0)
+    # Creation time, lowdatetime, highdatetime
+    now = mapi_time(time.time())
+    goid += struct.pack('II', now & 0xffffffff, now >> 32)
+    # Reserved, 8 zeros
+    goid += struct.pack('L', 0)
+    # data size
+    goid += struct.pack('I', 16)
+    # Unique data
+    for _ in range(0, 16):
+        goid += struct.pack('B', random.getrandbits(8))
+    return goid
+
+def _create_meetingrequest(cal_item, item, basedate=None):
+    # TODO Update the calendar item, for tracking status
+    # TODO Set the body of the message like WebApp / OL does.
+    # TODO Whitelist properties?
+
+    item2 = item.copy(item.store.outbox)
+    cancel = item.canceled
+
+    # remove meeting organizer TODO just copy correct ones? or why is the organizer MAPI_TO?
+    table = item2.mapiobj.OpenProperty(PR_MESSAGE_RECIPIENTS, IID_IMAPITable, MAPI_UNICODE, 0)
+    table.SetColumns(RECIP_PROPS, 0)
+    orgs = []
+    for row in table.QueryRows(-1,0):
+        recipient_flags = PpropFindProp(row, PR_RECIPIENT_FLAGS)
+        if recipient_flags and recipient_flags.Value & recipOrganizer:
+            orgs.append(row)
+    item2.mapiobj.ModifyRecipients(MODRECIP_REMOVE, orgs)
+
+    # set meeting request props
+    if cancel:
+        item2.message_class = 'IPM.Schedule.Meeting.Canceled'
+    else:
+        item2.message_class = 'IPM.Schedule.Meeting.Request'
+
+    stateflags = ASF_MEETING | ASF_RECEIVED
+    if cancel:
+        stateflags |= ASF_CANCELED
+        item2.subject = u'Canceled: '+item2.subject
+    item2[PidLidAppointmentStateFlags] = stateflags
+
+    # create appointment goid if not there
+    cleangoid = cal_item.get(PidLidCleanGlobalObjectId)
+    if cleangoid is None:
+        cleangoid = _generate_goid()
+        cal_item[PidLidGlobalObjectId] = cleangoid
+        cal_item[PidLidCleanGlobalObjectId] = cleangoid
+
+    # update sequence props
+    sequence = cal_item.get(PidLidAppointmentSequence)
+    if sequence is None:
+        cal_item[PidLidAppointmentSequence] = 0
+        cal_item[PidLidAppointmentLastSequence] = 0
+    else:
+        cal_item[PidLidAppointmentSequence] = sequence+1
+        cal_item[PidLidAppointmentLastSequence] = sequence+1
+    item2[PidLidAppointmentSequence] = cal_item[PidLidAppointmentSequence]
+    item2[PidLidAppointmentLastSequence] = cal_item[PidLidAppointmentLastSequence]
+
+    # set item goids
+    item2[PidLidCleanGlobalObjectId] = cleangoid
+    if basedate:
+        datefield = struct.pack('>H2B', basedate.year, basedate.month, basedate.day)
+        goid = cleangoid[:16] + datefield + cleangoid[20:]
+
+        item2[PidLidGlobalObjectId] = goid
+        item2[PidLidRecurring] = False
+
+        # update for non-exception TODO don't overwrite if exception
+        if cancel:
+            item2[PidLidAppointmentStartWhole] = basedate
+            item2[PidLidAppointmentEndWhole] = basedate + (cal_item.end - cal_item.start)
+
+            item2[PR_START_DATE] = basedate
+            item2[PR_END_DATE] = basedate + (cal_item.end - cal_item.start)
+
+            item2[PidLidExceptionReplaceTime] = datetime.datetime(basedate.year, basedate.month, basedate.day)
+
+    return item2
 
 class MeetingRequest(object):
     """MeetingRequest class"""
@@ -175,7 +301,7 @@ class MeetingRequest(object):
         return store.calendar
 
     @property
-    def calendar_item(self):
+    def calendar_item(self): # TODO ambiguous: split in two (match exact GOID or parent recurrence?)
         """ Global calendar item :class:`item <Item>` (possibly in delegator store) """
 
         goid = self.item.get_prop(PidLidCleanGlobalObjectId)
@@ -193,9 +319,7 @@ class MeetingRequest(object):
         if blob is not None:
             y, m, d = struct.unpack_from('>HBB', blob, 16)
             if (y, m, d) != (0, 0, 0):
-                ts = timegm(datetime.datetime(y, m, d).timetuple())
-                tz = self.item.get(PidLidTimeZoneStruct)
-                return _utils._to_gmt(datetime.datetime.fromtimestamp(ts), tz)
+                return _timezone._to_utc(datetime.datetime(y, m, d), self.item.tzinfo)
 
     @property
     def update_counter(self):
@@ -216,8 +340,7 @@ class MeetingRequest(object):
     @property
     def processed(self):
         """ Has the request/response been processed """
-
-        processed = self.item.get(PR_PROCESSED) or False
+        return self.item.get(PR_PROCESSED, False)
 
     @processed.setter
     def processed(self, value):
@@ -230,15 +353,23 @@ class MeetingRequest(object):
             self.processed = True
 
     @property
+    def response_requested(self):
+        """ Is a response requested """
+        return self.item.get(PR_RESPONSE_REQUESTED, False)
+
+    @property
     def is_request(self):
+        """ Is it an actual request """
         return self.item.message_class == 'IPM.Schedule.Meeting.Request'
 
     @property
     def is_response(self):
+        """ Is it a response """
         return self.item.message_class.startswith('IPM.Schedule.Meeting.Resp.')
 
     @property
     def is_cancellation(self):
+        """ Is it a cancellation """
         return self.item.message_class == 'IPM.Schedule.Meeting.Canceled'
 
     def _respond(self, subject_prefix, message_class, message=None):
@@ -247,7 +378,7 @@ class MeetingRequest(object):
 
         response.subject = subject_prefix + ': ' + self.item.subject
         if message:
-            response.body = message
+            response.text = message
         response.to = self.item.server.user(email=self.item.from_.email) # XXX
         response.from_ = self.item.store.user # XXX slow?
 
@@ -276,7 +407,7 @@ class MeetingRequest(object):
                 cal_item.mapiobj.ModifyRecipients(MODRECIP_ADD, [organizer_props] + rows)
             else:
                 cal_item.mapiobj.ModifyRecipients(MODRECIP_ADD, [organizer_props])
-            cal_item.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+            _utils._save(cal_item.mapiobj)
 
     def accept(self, tentative=False, response=True, add_bcc=False):
         """ Accept meeting request
@@ -301,14 +432,14 @@ class MeetingRequest(object):
             # update existing recurrence
             if cal_item and cal_item.recurring:
                 recurrence = cal_item.recurrence
-                if recurrence.is_exception(basedate):
-                    recurrence.modify_exception(basedate, self.item)
+                if recurrence._is_exception(basedate):
+                    recurrence._modify_exception(basedate, self.item)
                 else:
-                    recurrence.create_exception(basedate, self.item)
+                    recurrence._create_exception(basedate, self.item)
 
             # otherwise replace calendar item
             else:
-                if cal_item:
+                if cal_item and cal_item[PidLidGlobalObjectId] == self.item[PidLidGlobalObjectId]:
                     calendar.delete(cal_item)
                 cal_item = self.item.copy(calendar)
                 self._init_calitem(cal_item, tentative)
@@ -347,7 +478,9 @@ class MeetingRequest(object):
                 merge = True
                 rec = cal_item.recurrence
                 for item in existing_items:
-                    rec.create_exception(item.meetingrequest.basedate, item, merge=True)
+                    if not rec._is_exception(item.meetingrequest.basedate):
+                        rec._create_exception(item.meetingrequest.basedate, item, merge=True)
+                    # TODO else update..?
 
             calendar.delete(existing_items)
 
@@ -359,7 +492,7 @@ class MeetingRequest(object):
                 table.SetColumns(RECIP_PROPS, 0)
                 rows = table.QueryRows(-1, 0)
                 cal_item.mapiobj.ModifyRecipients(MODRECIP_MODIFY, rows)
-                cal_item.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+                _utils._save(cal_item.mapiobj)
 
         # add self as BCC for ZCP-9901 XXX still relevant?
         proptags = [
@@ -384,14 +517,14 @@ class MeetingRequest(object):
         ])
         if add_bcc and not merge:
             cal_item.mapiobj.ModifyRecipients(MODRECIP_ADD, [props])
-            cal_item.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+            _utils._save(cal_item.mapiobj)
 
         # send response
         if response:
             if tentative:
-                message_class ='IPM.Schedule.Meeting.Resp.Tent'
+                message_class = 'IPM.Schedule.Meeting.Resp.Tent'
             else:
-                message_class ='IPM.Schedule.Meeting.Resp.Pos'
+                message_class = 'IPM.Schedule.Meeting.Resp.Pos'
             self._respond('Accepted', message_class)
 
     def decline(self, message=None, response=True):
@@ -426,19 +559,23 @@ class MeetingRequest(object):
                 copytags = _copytags(cal_item.mapiobj)
 
                 if delete:
-                    recurrence.delete_exception(basedate, self.item, copytags)
+                    recurrence._delete_exception(basedate, self.item, copytags)
                 else:
-                    if recurrence.is_exception(basedate):
-                        recurrence.modify_exception(basedate, self.item, copytags)
+                    if recurrence._is_exception(basedate):
+                        recurrence._modify_exception(basedate, self.item, copytags)
                     else:
-                        recurrence.create_exception(basedate, self.item, copytags)
+                        recurrence._create_exception(basedate, self.item, copytags)
 
-                    message = recurrence.exception_message(basedate)
+                    message = recurrence._exception_message(basedate)
                     message[PidLidBusyStatus] = libfreebusy.fbFree
                     message[PR_MESSAGE_FLAGS] = MSGFLAG_UNSENT | MSGFLAG_READ
 
-                    message._attobj.SaveChanges(KEEP_OPEN_READWRITE)
-
+                    _utils._save(message._attobj)
+            else:
+                if delete:
+                    self.calendar.delete(cal_item)
+                else:
+                    cal_item.cancel()
         else:
             if delete:
                 self.calendar.delete(cal_item)
@@ -446,8 +583,8 @@ class MeetingRequest(object):
                 self.item.mapiobj.CopyTo([], [], 0, None, IID_IMessage, cal_item.mapiobj, 0)
                 cal_item.mapiobj.SetProps([SPropValue(PR_MESSAGE_CLASS_W, u'IPM.Appointment')])
 
-        if cal_item:
-            cal_item.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        if cal_item and not delete:
+            _utils._save(cal_item.mapiobj)
 
     def process_response(self):
         """ Process meeting request response """
@@ -467,10 +604,10 @@ class MeetingRequest(object):
             if cal_item.recurring:
                 recurrence = cal_item.recurrence
 
-                recurrence._update_calitem(self.item) # XXX via create/modify exception
+                recurrence._update_calitem() # XXX via create/modify exception
 
-                if recurrence.is_exception(basedate):
-                    message = recurrence.exception_message(basedate)
+                if recurrence._is_exception(basedate):
+                    message = recurrence._exception_message(basedate)
 
                     owner_appt_id = self.item.get(PR_OWNER_APPT_ID)
                     if owner_appt_id is not None:
@@ -483,7 +620,7 @@ class MeetingRequest(object):
 
         # update recipient track status
         table = message.mapiobj.OpenProperty(PR_MESSAGE_RECIPIENTS, IID_IMAPITable, MAPI_UNICODE, 0)
-        table.SetColumns(RECIP_PROPS, 0) # XXX why do things get lot witout this
+        table.SetColumns(RECIP_PROPS, 0) # XXX things seem to get lost without this
 
         rows = table.QueryRows(-1, 0)
         for row in rows:
@@ -494,7 +631,7 @@ class MeetingRequest(object):
 
                 attendee_crit_change = self.item.get_prop(PidLidAttendeeCriticalChange)
                 if trackstatus_time and attendee_crit_change and \
-                    attendee_crit_change.mapiobj.Value <= trackstatus_time.Value:
+                   attendee_crit_change.mapiobj.Value <= trackstatus_time.Value:
                     continue
 
                 if trackstatus_time:
@@ -522,11 +659,11 @@ class MeetingRequest(object):
             message[PidLidAppointmentCounterProposal] = True
 
         # save all the things
-        message.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(message.mapiobj)
 
         if attach:
-            attach.SaveChanges(KEEP_OPEN_READWRITE)
-            cal_item.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+            _utils._save(attach)
+            _utils._save(cal_item.mapiobj)
 
     def _compare_ab_entryids(self, entryid1, entryid2): # XXX shorten?
         smtp1 = self._get_smtp_address(entryid1)

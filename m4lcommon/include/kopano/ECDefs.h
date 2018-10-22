@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECDEFS_H
@@ -20,6 +8,7 @@
 
 #include <string>
 #include <kopano/platform.h>
+#include <mapidefs.h>
 
 namespace KC {
 
@@ -132,11 +121,6 @@ enum userobject_admin_level_t {
 	ADMIN_LEVEL_SYSADMIN = 2		/* System administrator (same rights as SYSTEM). */
 };
 
-struct ECENTRYID {
-	unsigned int	cb;
-	unsigned char*	lpb;
-};
-
 struct ECSVRNAMELIST {
 	unsigned int	cServers;
 	LPTSTR*			lpszaServer;
@@ -169,46 +153,32 @@ typedef struct MVPROPMAP *LPMVPROPMAP;
 
 struct ECUSER {
 	LPTSTR			lpszUsername;	// username@companyname
-	LPTSTR			lpszPassword;
-	LPTSTR			lpszMailAddress;
-	LPTSTR			lpszFullName;
-	LPTSTR			lpszServername;
+	TCHAR *lpszPassword, *lpszMailAddress, *lpszFullName, *lpszServername;
 	objectclass_t	ulObjClass;
 	unsigned int	ulIsAdmin;		// See userobject_admin_level_t
 	unsigned int	ulIsABHidden;	// Is user hidden from address book
 	unsigned int	ulCapacity;		// Resource capacity
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
-	ECENTRYID		sUserId;
+	SBinary sUserId;
 };
 
 struct ECGROUP {
 	LPTSTR			lpszGroupname; // groupname@companyname
-	LPTSTR			lpszFullname;
-	LPTSTR			lpszFullEmail;
-	ECENTRYID		sGroupId;
+	TCHAR *lpszFullname, *lpszFullEmail;
+	SBinary sGroupId;
 	unsigned int	ulIsABHidden;	// Is group hidden from address book
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
 };
 
 struct ECCOMPANY {
-	ECENTRYID		sAdministrator; // userid of the administrator
-	LPTSTR			lpszCompanyname;
-	LPTSTR			lpszServername;
-	ECENTRYID		sCompanyId;
+	SBinary sAdministrator; // userid of the administrator
+	TCHAR *lpszCompanyname, *lpszServername;
+	SBinary sCompanyId;
 	unsigned int	ulIsABHidden;	// Is company hidden from address book
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
-};
-
-struct ECUSERCLIENTUPDATESTATUS {
-	unsigned int	ulTrackId;
-	time_t			tUpdatetime;
-	LPTSTR			lpszCurrentversion;
-	LPTSTR			lpszLatestversion;
-	LPTSTR			lpszComputername;
-	unsigned int 	ulStatus;
 };
 
 #define UPDATE_STATUS_UNKNOWN	0
@@ -217,18 +187,14 @@ struct ECUSERCLIENTUPDATESTATUS {
 #define UPDATE_STATUS_FAILED    3
 
 struct ECPERMISSION {
-	unsigned int	ulType;
-	unsigned int	ulRights;
-	unsigned int	ulState;
-	ECENTRYID		sUserId;
+	unsigned int ulType, ulRights, ulState;
+	SBinary sUserId;
 };
 
 struct ECQUOTA {
 	bool			bUseDefaultQuota;
 	bool			bIsUserDefaultQuota; // Default quota for users within company
-	int64_t		llWarnSize;
-	int64_t		llSoftSize;
-	int64_t		llHardSize;
+	int64_t llWarnSize, llSoftSize, llHardSize;
 };
 
 struct ECQUOTASTATUS {
@@ -237,11 +203,7 @@ struct ECQUOTASTATUS {
 };
 
 struct ECSERVER {
-	LPTSTR	lpszName;
-	LPTSTR	lpszFilePath;
-	LPTSTR	lpszHttpPath;
-	LPTSTR	lpszSslPath;
-	LPTSTR	lpszPreferedPath;
+	TCHAR *lpszName, *lpszFilePath, *lpszHttpPath, *lpszSslPath, *lpszPreferedPath;
 	ULONG	ulFlags;
 };
 

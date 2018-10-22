@@ -1,22 +1,8 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <iostream>
 #include <set>
 #include <string>
@@ -43,14 +29,12 @@ static bool ReadYesNoMessage(const std::string &strMessage,
 	string strReply;
 
 	cout << strMessage << " [yes/no]: ";
-
 	if (strAuto.empty())
 		getline(cin, strReply);
 	else {
 		cout << strAuto << endl;
 		strReply = strAuto;
 	}
-
 	return (strReply[0] == 'y' || strReply[0] == 'Y');
 }
 
@@ -61,15 +45,11 @@ static HRESULT DeleteEntry(LPMAPIFOLDER lpFolder,
 	HRESULT hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~lpEntryList);
 	if (hr != hrSuccess)
 		goto exit;
-
 	hr = MAPIAllocateMore(sizeof(SBinary), lpEntryList, (void**)&lpEntryList->lpbin);
 	if (hr != hrSuccess)
 		goto exit;
-
 	lpEntryList->cValues = 1;
-	lpEntryList->lpbin[0].cb = lpItemProperty->Value.bin.cb;
-	lpEntryList->lpbin[0].lpb = lpItemProperty->Value.bin.lpb;
-
+	lpEntryList->lpbin[0] = lpItemProperty->Value.bin;
 	hr = lpFolder->DeleteMessages(lpEntryList, 0, NULL, 0);
 
 exit:
@@ -77,7 +57,6 @@ exit:
 		cout << "Item deleted." << endl;
 	else
 		cout << "Failed to delete entry." << endl;
-
 	return hr;
 }
 
@@ -91,7 +70,7 @@ static HRESULT FixProperty(LPMESSAGE lpMessage, const std::string &strName,
 	/* NOTE: Named properties don't have the PT value set by default,
 	   The caller of this function should have taken care of this. */
 	if (PROP_ID(ulTag) == 0 || PROP_TYPE(ulTag) == 0) {
-		cout << "Invalid property tag: " << stringify(ulTag, true) << endl;
+		cout << "Invalid property tag: " << stringify_hex(ulTag) << endl;
 		return MAPI_E_INVALID_PARAMETER;
 	}
 	auto hr = lpMessage->SetProps(1, &ErrorProp, nullptr);
@@ -147,8 +126,7 @@ static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 	HRESULT hr = hrSuccess;
 	object_ptr<IMessage> lpMessage;
 	ULONG ulObjectType = 0;
-	string strName;
-	string strClass;
+	std::string strName, strClass;
 
 	auto lpItemProperty = lpRow->cfind(PR_ENTRYID);
 	if (!lpItemProperty) {
@@ -162,19 +140,15 @@ static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 		cout << "Failed to open EntryID." << endl;
 		goto exit;
 	}
-
 	hr = DetectFolderEntryDetails(lpMessage, &strName, &strClass);
 	if (hr != hrSuccess)
 		goto exit;
-
 	hr = lpFsck->ValidateMessage(lpMessage, strName, strClass);
 	if (hr != hrSuccess)
 		goto exit;
-
 exit:
 	if (hr != hrSuccess)
 		hr = lpFsck->DeleteMessage(lpFolder, lpItemProperty);
-
 	return hr;
 }
 
@@ -183,13 +157,11 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 {
 	object_ptr<IMAPITable> lpTable;
 	ULONG ulCount;
-
 	HRESULT hr = lpFolder->GetContentsTable(0, &~lpTable);
  	if(hr != hrSuccess) {
 		cout << "Failed to open Folder table." << endl;
 		return hr;
 	}
-
 	/*
 	 * Check if we have found at least *something*.
 	 */
@@ -212,7 +184,6 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 			return hr;
 		if (lpRows->cRows == 0)
 			break;
-
 		for (ULONG i = 0; i < lpRows->cRows; ++i) {
 			hr = ProcessFolderEntry(lpFsck, lpFolder, &lpRows[i]);
 			if (hr != hrSuccess)
@@ -230,12 +201,9 @@ HRESULT Fsck::ValidateMessage(LPMESSAGE lpMessage,
     const std::string &strName, const std::string &strClass)
 {
 	cout << "Validating entry: \"" << strName << "\"" << endl;
-
-	++this->ulEntries;
-	HRESULT hr = this->ValidateItem(lpMessage, strClass);
-
+	++ulEntries;
+	auto hr = ValidateItem(lpMessage, strClass);
 	cout << "Validating of entry \"" << strName << "\" ended" << endl;
-
 	return hr;
 }
 
@@ -243,11 +211,9 @@ HRESULT Fsck::ValidateFolder(LPMAPIFOLDER lpFolder,
     const std::string &strName)
 {
 	cout << "Validating folder \"" << strName << "\"" << endl;
-
-	++this->ulFolders;
+	++ulFolders;
 	HRESULT hr = ProcessFolder(this, lpFolder, strName);
 	cout << "Validating of folder \"" << strName << "\" ended" << endl;
-
 	return hr;
 }
 
@@ -255,13 +221,12 @@ HRESULT Fsck::AddMissingProperty(LPMESSAGE lpMessage,
     const std::string &strName, ULONG ulTag, __UPV Value)
 {
 	cout << "Missing property " << strName << endl;
-
-	++this->ulProblems;
+	++ulProblems;
 	if (!ReadYesNoMessage("Add missing property?", auto_fix))
 		return hrSuccess;
 	auto hr = FixProperty(lpMessage, strName, ulTag, Value);
 	if (hr == hrSuccess)
-		++this->ulFixed;
+		++ulFixed;
 	return hr;
 }
 
@@ -270,19 +235,18 @@ HRESULT Fsck::ReplaceProperty(LPMESSAGE lpMessage,
     __UPV Value)
 {
 	cout << "Invalid property " << strName << " - " << strError << endl;
-
-	++this->ulProblems;
+	++ulProblems;
 	if (!ReadYesNoMessage("Fix broken property?", auto_fix))
 		return hrSuccess;
 	auto hr = FixProperty(lpMessage, strName, ulTag, Value);
 	if (hr == hrSuccess)
-		++this->ulFixed;
+		++ulFixed;
 	return hr;
 }
 
 HRESULT Fsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged)
 {
-	++this->ulProblems;
+	++ulProblems;
 	cout << mapiReciptDel.size() << " duplicate or invalid recipients found. " << endl;
 	if (!ReadYesNoMessage("Remove duplicate or invalid recipients?", auto_fix))
 		return hrSuccess;
@@ -310,7 +274,7 @@ HRESULT Fsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &
 	if (hr != hrSuccess)
 		return hr;
 	bChanged = true;
-	++this->ulFixed;
+	++ulFixed;
 	return hrSuccess;
 }
 
@@ -321,7 +285,7 @@ HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder,
 		return hrSuccess;
 	auto hr = DeleteEntry(lpFolder, lpItemProperty);
 	if (hr == hrSuccess)
-		++this->ulDeleted;
+		++ulDeleted;
 	return hr;
 }
 
@@ -425,8 +389,7 @@ HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
 				continue;
 			}
-
-			// Invalid or missing entryid 
+			// Invalid or missing entryid
 			if (pRows[i].lpProps[4].ulPropTag != PR_ENTRYID ||
 			    pRows[i].lpProps[4].Value.bin.cb == 0) {
 				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
@@ -441,7 +404,7 @@ HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 			if (pRows[i].lpProps[3].ulPropTag == PR_RECIPIENT_TYPE)
 				strData += stringify(pRows[i].lpProps[3].Value.ul);
 			auto res = mapRecip.emplace(std::move(strData));
-			if (res.second == false)
+			if (!res.second)
 				mapiReciptDel.emplace_back(pRows[i].lpProps[0].Value.ul);
 		}
 	}

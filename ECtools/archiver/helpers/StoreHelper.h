@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef STOREHELPER_H_INCLUDED
@@ -37,14 +25,14 @@ typedef std::unique_ptr<StoreHelper> StoreHelperPtr;
  * The StoreHelper class provides some common utility functions that relate to IMsgStore
  * objects in the archiver context.
  */
-class _kc_export StoreHelper _kc_final : public MAPIPropHelper {
+class _kc_export StoreHelper final : public MAPIPropHelper {
 public:
 	static HRESULT Create(MsgStorePtr &ptrMsgStore, StoreHelperPtr *lpptrStoreHelper);
 	_kc_hidden HRESULT GetFolder(const tstring &name, bool create, LPMAPIFOLDER *ret);
 	_kc_hidden HRESULT UpdateSearchFolders(void);
 	_kc_hidden HRESULT GetIpmSubtree(LPMAPIFOLDER *);
 	HRESULT GetSearchFolders(LPMAPIFOLDER *lppSearchArchiveFolder, LPMAPIFOLDER *lppSearchDeleteFolder, LPMAPIFOLDER *lppSearchStubFolder);
-	
+
 private:
 	_kc_hidden StoreHelper(MsgStorePtr &);
 	_kc_hidden HRESULT Init(void);
@@ -70,7 +58,7 @@ private:
 	static const search_folder_info_t s_infoSearchFolders[];
 	MsgStorePtr	m_ptrMsgStore;
 	MAPIFolderPtr m_ptrIpmSubtree;
-	
+
 	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)

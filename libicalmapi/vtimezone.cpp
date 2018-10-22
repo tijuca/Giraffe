@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include "vtimezone.h"
@@ -153,8 +140,7 @@ static HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent *lpVTZ,
     TIMEZONE_STRUCT *lpsTimeZone)
 {
 	icalcomponent *icComp = NULL;
-	SYSTEMTIME *lpSysTime = NULL;
-	SYSTEMTIME stRecurTime;
+	SYSTEMTIME stRecurTime, *lpSysTime = NULL;
 
 	/* Assumes that definitions are sorted on dtstart, in ascending order. */
 	auto iterComp = icalcomponent_get_first_component(lpVTZ, kind);
@@ -339,32 +325,29 @@ HRESULT HrCreateVTimeZone(const std::string &strTZID,
 	icalcomponent_add_component(icTZComp, icComp);
 
 	// DST, optional
-	if (tsTimeZone.lStdBias != tsTimeZone.lDstBias && tsTimeZone.stStdDate.wMonth != 0 && tsTimeZone.stDstDate.wMonth != 0) {
-		icComp = icalcomponent_new_xdaylight();
-		icTime = icaltime_from_timet_with_zone(SystemTimeToUnixTime(tsTimeZone.stDstDate), 0, nullptr);
-		icalcomponent_add_property(icComp, icalproperty_new_dtstart(icTime));
-
-		icalcomponent_add_property(icComp, icalproperty_new_tzoffsetfrom(-tsTimeZone.lBias *60));
-		icalcomponent_add_property(icComp, icalproperty_new_tzoffsetto( ((-tsTimeZone.lBias) + (-tsTimeZone.lDstBias)) *60) );
-
-		// create rrule for DST zone
-		icalrecurrencetype_clear(&icRec);
-		icRec.freq = ICAL_YEARLY_RECURRENCE;
-		icRec.interval = 1;
-
-		icRec.by_month[0] = tsTimeZone.stDstDate.wMonth;
-		icRec.by_month[1] = ICAL_RECURRENCE_ARRAY_MAX;
-
-		icRec.week_start = ICAL_SUNDAY_WEEKDAY;
-
-		icRec.by_day[0] = tsTimeZone.stDstDate.wDay == 5 ? -1*(8+tsTimeZone.stDstDate.wDayOfWeek+1) : (tsTimeZone.stDstDate.wDay)*8+tsTimeZone.stDstDate.wDayOfWeek+1;
-		icRec.by_day[1] = ICAL_RECURRENCE_ARRAY_MAX;
-		
-		icalcomponent_add_property(icComp, icalproperty_new_rrule(icRec));
-
-		icalcomponent_add_component(icTZComp, icComp);
+	if (tsTimeZone.lStdBias == tsTimeZone.lDstBias ||
+	    tsTimeZone.stStdDate.wMonth == 0 ||
+	    tsTimeZone.stDstDate.wMonth == 0) {
+		*lppVTZComp = icTZComp;
+		return hrSuccess;
 	}
 
+	icComp = icalcomponent_new_xdaylight();
+	icTime = icaltime_from_timet_with_zone(SystemTimeToUnixTime(tsTimeZone.stDstDate), 0, nullptr);
+	icalcomponent_add_property(icComp, icalproperty_new_dtstart(icTime));
+	icalcomponent_add_property(icComp, icalproperty_new_tzoffsetfrom(-tsTimeZone.lBias * 60));
+	icalcomponent_add_property(icComp, icalproperty_new_tzoffsetto(((-tsTimeZone.lBias) + (-tsTimeZone.lDstBias)) * 60));
+	// create rrule for DST zone
+	icalrecurrencetype_clear(&icRec);
+	icRec.freq = ICAL_YEARLY_RECURRENCE;
+	icRec.interval = 1;
+	icRec.by_month[0] = tsTimeZone.stDstDate.wMonth;
+	icRec.by_month[1] = ICAL_RECURRENCE_ARRAY_MAX;
+	icRec.week_start = ICAL_SUNDAY_WEEKDAY;
+	icRec.by_day[0] = tsTimeZone.stDstDate.wDay == 5 ? -1 * (8 + tsTimeZone.stDstDate.wDayOfWeek + 1) : (tsTimeZone.stDstDate.wDay) * 8 + tsTimeZone.stDstDate.wDayOfWeek + 1;
+	icRec.by_day[1] = ICAL_RECURRENCE_ARRAY_MAX;
+	icalcomponent_add_property(icComp, icalproperty_new_rrule(icRec));
+	icalcomponent_add_component(icTZComp, icComp);
 	*lppVTZComp = icTZComp;
 	return hrSuccess;
 }

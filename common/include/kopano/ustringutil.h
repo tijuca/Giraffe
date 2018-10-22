@@ -1,27 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ustringutil_INCLUDED
 #define ustringutil_INCLUDED
 
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
 #include <string>
-
 #include <unicode/coll.h>
 #include <unicode/sortkey.h>
 #include <unicode/unistr.h>
@@ -58,7 +44,6 @@ extern _kc_export bool u8_istartswith(const char *, const char *, const ECLocale
 extern _kc_export int u8_icompare(const char *, const char *, const ECLocale &);
 extern _kc_export bool u8_contains(const char *haystack, const char *needle, const ECLocale &);
 extern _kc_export bool u8_icontains(const char *haystack, const char *needle, const ECLocale &);
-
 extern _kc_export unsigned int u8_ncpy(const char *src, unsigned int n, std::string *dst);
 extern _kc_export unsigned int u8_cappedbytes(const char *s, unsigned int max);
 extern _kc_export unsigned int u8_len(const char *);

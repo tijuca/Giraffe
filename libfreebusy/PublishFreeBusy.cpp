@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include <kopano/ECRestriction.h>
@@ -39,7 +26,7 @@
 
 namespace KC {
 
-class PublishFreeBusy _kc_final {
+class PublishFreeBusy final {
 	public:
 	PublishFreeBusy(IMAPISession *, IMsgStore *defstore, time_t start, ULONG months);
 	HRESULT HrInit();
@@ -90,7 +77,9 @@ HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore,
 	ULONG cValues = 0;
 
 	ec_log_debug("current time %d", (int)tsStart);
-	std::unique_ptr<PublishFreeBusy> lpFreeBusy(new PublishFreeBusy(lpSession, lpDefStore, tsStart, ulMonths));
+	auto lpFreeBusy = make_unique_nt<PublishFreeBusy>(lpSession, lpDefStore, tsStart, ulMonths);
+	if (lpFreeBusy == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	auto hr = lpFreeBusy->HrInit();
 	if (hr != hrSuccess)
 		return hr;
@@ -294,8 +283,10 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 				kc_perror("Error loading recurrence state", hr);
 				continue;
 			}
-			if (lpRowSet[i].lpProps[6].ulPropTag == PROP_APPT_TIMEZONESTRUCT)
-				ttzInfo = *reinterpret_cast<TIMEZONE_STRUCT *>(lpRowSet[i].lpProps[6].Value.bin.lpb);
+			if (lpRowSet[i].lpProps[6].ulPropTag == PROP_APPT_TIMEZONESTRUCT) {
+				memcpy(&ttzInfo, lpRowSet[i].lpProps[6].Value.bin.lpb, sizeof(ttzInfo));
+				ttzInfo.le_to_cpu();
+			}
 			if (lpRowSet[i].lpProps[2].ulPropTag == PROP_APPT_FBSTATUS)
 				ulFbStatus = lpRowSet[i].lpProps[2].Value.ul;
 			hr = lpRecurrence.HrGetItems(m_tsStart, m_tsEnd, ttzInfo, ulFbStatus, &+lpOccrInfo, lpcValues);

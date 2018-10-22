@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECCACHE_INCLUDED
@@ -24,8 +12,9 @@
 #include <vector>
 #include <utility>
 #include <cassert>
-
+#include <cstdint>
 #include <kopano/platform.h>
+#include <kopano/kcodes.h> /* ECRESULT */
 
 namespace KC {
 
@@ -50,10 +39,15 @@ public:
 	time_t ulLastAccess = 0;
 };
 
+struct ECCacheStat {
+	std::string name;
+	uint64_t items, size, maxsize, req, hit;
+};
+
 class _kc_export ECCacheBase {
 public:
 	typedef unsigned long		count_type;
-		typedef uint64_t	size_type;
+	typedef size_t size_type;
 
 	_kc_hidden virtual ~ECCacheBase(void) = default;
 	_kc_hidden virtual count_type ItemCount(void) const = 0;
@@ -65,16 +59,19 @@ public:
 
 	// Decrement the valid count. Used from ECCacheManger::GetCell.
 	_kc_hidden void DecrementValidCount(void)
-	{ 
+	{
 		assert(m_ulCacheValid >= 1);
 		--m_ulCacheValid;
 	}
 
 	// Call the provided callback with some statistics.
-	void RequestStats(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj);
+	ECCacheStat get_stats() const;
 
 	// Dump statistics
-	void DumpStats(void) const;
+	void SetMaxSize(size_type ulMaxSize)
+	{
+		m_ulMaxSize = ulMaxSize;
+	}
 
 protected:
 	ECCacheBase(const std::string &strCachename, size_type ulMaxSize, long lMaxAge);
@@ -84,7 +81,7 @@ protected:
 
 private:
 	const std::string	m_strCachename;
-	const size_type		m_ulMaxSize;
+	size_type		m_ulMaxSize;
 	const long			m_lMaxAge;
 	size_type m_ulCacheHit = 0, m_ulCacheValid = 0;
 };
@@ -93,12 +90,12 @@ template<typename MapType> class ECCache _kc_final : public ECCacheBase {
 public:
 	typedef typename MapType::key_type key_type;
 	typedef typename MapType::mapped_type mapped_type;
-	
+
 	ECCache(const std::string &strCachename, size_type ulMaxSize, long lMaxAge)
 		: ECCacheBase(strCachename, ulMaxSize, lMaxAge)
 		, m_ulSize(0)
 	{ }
-	
+
 	ECRESULT ClearCache()
 	{
 		m_map.clear();
@@ -106,19 +103,19 @@ public:
 		ClearCounters();
 		return erSuccess;
 	}
-	
+
 	count_type ItemCount(void) const _kc_override
 	{
 		return m_map.size();
 	}
-	
+
 	size_type Size(void) const _kc_override
 	{
 		/* It works with map and unordered_map. */
 		return m_map.size() * (sizeof(typename MapType::value_type) + sizeof(MapType)) + m_ulSize;
 	}
 
-	ECRESULT RemoveCacheItem(const key_type &key) 
+	ECRESULT RemoveCacheItem(const key_type &key)
 	{
 		auto iter = m_map.find(key);
 		if (iter == m_map.end())
@@ -129,12 +126,12 @@ public:
 		m_map.erase(iter);
 		return erSuccess;
 	}
-	
+
 	ECRESULT GetCacheItem(const key_type &key, mapped_type **lppValue)
 	{
 		time_t	tNow  = GetProcessTime();
 		auto iter = m_map.find(key);
-		
+
 		if (iter == m_map.end()) {
 			IncrementHitCount();
 			return KCERR_NOT_FOUND;
@@ -178,13 +175,13 @@ public:
 			values->emplace_back(*i);
 		return erSuccess;
 	}
-	
+
 	ECRESULT AddCacheItem(const key_type &key, const mapped_type &value)
 	{
 		if (MaxSize() == 0)
 			return erSuccess;
 		auto result = m_map.emplace(key, value);
-		if (result.second == false) {
+		if (!result.second) {
 			// The key already exists but its value is unmodified. So update it now
 			m_ulSize += GetCacheAdditionalSize(value);
 			m_ulSize -= GetCacheAdditionalSize(result.first->second);
@@ -200,9 +197,9 @@ public:
 		UpdateCache(0.05F);
 		return erSuccess;
 	}
-	
+
 	// Used in ECCacheManager::SetCell, where the content of a cache item is modified.
-		ECRESULT AddToSize(int64_t ulSize)
+	ECRESULT AddToSize(int64_t ulSize)
 	{
 		m_ulSize += ulSize;
 		return erSuccess;
@@ -221,7 +218,6 @@ private:
 		}
 
 		lstEntries.sort(KeyEntryOrder<key_type>);
-
 		// We now have a list of all cache items, sorted by access time, (oldest first)
 		size_t ulDelete = m_map.size() * ratio;
 
@@ -239,7 +235,7 @@ private:
 
 		return erSuccess;
 	}
-	
+
 	ECRESULT UpdateCache(float ratio)
 	{
 		if (Size() > MaxSize())
@@ -247,7 +243,7 @@ private:
 		return erSuccess;
 	}
 
-	MapType m_map;	
+	MapType m_map;
 	size_type			m_ulSize;
 };
 

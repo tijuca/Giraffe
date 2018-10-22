@@ -1,28 +1,18 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef MAILER_H
 #define MAILER_H
 
+#include <memory>
 #include <mapidefs.h>
 #include <inetmapi/inetmapi.h>
 #include <kopano/ECDefs.h>
 
+namespace KC { class ECLogger; }
 extern HRESULT SendUndeliverable(KC::ECSender *, IMsgStore *, IMessage *);
-HRESULT ProcessMessageForked(const wchar_t *szUsername, const char *szSMTP, int ulPort, const char *szPath, ULONG cbMsgEntryId, LPENTRYID lpMsgEntryId, bool bDoSentMail);
+extern HRESULT ProcessMessageForked(const wchar_t *user, const char *smtp_host, int smtp_port, const char *path, unsigned int eid_size, const ENTRYID *msg_eid, std::shared_ptr<KC::ECLogger>, bool do_sentmail);
 
 #endif

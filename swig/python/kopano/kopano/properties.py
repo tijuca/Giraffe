@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -11,21 +12,22 @@ from MAPI import (
     KEEP_OPEN_READWRITE, PT_UNICODE, PT_ERROR, MAPI_E_NOT_FOUND
 )
 
-from MAPI.Defs import (
-    PROP_TYPE, PROP_ID
-)
-
-from MAPI.Struct import (
-    SPropValue
-)
+from MAPI.Defs import PROP_TYPE
+from MAPI.Struct import SPropValue
 
 from .compat import repr as _repr
 from .errors import NotFoundError
 
 if sys.hexversion >= 0x03000000:
     from . import property_ as _prop
-else:
+
+    try:
+        from . import utils as _utils
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
     import property_ as _prop
+    import utils as _utils
 
 class Properties(object):
     """Property mixin class"""
@@ -37,7 +39,7 @@ class Properties(object):
         :param create: create property if it doesn't exist
         """
         return _prop.prop(self, self.mapiobj, proptag, create=create,
-            proptype=proptype)
+                          proptype=proptype)
 
     def get_prop(self, proptag):
         """Return :class:`property <Property>` with given proptag or
@@ -95,18 +97,20 @@ class Properties(object):
     # about 20 SQL statements _per item_ (!)
 
     # TODO generalize for any property?
-    def _get_fast(self, proptag, default=None, must_exist=False):
+    def _get_fast(self, proptag, default=None, must_exist=False, capped=False):
         # in cache
-        if proptag in self._cache:
-            proptype = PROP_TYPE(self._cache[proptag].proptag)
-            value = self._cache[proptag].value
+
+        prop = self._cache.get(proptag)
+        if prop is not None:
+            proptype = PROP_TYPE(prop.proptag)
+            value = prop.value
 
             if proptype == PT_ERROR and value == MAPI_E_NOT_FOUND:
                 return default
 
             # mapi table cells are limited to 255 characters/bytes
             # TODO check other types
-            if not (proptype == PT_UNICODE and len(value) >= 255):
+            if capped or not (proptype == PT_UNICODE and len(value) >= 255):
                 return value
 
         # fallback to (slow) lookup
@@ -121,7 +125,7 @@ class Properties(object):
     def _set_fast(self, proptag, value):
         self._cache.pop(proptag, None)
         self.mapiobj.SetProps([SPropValue(proptag, value)])
-        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.mapiobj)
 
     def __repr__(self):
         return _repr(self)

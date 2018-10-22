@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 High-level python bindings for Kopano
 
@@ -54,13 +55,12 @@ from .version import __version__
 from .config import Config, CONFIG
 from .errors import (
     Error, ConfigError, DuplicateError, NotFoundError, LogonError,
-    NotSupportedError
+    NotSupportedError, ArgumentError,
 )
 from .server import Server
 from .address import Address
 from .attachment import Attachment
 from .autoaccept import AutoAccept
-from .body import Body
 from .company import Company
 from .compat import set_bin_encoding, set_missing_none, hex, unhex, benc, bdec
 from .delegation import Delegation
@@ -68,11 +68,12 @@ from .folder import Folder
 from .freebusy import FreeBusyBlock, FreeBusy
 from .group import Group
 from .item import Item
-from .log import log_exc, QueueListener
+from .log import log_exc, QueueListener, logger
 from .meetingrequest import MeetingRequest
 from .outofoffice import OutOfOffice
 from .property_ import Property
 from .permission import Permission
+from .picture import Picture
 from .quota import Quota
 from .recurrence import Recurrence, Occurrence
 from .restriction import Restriction

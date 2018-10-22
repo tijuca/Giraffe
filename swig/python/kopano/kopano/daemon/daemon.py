@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: Python-2.0-or-later
 
 # daemon/daemon.py
 # Part of python-daemon, an implementation of PEP 3143.
@@ -704,6 +705,13 @@ def get_maximum_file_descriptors():
     limits = resource.getrlimit(resource.RLIMIT_NOFILE)
     result = limits[1]
     if result == resource.RLIM_INFINITY:
+        result = MAXFD
+    if result > MAXFD:
+        # NOTE(longsleep): Limit amount of FDs since it can take avery
+        # long time to process a million FDs. This is a workaround
+        # but eventually upstream python-daemon library might have a
+        # better solution. See https://pagure.io/python-daemon/pull-request/11
+        # for reference.
         result = MAXFD
     return result
 

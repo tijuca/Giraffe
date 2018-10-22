@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.6.5], [development@kopano.io])
+AC_INIT([kopano], [8.6.90], [development@kopano.io])
 
 dnl ABI tags are used to prevent inadvertent mixing of wildly different
 dnl versions of KC components without knowing it.
@@ -7,7 +7,7 @@ dnl Development cycle: ABI changes frequently, don't bother with the tag
 dnl  -> versions 8.5.80 through 8.5.99 use ABI tag "8.5.80"
 dnl Maintenance cycle: ABI ought to not change, hence no tag change
 dnl  -> versions 8.6 through 8.6.79 use ABI tag "8.6"
-PACKAGE_ABI=8.6.1
+PACKAGE_ABI=8.6.80
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
 AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
@@ -91,9 +91,9 @@ ZCXXFLAGS="-Wall -Wmissing-declarations"
 LFS_CFLAGS=`getconf LFS_CFLAGS`
 ZCPPFLAGS="$ZCPPFLAGS $LFS_CFLAGS"
 
-AC_MSG_CHECKING([for C++2011 support])
+AC_MSG_CHECKING([available C++ standard])
 cxxmode=""
-for i in "c++11" "c++0x"; do
+for i in "c++17" "c++14"; do
 	CXXFLAGS="$CXXFLAGS_system -std=$i"
 	AC_COMPILE_IFELSE([AC_LANG_SOURCE([])], [cxxmode="$i"])
 	AS_IF([test -n "$cxxmode"], [break])
@@ -141,17 +141,6 @@ AC_ARG_WITH([ubsan], AS_HELP_STRING([--with-ubsan], [Activate Undefined Behavior
 	[ZCXXFLAGS="$ZCXXFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"])
 AC_SUBST([NO_VSYM])
 
-AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [Enable debug mode (adds debug code, not the -g flag)]),
-  [want_debug=${enableval}],[want_debug=no])
-if test "$want_debug" = "yes"; then
-    DEBUGFLAGS="-DDEBUG"
-    DEBUG=1
-else
-    DEBUGFLAGS=
-    DEBUG=0
-fi
-AC_SUBST(DEBUGFLAGS)
-
 # profiling
 AC_ARG_ENABLE(profiling,
   AS_HELP_STRING([--enable-profiling], [enable profiling (-pg)]),
@@ -169,11 +158,10 @@ AC_ARG_ENABLE(coverage,
 	  fi
     ])
 
-# user create scripts location
-AC_ARG_WITH(userscript-prefix,
-  AS_HELP_STRING([--with-userscript-prefix=PATH], [path to install the userscripts in (default SYSCONFDIR/kopano/userscripts)]),
-  [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR='/etc/kopano/userscripts'])
-AC_SUBST(USERSCRIPTDIR)
+uscriptlibdir='${prefix}/lib/kopano/userscripts'
+uscriptconfdir='${sysconfdir}/kopano/userscripts'
+AC_SUBST([uscriptlibdir])
+AC_SUBST([uscriptconfdir])
 
 # quota warning templates location
 AC_ARG_WITH(quotatemplate-prefix,
@@ -248,6 +236,7 @@ LIBNCURSES_WITH_CONFIG
 AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h malloc.h])
 AC_CHECK_FUNCS([mallinfo timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
 AC_CHECK_MEMBERS([siginfo_t.si_fd siginfo_t.si_utime], [], [], [#include <csignal>])
+AC_CHECK_MEMBERS([sockpeercred.uid], [], [], [#include <sys/socket.h>])
 
 #
 # find required/optional libraries
@@ -267,12 +256,7 @@ AS_IF([test "$with_php" != "no"], [
 ])
 AM_CONDITIONAL([WITH_PHP5], [test "$with_php" = 5])
 AM_CONDITIONAL([WITH_PHP7], [test "$with_php" = 7])
-PKG_CHECK_EXISTS([popt],
-	[PKG_CHECK_MODULES([popt], [popt])],
-	[AC_CHECK_HEADER([popt.h], [
-		popt_LIBS="-lpopt"
-		AC_SUBST([popt_LIBS])
-	], [AC_MSG_ERROR([popt.h is required])])])
+PKG_CHECK_MODULES([libHX], [libHX >= 1.10])
 PKG_CHECK_MODULES([XML2], [libxml-2.0])
 
 # Checks for MySQL 4.1 or better
@@ -395,6 +379,10 @@ PKG_CHECK_MODULES([curl], [libcurl], [], [:])
 CPPFLAGS="$CPPFLAGS $curl_CFLAGS"
 AC_CHECK_HEADERS([curl/curl.h])
 CPPFLAGS="$CPPFLAGS_system"
+PKG_CHECK_MODULES([mhttpd], [libmicrohttpd >= 0.9.30], [], [:])
+PKG_CHECK_MODULES([rrd], [librrd >= 1.3], [], [:])
+AM_CONDITIONAL([HAVE_MHTTPD], [test -n "$mhttpd_CFLAGS" -o -n "$mhttpd_LIBS"])
+AM_CONDITIONAL([HAVE_RRD], [test -n "$rrd_CFLAGS" -o -n "$rrd_LIBS"])
 PKG_CHECK_MODULES([TCMALLOC], [libtcmalloc_minimal], [], [:])
 CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
 AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
@@ -616,8 +604,8 @@ AS_IF([test "$BUILDOS" = linux && test "$want_epoll" = "yes"], [
 
 tidy_CPPFLAGS="-I/usr/include/tidy"
 CPPFLAGS="$CPPFLAGS $tidy_CPPFLAGS"
-AC_CHECK_HEADERS([tidy.h])
-AM_CONDITIONAL([HAVE_TIDY], [test "x$ac_cv_header_tidy_h" = "xyes"])
+AC_CHECK_HEADERS([tidybuffio.h])
+AM_CONDITIONAL([HAVE_TIDY], [test "x$ac_cv_header_tidybuffio_h" = "xyes"])
 AC_SUBST([tidy_CPPFLAGS])
 CPPFLAGS="$CPPFLAGS_system"
 
@@ -663,10 +651,6 @@ AS_IF([test "$have_icu" = 0], [
 ])
 ZCPPFLAGS="$ZCPPFLAGS $icu_uc_CFLAGS $icu_i18n_CFLAGS"
 
-# all libs for programs, because functions are in static common stuff
-PROG_LIBS="$UUID_LIBS $INTL_LIBS $ICONV_LIBS $GZ_LIBS"
-AC_SUBST(PROG_LIBS)
-
 # done testing C++ requirements
 AC_LANG_POP
 dnl Set default project flags. On overriding AM_CXXFLAGS, include ${ZCXXFLAGS}
@@ -685,6 +669,7 @@ AS_IF([test -n "$PYTHON"], [
 	AS_IF([test -z "$PYTHON"], [PYTHON="$1"])
 	shift
 	PYTHON=$(echo "$PYTHON $@")
+	PYTHON_MAJOR_VERSION=$($PYTHON -c "from __future__ import print_function;import sys;print(sys.version_info[[0]])" 2>/dev/null)
 ])
 AH_TEMPLATE([ENABLE_PYTHON], [Build dagent/spooler with Python plugin support])
 AC_ARG_ENABLE([python], [AS_HELP_STRING([--enable-python], [Enable building of Python bindings (default: auto)])],
@@ -702,6 +687,8 @@ AS_IF([test "$want_python" != no], [
 ])
 AM_CONDITIONAL([ENABLE_PYTHON], [test "$want_python" != no -a -n "$PYTHON_LIBS"])
 
+AM_CONDITIONAL([WITH_PYTHON3], [test "x$PYTHON_MAJOR_VERSION" = "x3"])
+AM_CONDITIONAL([WITH_PYTHON2], [test "x$PYTHON_MAJRO_VERSION" = "x2"])
 
 #
 # Output files
@@ -718,19 +705,15 @@ AC_CONFIG_FILES([Makefile
 		ECtools/backup/Makefile
 		ECtools/cli/Makefile
 		ECtools/presence/Makefile
+		ECtools/rest/Makefile
 		ECtools/search/Makefile
 		ECtools/spamd/Makefile
 		ECtools/migration-pst/Makefile
 		ECtools/utils/Makefile
 		installer/Makefile
 		installer/linux/Makefile
+		installer/linux/kopano-statsd.service
 		installer/userscripts/Makefile
-		installer/userscripts/createcompany.d/Makefile
-		installer/userscripts/creategroup.d/Makefile
-		installer/userscripts/createuser.d/Makefile
-		installer/userscripts/deletecompany.d/Makefile
-		installer/userscripts/deletegroup.d/Makefile
-		installer/userscripts/deleteuser.d/Makefile
 		installer/quotamail/Makefile
 		installer/searchscripts/Makefile
 		po/Makefile
@@ -740,11 +723,12 @@ AC_CONFIG_FILES([Makefile
 		swig/python/include/kopano/Makefile
 		swig/python/kopano/Makefile
 		swig/python/zarafa/Makefile
-		common/kopano.pc common/libkcmapi.sym common/libkcutil.sym
+		common/kopano.pc common/libkcutil.sym
 		default.sym
 		mapi4linux/src/libmapi.sym
 		provider/plugin.sym provider/provider.sym
 		provider/libkcserver.sym provider/libkcsoap.sym
+		spooler/libkcpyplug.sym
 ])
 
 # Python tools
@@ -755,29 +739,30 @@ AC_CONFIG_FILES([ECtools/cli/kopano-cli], [chmod +x ECtools/cli/kopano-cli])
 AC_CONFIG_FILES([ECtools/presence/kopano-presence], [chmod +x ECtools/presence/kopano-presence])
 AC_CONFIG_FILES([ECtools/migration-pst/kopano-migration-pst], [chmod +x ECtools/migration-pst/kopano-migration-pst])
 AC_CONFIG_FILES([ECtools/spamd/kopano-spamd], [chmod +x ECtools/spamd/kopano-spamd])
-AC_CONFIG_FILES([ECtools/utils/kopano-mr-accept.py], [chmod +x ECtools/utils/kopano-mr-accept.py])
-AC_CONFIG_FILES([ECtools/utils/kopano-mr-process.py], [chmod +x ECtools/utils/kopano-mr-process.py])
+AC_CONFIG_FILES([ECtools/utils/kopano-mr-accept], [chmod +x ECtools/utils/kopano-mr-accept])
+AC_CONFIG_FILES([ECtools/utils/kopano-mr-process], [chmod +x ECtools/utils/kopano-mr-process])
 AC_CONFIG_FILES([ECtools/utils/kopano-autorespond.py], [chmod +x ECtools/utils/kopano-autorespond.py])
 AC_CONFIG_FILES([ECtools/search/kopano_search/version.py], [])
 AC_CONFIG_FILES([ECtools/backup/kopano_backup/version.py], [])
 AC_CONFIG_FILES([ECtools/cli/kopano_cli/version.py], [])
+AC_CONFIG_FILES([ECtools/presence/kopano_presence/version.py], [])
+AC_CONFIG_FILES([ECtools/migration-pst/kopano_migration_pst/version.py], [])
 AC_CONFIG_FILES([ECtools/rest/kopano_rest/version.py], [])
 AC_CONFIG_FILES([ECtools/spamd/kopano_spamd/version.py], [])
 AC_CONFIG_FILES([ECtools/utils/kopano_utils/version.py], [])
 AC_CONFIG_FILES([swig/python/kopano/kopano/version.py], [])
+AC_CONFIG_FILES([swig/python/MAPI/version.py], [])
 
 AC_OUTPUT
 $LN_TFSV "$abs_top_srcdir" "@"
 
 AC_MSG_RESULT([
 Install prefix	:	$prefix
-Userscript dir	:	$USERSCRIPTDIR
 Quota dir	:	$QUOTATEMPLATEDIR
 Search scripts dir	:	$SEARCHSCRIPTSDIR
 
 Build host	:	$host
 Compile flags	:	$ZCPPFLAGS $CPPFLAGS $ZCXXFLAGS $CXXFLAGS
-Debug flags	:	$DEBUGFLAGS
 PHP version	:	$PHP_VERSION
 PHP ext dir	:	$PHP_EXTENSION_DIR
 PHP config dir	:	$PHP_SYSCONF_DIR
@@ -796,7 +781,6 @@ XML2 libs	:	$XML2_LIBS
 ICal flags	:	$ICAL_CFLAGS
 ICal libs	:	$ICAL_LIBS
 ncurses libs	:	$NCURSES_LIBS
-Clients libs	:	$PROG_LIBS
 LDAP support	:	$want_ldap
 LDAP flags	:	$LDAP_FLAGS
 LDAP libs	:	$LDAP_LIBS
@@ -809,4 +793,5 @@ KCOIDC lib	:	$kcoidc_LIBS
 ICU libs	:	$icu_uc_LIBS $icu_i18n_LIBS
 Python flags	:	$PYTHON_CFLAGS
 Python libs	:	$PYTHON_LIBS
+Python version  :       $PYTHON_MAJOR_VERSION
 ])

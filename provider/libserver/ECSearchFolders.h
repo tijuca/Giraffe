@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECSEARCHFOLDERS_H
@@ -20,15 +8,14 @@
 
 #include <kopano/zcdefs.h>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <pthread.h>
 #include "ECDatabaseFactory.h"
 #include <kopano/ECKeyTable.h>
 #include "ECStoreObjectTable.h"
-
 #include "soapH.h"
 #include "SOAPUtils.h"
-
 #include <map>
 #include <set>
 #include <list>
@@ -37,53 +24,32 @@ namespace KC {
 
 class ECSessionManager;
 
-struct SEARCHFOLDER _kc_final {
-	SEARCHFOLDER(unsigned int ulStoreId, unsigned int ulFolderId) {
-		this->ulStoreId = ulStoreId;
-		this->ulFolderId = ulFolderId;
-		memset(&sThreadId, 0, sizeof(sThreadId));
-	}
+struct SEARCHFOLDER final {
+	SEARCHFOLDER(unsigned int store_id, unsigned int folder_id) :
+		sThreadId{}, ulStoreId(store_id), ulFolderId(folder_id)
+	{}
 	~SEARCHFOLDER() {
-		if (this->lpSearchCriteria)
-			FreeSearchCriteria(this->lpSearchCriteria);
+		FreeSearchCriteria(lpSearchCriteria);
 	}
 
 	struct searchCriteria *lpSearchCriteria = nullptr;
     pthread_t 				sThreadId;
 	std::mutex mMutexThreadFree;
-	bool bThreadFree = true;
-	bool bThreadExit = false;
-    unsigned int			ulStoreId;
-    unsigned int			ulFolderId;
+	bool bThreadFree = true, bThreadExit = false;
+	unsigned int ulStoreId, ulFolderId;
 };
 
 struct EVENT {
-    unsigned int			ulStoreId;
-    unsigned int			ulFolderId;
-    unsigned int			ulObjectId;
+	unsigned int ulStoreId, ulFolderId, ulObjectId;
     ECKeyTable::UpdateType  ulType;
-    
-	bool operator<(const struct EVENT &b) const noexcept
-	{
-		return ulFolderId < b.ulFolderId ? true :
-		       (ulType < b.ulType ? true :
-		       (ulObjectId < b.ulObjectId ? true : false));
-	}
-	bool operator==(const struct EVENT &b) const noexcept
-	{
-		return ulFolderId == b.ulFolderId && ulType == b.ulType &&
-		       ulObjectId ==  b.ulObjectId;
-	}
 };
 
-typedef std::map<unsigned int, SEARCHFOLDER *> FOLDERIDSEARCH;
+typedef std::map<unsigned int, std::shared_ptr<SEARCHFOLDER>> FOLDERIDSEARCH;
 typedef std::map<unsigned int, FOLDERIDSEARCH> STOREFOLDERIDSEARCH;
 typedef std::map<unsigned int, pthread_t> SEARCHTHREADMAP;
 
 struct sSearchFolderStats {
-	ULONG ulStores;
-	ULONG ulFolders;
-	ULONG ulEvents;
+	ULONG ulStores, ulFolders, ulEvents;
 	ULONGLONG ullSize;
 };
 
@@ -104,7 +70,7 @@ struct sSearchFolderStats {
  * except rebuilding searchfolders; when the server starts and finds a searchfolder that was only half-built, a complete
  * rebuild is started since we don't know how far the rebuild got last time.
  */
-class _kc_export ECSearchFolders _kc_final {
+class _kc_export ECSearchFolders final {
 public:
 	_kc_hidden ECSearchFolders(ECSessionManager *, ECDatabaseFactory *);
 	_kc_hidden virtual ~ECSearchFolders(void);
@@ -125,7 +91,7 @@ public:
      * @param[in] ulFolderId The folder id (hierarchyid) of the searchfolder being modified
      * @param[in] lpSearchCriteria Search criteria to be set
      */
-	_kc_hidden virtual ECRESULT SetSearchCriteria(unsigned int store_id, unsigned int folder_id, struct searchCriteria *);
+	_kc_hidden virtual ECRESULT SetSearchCriteria(unsigned int store_id, unsigned int folder_id, const struct searchCriteria *);
 
     /**
      * Retrieve search criteria for an existing search folder
@@ -166,17 +132,10 @@ public:
      * @param[in] ulType ECKeyTable::TABLE_ROW_ADD or TABLE_ROW_MODIFY or TABLE_ROW_DELETE
      */
 	_kc_hidden virtual ECRESULT UpdateSearchFolders(unsigned int store_id, unsigned int folder_id, unsigned int obj_id, ECKeyTable::UpdateType);
-    
-    /** 
-     * Returns erSuccess if the folder is a search folder
-     *
-     * @param[in] ulFolderId The folder id (hierarchyid) of the folder being queried
-     */
-	_kc_hidden virtual ECRESULT IsSearchFolder(unsigned int folder_id);
 
-    /** 
+    /**
      * Remove a search folder because it has been deleted. Cancels the search before removing the information. It will
-     * remove all results from the database. 
+     * remove all results from the database.
      *
      * This is differenct from Cancelling a search folder (see CancelSearchFolder()) because the results are actually
      * deleted after cancelling.
@@ -187,8 +146,8 @@ public:
 	_kc_hidden virtual ECRESULT RemoveSearchFolder(unsigned int store_id, unsigned int folder_id);
 
 	/**
-	 * Remove a search folder of a specific store because it has been deleted. Cancels the search before removing the 
-	 * information. It will remove all results from the database. 
+	 * Remove a search folder of a specific store because it has been deleted. Cancels the search before removing the
+	 * information. It will remove all results from the database.
 	 *
 	 * @param[in] ulStoreId The store id (hierarchyid) of the folder to be removed
 	 */
@@ -199,34 +158,20 @@ public:
 	 *
 	 * @param[in] lpFolder	Search folder data object
 	 */
-	_kc_hidden void DestroySearchFolder(SEARCHFOLDER *);
+	_kc_hidden void DestroySearchFolder(std::shared_ptr<SEARCHFOLDER> &&);
 
-    /** 
-     * Restart all searches. 
+    /**
+     * Restart all searches.
      * This is a rather heavy operation, and runs synchronously. You have to wait until it has finished.
      * This is only called with the --restart-searches option of kopano-server and never used in a running
      * system
      */
     virtual ECRESULT RestartSearches();
-    
-	/**
-	 * Save search criteria to the database
-	 *
-	 * Purely writes the given search criteria to the database without any further processing. This is really
-	 * a private function but it is used hackishly from ECDatabaseUpdate() when upgrading from really old (4.1)
-	 * versions of kopano which have a slightly different search criteria format. Do not use this function for
-	 * anything else!
-	 *
-	 * @param[in] lpDatabase Database handle
-	 * @param[in] ulFolderId Folder id (hierarchy id) of the searchfolder to write
-	 * @param[in] lpSearchCriteria Search criteria to write
-	 */
-	_kc_hidden static ECRESULT SaveSearchCriteria(ECDatabase *, unsigned int folder_id, struct searchCriteria *);
 
 	/**
 	 * Get the searchfolder statistics
 	 */
-	_kc_hidden virtual ECRESULT GetStats(sSearchFolderStats &);
+	_kc_hidden sSearchFolderStats get_stats();
 
 	/**
 	 * Kick search thread to flush events, and wait for the results.
@@ -261,7 +206,7 @@ private:
      * This function add a search folder that should be monitored. This means that changes on objects received via UpdateSearchFolders()
      * will be matched against the criteria passed to this function and processed accordingly.
      *
-     * Optionally, a rebuild can be started with the fStartSearch flag. This should be done if the search should be rebuilt, or 
+     * Optionally, a rebuild can be started with the fStartSearch flag. This should be done if the search should be rebuilt, or
      * if this is a new search folder. On rebuild, existing searches for this search folder will be cancelled first.
      *
      * @param[in] ulStoreId Store id of the search folder
@@ -269,10 +214,10 @@ private:
      * @param[in] fStartSearch TRUE if a rebuild must take place, FALSE if not (eg this happens at server startup)
      * @param[in] lpSearchCriteria Search criteria for this search folder
      */
-	    _kc_hidden virtual ECRESULT AddSearchFolder(unsigned int store_id, unsigned int folder_id, bool start_search, struct searchCriteria *);
-    
-    /** 
-     * Cancel a search. 
+	    _kc_hidden virtual ECRESULT AddSearchFolder(unsigned int store_id, unsigned int folder_id, bool start_search, const struct searchCriteria *);
+
+    /**
+     * Cancel a search.
      *
      * This means that the search results are 'frozen'. If a search thread is running, it is cancelled.
      * After a search has been cancelled, we can ignore any updates for that folder, so it is removed from the list
@@ -283,7 +228,7 @@ private:
      * @param[in] ulFolderId Folder id of the search folder
      */
 	_kc_hidden virtual ECRESULT CancelSearchFolder(unsigned int store_id, unsigned int folder_id);
-    
+
     /**
      * Does an actual search for all matching items for a searchfolder
      *
@@ -297,9 +242,11 @@ private:
      * @param[in] lpbCancel Pointer to cancel flag. This is polled frequently to be able to cancel the search action
      * @param[in] bNotify If TRUE, send notifications to table listeners, else do not (eg when doing RestartSearches())
      */
-	_kc_hidden virtual ECRESULT Search(unsigned int store_id, unsigned int folder_id, struct searchCriteria *, bool *cancel, bool notify = true);
+	_kc_hidden virtual ECRESULT Search(unsigned int store_id, unsigned int folder_id, const struct searchCriteria *, bool *cancel, bool notify = true);
+	_kc_hidden ECRESULT search_r1(ECDatabase *, ECSession *, ECODStore &&, ECCacheManager *, const struct restrictTable *extra_restr, unsigned int store_id, unsigned int folder_id, const std::list<unsigned int> &ix_results, const std::string &sugg, bool notify, bool *cancel);
+	_kc_hidden ECRESULT search_r2(ECDatabase *, ECSession *, ECODStore &&, const struct searchCriteria *, unsigned int store_id, unsigned int folder_id, const ECListInt &folders, bool notify, bool *cancel);
 
-    /** 
+    /**
      * Get the state of a search folder
      *
      * It may be rebuilding (thread running), running (no thread) or stopped (not active - 'frozen')
@@ -310,8 +257,8 @@ private:
      */
 	_kc_hidden virtual ECRESULT GetState(unsigned int store_id, unsigned int folder_id, unsigned int *state);
 
-    /** 
-     * Search thread entrypoint. 
+    /**
+     * Search thread entrypoint.
      *
      * Simply a wrapper for Search(), and has code to do thread deregistration.
      * @param[in] lpParam THREADINFO * thread information
@@ -319,7 +266,7 @@ private:
 	_kc_hidden static void *SearchThread(void *);
 
     // Functions to do things in the database
-    
+
     /**
      * Reset all results for a searchfolder (removes all results)
      *
@@ -336,7 +283,7 @@ private:
      * @param[out] lpfInserted true if a new record was inserted, false if flags were updated in an existing record
      */
 	_kc_hidden virtual ECRESULT AddResults(unsigned int folder_id, unsigned int obj_id, unsigned int flags, bool *inserted);
-    
+
     /**
      * Add multiple search results
      *
@@ -382,7 +329,7 @@ private:
      * @param[in] ulFolderId Folder id of the search folder
      * @param[in] lpSearchCriteria Search criteria to save
      */
-	_kc_hidden virtual ECRESULT SaveSearchCriteria(unsigned int folder_id, struct searchCriteria *);
+	_kc_hidden virtual ECRESULT SaveSearchCriteria(unsigned int folder_id, const struct searchCriteria *);
 
     /**
      * Main processing thread entrypoint
@@ -393,6 +340,17 @@ private:
      * @param[in] lpSearchFolders Pointer to 'this' of search folder manager instance
      */
 	_kc_hidden static void *ProcessThread(void *search_folders);
+
+	/**
+	 * Save search criteria (row) to the database
+	 *
+	 * Purely writes the given search criteria to the database without any further processing.
+	 *
+	 * @param[in] lpDatabase Database handle
+	 * @param[in] ulFolderId Folder id (hierarchy id) of the searchfolder to write
+	 * @param[in] lpSearchCriteria Search criteria to write
+	 */
+	_kc_hidden static ECRESULT SaveSearchCriteriaRow(ECDatabase *, unsigned int folder_id, const struct searchCriteria *);
 
     /**
      * Process candidate rows and add them to search folder results
@@ -413,9 +371,9 @@ private:
      * @param[in] bNotify TRUE on a live system, FALSE if only the database must be updated.
      * @return result
      */
-	_kc_hidden virtual ECRESULT ProcessCandidateRows(ECDatabase *, ECSession *, struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &, std::list<unsigned int> &);
-	_kc_hidden virtual ECRESULT ProcessCandidateRows(ECDatabase *, ECSession *, struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &);
-	_kc_hidden virtual ECRESULT ProcessCandidateRowsNotify(ECDatabase *, ECSession *, struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &);
+	_kc_hidden virtual ECRESULT ProcessCandidateRows(ECDatabase *, ECSession *, const struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &, std::list<unsigned int> &);
+	_kc_hidden virtual ECRESULT ProcessCandidateRows(ECDatabase *, ECSession *, const struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &);
+	_kc_hidden virtual ECRESULT ProcessCandidateRowsNotify(ECDatabase *, ECSession *, const struct restrictTable *r, bool *cancel, unsigned int store_id, unsigned int folder_id, ECODStore *, ECObjectTableList rows, struct propTagArray *tags, const ECLocale &);
 
     // Map StoreID -> SearchFolderId -> SearchCriteria
     // Because searchfolders only work within a store, this allows us to skip 99% of all
@@ -433,12 +391,12 @@ private:
     std::list<EVENT> m_lstEvents;
 	std::recursive_mutex m_mutexEvents;
 	std::condition_variable_any m_condEvents;
-    
+
     // Change processing thread
     pthread_t m_threadProcess;
-    
+
     // Exit request for processing thread
-	bool m_bExitThread = false, m_bRunning = false;
+	bool m_thread_active = false, m_bExitThread = false, m_bRunning = false;
 };
 
 } /* namespace */

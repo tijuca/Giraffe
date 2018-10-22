@@ -1,26 +1,14 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ARCHIVECONTROLIMPL_H_INCLUDED
 #define ARCHIVECONTROLIMPL_H_INCLUDED
 
+#include <memory>
 #include <set>
 #include <kopano/memory.hpp>
-#include <kopano/zcdefs.h>
 #include "operations/operations_fwd.h"
 #include "helpers/ArchiveHelper.h"
 
@@ -108,13 +96,14 @@ class ECArchiverLogger;
  * This way necessary steps will be executed on a message, regardless of searchfolder
  * timing.
  */
-class ArchiveControlImpl _kc_final : public ArchiveControl {
+class ArchiveControlImpl final : public ArchiveControl {
 public:
-	static HRESULT Create(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl);
-	eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags) _kc_override;
-	eResult Archive(const tstring &strUser, bool bAutoAttach, unsigned int ulFlags) _kc_override;
-	eResult CleanupAll(bool bLocalOnly) _kc_override;
-	eResult Cleanup(const tstring &strUser) _kc_override;
+	static HRESULT Create(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, std::shared_ptr<ECLogger>, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl);
+	eResult ArchiveAll(bool local_only, bool auto_attach, unsigned int flags) override;
+	HRESULT Archive2(const tstring &user, bool auto_attach, unsigned int flags);
+	eResult Archive(const tstring &user, bool auto_attach, unsigned int flags) override;
+	eResult CleanupAll(bool local_only) override;
+	eResult Cleanup(const tstring &user) override;
 
 private:
 	class ReferenceLessCompare {
@@ -125,49 +114,38 @@ private:
 			return lhs.second < rhs.second;
 		}
 	};
-	
+
 	typedef HRESULT(ArchiveControlImpl::*fnProcess_t)(const tstring&);
 	typedef std::set<entryid_t> EntryIDSet;
 	typedef std::set<std::pair<entryid_t, entryid_t>, ReferenceLessCompare> ReferenceSet;
 
-	ArchiveControlImpl(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup);
+	ArchiveControlImpl(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, std::shared_ptr<ECLogger>, bool bForceCleanup);
 	HRESULT Init();
-
 	HRESULT DoArchive(const tstring& strUser);
 	HRESULT DoCleanup(const tstring& strUser);
-	
+	HRESULT ProcessFolder2(object_ptr<IMAPIFolder> &, std::shared_ptr<operations::IArchiveOperation>, bool &);
 	HRESULT ProcessFolder(MAPIFolderPtr &ptrFolder, operations::ArchiveOperationPtr ptrArchiveOperation);
-
 	HRESULT ProcessAll(bool bLocalOnly, fnProcess_t fnProcess);
-
 	HRESULT PurgeArchives(const ObjectEntryList &lstArchives);
 	HRESULT PurgeArchiveFolder(MsgStorePtr &ptrArchive, const entryid_t &folderEntryID, const LPSRestriction lpRestriction);
-
 	HRESULT CleanupArchive(const SObjectEntry &archiveEntry, IMsgStore* lpUserStore, LPSRestriction lpRestriction);
 	HRESULT GetAllReferences(LPMDB lpUserStore, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
 	HRESULT AppendAllReferences(LPMAPIFOLDER lpRoot, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
 	HRESULT GetAllEntries(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc, LPSRestriction, EntryIDSet *entries);
 	HRESULT AppendAllEntries(LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpMsgEntries);
 	HRESULT CleanupHierarchy(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_root, LPMDB user_store);
-
 	HRESULT MoveAndDetachMessages(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_folder, const EntryIDSet &);
 	HRESULT MoveAndDetachFolder(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_folder);
-
 	HRESULT DeleteMessages(LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
 	HRESULT DeleteFolder(LPMAPIFOLDER lpArchiveFolder);
-	
 	HRESULT AppendFolderEntries(LPMAPIFOLDER lpBase, EntryIDSet *lpEntries);
-	
 	HRESULT CheckSafeCleanupSettings();
-    HRESULT purgesoftdeletedmessages(const tstring& strUser);
-    tstring getfoldername(LPMAPIFOLDER folder);
-    HRESULT purgesoftdeleteditems(LPMAPIFOLDER folder, const tstring& strUser);
-	
+
 	enum eCleanupAction { caDelete, caStore, caNone };
 
 	ArchiverSessionPtr m_ptrSession;
 	ECConfig *m_lpConfig = nullptr;
-	object_ptr<ECArchiverLogger> m_lpLogger;
+	std::shared_ptr<ECArchiverLogger> m_lpLogger;
 	FILETIME m_ftCurrent = {0, 0};
 	bool m_bArchiveEnable = true;
 	int m_ulArchiveAfter = 30;
@@ -182,14 +160,13 @@ private:
 	eCleanupAction m_cleanupAction;
 	bool m_bCleanupFollowPurgeAfter = false;
 	bool m_bForceCleanup;
-	
+
 	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ORIGINAL_SOURCEKEY)
 	PROPMAP_DEF_NAMED_ID(STUBBED)
 	PROPMAP_DEF_NAMED_ID(DIRTY)
-
 };
 
 } /* namespace */

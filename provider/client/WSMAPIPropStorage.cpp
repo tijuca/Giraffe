@@ -1,17 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <new>
 #include <kopano/platform.h>
@@ -26,27 +15,23 @@
 #include "soapKCmdProxy.h"
 
 /*
- *
  * This is a PropStorage object for use with the WebServices storage platform
- *
  */
-
 #define START_SOAP_CALL retry:
-
 #define END_SOAP_CALL 	\
-	if (er == KCERR_END_OF_SESSION && this->m_lpTransport->HrReLogon() == hrSuccess) \
+	if (er == KCERR_END_OF_SESSION && m_lpTransport->HrReLogon() == hrSuccess) \
 		goto retry; \
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
+using namespace KC;
+
 WSMAPIPropStorage::WSMAPIPropStorage(ULONG cbParentEntryId,
-    LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId,
-    ULONG ulFlags, KCmdProxy *cmd, std::recursive_mutex &data_lock,
-    ECSESSIONID sid, unsigned int sc, WSTransport *tp) :
-	ECUnknown("WSMAPIPropStorage"), lpCmd(cmd), lpDataLock(data_lock),
-	ecSessionId(sid), ulServerCapabilities(sc),
-	m_ulFlags(ulFlags), m_lpTransport(tp)
+    const ENTRYID *lpParentEntryId, ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ULONG ulFlags, ECSESSIONID sid, unsigned int sc, WSTransport *tp) :
+	ECUnknown("WSMAPIPropStorage"), ecSessionId(sid),
+	ulServerCapabilities(sc), m_ulFlags(ulFlags), m_lpTransport(tp)
 {
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 	CopyMAPIEntryIdToSOAPEntryId(cbParentEntryId, lpParentEntryId, &m_sParentEntryId);
@@ -58,15 +43,12 @@ WSMAPIPropStorage::~WSMAPIPropStorage()
 	// Unregister the notification request we sent
 	if(m_bSubscribed) {
 		ECRESULT er = erSuccess;
-
-		LockSoap();		
-		lpCmd->notifyUnSubscribe(ecSessionId, m_ulConnection, &er);
-		UnLockSoap();
+		soap_lock_guard spg(*m_lpTransport);
+		m_lpTransport->m_lpCmd->notifyUnSubscribe(ecSessionId, m_ulConnection, &er);
 	}
-	
+
 	FreeEntryId(&m_sEntryId, false);
 	FreeEntryId(&m_sParentEntryId, false);
-
 	m_lpTransport->RemoveSessionReloadCallback(m_ulSessionReloadCallback);
 }
 
@@ -78,13 +60,12 @@ HRESULT WSMAPIPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 }
 
 HRESULT WSMAPIPropStorage::Create(ULONG cbParentEntryId,
-    LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId,
-    ULONG ulFlags, KCmdProxy *lpCmd, std::recursive_mutex &lpDataLock,
-    ECSESSIONID ecSessionId, unsigned int ulServerCapabilities,
+    const ENTRYID *lpParentEntryId, ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ULONG ulFlags, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities,
     WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage)
 {
 	return alloc_wrap<WSMAPIPropStorage>(cbParentEntryId, lpParentEntryId,
-	       cbEntryId, lpEntryId, ulFlags, lpCmd, lpDataLock, ecSessionId,
+	       cbEntryId, lpEntryId, ulFlags, ecSessionId,
 	       ulServerCapabilities, lpTransport).put(lppPropStorage);
 }
 
@@ -95,17 +76,17 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 	LPSPropValue	lpsPropValDst = NULL;
 
 	struct loadPropResponse	sResponse;
-	
-	LockSoap();
-	
-	if (ulObjId == 0 && ((this->ulServerCapabilities & KOPANO_CAP_LOADPROP_ENTRYID) == 0)) {
-		hr = MAPI_E_NO_SUPPORT; 
-		goto exit; 
-	} 
+	soap_lock_guard spg(*m_lpTransport);
+
+	if (ulObjId == 0 && (ulServerCapabilities & KOPANO_CAP_LOADPROP_ENTRYID) == 0) {
+		hr = MAPI_E_NO_SUPPORT;
+		goto exit;
+	}
 
 	START_SOAP_CALL
 	{
-		if (lpCmd->loadProp(ecSessionId, m_sEntryId, ulObjId, ulPropTag, &sResponse) != SOAP_OK)
+		if (m_lpTransport->m_lpCmd->loadProp(ecSessionId, m_sEntryId,
+		    ulObjId, ulPropTag, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -113,7 +94,6 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 	END_SOAP_CALL
 
 	hr = ECAllocateBuffer(sizeof(SPropValue), (void **)&lpsPropValDst);
-
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -123,29 +103,22 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 	}
 
 	hr = CopySOAPPropValToMAPIPropVal(lpsPropValDst, sResponse.lpPropVal, lpsPropValDst);
-
 	*lppsPropValue = lpsPropValDst;
-
 exit:
-	UnLockSoap();
-
 	return hr;
 }
 
 HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObject,
     struct saveObject *lpSaveObj, convert_context *lpConverter)
 {
-	HRESULT hr = hrSuccess;
-	unsigned int size;
-	unsigned int i;
-	ULONG ulPropId = 0;
-	GUID sServerGUID = {0};
-	GUID sSIGUID = {0};
-	
 	if (lpConverter == NULL) {
 		convert_context converter;
 		return HrMapiObjectToSoapObject(lpsMapiObject, lpSaveObj, &converter);
 	}
+
+	HRESULT hr = hrSuccess;
+	ULONG ulPropId = 0;
+	GUID sServerGUID = {0}, sSIGUID = {0};
 
 	if (lpsMapiObject->lpInstanceID) {
 		lpSaveObj->lpInstanceIds = s_alloc<entryList>(nullptr);
@@ -166,11 +139,11 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObj
 	}
 
 	// deleted props
-	size = lpsMapiObject->lstDeleted.size();
+	unsigned int size = lpsMapiObject->lstDeleted.size();
 	if (size != 0) {
 		lpSaveObj->delProps.__ptr = s_alloc<unsigned int>(nullptr, size);
 		lpSaveObj->delProps.__size = size;
-		i = 0;
+		unsigned int i = 0;
 		for (auto id : lpsMapiObject->lstDeleted)
 			lpSaveObj->delProps.__ptr[i++] = id;
 	} else {
@@ -182,12 +155,12 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObj
 	size = lpsMapiObject->lstModified.size();
 	if (size != 0) {
 		lpSaveObj->modProps.__ptr = s_alloc<propVal>(nullptr, size);
-		i = 0;
+		unsigned int i = 0;
 		for (const auto &prop : lpsMapiObject->lstModified) {
 			SPropValue tmp = prop.GetMAPIPropValRef();
 			if (PROP_ID(tmp.ulPropTag) == ulPropId)
-				/* Skip the data if it is a Instance ID, If the instance id is invalid 
-				 * the data will be replaced in HrUpdateSoapObject function. The memory is already 
+				/* Skip the data if it is a Instance ID, If the instance id is invalid
+				 * the data will be replaced in HrUpdateSoapObject function. The memory is already
 				 * allocated, but not used. */
 				if (/*lpsMapiObject->bChangedInstance &&*/ lpsMapiObject->lpInstanceID)
 					continue;
@@ -205,7 +178,7 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObj
 	// recursive process all children when parent is still present
 	lpSaveObj->__size = 0;
 	lpSaveObj->__ptr = NULL;
-	if (lpsMapiObject->bDelete == false) {
+	if (!lpsMapiObject->bDelete) {
 		size = lpsMapiObject->lstChildren.size();
 		if (size != 0) {
 			lpSaveObj->__ptr = s_alloc<saveObject>(nullptr, size);
@@ -226,14 +199,12 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(const MAPIOBJECT *lpsMapiObj
 	lpSaveObj->ulServerId = lpsMapiObject->ulObjId;
 	lpSaveObj->ulObjType = lpsMapiObject->ulObjType;
 	return hr;
-} 
+}
 
 HRESULT WSMAPIPropStorage::HrUpdateSoapObject(const MAPIOBJECT *lpsMapiObject,
     struct saveObject *lpsSaveObj, convert_context *lpConverter)
 {
-	HRESULT hr;
 	std::list<ECProperty>::const_iterator iterProps;
-	SPropValue sData;
 	ULONG ulPropId = 0;
 
 	if (lpConverter == NULL) {
@@ -244,10 +215,9 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(const MAPIOBJECT *lpsMapiObject,
 	/* FIXME: Support Multiple Single Instances */
 	if (lpsSaveObj->lpInstanceIds && lpsSaveObj->lpInstanceIds->__size) {
 		/* Check which property this Instance ID is for */
-		hr = HrSIEntryIDToID(lpsSaveObj->lpInstanceIds->__ptr[0].__size, lpsSaveObj->lpInstanceIds->__ptr[0].__ptr, NULL, NULL, (unsigned int*)&ulPropId);
+		auto hr = HrSIEntryIDToID(lpsSaveObj->lpInstanceIds->__ptr[0].__size, lpsSaveObj->lpInstanceIds->__ptr[0].__ptr, NULL, NULL, (unsigned int*)&ulPropId);
 		if (hr != hrSuccess)
 			return hr;
-
 		/* Instance ID was incorrect, remove it */
 		FreeEntryList(lpsSaveObj->lpInstanceIds, true);
 		lpsSaveObj->lpInstanceIds = NULL;
@@ -256,8 +226,7 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(const MAPIOBJECT *lpsMapiObject,
 		for (iterProps = lpsMapiObject->lstModified.cbegin();
 		     iterProps != lpsMapiObject->lstModified.cend();
 		     ++iterProps) {
-			sData = iterProps->GetMAPIPropValRef();
-
+			const auto &sData = iterProps->GetMAPIPropValRef();
 			if (PROP_ID(sData.ulPropTag) != ulPropId)
 				continue;
 
@@ -287,7 +256,7 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(const MAPIOBJECT *lpsMapiObject,
 		MAPIOBJECT find(lpsSaveObj->__ptr[i].ulObjType, lpsSaveObj->__ptr[i].ulClientId);
 		auto iter = lpsMapiObject->lstChildren.find(&find);
 		if (iter != lpsMapiObject->lstChildren.cend()) {
-			hr = HrUpdateSoapObject(*iter, &lpsSaveObj->__ptr[i], lpConverter);
+			auto hr = HrUpdateSoapObject(*iter, &lpsSaveObj->__ptr[i], lpConverter);
 			if (hr != hrSuccess)
 				return hr;
 		}
@@ -302,7 +271,6 @@ void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
 			DeleteSoapObject(&lpSaveObj->__ptr[i]);
 		s_free(nullptr, lpSaveObj->__ptr);
 	}
-
 	if (lpSaveObj->modProps.__ptr) {
 		for (gsoap_size_t i = 0; i < lpSaveObj->modProps.__size; ++i)
 			FreePropVal(&lpSaveObj->modProps.__ptr[i], false);
@@ -324,22 +292,19 @@ ECRESULT WSMAPIPropStorage::EcFillPropTags(const struct saveObject *lpsSaveObj,
 ECRESULT WSMAPIPropStorage::EcFillPropValues(const struct saveObject *lpsSaveObj,
      MAPIOBJECT *lpsMapiObj)
 {
-	ECRESULT ec = erSuccess;
 	convert_context	context;
 
 	for (gsoap_size_t i = 0; i < lpsSaveObj->modProps.__size; ++i) {
 		ecmem_ptr<SPropValue> lpsProp;
-
-		ec = ECAllocateBuffer(sizeof(SPropValue), &~lpsProp);
+		auto ec = ECAllocateBuffer(sizeof(SPropValue), &~lpsProp);
 		if (ec != erSuccess)
-			break;
+			return ec;
 		ec = CopySOAPPropValToMAPIPropVal(lpsProp, &lpsSaveObj->modProps.__ptr[i], lpsProp, &context);
 		if (ec != erSuccess)
-			break;
+			return ec;
 		lpsMapiObj->lstProperties.emplace_back(lpsProp);
 	}
-
-	return ec;
+	return erSuccess;
 }
 
 // sets the ulObjId from the server in the object (hierarchyid)
@@ -349,13 +314,10 @@ HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj,
     const struct saveObject *lpsServerObj)
 {
 	lpClientObj->ulObjId = lpsServerObj->ulServerId;
-
 	// The deleted properties have been deleted, so forget about them
 	lpClientObj->lstDeleted.clear();
-
 	// The modified properties have been sent. Delete them.
 	lpClientObj->lstModified.clear();
-
 	// The object is no longer 'changed'
 	lpClientObj->bChangedInstance = false;
 	lpClientObj->bChanged = false;
@@ -419,13 +381,13 @@ HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject
 	convert_context converter;
 
 	HrMapiObjectToSoapObject(lpsMapiObject, &sSaveObj, &converter);
-
-	LockSoap();
-
+	soap_lock_guard spg(*m_lpTransport);
 	// ulFlags == object flags, e.g. MAPI_ASSOCIATE for messages, FOLDER_SEARCH on folders...
 	START_SOAP_CALL
 	{
-		if (lpCmd->saveObject(ecSessionId, m_sParentEntryId, m_sEntryId, &sSaveObj, ulFlags, m_ulSyncId, &sResponse) != SOAP_OK)
+		if (m_lpTransport->m_lpCmd->saveObject(ecSessionId,
+		    m_sParentEntryId, m_sEntryId, &sSaveObj, ulFlags,
+		    m_ulSyncId, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
@@ -436,7 +398,6 @@ HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject
 		hr = HrUpdateSoapObject(lpsMapiObject, &sSaveObj, &converter);
 		if (hr != hrSuccess)
 			goto exit;
-
 		goto retry;
 	}
 	END_SOAP_CALL
@@ -449,15 +410,11 @@ HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject
 	// HrUpdateMapiObject() has now moved the modified properties of all objects recursively
 	// into their 'normal' properties list (lstProperties). This is correct because when we now
 	// open a subobject, it needs all the properties.
-
 	// However, because we already have all properties of the top-level message in-memory via
-	// ECGenericProps, the properties in 
-
+	// ECGenericProps, the properties in
 exit:
-	UnLockSoap();
-
+	spg.unlock();
 	DeleteSoapObject(&sSaveObj);
-
 	return hr;
 }
 
@@ -465,15 +422,12 @@ ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(const struct saveObject *lp
     MAPIOBJECT *lpsMapiObject)
 {
 	MAPIOBJECT *mo = NULL;
-	ULONG ulAttachUniqueId = 0;
-	ULONG ulRecipUniqueId = 0;
+	unsigned int ulAttachUniqueId = 0, ulRecipUniqueId = 0;
 
 	// delProps contains all the available property tag
 	EcFillPropTags(lpsSaveObj, lpsMapiObject);
-
 	// modProps contains all the props < 8K
 	EcFillPropValues(lpsSaveObj, lpsMapiObject);
-
 	// delete stays false, unique id is set upon allocation
 	lpsMapiObject->ulObjId = lpsSaveObj->ulServerId;
 	lpsMapiObject->ulObjType = lpsSaveObj->ulObjType;
@@ -516,7 +470,6 @@ HRESULT WSMAPIPropStorage::RegisterAdvise(ULONG ulEventMask, ULONG ulConnection)
 {
 	m_ulConnection = ulConnection;
 	m_ulEventMask = ulEventMask;
-
 	return hrSuccess;
 }
 
@@ -524,7 +477,6 @@ HRESULT WSMAPIPropStorage::GetEntryIDByRef(ULONG *lpcbEntryID, LPENTRYID *lppEnt
 {
 	if (lpcbEntryID == NULL || lppEntryID == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
 	*lpcbEntryID = m_sEntryId.__size;
 	*lppEntryID = (LPENTRYID)m_sEntryId.__ptr;
 	return hrSuccess;
@@ -542,19 +494,16 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 		// Register notification
 		sNotSubscribe.ulConnection = m_ulConnection;
 		sNotSubscribe.ulEventMask = m_ulEventMask;
-
 		sNotSubscribe.sKey.__size = m_sEntryId.__size;
 		sNotSubscribe.sKey.__ptr = m_sEntryId.__ptr;
 	}
 
-	LockSoap();
-
+	soap_lock_guard spg(*m_lpTransport);
 	if (!lppsMapiObject) {
 		assert(false);
 		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
-
 	if (*lppsMapiObject) {
 		// memleak detected
 		assert(false);
@@ -564,12 +513,15 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 
 	START_SOAP_CALL
 	{
-		if (lpCmd->loadObject(ecSessionId, m_sEntryId, (m_ulConnection == 0 || m_bSubscribed) ? nullptr : &sNotSubscribe, m_ulFlags | 0x80000000, &sResponse) != SOAP_OK)
+		if (m_lpTransport->m_lpCmd->loadObject(ecSessionId, m_sEntryId,
+		    (m_ulConnection == 0 || m_bSubscribed) ? nullptr : &sNotSubscribe,
+		    m_ulFlags | 0x80000000, &sResponse) != SOAP_OK)
 			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
 	//END_SOAP_CALL
+
 	if (er == KCERR_END_OF_SESSION && m_lpTransport->HrReLogon() == hrSuccess)
 		goto retry;
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND);
@@ -579,33 +531,10 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 		goto exit;
 	lpsMapiObject = new MAPIOBJECT; /* ulObjType, ulObjId and ulUniqueId are unknown here */
 	ECSoapObjectToMapiObject(&sResponse.sSaveObject, lpsMapiObject);
-
 	*lppsMapiObject = lpsMapiObject;
-	
 	m_bSubscribed = m_ulConnection != 0;
-
 exit:
-	UnLockSoap();
-
 	return hr;
-}
-
-//FIXME: one lock/unlock function
-HRESULT WSMAPIPropStorage::LockSoap()
-{
-	lpDataLock.lock();
-	return erSuccess;
-}
-
-HRESULT WSMAPIPropStorage::UnLockSoap()
-{
-	//Clean up data create with soap_malloc
-	if(lpCmd->soap) {
-		soap_destroy(lpCmd->soap);
-		soap_end(lpCmd->soap);
-	}
-	lpDataLock.unlock();
-	return erSuccess;
 }
 
 HRESULT WSMAPIPropStorage::HrSetSyncId(ULONG ulSyncId) {

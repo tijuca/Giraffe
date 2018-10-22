@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include <kopano/Util.h>
@@ -23,7 +10,7 @@
 
 namespace KC { namespace operations {
 
-Transaction::Transaction(const SObjectEntry &objectEntry): m_objectEntry(objectEntry) 
+Transaction::Transaction(const SObjectEntry &objectEntry) : m_objectEntry(objectEntry)
 { }
 
 HRESULT Transaction::SaveChanges(ArchiverSessionPtr ptrSession, RollbackPtr *lpptrRollback)
@@ -117,10 +104,8 @@ HRESULT Transaction::Delete(const SObjectEntry &objectEntry, bool bDeferredDelet
 
 HRESULT Rollback::Delete(ArchiverSessionPtr ptrSession, IMessage *lpMessage)
 {
-	HRESULT hr;
 	SPropArrayPtr ptrMsgProps;
-	ULONG cMsgProps;
-	ULONG ulType;
+	unsigned int cMsgProps, ulType;
 	DelEntry entry;
 	static constexpr const SizedSPropTagArray(2, sptaMsgProps) =
 		{2, {PR_ENTRYID, PR_PARENT_ENTRYID}};
@@ -128,7 +113,7 @@ HRESULT Rollback::Delete(ArchiverSessionPtr ptrSession, IMessage *lpMessage)
 
 	if (lpMessage == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = lpMessage->GetProps(sptaMsgProps, 0, &cMsgProps, &~ptrMsgProps);
+	auto hr = lpMessage->GetProps(sptaMsgProps, 0, &cMsgProps, &~ptrMsgProps);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrSession->GetMAPISession()->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb,

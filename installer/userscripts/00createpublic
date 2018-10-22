@@ -1,0 +1,3 @@
+#! /bin/sh
+PATH=$PATH:/sbin:/usr/local/sbin:/usr/sbin
+exec kopano-storeadm -Pk "$KOPANO_COMPANY"

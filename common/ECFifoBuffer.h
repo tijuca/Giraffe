@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECFIFOBUFFER_H
@@ -41,34 +29,18 @@ public:
 	_kc_hidden bool IsClosed(ULONG flags) const;
 	_kc_hidden bool IsEmpty() const { return m_storage.empty(); }
 	_kc_hidden bool IsFull() const { return m_storage.size() == m_ulMaxSize; }
-	
+
 private:
 	// prohibit copy
 	ECFifoBuffer(const ECFifoBuffer &) = delete;
 	ECFifoBuffer &operator=(const ECFifoBuffer &) = delete;
-	
+
 	storage_type	m_storage;
 	size_type		m_ulMaxSize;
 	bool m_bReaderClosed = false, m_bWriterClosed = false;
 	std::mutex m_hMutex;
 	std::condition_variable m_hCondNotEmpty, m_hCondNotFull, m_hCondFlushed;
 };
-
-
-// inlines
-inline bool ECFifoBuffer::IsClosed(ULONG flags) const {
-	switch (flags) {
-	case cfRead:
-		return m_bReaderClosed;
-	case cfWrite:
-		return m_bWriterClosed;
-	case cfRead|cfWrite:
-		return m_bReaderClosed && m_bWriterClosed;
-	default:
-		assert(false);
-		return false;
-	}
-}
 
 } /* namespace */
 

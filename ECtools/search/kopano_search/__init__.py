@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-only
+from __future__ import print_function
 from .version import __version__
 
 import collections
@@ -14,7 +16,7 @@ import sys
 if sys.hexversion >= 0x03000000:
     import bsddb3 as bsddb
     from queue import Empty
-else:
+else: # pragma: no cover
     import bsddb
     from Queue import Empty
 
@@ -95,7 +97,7 @@ if sys.hexversion >= 0x03000000:
 
     def _encode(s):
         return s.encode()
-else:
+else: # pragma: no cover
     def _is_unicode(s):
         return isinstance(s, unicode)
 
@@ -329,7 +331,11 @@ class Service(kopano.Service):
         index_path = self.config['index_path']
         os.umask(0o77)
         if not os.path.exists(index_path):
-            os.makedirs(index_path)
+            try:
+                os.makedirs(index_path)
+            except PermissionError:
+                self.log.error("Unable to create directory '%s': permission denied", index_path)
+                sys.exit(1)
         self.state_db = os.path.join(index_path, self.server.guid+'_state')
         self.plugin = __import__('plugin_%s' % self.config['search_engine']).Plugin(index_path, self.log)
         self.iqueue, self.oqueue = Queue(), Queue()
@@ -337,7 +343,12 @@ class Service(kopano.Service):
         workers = [IndexWorker(self, 'index%d'%i, nr=i, iqueue=self.iqueue, oqueue=self.oqueue) for i in range(self.index_processes)]
         for worker in workers:
             worker.start()
-        self.state = db_get(self.state_db, 'SERVER')
+        try:
+            self.state = db_get(self.state_db, 'SERVER')
+        except bsddb.db.DBAccessError:
+            self.log.error("Cannot access '%s': permission denied", self.state_db)
+            sys.exit(1)
+
         if self.state:
             self.log.info('found previous server sync state: %s', self.state)
         else:
@@ -396,23 +407,36 @@ class Service(kopano.Service):
     def reindex(self):
         """ pass usernames/store-ids given on command-line to running search process """
 
-        for key in self.options.reindex: # usernames supported for convenience/backward compatibility
-            store = self.server.get_store(key)
-            if not store:
-                user = self.server.get_user(key)
-                if user:
-                    store = user.store
-            if store: # XXX check all keys first
-                with closing(kopano.client_socket(self.config['server_bind_name'], ssl_cert=self.config['ssl_certificate_file'])) as s:
-                    s.sendall('REINDEX %s\r\n' % store.guid)
-                    s.recv(1024)
-            else:
-                print("no such user/store: %s" % key)
+        store_guids = []
+
+        if not (self.options.users or self.options.stores):
+            print("no user/store specified (use -u/-S)", file=sys.stderr)
+            sys.exit(1)
+
+        for username in self.options.users:
+            user = self.server.get_user(username)
+            if not user:
+                print("no such user: %s" % username, file=sys.stderr)
                 sys.exit(1)
+            elif user.store:
+                store_guids.append(user.store.guid)
+
+        for store_guid in self.options.stores:
+            store = self.server.get_store(store_guid)
+            if not store:
+                print("no such store: %s" % store_guid, file=sys.stderr)
+                sys.exit(1)
+            else:
+                store_guids.append(store.guid)
+
+        for store_guid in store_guids:
+            with closing(kopano.client_socket(self.config['server_bind_name'], ssl_cert=self.config['ssl_certificate_file'])) as s:
+                s.sendall((u'REINDEX %s\r\n' % store_guid).encode('ascii'))
+                s.recv(1024)
 
 def main():
-    parser = kopano.parser('ckpsFlV') # select common cmd-line options
-    parser.add_option('-r', '--reindex', dest='reindex', action='append', default=[], help='Reindex user/store', metavar='USER')
+    parser = kopano.parser('ckpsFlVuS') # select common cmd-line options
+    parser.add_option('-r', '--reindex', dest='reindex', action='store_true',help='Reindex user/store')
     options, args = parser.parse_args()
     service = Service('search', config=CONFIG, options=options)
     if options.reindex:
@@ -421,4 +445,4 @@ def main():
         service.start()
 
 if __name__ == '__main__':
-    main()
+    main() # pragma: no cover

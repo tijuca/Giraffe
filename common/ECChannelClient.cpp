@@ -1,23 +1,9 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <new>
-
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapix.h>
@@ -28,8 +14,8 @@
 #include <sys/socket.h>
 #include <kopano/ECChannel.h>
 #include <kopano/ECDefs.h>
+#include <kopano/scope.hpp>
 #include <kopano/stringutil.h>
-
 #include "ECChannelClient.h"
 
 namespace KC {
@@ -48,28 +34,22 @@ ECChannelClient::ECChannelClient(const char *szPath, const char *tk) :
 
 ECRESULT ECChannelClient::DoCmd(const std::string &strCommand, std::vector<std::string> &lstResponse)
 {
-	ECRESULT er;
 	std::string strResponse;
-
-	er = Connect();
+	auto er = Connect();
 	if (er != erSuccess)
 		return er;
-
 	er = m_lpChannel->HrWriteLine(strCommand);
 	if (er != erSuccess)
 		return er;
-
 	er = m_lpChannel->HrSelect(m_ulTimeout);
 	if (er != erSuccess)
 		return er;
-
 	// @todo, should be able to read more than 4MB of results
-	er = m_lpChannel->HrReadLine(&strResponse, 4*1024*1024);
+	er = m_lpChannel->HrReadLine(strResponse, 4*1024*1024);
 	if (er != erSuccess)
 		return er;
 
 	lstResponse = tokenize(strResponse, m_strTokenizer);
-
 	if (!lstResponse.empty() && lstResponse.front() == "OK")
 		lstResponse.erase(lstResponse.begin());
 	else
@@ -79,22 +59,13 @@ ECRESULT ECChannelClient::DoCmd(const std::string &strCommand, std::vector<std::
 
 ECRESULT ECChannelClient::Connect()
 {
-	ECRESULT er = erSuccess;
-
-	if (!m_lpChannel) {
-		if (m_bSocket)
-			er = ConnectSocket();
-		else
-			er = ConnectHttp();
-	}
-
-	return er;
+	if (m_lpChannel)
+		return erSuccess;
+	return m_bSocket ? ConnectSocket() : ConnectHttp();
 }
 
 ECRESULT ECChannelClient::ConnectSocket()
 {
-	ECRESULT er = erSuccess;
-	int fd = -1;
 	struct sockaddr_un saddr;
 
 	memset(&saddr, 0, sizeof(saddr));
@@ -106,29 +77,26 @@ ECRESULT ECChannelClient::ConnectSocket()
 	}
 	kc_strlcpy(saddr.sun_path, m_strPath.c_str(), sizeof(saddr.sun_path));
 
-	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
+	auto fd = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
 		return KCERR_INVALID_PARAMETER;
 	if (connect(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
-		er = KCERR_NETWORK_ERROR;
-		goto exit;
+		if (fd != -1)
+			close(fd);
+		return KCERR_NETWORK_ERROR;
 	}
 	m_lpChannel.reset(new(std::nothrow) ECChannel(fd));
 	if (!m_lpChannel) {
-		er = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
+		if (fd != -1)
+			close(fd);
+		return KCERR_NOT_ENOUGH_MEMORY;
 	}
-
-exit:
-	if (er != erSuccess && fd != -1)
-		close(fd);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECChannelClient::ConnectHttp()
 {
-	ECRESULT er = erSuccess;
-	int fd = -1, ret;
+	int fd = -1;
 	struct addrinfo *sock_res, sock_hints;
 	const struct addrinfo *sock_addr;
 	char port_string[sizeof("65536")];
@@ -136,10 +104,14 @@ ECRESULT ECChannelClient::ConnectHttp()
 	snprintf(port_string, sizeof(port_string), "%u", m_ulPort);
 	memset(&sock_hints, 0, sizeof(sock_hints));
 	sock_hints.ai_socktype = SOCK_STREAM;
-	ret = getaddrinfo(m_strPath.c_str(), port_string, &sock_hints,
-	      &sock_res);
+	auto ret = getaddrinfo(m_strPath.c_str(), port_string, &sock_hints, &sock_res);
 	if (ret != 0)
 		return KCERR_NETWORK_ERROR;
+
+	auto free_sock_res = make_scope_success([&]() {
+		if (sock_res != nullptr)
+			freeaddrinfo(sock_res);
+	});
 
 	for (sock_addr = sock_res; sock_addr != NULL;
 	     sock_addr = sock_addr->ai_next)
@@ -149,7 +121,6 @@ ECRESULT ECChannelClient::ConnectHttp()
 		if (fd < 0)
 			/* Socket type could not be created */
 			continue;
-
 		if (connect(fd, sock_addr->ai_addr,
 		    sock_addr->ai_addrlen) < 0) {
 			/* No route */
@@ -162,23 +133,16 @@ ECRESULT ECChannelClient::ConnectHttp()
 		/* Good connected socket, use it */
 		break;
 	}
-	if (fd < 0) {
-		er = KCERR_NETWORK_ERROR;
-		goto exit;
-	}
+	if (fd < 0)
+		return KCERR_NETWORK_ERROR;
+
 	m_lpChannel.reset(new(std::nothrow) ECChannel(fd));
 	if (!m_lpChannel) {
-		er = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
+		if (fd != -1)
+			close(fd);
+		return KCERR_NOT_ENOUGH_MEMORY;
 	}
-
-exit:
-	if (sock_res != NULL)
-		freeaddrinfo(sock_res);
-	if (er != erSuccess && fd != -1)
-		close(fd);
-
-	return er;
+	return erSuccess;
 }
 
 } /* namespace */

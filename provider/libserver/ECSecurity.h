@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // ECSecurity.h: interface for the ECSecurity class.
@@ -26,7 +14,6 @@
 #include <kopano/memory.hpp>
 #include "ECUserManagement.h"
 #include "plugin.h"
-
 #include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECDefs.h>
@@ -37,9 +24,9 @@ class ECSession;
 
 #define EC_NO_IMPERSONATOR		((unsigned int)-1)
 
-class ECSecurity _kc_final {
+class ECSecurity final {
 public:
-	ECSecurity(ECSession *lpSession, ECConfig *lpConfig, ECLogger *lpAudit);
+	ECSecurity(ECSession *lpSession, std::shared_ptr<ECConfig>, std::shared_ptr<ECLogger> audit);
 
 	/* must be called once the object is created */
 	virtual ECRESULT SetUserContext(unsigned int ulUserId, unsigned int ulImpersonatorID);
@@ -92,14 +79,13 @@ private:
 
 protected:
 	ECSession			*m_lpSession;
-	object_ptr<ECLogger> m_lpAudit;
-	ECConfig			*m_lpConfig;
+	std::shared_ptr<ECLogger> m_lpAudit;
+	std::shared_ptr<ECConfig> m_lpConfig;
 
 	unsigned int m_ulUserID = 0; // current user id
 	unsigned int m_ulImpersonatorID = 0; // id of user that is impersonating the current user
 	unsigned int m_ulCompanyID = 0; // Company to which the user belongs to
-	objectdetails_t		m_details;
-    objectdetails_t 	m_impersonatorDetails;
+	objectdetails_t m_details, m_impersonatorDetails;
 	bool				m_bRestrictedAdmin; // True if restricted admin permissions enabled
 	bool 				m_bOwnerAutoFullAccess;
 	std::unique_ptr<std::list<localobjectdetails_t>> m_lpGroups; // current user groups

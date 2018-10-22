@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include "vevent.h"
 #include <mapiutil.h>
@@ -83,8 +70,7 @@ HRESULT VEventConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *
 HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalcomponent *lpicEvent, void *base, bool bisException, std::list<SPropValue> *lstMsgProps)
 {
 	SPropValue sPropVal;
-	bool bMeeting = false;
-	bool bMeetingOrganised = false;
+	bool bMeeting = false, bMeetingOrganised = false;
 	std::wstring strEmail;
 
 	auto icProp = icalcomponent_get_first_property(lpicEvent, ICAL_ORGANIZER_PROPERTY);
@@ -192,11 +178,8 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 		HrCopyString(base, L"IPM.Appointment", &sPropVal.Value.lpszW);
 
 		// if we don't have attendees, skip the meeting request props
-		if (icalcomponent_get_first_property(lpicEvent, ICAL_ATTENDEE_PROPERTY) == NULL)
-			bMeeting = false;
-		else
-			bMeeting = true;	//if Attendee is present then set the PROP_MEETINGSTATUS property
-
+		// if Attendee is present, then set the PROP_MEETINGSTATUS property
+		bMeeting = icalcomponent_get_first_property(lpicEvent, ICAL_ATTENDEE_PROPERTY) != nullptr;
 		break;
 	}
 	}
@@ -204,6 +187,16 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 	if (!bisException) {
 		sPropVal.ulPropTag = PR_MESSAGE_CLASS_W;
 		lstMsgProps->emplace_back(sPropVal);
+	}
+
+	if (m_lpMailUser != nullptr) {
+		memory_ptr<SPropValue> tmp;
+		auto hr = HrGetOneProp(m_lpMailUser, PR_DISPLAY_NAME_W, &~tmp);
+		if (hr == hrSuccess) {
+			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_8230], PT_UNICODE);
+			HrCopyString(base, tmp->Value.lpszW, &sPropVal.Value.lpszW);
+			lstMsgProps->emplace_back(sPropVal);
+		}
 	}
 
 	if (icMethod == ICAL_METHOD_CANCEL || icMethod == ICAL_METHOD_REQUEST)
@@ -266,8 +259,7 @@ HRESULT VEventConverter::HrAddBaseProperties(icalproperty_method icMethod, icalc
 HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *lpicEventRoot, icalcomponent *lpicEvent, bool bIsAllday, icalitem *lpIcalItem)
 {
 	SPropValue sPropVal;
-	icalproperty* lpicOrigDTStartProp = NULL;
-	icalproperty* lpicOrigDTEndProp = NULL;
+	icalproperty *lpicOrigDTStartProp = nullptr, *lpicOrigDTEndProp = nullptr;
 	std::unique_ptr<icalproperty, icalmapi_delete> lpicFreeDTStartProp, lpicFreeDTEndProp;
 	time_t timeDTStartUTC = 0, timeDTEndUTC = 0;
 	time_t timeDTStartLocal = 0, timeDTEndLocal = 0;
@@ -357,7 +349,6 @@ HRESULT VEventConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent 
 	if (lpicDTEndProp) {
 		timeDTEndUTC = ICalTimeTypeToUTC(lpicEventRoot, lpicDTEndProp);
 		timeDTEndLocal = ICalTimeTypeToLocal(lpicDTEndProp);
-
 	} else {
 		// @note not so sure if the following comment is 100% true. It may also be used to complement a missing DTSTART or DTEND, according to MS specs.
 		// When DTEND is not in the ical, it should be a recurring message, which never ends!
@@ -448,10 +439,8 @@ HRESULT VEventConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *l
  */
 HRESULT VEventConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsgProps, icaltimezone *lpicTZinfo, const std::string &strTZid, icalcomponent *lpEvent)
 {
-	bool bIsAllDay = false;
-	bool bCounterProposal = false;
-	ULONG ulStartIndex = PROP_APPTSTARTWHOLE;
-	ULONG ulEndIndex = PROP_APPTENDWHOLE;
+	bool bIsAllDay = false, bCounterProposal = false;
+	ULONG ulStartIndex = PROP_APPTSTARTWHOLE, ulEndIndex = PROP_APPTENDWHOLE;
 
 	HRESULT hr = VConverter::HrSetTimeProperties(lpMsgProps, ulMsgProps,
 	             lpicTZinfo, strTZid, lpEvent);

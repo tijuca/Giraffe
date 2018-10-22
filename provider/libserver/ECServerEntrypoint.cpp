@@ -1,29 +1,18 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
+#include <memory>
 #include <mutex>
+#include <utility>
 #include <pthread.h>
 #include <kopano/ECLogger.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/hl.hpp>
 #include "ECDatabase.h"
 #include "ECSessionManager.h"
-#include "ECStatsCollector.h"
+#include "StatsClient.h"
 #include "ECDatabaseFactory.h"
 #include "ECServerEntrypoint.h"
 #include "ECS3Attachment.h"
@@ -33,8 +22,7 @@ namespace KC {
 pthread_key_t database_key;
 pthread_key_t plugin_key;
 
-_kc_export ECSessionManager *g_lpSessionManager;
-_kc_export ECStatsCollector *g_lpStatsCollector;
+_kc_export std::unique_ptr<ECSessionManager> g_lpSessionManager;
 static std::set<ECDatabase *> g_lpDBObjectList;
 static std::mutex g_hMutexDBObjectList;
 static bool g_bInitLib = false;
@@ -63,19 +51,17 @@ static void plugin_destroy(void *lpParam)
 
 ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 {
-	if (g_bInitLib == true)
+	if (g_bInitLib)
 		return KCERR_CALL_FAILED;
 
 	// This is a global key that we can reference from each thread with a different value. The
 	// database_destroy routine is called when the thread terminates.
-
 	pthread_key_create(&database_key, database_destroy);
 	pthread_key_create(&plugin_key, plugin_destroy); // same goes for the userDB-plugin
 
 	// Init mutex for database object list
 	auto er = ECDatabase::InitLibrary(lpDatabaseDir, lpConfigFile);
-	g_lpStatsCollector = new ECStatsCollector();
-	
+
 	//TODO: with an error remove all variables and g_bInitLib = false
 	g_bInitLib = true;
 	return er;
@@ -86,8 +72,8 @@ ECRESULT kopano_unloadlibrary(void)
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
 
-	// Delete the global key,  
-	//  on this position, there are zero or more threads exist. 
+	// Delete the global key,
+	//  on this position, there are zero or more threads exist.
 	//  As you delete the keys, the function database_destroy and plugin_destroy will never called
 	//
 	pthread_key_delete(database_key);
@@ -106,22 +92,17 @@ ECRESULT kopano_unloadlibrary(void)
 	return erSuccess;
 }
 
-ECRESULT kopano_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedKopano, bool bDistributedKopano)
+ECRESULT kopano_init(std::shared_ptr<ECConfig> cfg, std::shared_ptr<ECLogger> ad,
+    std::shared_ptr<server_stats> sc, bool bHostedKopano, bool bDistributedKopano)
 {
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
 	try {
-		g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedKopano, bDistributedKopano);
+		g_lpSessionManager = std::make_unique<ECSessionManager>(std::move(cfg), std::move(ad), std::move(sc), bHostedKopano, bDistributedKopano);
 	} catch (const KMAPIError &e) {
 		return e.code();
 	}
 	return g_lpSessionManager->LoadSettings();
-}
-
-void kopano_removeallsessions()
-{
-	if (g_lpSessionManager != nullptr)
-		g_lpSessionManager->RemoveAllSessions();
 }
 
 ECRESULT kopano_exit()
@@ -130,13 +111,7 @@ ECRESULT kopano_exit()
 		return KCERR_NOT_INITIALIZED;
 	// delete our plugin of the mainthread: requires ECPluginFactory to be alive, because that holds the dlopen() result
 	plugin_destroy(pthread_getspecific(plugin_key));
-
-	delete g_lpSessionManager;
-	g_lpSessionManager = NULL;
-
-	delete g_lpStatsCollector;
-	g_lpStatsCollector = NULL;
-
+	g_lpSessionManager.reset();
 	// Close all database connections
 	scoped_lock l_obj(g_hMutexDBObjectList);
 	for (auto dbobjp : g_lpDBObjectList)
@@ -175,8 +150,7 @@ void kopano_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 	auto lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
 	lpInfo->bProxy = false;
-	soap->user = (void *)lpInfo;
-	
+	soap->user = lpInfo;
 	if (szProxy[0] == '\0')
 		return;
 	if (strcmp(szProxy, "*") == 0) {
@@ -199,7 +173,7 @@ void kopano_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
 	auto lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
 	lpInfo->bProxy = false;
-	soap->user = (void *)lpInfo;
+	soap->user = lpInfo;
 }
 
 void kopano_end_soap_listener(struct soap *soap)
@@ -217,14 +191,13 @@ void kopano_disconnect_soap_connection(struct soap *soap)
 }
 
 // Export functions
-ECRESULT GetDatabaseObject(ECDatabase **lppDatabase)
+ECRESULT GetDatabaseObject(std::shared_ptr<ECStatsCollector> sc, ECDatabase **lppDatabase)
 {
 	if (g_lpSessionManager == NULL)
 		return KCERR_UNKNOWN;
 	if (lppDatabase == NULL)
 		return KCERR_INVALID_PARAMETER;
-
-	ECDatabaseFactory db(g_lpSessionManager->GetConfig());
+	ECDatabaseFactory db(g_lpSessionManager->GetConfig(), std::move(sc));
 	return GetThreadLocalDatabase(&db, lppDatabase);
 }
 

@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# kopano-spamd Kopano Core Spamd
+# kopano-spamd Kopano Groupware Core SPAM learning Daemon
 #
 # chkconfig: 345 86 24
 # processname: /usr/sbin/kopano-spamd
 # config: /etc/kopano/spamd.cfg
 # pidfile: /var/run/kopano/spamd.pid
-
+# SPDX-License-Identifier: AGPL-3.0-only
 ### BEGIN INIT INFO
 # Provides: kopano-spamd
 # Required-Start: $local_fs $network $remote_fs $syslog
 # Required-Stop: $local_fs $network $remote_fs $syslog
 # Should-Start: kopano-server
 # Should-Stop: kopano-server
-# Short-Description: Kopano Core Spamd
+# Short-Description: Kopano Groupware Core SPAM learning Daemon
 ### END INIT INFO
 
 SPAMDCONFIG=/etc/kopano/spamd.cfg
@@ -24,11 +24,6 @@ SPAMDPROGRAM=/usr/sbin/kopano-spamd
 
 SPAMDCONFIG_OPT=""
 [ ! -z $SPAMDCONFIG -a -f $SPAMDCONFIG ] && SPAMDCONFIG_OPT="-c $SPAMDCONFIG"
-
-[ -f /etc/sysconfig/kopano ] && . /etc/sysconfig/kopano
-if [ -z "$KOPANO_LOCALE" ]; then
-	KOPANO_LOCALE="C"
-fi
 
 # Source function library.
 . /etc/rc.d/init.d/functions
@@ -42,8 +37,6 @@ start() {
 	# Start in background, always succeeds
 	echo -n $"Starting $spamd: "
 	install -dm0775 -o kopano -g kopano /var/run/kopano
-	export LC_ALL=$KOPANO_LOCALE
-	export LANG=$KOPANO_LOCALE
 	daemon --pidfile="$pidfile" $SPAMDPROGRAM $SPAMDCONFIG_OPT >/dev/null 2>&1
 	RETVAL=$?
 	unset LC_ALL LANG

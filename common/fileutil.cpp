@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
@@ -22,38 +9,37 @@
 #include <string>
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <kopano/ECIConv.h>
 #include <kopano/ECLogger.h>
-
 #include <mapicode.h>
 #include <mapidefs.h>
-#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
-#include "fileutil.h"
-
+#include <unistd.h>
+#include <kopano/ECConfig.h>
+#include <kopano/fileutil.hpp>
 #define BLOCKSIZE	65536
 
 namespace KC {
 
-/** 
+/**
  * Reads the contents of a file, and writes it to the output file
  * while converting Unix \n enters to DOS \r\n enters.
- * 
+ *
  * @todo this function prints errors to screen using perror(), which should be removed
  * @todo this function doesn't return the filepointer in case of an error, but also doesn't unlink the tempfile either.
  *
  * @param[in] fin input file to read strings from
  * @param[out] fout new filepointer to a temporary file
- * 
+ *
  * @return MAPI error code
  */
 HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout)
 {
-	char	bufferin[BLOCKSIZE / 2];
-	char	bufferout[BLOCKSIZE+1];
+	char bufferin[BLOCKSIZE/2], bufferout[BLOCKSIZE+1];
 	size_t sizebufferout;
 
 	if(fin == NULL || fout == NULL)
@@ -83,139 +69,35 @@ HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout)
 	return hrSuccess;
 }
 
-/** 
- * align to page boundary (4k)
- * 
- * @param size add "padding" to size to make sure it's a multiple 4096 bytes
- * 
- * @return aligned size
- */
-static inline int mmapsize(unsigned int size)
-{
-	return (((size + 1) >> 12) + 1) << 12;
-}
-
-/** 
- * Load a file, first by trying to use mmap. If that fails, the whole
- * file is loaded in memory.
- * 
- * @param[in] f file to read
- * @param[out] lppBuffer buffer containing the file contents
- * @param[out] lpSize length of the buffer
- * @param[out] lpImmap boolean denoting if the buffer is mapped or not (used when freeing the buffer)
- * 
- * @return MAPI error code
- */
-static HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize,
-    bool *lpImmap)
-{
-	char *lpBuffer = NULL;
-	int offset = 0;
-	long ulBufferSize = BLOCKSIZE;
-	struct stat stat;
-	int fd = fileno(f);
-
-	*lpImmap = false;
-
-	/* Try mmap first */
-	if (fstat(fd, &stat) != 0) {
-		perror("Stat failed");
-		return MAPI_E_CALL_FAILED;
-	}
-
-	/* auto-zero-terminate because mmap zeroes bytes after the file */
-	lpBuffer = (char *)mmap(0, mmapsize(stat.st_size), PROT_READ, MAP_PRIVATE, fd, 0);
-	if (lpBuffer != MAP_FAILED) {
-		*lpImmap = true;
-		*lppBuffer = lpBuffer;
-		*lpSize = stat.st_size;
-		return hrSuccess;
-	}
-
-	/* mmap failed (probably reading from STDIN as a stream), just read the file into memory, and return that */
-	lpBuffer = (char*)malloc(BLOCKSIZE); // will be deleted as soon as possible
-	while (!feof(f)) {
-		long ulReadsize = fread(lpBuffer+offset, 1, BLOCKSIZE, f);
-		if (ferror(f)) {
-			perror("Read error");
-			break;
-		}
-
-		offset += ulReadsize;
-		if (offset + BLOCKSIZE > ulBufferSize) {    // Next read could cross buffer boundary, realloc
-			auto lpRealloc = static_cast<char *>(realloc(lpBuffer, offset + BLOCKSIZE));
-			if (lpRealloc == NULL) {
-				free(lpBuffer);
-				return MAPI_E_NOT_ENOUGH_MEMORY;
-			}
-			lpBuffer = lpRealloc;
-			ulBufferSize += BLOCKSIZE;
-		}
-	}
-
-	/* Nothing was read */
-    if (offset == 0) {
-		free(lpBuffer);
-		*lppBuffer = NULL;
-		*lpSize = 0;
-		return hrSuccess;
-	}
-	/* Add terminate character */
-	lpBuffer[offset] = 0;
-	*lppBuffer = lpBuffer;
-	*lpSize = offset;
-	return hrSuccess;
-}
-
-/** 
- * Free a buffer from HrMapFileToBuffer
- * 
- * @param[in] lpBuffer buffer to free
- * @param[in] ulSize size of the buffer
- * @param[in] bImmap marker if the buffer is mapped or not
- */
-static HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
-{
-	if (bImmap)
-		munmap(lpBuffer, mmapsize(ulSize));
-	else
-		free(lpBuffer);
-	return hrSuccess;
-}
-
-/** 
- * Reads a file into a std::string using file mapping if possible.
+/**
+ * Reads a file into a std::string
  *
- * @todo doesn't the std::string undermine the whole idea of mapping?
- * @todo std::string has a length method, so what's with the lpSize parameter?
- * 
  * @param[in] f file to read in memory
- * @param[out] lpstrBuffer string containing the file contents, optionally returned (why?)
- * @param[out] lpSize size of the buffer, optionally returned
- * 
- * @return 
+ * @param[out] lpstrBuffer string containing the file contents
+ *
+ * @return
  */
-HRESULT HrMapFileToString(FILE *f, std::string *lpstrBuffer, int *lpSize)
+HRESULT HrMapFileToString(FILE *f, std::string *lpstrBuffer)
 {
-	HRESULT hr = hrSuccess;
-	char *lpBuffer = NULL;
-	int ulBufferSize = 0;
-	bool immap = false;
-
-	hr = HrMapFileToBuffer(f, &lpBuffer, &ulBufferSize, &immap); // what if message was half read?
-	if (hr != hrSuccess || !lpBuffer)
-		goto exit;
-
-	if (lpstrBuffer)
-		*lpstrBuffer = std::string(lpBuffer, ulBufferSize);
-	if (lpSize)
-		*lpSize = ulBufferSize;
-
-exit:
-	if (lpBuffer)
-		HrUnmapFileBuffer(lpBuffer, ulBufferSize, immap);
-
-	return hr;
+	struct stat sb;
+	if (fstat(fileno(f), &sb) != 0)
+		return MAPI_E_CALL_FAILED;
+	lpstrBuffer->clear();
+	char buf[BLOCKSIZE];
+	while (!feof(f)) {
+		auto rd = fread(buf, 1, sizeof(buf), f);
+		if (ferror(f)) {
+			perror("MapFileToString/fread");
+			return MAPI_E_CORRUPT_DATA;
+		}
+		try {
+			lpstrBuffer->append(buf, rd);
+		} catch (const std::bad_alloc &) {
+			perror("malloc");
+			return MAPI_E_NOT_ENOUGH_MEMORY;
+		}
+	}
+	return hrSuccess;
 }
 
 /**
@@ -261,6 +143,124 @@ bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 		}
 	}
 	return true;
+}
+
+TmpPath TmpPath::instance;
+
+TmpPath::TmpPath()
+{
+	const char *dummy = nullptr;
+
+	if (path.empty()) {
+		dummy = getenv("TMP");
+		if (dummy != nullptr)
+			path = dummy;
+	}
+	if (path.empty()) {
+		dummy = getenv("TEMP");
+		if (dummy != nullptr)
+			path = dummy;
+	}
+	if (!path.empty()) {
+		struct stat st;
+		if (stat(path.c_str(), &st) == -1)
+			path = "/tmp"; // what to do if we can't access that path either? FIXME
+	}
+	if (path.empty())
+		path = "/tmp";
+}
+
+bool TmpPath::OverridePath(ECConfig *ec)
+{
+	bool rc = true;
+	const char *newPath = ec->GetSetting("tmp_path");
+
+	if (newPath == nullptr || newPath[0] == '\0')
+		return true;
+	path = newPath;
+	size_t s = path.size();
+	if (path.at(s - 1) == '/' && s > 1)
+		path = path.substr(0, s - 1);
+	struct stat st;
+	if (stat(path.c_str(), &st) == -1) {
+		path = "/tmp"; // what to do if we can't access that path either? FIXME
+		rc = false;
+	}
+	setenv("TMP", newPath, 1);
+	setenv("TEMP", newPath, 1);
+	return rc;
+}
+
+/* Does mkdir -p <path> */
+int CreatePath(std::string s, unsigned int mode)
+{
+	if (s.size() == 0)
+		return -ENOENT;
+	size_t p = 0;
+	while (s[p] == '/')
+		/* No need to create the root directory; it always exists. */
+		++p;
+	do {
+		p = s.find('/', p);
+		if (p == std::string::npos)
+			break;
+		s[p] = '\0';
+		auto ret = mkdir(s.c_str(), mode);
+		if (ret != 0 && errno != EEXIST)
+			return -errno;
+		s[p++] = '/';
+		while (s[p] == '/')
+			++p;
+	} while (true);
+	auto ret = mkdir(s.c_str(), mode);
+	if (ret != 0 && errno != EEXIST)
+		return -errno;
+	return 0;
+}
+
+ssize_t read_retry(int fd, void *data, size_t len)
+{
+	auto buf = static_cast<char *>(data);
+	size_t tread = 0;
+
+	while (len > 0) {
+		ssize_t ret = read(fd, buf, len);
+		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+			continue;
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			break;
+		len -= ret;
+		buf += ret;
+		tread += ret;
+	}
+	return tread;
+}
+
+ssize_t write_retry(int fd, const void *data, size_t len)
+{
+	auto buf = static_cast<const char *>(data);
+	size_t twrote = 0;
+
+	while (len > 0) {
+		ssize_t ret = write(fd, buf, len);
+		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+			continue;
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			break;
+		len -= ret;
+		buf += ret;
+		twrote += ret;
+	}
+	return twrote;
+}
+
+bool force_buffers_to_disk(const int fd)
+{
+	return fsync(fd) != -1;
 }
 
 } /* namespace */

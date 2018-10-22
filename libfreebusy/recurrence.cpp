@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <string>
 #include <utility>
@@ -23,13 +10,12 @@
 #include <kopano/ECLogger.h>
 #include <mapicode.h>
 #include <kopano/stringutil.h>
-#include <kopano/ECIConv.h>
+#include <kopano/charset/convert.h>
 #include <ctime>
 #include <kopano/CommonUtil.h>
 #include <mapiutil.h>
 #include <kopano/mapiguidext.h>
 #include <kopano/namedprops.h>
-
 #include <iostream>
 #include <algorithm>
 
@@ -42,7 +28,7 @@ namespace KC {
  * @param[out]	lpulLen	Length of returned data in lppData.
  * @param[in]	base	base pointer to MAPIAllocateMore() for lppData allocation. NULL to use MAPIAllocateBuffer().
  */
-HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, void *base)
+HRESULT recurrence::HrGetRecurrenceState(char **lppData, size_t *lpulLen, void *base)
 {
 	struct tm tm;
 
@@ -57,7 +43,7 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 	    m_sRecState.ulPatternType != PT_WEEK &&
 	    m_sRecState.ulPatternType != PT_MONTH &&
 	    m_sRecState.ulPatternType != PT_MONTH_NTH &&
-	    m_sRecState.ulPatternType != PT_MONTH_END && 
+	    m_sRecState.ulPatternType != PT_MONTH_END &&
 	    m_sRecState.ulPatternType != PT_HJ_MONTH &&
 	    m_sRecState.ulPatternType != PT_HJ_MONTH_NTH &&
 	    m_sRecState.ulPatternType != PT_HJ_MONTH_END)
@@ -612,7 +598,6 @@ time_t recurrence::calcStartDate() const
 				// Monthly, go to next occurrence in 'everyn' months
 				count = m_sRecState.ulPeriod;
 			} else if (m_sRecState.ulRecurFrequency == RF_YEARLY) {
-
 				if (getMonth() - 1 < tm.tm_mon || (getMonth() - 1 == tm.tm_mon && static_cast<int>(m_sRecState.ulDayOfMonth) < tm.tm_mday))
 					// Yearly, go to next occurrence in 'everyn' months minus difference in first occurence and original date
 					count = (m_sRecState.ulPeriod - (tm.tm_mon - (getMonth()-1)));
@@ -623,7 +608,7 @@ time_t recurrence::calcStartDate() const
 			int curmonth = tm.tm_mon + 1;
 			int curyear = tm.tm_year + 1900;
 			for (unsigned int i = 0; i < count; ++i) {
-				tStart += MonthInSeconds(curyear, curmonth); 
+				tStart += MonthInSeconds(curyear, curmonth);
 				if (curmonth == 12) {
 					curmonth = 0;
 					++curyear;
@@ -647,7 +632,7 @@ time_t recurrence::calcStartDate() const
 
 		// seek to the begin of the month
 		tStart -= (tm.tm_mday - 1) * 24 * 60 * 60;
-		
+
 		// See to the end of the month when every last n Day of the month
 		if (m_sRecState.ulWeekNumber == 5)
 			tStart += MonthInSeconds(tm.tm_year + 1900, tm.tm_mon + 1) - (24 * 60 * 60);
@@ -773,7 +758,7 @@ time_t recurrence::calcEndDate() const
 			// next day
 			tEnd += 24*60*60;
 		}
-		
+
 		break;
 	}
 	case RF_MONTHLY:
@@ -831,7 +816,7 @@ time_t recurrence::calcEndDate() const
 		break;
 	}
 	}
-	
+
 	return tEnd;
 }
 
@@ -845,11 +830,11 @@ ULONG recurrence::calcBits(ULONG x) const
 	return n;
 }
 
-/** 
+/**
  * Returns the number of occurrences in this DATE ending recurring
  * item. It doesn't really matter what is returned, since this value
  * is only used for display in a Recurrence Dialog window.
- * 
+ *
  * @return number of occurrences
  */
 ULONG recurrence::calcCount() const
@@ -1019,7 +1004,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 {
 	HRESULT hr = 0;
 	OccrInfo *lpOccrInfoAll = *lppOccrInfo;
-	
+
 	std::vector<RecurrenceState::Exception> lstExceptions;
 	RecurrenceState::Exception lpException;
 	auto tsDayStart = getStartDate();
@@ -1072,7 +1057,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 	case WEEKLY:
 		if(m_sRecState.ulPeriod <= 0)
 			m_sRecState.ulPeriod = 1;
-			
+
                 if(last) {
                         bool found = false;
 			time_t remainder = (tsDayEnd - tsDayStart) % (m_sRecState.ulPeriod * 604800);
@@ -1112,19 +1097,16 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 			time_t tsDayNow = 0;
 
 			if(m_sRecState.ulDayOfMonth != 0) {
-				
 				ulDiffrence = 1;
 
 				if(m_sRecState.ulWeekDays == 0 && m_sRecState.ulDayOfMonth > ulDaysOfMonths)
 					ulDiffrence = m_sRecState.ulDayOfMonth - ulDaysOfMonths + 1;
-				
-				tsDayNow = tsNow + (m_sRecState.ulDayOfMonth - ulDiffrence) *24*60*60;
 
+				tsDayNow = tsNow + (m_sRecState.ulDayOfMonth - ulDiffrence) *24*60*60;
 			} else if( m_sRecState.ulWeekNumber != 0 && m_sRecState.ulWeekDays != 0) {
 				if (m_sRecState.ulWeekNumber < 5) {
 					ulDayCounter = 0;
 					for (ULONG ulDay = 0; ulDay < DaysInMonth(YearFromTime(tsNow), MonthFromTime(tsNow)); ++ulDay) {
-
 						tsDayNow = tsNow + ulDay * 60 * 60 * 24;
 						if (m_sRecState.ulWeekDays & (1 << WeekDayFromTime(tsDayNow)))
 							++ulDayCounter;
@@ -1148,37 +1130,32 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 				auto tsOccEnd = LocalToUTC(tsDayNow + getEndTimeOffset(), ttZinfo);
 				AddValidOccr(tsOccStart, tsOccEnd, ulBusyStatus, &lpOccrInfoAll, lpcValues);
 			}
-		
-			tsNow += DaysTillMonth(tsNow, m_sRecState.ulPeriod) * 60 * 60 * 24;			
+
+			tsNow += DaysTillMonth(tsNow, m_sRecState.ulPeriod) * 60 * 60 * 24;
 		}
 		break;// CASE : MONTHLY
 	}
 	case YEARLY: {
-		
 		if(m_sRecState.ulPeriod <= 0)
 			m_sRecState.ulPeriod = 12;
 		auto tsNow = StartOfYear(tsDayStart);
 		ec_log_debug("Recurrence Type Yearly");
 		while(tsNow < tsDayEnd) {
-			ULONG ulMonthDay = 0, ulValidDay = 0;
+			ULONG ulValidDay = 0;
 			time_t tsDayNow = 0, tMonthStart = 0, tsMonthNow = 0;
 
 			if(m_sRecState.ulDayOfMonth != 0) {
-				
-				ulMonthDay = m_sRecState.ulDayOfMonth;
+				ULONG ulMonthDay = m_sRecState.ulDayOfMonth;
 				tMonthStart = tsNow + DaysTillMonth(tsNow, getMonth()-1) * 24 * 60 *60;
 
 				if( ulMonthDay > DaysInMonth(YearFromTime(tMonthStart),MonthFromTime(tMonthStart)))
 					ulMonthDay = DaysInMonth(YearFromTime(tMonthStart),MonthFromTime(tMonthStart));
 
-				tsDayNow = tMonthStart + (ulMonthDay -1) * 24 * 60 * 60;				
-				
+				tsDayNow = tMonthStart + (ulMonthDay -1) * 24 * 60 * 60;
 			} else if( m_sRecState.ulWeekNumber != 0 && m_sRecState.ulWeekDays != 0) {
-				
 				tsMonthNow = tsNow + DaysTillMonth(tsNow, getMonth()-1) * 24 * 60 * 60;
 				ec_log_debug("Checking yearly nth Weekday Occrrence ulMonthNow: %s", ctime(&tsMonthNow));
 				for (int ulDay = 0; ulDay < 7; ++ulDay) {
-
 					tsDayNow = tsMonthNow + ulDay * 60 * 60 * 24;
 					if (m_sRecState.ulWeekDays & (1 << WeekDayFromTime(tsDayNow))) {
 						ulValidDay = ulDay;
@@ -1196,14 +1173,13 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd,
 				auto tsOccEnd = LocalToUTC(tsDayNow + getEndTimeOffset(), ttZinfo);
 				AddValidOccr(tsOccStart, tsOccEnd, ulBusyStatus, &lpOccrInfoAll, lpcValues);
 			}
-	
+
 			tsNow += DaysTillMonth(tsNow, m_sRecState.ulPeriod) * 60 * 60 * 24;
-		
 		}
 		break;
 	}
 	}
-	
+
 	for (lstExceptions = m_sRecState.lstExceptions; lstExceptions.size() != 0; lstExceptions.pop_back()) {
 		OccrInfo sOccrInfo;
 
@@ -1294,10 +1270,9 @@ bool recurrence::isException(time_t tsOccDate) const
 ULONG recurrence::countDaysOfMonth(time_t tsDate) const
 {
 	static const ULONG ulDaysArray[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-	
-	auto ulYear = this->YearFromTime(tsDate);
-	auto ulMonth = this->MonthFromTime(tsDate);
-	if(this->isLeapYear(ulYear)  && ulMonth == 2 )
+	auto ulYear = YearFromTime(tsDate);
+	auto ulMonth = MonthFromTime(tsDate);
+	if (isLeapYear(ulYear) && ulMonth == 2)
 		return 29;
 	return ulDaysArray[ulMonth -1];
 }

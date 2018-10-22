@@ -1,24 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECMESSAGE_H
 #define ECMESSAGE_H
 
-#include <kopano/zcdefs.h>
 #include <kopano/ECMemTable.h>
 #include <kopano/Util.h>
 #include <kopano/memory.hpp>
@@ -73,8 +59,8 @@ public:
 	/**
 	 * \brief Handles GetProp requests for previously registered properties.
 	 *
-	 * Properties can be registered through ECGenericProp::HrAddPropHandlers to be obtained through 
-	 * this function when special processing is needed. 
+	 * Properties can be registered through ECGenericProp::HrAddPropHandlers to be obtained through
+	 * this function when special processing is needed.
 	 *
 	 * \param[in] ulPropTag		The proptag of the requested property.
 	 * \param[in] lpProvider	The provider for the requested property (Probably an ECMsgStore pointer).
@@ -85,7 +71,7 @@ public:
 	 * \return hrSuccess on success.
 	 */
 	static HRESULT	GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
-	
+
 	/**
 	 * \brief Handles SetProp requests for previously registered properties.
 	 *
@@ -100,59 +86,55 @@ public:
 	 * \return hrSuccess on success.
 	 */
 	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
-	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
-	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk);
-	virtual HRESULT GetAttachmentTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG ulFlags, LPATTACH *lppAttach);
-	virtual HRESULT CreateAttach(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach);
-	virtual HRESULT DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
-	virtual HRESULT GetRecipientTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT ModifyRecipients(ULONG ulFlags, const ADRLIST *lpMods);
-	virtual HRESULT SubmitMessage(ULONG ulFlags);
-	virtual HRESULT SetReadFlag(ULONG ulFlags);
+	virtual HRESULT	QueryInterface(const IID &, void **) override;
+	virtual HRESULT OpenProperty(ULONG proptag, const IID *intf, ULONG iface_opts, ULONG flags, IUnknown **) override;
+	virtual HRESULT GetAttachmentTable(ULONG flags, IMAPITable **) override;
+	virtual HRESULT OpenAttach(ULONG atnum, const IID *intf, ULONG flags, IAttach **) override;
+	virtual HRESULT CreateAttach(const IID *intf, ULONG flags, ULONG *atnum, IAttach **) override;
+	virtual HRESULT DeleteAttach(ULONG atnum, ULONG ui_param, IMAPIProgress *, ULONG flags) override;
+	virtual HRESULT GetRecipientTable(ULONG flags, IMAPITable **) override;
+	virtual HRESULT ModifyRecipients(ULONG flags, const ADRLIST *mods) override;
+	virtual HRESULT SubmitMessage(ULONG flags) override;
+	virtual HRESULT SetReadFlag(ULONG flags) override;
 
 	// override for IMAPIProp::SaveChanges
-	virtual HRESULT SaveChanges(ULONG ulFlags);
-	virtual HRESULT HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
+	virtual HRESULT SaveChanges(ULONG flags) override;
+	virtual HRESULT HrSaveChild(ULONG flags, MAPIOBJECT *) override;
 	// override for IMAPIProp::CopyTo
-	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
+	virtual HRESULT CopyTo(ULONG nexcl, const IID *excl, const SPropTagArray *exclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **) override;
+	virtual HRESULT CopyProps(const SPropTagArray *inclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **) override;
 
 	// RTF/Subject overrides
-	virtual HRESULT SetProps(ULONG cValues, const SPropValue *lpPropArray, LPSPropProblemArray *lppProblems);
-	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
-	virtual HRESULT HrLoadProps();
+	virtual HRESULT SetProps(ULONG nvals, const SPropValue *, SPropProblemArray **) override;
+	virtual HRESULT DeleteProps(const SPropTagArray *, SPropProblemArray **) override;
+	virtual HRESULT HrLoadProps() override;
 
 	// Our table-row getprop handler (handles client-side generation of table columns)
 	static HRESULT TableRowGetProp(void *prov, const struct propVal *src, SPropValue *dst, void **base, ULONG type);
 
 	// RTF overrides
-	virtual HRESULT HrSetRealProp(const SPropValue *lpsPropValue);
+	virtual HRESULT HrSetRealProp(const SPropValue *) override;
 
 protected:
 	void RecursiveMarkDelete(MAPIOBJECT *lpObj);
-
 	HRESULT CreateAttach(LPCIID lpInterface, ULONG ulFlags, const IAttachFactory &refFactory, ULONG *lpulAttachmentNum, LPATTACH *lppAttach);
-
 	HRESULT GetRtfData(std::string *lpstrRtfData);
 	HRESULT GetCodePage(unsigned int *lpulCodePage);
 
 private:
 	enum eSyncChange {syncChangeNone, syncChangeBody, syncChangeRTF, syncChangeHTML};
 	enum eBodyType { bodyTypeUnknown, bodyTypePlain, bodyTypeRTF, bodyTypeHTML };
-
-	HRESULT UpdateTable(ECMemTable *lpTable, ULONG ulObjType, ULONG ulObjKeyProp);
+	HRESULT UpdateTable(KC::ECMemTable *table, ULONG obj_type, ULONG obj_keyprop);
 	HRESULT SaveRecips();
 	HRESULT SyncAttachments();
 	BOOL HasAttachment();
-
 	HRESULT SyncRecips();
 	HRESULT SyncSubject();
 	HRESULT GetBodyType(eBodyType *lpulBodyType);
-	
+
 	// Override GetProps/GetPropList so we can sync RTF before calling GetProps
-	virtual HRESULT GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppPropArray);
-	virtual HRESULT GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray);
+	virtual HRESULT GetProps(const SPropTagArray *, ULONG flags, ULONG *nvals, SPropValue **) override;
+	virtual HRESULT GetPropList(ULONG flags, SPropTagArray **) override;
 
 	HRESULT GetSyncedBodyProp(ULONG ulPropTag, ULONG ulFlags, void *lpBase, LPSPropValue lpsPropValue);
 	HRESULT SyncBody(ULONG ulPropTag);
@@ -161,22 +143,21 @@ private:
 	HRESULT SyncRtf();
 	HRESULT SyncHtmlToPlain();
 	HRESULT SyncHtmlToRtf();
+	HRESULT SetReadFlag2(unsigned int flags);
 	
-	BOOL			fNew;
-	BOOL			m_bEmbedded;
-	BOOL m_bExplicitSubjectPrefix = false;
+	BOOL fNew, m_bEmbedded, m_bExplicitSubjectPrefix = false;
 	BOOL m_bRecipsDirty = false, m_bInhibitSync = false;
 	eBodyType m_ulBodyType = bodyTypeUnknown;
 
 public:
 	ULONG m_cbParentID = 0;
-	KC::object_ptr<ECMemTable> lpAttachments, lpRecips;
+	KC::object_ptr<KC::ECMemTable> lpAttachments, lpRecips;
 	KC::memory_ptr<ENTRYID> m_lpParentID;
 	ULONG ulNextRecipUniqueId = 0, ulNextAttUniqueId = 0;
 	ALLOC_WRAP_FRIEND;
 };
 
-class ECMessageFactory _kc_final : public IMessageFactory {
+class ECMessageFactory final : public IMessageFactory {
 public:
 	HRESULT Create(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root, ECMessage **) const;
 };

@@ -1,44 +1,27 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <kopano/ECGuid.h>
+#include <kopano/MAPIErrors.h>
 #include "ics.h"
 #include "pcutil.hpp"
-
 #include "ECABContainer.h"
 #include <kopano/IECInterfaces.hpp>
+#include <kopano/MAPIErrors.h>
 #include "ECMsgStore.h"
-
 #include "ECExportAddressbookChanges.h"
-
 #include <kopano/ECLogger.h>
-#include <ECSyncLog.h>
 #include <kopano/stringutil.h>
 #include <kopano/Util.h>
-
 #include <edkmdb.h>
 
+using namespace KC;
+
 ECExportAddressbookChanges::ECExportAddressbookChanges(ECMsgStore *lpStore) :
-	m_lpMsgStore(lpStore)
-{
-	ECSyncLog::GetLogger(&~m_lpLogger);
-}
+	m_lpMsgStore(lpStore), m_lpLogger(new ECLogger_Null)
+{}
 
 HRESULT ECExportAddressbookChanges::QueryInterface(REFIID refiid, void **lppInterface) {
 	REGISTER_INTERFACE2(ECUnknown, this);
@@ -49,21 +32,17 @@ HRESULT ECExportAddressbookChanges::QueryInterface(REFIID refiid, void **lppInte
 
 HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IECImportAddressbookChanges *lpCollector)
 {
-	HRESULT hr;
 	LARGE_INTEGER lint = {{ 0, 0 }};
     ABEID abeid;
 	STATSTG sStatStg;
-	ULONG ulCount = 0;
-	ULONG ulProcessed = 0;
-	ULONG ulRead = 0;
+	unsigned int ulCount = 0, ulProcessed = 0, ulRead = 0;
 	ICSCHANGE *lpLastChange = NULL;
 	int n = 0;
 
 	// Read state from stream
-	hr = lpStream->Stat(&sStatStg, 0);
+	auto hr = lpStream->Stat(&sStatStg, 0);
 	if(hr != hrSuccess)
 		return hr;
-
 	hr = lpStream->Seek(lint, STREAM_SEEK_SET, NULL);
 	if (hr != hrSuccess)
 		return hr;
@@ -77,7 +56,6 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 		hr = lpStream->Read(&m_ulChangeId, sizeof(ULONG), &ulRead);
 		if(hr != hrSuccess)
 			return hr;
-
 		hr = lpStream->Read(&ulCount, sizeof(ULONG), &ulRead);
 		if(hr != hrSuccess)
 			return hr;
@@ -96,7 +74,7 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 	abeid.ulType = MAPI_ABCONT;
 	memcpy(&abeid.guid, &MUIDECSAB, sizeof(GUID));
 	abeid.ulId = 1; // 1 is the first container
-    
+
     // The parent source key is the entryid of the AB container that we're sync'ing
 	m_lpChanges.reset();
 	hr = m_lpMsgStore->lpTransport->HrGetChanges(std::string(reinterpret_cast<const char *>(&abeid), sizeof(ABEID)),
@@ -139,62 +117,62 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 				continue;
 
 			// Now check if we changed objects. if so we write the last change to the changes list
-			if (lpLastChange && CompareABEID(lpLastChange->sSourceKey.cb, (LPENTRYID)lpLastChange->sSourceKey.lpb,
-											 m_lpRawChanges[i].sSourceKey.cb, (LPENTRYID)m_lpRawChanges[i].sSourceKey.lpb) == false) {
+			if (lpLastChange != nullptr && !CompareABEID(lpLastChange->sSourceKey.cb,
+			    reinterpret_cast<const ENTRYID *>(lpLastChange->sSourceKey.lpb),
+			    m_lpRawChanges[i].sSourceKey.cb, (LPENTRYID)m_lpRawChanges[i].sSourceKey.lpb)) {
 				m_lpChanges[n++] = *lpLastChange;
 				lpLastChange = NULL;
 			}
-
-			if (!lpLastChange)
+			if (lpLastChange == nullptr) {
 				lpLastChange = &m_lpRawChanges[i];
-
-			else {
-				switch (m_lpRawChanges[i].ulChangeType) {
-				case ICS_AB_NEW:
-					// This shouldn't happen since apparently we have another change for the same object.
-					if (lpLastChange->ulChangeType == ICS_AB_DELETE) {
-						// user was deleted and re-created (probably as different object class), so keep both events
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s",
-							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-						lpLastChange->ulChangeType = ICS_AB_CHANGE;
-					} else
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s",
-							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-					break;
-
-				case ICS_AB_CHANGE:
-					// The only valid previous change could have been an add, since the server doesn't track
-					// multiple changes and we can't change an object that was just deleted.
-					// We'll ignore this in any case.
-					if (lpLastChange->ulChangeType != ICS_AB_NEW)
-						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s",
-							lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s",
-						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-					break;
-
-				case ICS_AB_DELETE:
-					if (lpLastChange->ulChangeType == ICS_AB_NEW) {
-						ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s",
-							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-						lpLastChange = NULL;	// An add and a delete results in nothing.
-					}
-					else if (lpLastChange->ulChangeType == ICS_AB_CHANGE) {
-						// We'll ignore the previous change and write the delete now. This way we allow another object
-						// with the same ID to be added after this object.
-						ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s",
-							bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-						m_lpChanges[n++] = m_lpRawChanges[i];
-						lpLastChange = NULL;
-					}
-					break;
-				default:
-					ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
-						m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
-					break;
-				}
+				continue;
 			}
-		}	
+
+			switch (m_lpRawChanges[i].ulChangeType) {
+			case ICS_AB_NEW:
+				// This shouldn't happen since apparently we have another change for the same object.
+				if (lpLastChange->ulChangeType == ICS_AB_DELETE) {
+					// user was deleted and re-created (probably as different object class), so keep both events
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s",
+						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+					lpLastChange->ulChangeType = ICS_AB_CHANGE;
+				} else
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s",
+						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+				break;
+
+			case ICS_AB_CHANGE:
+				// The only valid previous change could have been an add, since the server doesn't track
+				// multiple changes and we can't change an object that was just deleted.
+				// We'll ignore this in any case.
+				if (lpLastChange->ulChangeType != ICS_AB_NEW)
+					ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s",
+						lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+				ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s",
+					bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+				break;
+
+			case ICS_AB_DELETE:
+				if (lpLastChange->ulChangeType == ICS_AB_NEW) {
+					ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s",
+						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+					lpLastChange = NULL;	// An add and a delete results in nothing.
+				}
+				else if (lpLastChange->ulChangeType == ICS_AB_CHANGE) {
+					// We'll ignore the previous change and write the delete now. This way we allow another object
+					// with the same ID to be added after this object.
+					ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s",
+						bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+					m_lpChanges[n++] = m_lpRawChanges[i];
+					lpLastChange = NULL;
+				}
+				break;
+			default:
+				ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
+					m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey).c_str());
+				break;
+			}
+		}
 
 		if (lpLastChange) {
 			m_lpChanges[n++] = *lpLastChange;
@@ -204,20 +182,21 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 
 	m_ulChanges = n;
 	ZLOG_DEBUG(m_lpLogger, "Got %u address book changes after sorting/filtering.", m_ulChanges);
-
     // Next change is first one
     m_ulThisChange = 0;
     return hr;
 }
 
 HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgress)
-{	
+{
     HRESULT hr = hrSuccess;
-    
+
     // Check if we're already done
-	if (m_ulThisChange >= m_ulChanges)
+	if (m_ulThisChange >= m_ulChanges) {
+		*lpulSteps = m_ulChanges;
 		return hrSuccess;
-    
+	}
+
 	if (m_lpChanges[m_ulThisChange].sSourceKey.cb < sizeof(ABEID))
 		return MAPI_E_INVALID_PARAMETER;
 
@@ -238,20 +217,18 @@ HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulPro
     default:
         return MAPI_E_INVALID_PARAMETER;
     }
-    
+
 	if (hr == SYNC_E_IGNORE)
 		hr = hrSuccess;
-
 	else if (hr == MAPI_E_INVALID_TYPE) {
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring invalid entry, type=%04x, sourcekey=%s",
+		m_lpLogger->logf(EC_LOGLEVEL_WARNING, "Ignoring invalid entry, type=%04x, sourcekey=%s",
 			m_lpChanges[m_ulThisChange].ulChangeType,
 			bin2hex(m_lpChanges[m_ulThisChange].sSourceKey).c_str());
 		hr = hrSuccess;
 	}
-
 	else if (hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "failed type=%04x, hr=%s, sourcekey=%s",
-			m_lpChanges[m_ulThisChange].ulChangeType, stringify(hr, true).c_str(),
+		ZLOG_DEBUG(m_lpLogger, "failed type=%04x, %s, hr=%x, sourcekey=%s",
+			m_lpChanges[m_ulThisChange].ulChangeType, GetMAPIErrorMessage(hr), hr,
 			bin2hex(m_lpChanges[m_ulThisChange].sSourceKey).c_str());
 		return hr;
 	}
@@ -259,54 +236,39 @@ HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulPro
 	// Mark the change as processed
 	m_setProcessed.emplace(m_lpChanges[m_ulThisChange].ulChangeId);
 	++m_ulThisChange;
-
-    if(lpulSteps)
-        *lpulSteps = m_ulChanges;
-        
-    if(lpulProgress)
-        *lpulProgress = m_ulThisChange;
-        
-    if(m_ulThisChange >= m_ulChanges)
-        hr = hrSuccess;
-    else
-        hr = SYNC_W_PROGRESS;
-         
-    return hr;
+	if (lpulSteps)
+		*lpulSteps = m_ulChanges;
+	if (lpulProgress)
+		*lpulProgress = m_ulThisChange;
+	return m_ulThisChange >= m_ulChanges ? hrSuccess : SYNC_W_PROGRESS;
 }
 
 HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
 {
-	HRESULT hr;
 	LARGE_INTEGER zero = {{0,0}};
 	ULARGE_INTEGER uzero = {{0,0}};
-	ULONG ulCount = 0;
 	ULONG ulWritten = 0;
-	ULONG ulProcessed = 0;
 
 	if(m_ulThisChange == m_ulChanges) {
 		// All changes have been processed, we can discard processed changes and go to the next server change ID
 		m_setProcessed.clear();
-
 		// The last change ID we received is always the highest change ID
 		if(m_ulMaxChangeId > 0)
 			m_ulChangeId = m_ulMaxChangeId;
 	}
 
-	hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
+	auto hr = lpStream->Seek(zero, STREAM_SEEK_SET, nullptr);
 	if(hr != hrSuccess)
 		return hr;
-
 	hr = lpStream->SetSize(uzero);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Write the change ID
 	hr = lpStream->Write(&m_ulChangeId, sizeof(ULONG), &ulWritten);
 	if(hr != hrSuccess)
 		return hr;
 
-	ulCount = m_setProcessed.size();
-
+	unsigned int ulCount = m_setProcessed.size();
 	// Write the number of processed IDs to follow
 	hr = lpStream->Write(&ulCount, sizeof(ULONG), &ulWritten);
 	if(hr != hrSuccess)
@@ -314,14 +276,13 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
 
 	// Write the processed IDs
 	for (const auto &pc : m_setProcessed) {
-		ulProcessed = pc;
+		unsigned int ulProcessed = pc;
 		hr = lpStream->Write(&ulProcessed, sizeof(ULONG), &ulWritten);
 		if(hr != hrSuccess)
 			return hr;
 	}
 
 	lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
-
 	// All done
 	return hrSuccess;
 }
@@ -351,10 +312,10 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
  *					the left parameter.
  *
  * @return		boolean
- * @retval		true	
+ * @retval		true
  *					The ICSCHANGE specified by left must be processed before the ICSCHANGE
  *					specified bu right.
- * @retval		false	
+ * @retval		false
  *					The ICSCHANGE specified by left must NOT be processed before the ICSCHANGE
  *					specified by right. Note that this does not mean that the ICSCHANGE specified
  *					by right must be processed before the ICSCHANGE specified by left.
@@ -363,18 +324,14 @@ bool ECExportAddressbookChanges::LeftPrecedesRight(const ICSCHANGE &left, const 
 {
 	ULONG ulTypeLeft = ((ABEID*)left.sSourceKey.lpb)->ulType;
 	assert(ulTypeLeft == MAPI_MAILUSER || ulTypeLeft == MAPI_DISTLIST || ulTypeLeft == MAPI_ABCONT);
-
 	ULONG ulTypeRight = ((ABEID*)right.sSourceKey.lpb)->ulType;
 	assert(ulTypeRight == MAPI_MAILUSER || ulTypeRight == MAPI_DISTLIST || ulTypeRight == MAPI_ABCONT);
 
 	if (ulTypeLeft == ulTypeRight)
 		return SortCompareABEID(left.sSourceKey.cb, (LPENTRYID)left.sSourceKey.lpb, right.sSourceKey.cb, (LPENTRYID)right.sSourceKey.lpb) < 0;
-
 	if (ulTypeRight == MAPI_ABCONT)		// Company is always bigger.
 		return true;
-
 	if (ulTypeRight == MAPI_DISTLIST && ulTypeLeft == MAPI_MAILUSER)	// Group is only bigger than user.
 		return true;
-
 	return false;
 }

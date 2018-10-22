@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // based on src/net/smtp/SMTPTransport.cpp, but with additions
@@ -40,7 +28,6 @@
 // a combined work based on this library.  Thus, the terms and conditions of
 // the GNU General Public License cover the whole combination.
 //
-
 #include <kopano/platform.h>
 #include <memory>
 #include <utility>
@@ -58,11 +45,9 @@
 #include <vmime/net/defaultConnectionInfos.hpp>
 #include <kopano/ECLogger.h>
 #include <kopano/charset/traits.h>
-
 #if VMIME_HAVE_SASL_SUPPORT
 #	include <vmime/security/sasl/SASLContext.hpp>
 #endif // VMIME_HAVE_SASL_SUPPORT
-
 #if VMIME_HAVE_TLS_SUPPORT
 #	include <vmime/net/tls/TLSSession.hpp>
 #	include <vmime/net/tls/TLSSecuredConnectionInfos.hpp>

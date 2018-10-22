@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef PLATFORM_LINUX_H
 #define PLATFORM_LINUX_H
 
@@ -30,7 +17,6 @@
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
-
 #include <pthread.h>
 #include <cstring>		/* memset, etc.. */
 #include <cctype>		/* 64-bit int definition */
@@ -48,7 +34,6 @@
 #	include <stdint.h>
 #endif
 #include <string>
-
 #ifdef HAVE_UNISTD_H
   #include <unistd.h>
 #endif
@@ -95,17 +80,13 @@ typedef LONGLONG*		LPLONGLONG;
 typedef uint64_t	ULONGLONG;
 typedef ULONGLONG*		LPULONGLONG;
 typedef uintptr_t ULONG_PTR;
-
 typedef int	LONG;
 typedef int	BOOL;
-
 typedef void* LPVOID;
 typedef const void* LPCVOID;
 typedef char* LPSTR;
 typedef const char* LPCSTR;
-
 typedef void* HGLOBAL;
-
 typedef __int64_t __int64;
 
 #ifndef FALSE
@@ -116,7 +97,7 @@ typedef __int64_t __int64;
 #endif
 
 /* This is a workaround for warnings in offsetof from stddef.h */
-#define offsetof_static(TYPE, MEMBER) ((size_t) (&((TYPE *)1)->MEMBER)-1)
+#define offsetof_static(TYPE, MEMBER) (reinterpret_cast<uintptr_t>(&((TYPE *)1)->MEMBER)-1)
 
 #define container_of(ptr, type, member) \
 	reinterpret_cast<type *>(reinterpret_cast<char *>(ptr) - offsetof_static(type, member))
@@ -134,13 +115,10 @@ struct GUID {
 };
 typedef GUID*  LPGUID;
 typedef const GUID *LPCGUID;
-
 typedef GUID   IID;
 typedef IID*   LPIID;
-
 typedef GUID   CLSID;
 typedef CLSID* LPCLSID;
-
 typedef GUID   FMTID;
 typedef FMTID* LPFMTID;
 
@@ -150,7 +128,6 @@ typedef FMTID* LPFMTID;
 #define REFFMTID const FMTID &
 
 typedef GUID  UUID;		// needed? existing?
-
 
 /* See initguid.h for the real defines */
 #ifndef INITGUID
@@ -164,7 +141,6 @@ typedef GUID  UUID;		// needed? existing?
 #endif
 
 #define DEFINE_OLEGUID(n,l,w1,w2) DEFINE_GUID(n,l,w1,w2,0xC0,0,0,0,0,0,0,0x46)
-
 
 //
 //  Code Page Default Values.
@@ -189,28 +165,22 @@ typedef GUID  UUID;		// needed? existing?
 //
 // IStream flags
 //
-
 #define STGM_DIRECT             0x00000000L
 #define STGM_TRANSACTED         0x00010000L
 #define STGM_SIMPLE             0x08000000L
-
 #define STGM_READ               0x00000000L
 #define STGM_WRITE              0x00000001L
 #define STGM_READWRITE          0x00000002L
-
 #define STGM_SHARE_DENY_NONE    0x00000040L
 #define STGM_SHARE_DENY_READ    0x00000030L
 #define STGM_SHARE_DENY_WRITE   0x00000020L
 #define STGM_SHARE_EXCLUSIVE    0x00000010L
-
 #define STGM_PRIORITY           0x00040000L
 #define STGM_DELETEONRELEASE    0x04000000L
 #define STGM_NOSCRATCH          0x00100000L
-
 #define STGM_CREATE             0x00001000L
 #define STGM_CONVERT            0x00020000L
 #define STGM_FAILIFTHERE        0x00000000L
-
 #define STGM_NOSNAPSHOT         0x00200000L
 #define STGM_DIRECT_SWMR        0x00400000L
 
@@ -293,14 +263,11 @@ typedef int				SCODE;
 
 /* mapi.h (and more) types */
 typedef unsigned int	FLAGS;
-
 typedef unsigned int	LHANDLE;
 typedef unsigned int*	LPLHANDLE;
 
-
 /* mapidefs.h (and more) types */
 typedef wchar_t 	WCHAR;
-
 typedef WCHAR		TCHAR;
 #define KC_T(x) L##x
 
@@ -308,7 +275,6 @@ namespace KC {
 typedef std::basic_string<TCHAR> tstring;
 }
 typedef unsigned char	TBYTE;
-
 typedef WCHAR*			LPWSTR;
 typedef const WCHAR*	LPCWSTR;
 typedef TCHAR*			LPTSTR;
@@ -411,7 +377,6 @@ enum STATFLAG {
 // typedef RemSNB* wireSNB;
 typedef OLECHAR** SNB;
 
-
 /*
   extra typedefs used in following interfaces
   since these are not used, we can define them as void, instead of the large struct it is in WIN32
@@ -426,7 +391,6 @@ extern "C" {
 
 extern _kc_export HRESULT CoCreateGuid(LPGUID);
 extern _kc_export void GetSystemTimeAsFileTime(FILETIME *);
-extern _kc_export DWORD GetTempPath(DWORD len, char *buf);
 
 /* Some wrappers to map Windows unicode functions */
 static inline int lstrcmpW(LPCWSTR str1, LPCWSTR str2)
@@ -470,13 +434,12 @@ typedef void * DLIB;
 
 namespace KC {
 
+extern _kc_export void le_to_cpu(SYSTEMTIME &);
 extern _kc_export time_t GetProcessTime(void);
 
 #define GetTickCount() 0L
 
 #define TICKS_PER_SEC (sysconf(_SC_CLK_TCK))
-#define createlocale(_cat, _loc) newlocale(_cat ## _MASK, _loc, NULL)
-#define createlocale_real(_cat, _loc) newlocale(_cat, _loc, NULL)
 
 /**
  * Tell the compiler that a funtion/method behaves like printf.

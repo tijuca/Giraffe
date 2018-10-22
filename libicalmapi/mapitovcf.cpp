@@ -1,19 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2017 - Kopano and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <kopano/zcdefs.h>
 #include <memory>
 #include <new>
 #include <cstdlib>
@@ -29,15 +17,19 @@
 #include <kopano/charset/convstring.h>
 #include <kopano/namedprops.h>
 #include <kopano/ecversion.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/mapiext.h>
+#include <kopano/timeutil.hpp>
+#include <kopano/Util.h>
 #include "mapitovcf.hpp"
 #include "icaluid.h"
 
 namespace KC {
 
-class mapitovcf_impl _kc_final : public mapitovcf {
+class mapitovcf_impl final : public mapitovcf {
 	public:
-	HRESULT add_message(IMessage *) _kc_override;
-	HRESULT finalize(std::string *) _kc_override;
+	HRESULT add_message(IMessage *) override;
+	HRESULT finalize(std::string *) override;
 
 	private:
 	bool prop_is_empty(const SPropValue &s) const;
@@ -47,6 +39,7 @@ class mapitovcf_impl _kc_final : public mapitovcf {
 	HRESULT add_email(IMessage *lpMessage, VObject *root);
 	HRESULT add_uid(IMessage *lpMessage, VObject *root);
 	HRESULT add_url(IMessage *lpMessage, VObject *root);
+	HRESULT add_photo(IMessage *lpMessage, VObject *root);
 
 	std::string m_result;
 	/*
@@ -161,8 +154,7 @@ HRESULT mapitovcf_impl::add_adr(IMessage *lpMessage, VObject *root)
 			to_prop(adrnode, "C", msgprop_array[4].Value.lpszW);
 	}
 
-	MAPINAMEID nameids[5];
-	MAPINAMEID *nameids_ptrs[5];
+	MAPINAMEID nameids[5], *nameids_ptrs[5];
 	for (size_t i = 0; i < 5; ++i) {
 		nameids[i].lpguid = const_cast<GUID *>(&PSETID_Address);
 		nameids[i].ulKind = MNID_ID;
@@ -196,10 +188,10 @@ HRESULT mapitovcf_impl::add_adr(IMessage *lpMessage, VObject *root)
 
 HRESULT mapitovcf_impl::add_email(IMessage *lpMessage, VObject *root)
 {
-	MAPINAMEID name;
-	MAPINAMEID *namep = &name;
+	MAPINAMEID name, *namep = &name;
+	const int first_email_id = 0x8083, last_email_id = 0x80a3;
 
-	for (int lid = 0x8083; lid <= 0x80a3; lid += 0x10) {
+	for (int lid = first_email_id; lid <= last_email_id; lid += 0x10) {
 		name.lpguid = const_cast<GUID *>(&PSETID_Address);
 		name.ulKind = MNID_ID;
 		name.Kind.lID = lid;
@@ -212,10 +204,16 @@ HRESULT mapitovcf_impl::add_email(IMessage *lpMessage, VObject *root)
 		ULONG proptype = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_UNICODE);
 		memory_ptr<SPropValue> prop;
 		hr = HrGetOneProp(lpMessage, proptype, &~prop);
-		if (hr == hrSuccess)
-			to_prop(root, VCEmailAddressProp, *prop);
-		else if (hr != MAPI_E_NOT_FOUND)
+		if (hr == hrSuccess) {
+			auto node = to_prop(root, VCEmailAddressProp, *prop);
+			std::wstring email_type = L"INTERNET";
+			if (lid == first_email_id)
+				/* first email address */
+				email_type += L",PREF";
+			to_prop(node, "TYPE", email_type.c_str());
+		} else if (hr != MAPI_E_NOT_FOUND) {
 			continue;
+		}
 	}
 
 	return hrSuccess;
@@ -223,9 +221,7 @@ HRESULT mapitovcf_impl::add_email(IMessage *lpMessage, VObject *root)
 
 HRESULT mapitovcf_impl::add_uid(IMessage *lpMessage, VObject *root)
 {
-	MAPINAMEID name;
-	MAPINAMEID *namep = &name;
-
+	MAPINAMEID name, *namep = &name;
 	name.lpguid = const_cast<GUID *>(&PSETID_Meeting);
 	name.ulKind = MNID_ID;
 	name.Kind.lID = dispidGlobalObjectID;
@@ -247,46 +243,111 @@ HRESULT mapitovcf_impl::add_uid(IMessage *lpMessage, VObject *root)
 	}
 	/* Object did not have guid, let us generate one, and save it
 	   if possible */
-	if (uid.size() == 0) {
-		HrGenerateUid(&uid);
-		auto binstr = hex2bin(uid);
-
-		SPropValue prop;
-		prop.ulPropTag = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_BINARY);
-		prop.Value.bin.lpb = (LPBYTE)binstr.c_str();
-		prop.Value.bin.cb = binstr.length();
-
-		hr = HrSetOneProp(lpMessage, &prop);
-		if (hr == hrSuccess) {
-			hr = lpMessage->SaveChanges(0);
-			if (hr != hrSuccess)
-				/* ignore */;
-		}
-
-		to_prop(root, "UID", prop);
+	if (uid.size() != 0)
+		return hrSuccess;
+	HrGenerateUid(&uid);
+	auto binstr = hex2bin(uid);
+	SPropValue prop;
+	prop.ulPropTag = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_BINARY);
+	prop.Value.bin.lpb = (LPBYTE)binstr.c_str();
+	prop.Value.bin.cb = binstr.length();
+	hr = HrSetOneProp(lpMessage, &prop);
+	if (hr == hrSuccess) {
+		hr = lpMessage->SaveChanges(0);
+		if (hr != hrSuccess)
+			/* ignore */;
 	}
-
+	to_prop(root, "UID", prop);
 	return hrSuccess;
 }
 
 HRESULT mapitovcf_impl::add_url(IMessage *lpMessage, VObject *root)
 {
-	MAPINAMEID name;
-	MAPINAMEID *namep = &name;
+	MAPINAMEID name, *namep = &name;
 	name.lpguid = const_cast<GUID *>(&PSETID_Address);
 	name.ulKind = MNID_ID;
 	name.Kind.lID = dispidWebPage;
 
 	memory_ptr<SPropTagArray> proptag;
 	auto hr = lpMessage->GetIDsFromNames(1, &namep, MAPI_BEST_ACCESS, &~proptag);
-	if (hr == hrSuccess) {
+	if (hr != hrSuccess)
+		return hrSuccess;
+	ULONG proptype = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_UNICODE);
+	memory_ptr<SPropValue> prop;
+	hr = HrGetOneProp(lpMessage, proptype, &~prop);
+	if (hr == hrSuccess)
+		to_prop(root, "URL", *prop);
+	return hrSuccess;
+}
 
-		ULONG proptype = CHANGE_PROP_TYPE(proptag->aulPropTag[0], PT_UNICODE);
-		memory_ptr<SPropValue> prop;
-		hr = HrGetOneProp(lpMessage, proptype, &~prop);
-		if (hr == hrSuccess)
-			to_prop(root, "URL", *prop);
-	}
+HRESULT mapitovcf_impl::add_photo(IMessage *lpMessage, VObject *root)
+{
+	object_ptr<IMAPITable> table;
+	static constexpr const SizedSPropTagArray(2, columns) =
+		{2, { PR_ATTACH_NUM, PR_ATTACH_MIME_TAG_W }};
+
+	auto hr = lpMessage->GetAttachmentTable(0, &~table);
+	if (hr != hrSuccess)
+		return hr;
+
+	hr = table->SetColumns(columns, 0);
+	if (hr != hrSuccess)
+		return hr;
+
+	SPropValue prop;
+	prop.ulPropTag = PR_ATTACHMENT_CONTACTPHOTO;
+	prop.Value.b = true;
+
+	memory_ptr<SRestriction> restriction;
+	hr = ECPropertyRestriction(RELOP_EQ, PR_ATTACHMENT_CONTACTPHOTO, &prop, ECRestriction::Cheap).CreateMAPIRestriction(&~restriction, ECRestriction::Cheap);
+	if (hr != hrSuccess)
+		return hr;
+
+	hr = table->Restrict(restriction, MAPI_DEFERRED_ERRORS);
+	if (hr != hrSuccess)
+		return hr;
+
+	rowset_ptr rows;
+	hr = HrQueryAllRows(table, nullptr, nullptr, nullptr, 0, &~rows);
+	if (hr != hrSuccess)
+		return hr;
+
+	if (rows->cRows == 0)
+		return hrSuccess;
+
+	auto attach_num_prop = rows[0].cfind(PR_ATTACH_NUM);
+	if (attach_num_prop == nullptr)
+		return MAPI_E_CALL_FAILED;
+
+	object_ptr<IAttach> attach;
+	hr = lpMessage->OpenAttach(attach_num_prop->Value.ul, nullptr, MAPI_BEST_ACCESS, &~attach);
+	if (hr != hrSuccess)
+		return hr;
+
+	object_ptr<IStream> stream;
+	hr = attach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, &~stream);
+	if (hr != hrSuccess)
+		return hr;
+
+	std::string bytes;
+	hr = Util::HrStreamToString(stream, bytes);
+	if (hr != hrSuccess)
+		return hr;
+
+	auto encoded_bytes = convert_to<std::wstring>(base64_encode(bytes.c_str(), bytes.size()));
+	auto node = to_prop(root, "PHOTO", encoded_bytes.c_str());
+	to_prop(node, "ENCODING", L"b");
+
+	auto attach_mime_tag = rows[0].cfind(PR_ATTACH_MIME_TAG_W);
+	if (attach_mime_tag == nullptr)
+		return hrSuccess;
+
+	if (wcscmp(attach_mime_tag->Value.lpszW, L"image/jpeg") == 0)
+		to_prop(node, "TYPE", L"JPEG");
+	else if (wcscmp(attach_mime_tag->Value.lpszW, L"image/png") == 0)
+		to_prop(node, "TYPE", L"PNG");
+	else if (wcscmp(attach_mime_tag->Value.lpszW, L"image/gif") == 0)
+		to_prop(node, "TYPE", L"GIF");
 
 	return hrSuccess;
 }
@@ -453,6 +514,10 @@ HRESULT mapitovcf_impl::add_message(IMessage *lpMessage)
 	if (hr == hrSuccess)
 		to_prop(root, "REV", *msgprop);
 	else if (hr != MAPI_E_NOT_FOUND)
+		return hr;
+
+	hr = add_photo(lpMessage, root);
+	if (hr != hrSuccess)
 		return hr;
 
 	/* Write memobject */

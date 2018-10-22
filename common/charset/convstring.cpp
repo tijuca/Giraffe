@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <kopano/charset/convstring.h>
 
@@ -33,7 +20,7 @@ convstring convstring::from_SPropValue(const SPropValue *lpsPropVal)
 {
 	if (!lpsPropVal)
 		return convstring();
-	
+
 	switch (PROP_TYPE(lpsPropVal->ulPropTag)) {
 	case PT_STRING8:
 		return convstring(lpsPropVal->Value.lpszA);
@@ -108,7 +95,7 @@ convstring::convstring(const wchar_t *lpsz)
 /** Create a new convstring object based on a raw pointer.
  *
  * Creates an object and assumes that the provided string is encoded in
- * the current locale or as a wide character string depending on the 
+ * the current locale or as a wide character string depending on the
  * precense of the MAPI_UNICODE flag in ulFlags.
  *
  * @param[in]	lpsz
@@ -195,7 +182,7 @@ convstring::operator utf8string() const
  *
  * @return	A std::string representing the internal string encoded in the current locale.
  */
-convstring::operator std::string() const 
+convstring::operator std::string() const
 {
 	return convert_to<std::string>();
 }

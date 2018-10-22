@@ -12,10 +12,10 @@ noinst_LTLIBRARIES = _archiver.la _RecurrenceState.la
 noinst_DATA = libkcpyconv.ldd libkcpydirector.ldd \
 	_MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
 	_archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd
-CLEANFILES = ${noinst_DATA}
+CLEANFILES = ${noinst_DATA} .*.dep
 
 # disable warnings since code is mostly generated
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
+AM_CPPFLAGS = ${ZCPPFLAGS} \
 	-I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	${PYTHON_CFLAGS} -I${top_srcdir}/swig -w \
@@ -40,19 +40,16 @@ _MAPICore_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libsync
 _MAPICore_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _MAPICore_la_LIBADD = libkcpyconv.la libkcpydirector.la \
 	${top_builddir}/libmapi.la \
-	${top_builddir}/libkcmapi.la \
 	${top_builddir}/libkcutil.la \
-	${top_builddir}/libkcsync.la \
-	$(XML2_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
+	$(XML2_LIBS) $(PYTHON_LIBS)
 
 _inetmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/inetmapi
 _inetmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _inetmapi_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/libmapi.la \
-	${top_builddir}/libkcmapi.la \
 	${top_builddir}/libkcutil.la \
 	${top_builddir}/libkcinetmapi.la \
-	$(PROG_LIBS) $(PYTHON_LIBS)
+	$(PYTHON_LIBS)
 
 _icalmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi \
 	-I${top_srcdir}/libfreebusy
@@ -60,32 +57,29 @@ _icalmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _icalmapi_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/libmapi.la \
 	${top_builddir}/libkcicalmapi.la \
-	${top_builddir}/libkcmapi.la \
 	${top_builddir}/libkcutil.la \
 	${top_builddir}/libkcfreebusy.la \
-	$(ICAL_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
+	$(ICAL_LIBS) $(PYTHON_LIBS)
 
 _archiver_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/ECtools/archiver
 _archiver_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
 _archiver_la_LIBADD = \
 	${top_builddir}/libkcarchiver.la \
 	${top_builddir}/libkcarchivercore.la \
-	$(PROG_LIBS) $(PYTHON_LIBS)
+	$(PYTHON_LIBS)
 
 _RecurrenceState_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
 _RecurrenceState_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/libmapi.la \
-	${top_builddir}/libkcmapi.la \
 	${top_builddir}/libkcutil.la \
-	$(PROG_LIBS) $(PYTHON_LIBS)
+	$(PYTHON_LIBS)
 
 _libfreebusy_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libfreebusy
 _libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _libfreebusy_la_LIBADD = libkcpyconv.la ${top_builddir}/libmapi.la \
 	${top_builddir}/libkcfreebusy.la \
-	${top_builddir}/libkcmapi.la \
 	${top_builddir}/libkcutil.la \
-	$(PROG_LIBS) $(PYTHON_LIBS)
+	$(PYTHON_LIBS)
 
 
 BUILT_SOURCES = mapi_wrap.cxx \
@@ -114,47 +108,71 @@ archiver.py: $(BUILT_SOURCES)
 libfreebusy.py: $(BUILT_SOURCES)
 RecurrenceState.py: $(BUILT_SOURCES)
 
+nodist__MAPICore_la_SOURCES = mapi_wrap.cxx mapi_wrap.h scl.h
+nodist__inetmapi_la_SOURCES = inetmapi_wrap.cxx
+nodist__icalmapi_la_SOURCES = icalmapi_wrap.cxx
+nodist__archiver_la_SOURCES = archiver_wrap.cxx archiver_conv.h archiver_conv.cpp
+nodist__RecurrenceState_la_SOURCES = RecurrenceState_wrap.cxx
+nodist__libfreebusy_la_SOURCES = libfreebusy_wrap.cxx libfreebusy_conv.h libfreebusy_conv.cpp
 
-_MAPICore_la_SOURCES = mapi_wrap.cxx mapi_wrap.h scl.h
-_inetmapi_la_SOURCES = inetmapi_wrap.cxx
-_icalmapi_la_SOURCES = icalmapi_wrap.cxx
-_archiver_la_SOURCES = archiver_wrap.cxx archiver_conv.h archiver_conv.cpp
-_RecurrenceState_la_SOURCES = RecurrenceState_wrap.cxx
-_libfreebusy_la_SOURCES = libfreebusy_wrap.cxx libfreebusy_conv.h libfreebusy_conv.cpp
+EXTRA_DIST = helpers_python.i \
+	setup.py \
+	setup.cfg \
+	MAPICore.py \
+	inetmapi.py \
+	icalmapi.py \
+	libfreebusy.py \
+	MAPI/Defs.py \
+	MAPI/__init__.py \
+	MAPI/version.py \
+	MAPI/Struct.py \
+	MAPI/Tags.py \
+	MAPI/Time.py \
+	MAPI/Util/__init__.py \
+	MAPI/Util/Generators.py \
+	MAPI/Util/Iterators.py \
+	MAPI/Util/AddressBook.py \
+	MAPI/Util/codepage.py \
+	archiver_python.i
 
-
-EXTRA_DIST = helpers_python.i setup.py $(BUILT_SOURCES) MAPICore.py inetmapi.py icalmapi.py libfreebusy.py MAPI/Defs.py  MAPI/__init__.py  MAPI/Struct.py  MAPI/Tags.py  MAPI/Time.py MAPI/Util/__init__.py MAPI/Util/Generators.py MAPI/Util/Iterators.py MAPI/Util/AddressBook.py MAPI/Util/codepage.py archiver_python.i
 datadir = ${pythondir}
 data_DATA = MAPICore.py inetmapi.py icalmapi.py libfreebusy.py
 noinst_datadir = RecurrenceState.py
 
+DEPFLAGS = -MMD -MF .$@.dep
 
 mapi_wrap.h: mapi_wrap.cxx
-mapi_wrap.cxx: ../mapi.i ../mapiutil.i ../mapidefs.i ../mapicode.i ../mapix.i ../mapinotifsink.i ../mapiutil.i ../include/kopano/typemap.i ../helpers.i ../edkmdb.i ../IECServiceAdmin.i ../ecdefs.i include/kopano/typemap_python.i helpers_python.i
+mapi_wrap.cxx: ../mapi.i
 	if test "x$(SWIG_EXEC)" = "x"; then echo "swig is required for 'make dist'"; exit 1; fi
-	${SWIG_EXEC} -I${top_srcdir}/common/include -I${top_srcdir}/libsync ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/common/include -I${top_srcdir}/libsync ${DEPFLAGS} ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
-inetmapi_wrap.cxx: ../inetmapi.i ../include/kopano/typemap.i ../inetmapi.i include/kopano/typemap_python.i helpers_python.i
-	${SWIG_EXEC} ${SWIG_CXXFLAGS} -o $@ $<
+inetmapi_wrap.cxx: ../inetmapi.i
+	${SWIG_EXEC} ${DEPFLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
-icalmapi_wrap.cxx: ../icalmapi.i ../include/kopano/typemap.i include/kopano/typemap_python.i helpers_python.i
-	${SWIG_EXEC} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy ${SWIG_CXXFLAGS} -o $@ $<
+icalmapi_wrap.cxx: ../icalmapi.i
+	${SWIG_EXEC} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy ${DEPFLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
-archiver_wrap.cxx: ../archiver.i archiver_python.i
-	${SWIG_EXEC} -I${top_srcdir}/ECtools/archiver ${SWIG_CXXFLAGS} -o $@ $<
+archiver_wrap.cxx: ../archiver.i
+	${SWIG_EXEC} -I${top_srcdir}/ECtools/archiver ${DEPFLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
 RecurrenceState_wrap.cxx: ../RecurrenceState.i
-	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon ${DEPFLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
 libfreebusy_wrap.cxx: ../libfreebusy.i
-	${SWIG_EXEC} -I${top_srcdir}/libfreebusy ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/libfreebusy ${DEPFLAGS} ${SWIG_CXXFLAGS} -o $@ $<
+
+-include .*.dep
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
 
 install-exec-local:
-	cd ${srcdir} && ${PYTHON} setup.py \
+	rm -Rf staging
+	${MKDIR_P} staging
+	cp -a ${srcdir}/setup.py ${srcdir}/setup.cfg ${srcdir}/MAPI staging/
+	cp -a MAPI/version.py staging/MAPI/
+	cd staging/ && ${PYTHON} setup.py \
 		build --build-base="${abs_builddir}/build" \
 		install -f $${DESTDIR+--root=${DESTDIR}} \
 		--prefix="${prefix}" --install-purelib ${pythondir}
@@ -162,6 +180,6 @@ install-exec-local:
 
 uninstall-local:
 	rm -Rf ${DESTDIR}${pythondir}/MAPI \
-		${DESTDIR}${pythondir}/MAPI-1*.egg-info
+		${DESTDIR}${pythondir}/MAPI-*.egg-info
 
 include ../../global.am

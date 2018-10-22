@@ -1,11 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
 Copyright 2018 - Kopano and its licensors (see LICENSE file for details)
 """
-
-from MAPI.Struct import MAPIErrorNotFound
-from MAPI.Util import TestRestriction
 
 from MAPI.Tags import (
     PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_EMAIL_ADDRESS_W, PR_ENTRYID,
@@ -27,7 +25,7 @@ class Attendee(object):
     @property
     def address(self):
         args = [self.row[p].value if p in self.row else None for p in
-            (PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_SEARCH_KEY)]
+                (PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_SEARCH_KEY)]
 
         return Address(self.server, *args, props=self.mapirow)
 
@@ -51,7 +49,7 @@ class Attendee(object):
             return prop.value
 
     @property
-    def type(self):
+    def type_(self):
         # TODO is it just webapp which uses this?
         # (as there are explicit meeting properties for this)
         prop = self.row.get(PR_RECIPIENT_TYPE)
@@ -67,4 +65,3 @@ class Attendee(object):
 
     def __repr__(self):
         return _repr(self)
-

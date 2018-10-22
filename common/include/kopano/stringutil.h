@@ -1,26 +1,16 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef _STRINGUTIL_H
 #define _STRINGUTIL_H
 
 #include <kopano/zcdefs.h>
 #include <cstdarg>
+#include <iterator>
+#include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <algorithm>
 #include <cctype>
@@ -29,6 +19,7 @@
 #include <openssl/md5.h>
 
 struct SBinary;
+struct option;
 
 namespace KC {
 
@@ -65,15 +56,26 @@ static inline std::wstring strToUpper(std::wstring f)
 	return f;
 }
 
-// Use casting if passing hard coded values.
-extern _kc_export std::string stringify(unsigned int x, bool usehex = false, bool _signed = false);
-extern _kc_export std::string stringify_int64(int64_t, bool usehex = false);
-extern _kc_export std::string stringify_float(float);
-extern _kc_export std::string stringify_double(double, int prec = 18, bool locale = false);
+static inline std::string stringify(unsigned int x)
+{
+	/* (w)stringify(-1) has a different result than to_(w)string(-1), so do not subtitute! */
+	return std::to_string(x);
+}
 
-extern _kc_export std::wstring wstringify(unsigned int x, bool usehex = false, bool _signed = false);
+static inline std::wstring wstringify(unsigned int x)
+{
+	return std::to_wstring(x);
+}
+
+extern _kc_export std::string stringify_hex(unsigned int);
+extern _kc_export std::string stringify_signed(int);
+extern _kc_export std::string stringify_int64(int64_t, bool usehex = false);
+extern _kc_export std::string stringify_float(double);
+extern _kc_export std::string stringify_double(double, int prec = 18, bool locale = false);
+extern _kc_export std::wstring wstringify_hex(unsigned int);
 
 #define tstringify			wstringify
+#define tstringify_hex wstringify_hex
 
 static inline unsigned int atoui(const char *s) { return strtoul(s, nullptr, 10); }
 static inline unsigned int xtoi(const char *s) { return strtoul(s, nullptr, 16); }
@@ -100,7 +102,6 @@ extern _kc_export std::string bin2hex(const SBinary &);
 extern _kc_export std::string urlEncode(const std::string &);
 extern _kc_export std::string urlEncode(const std::wstring &, const char *charset);
 extern _kc_export std::string urlEncode(const wchar_t *input, const char *charset);
-
 extern _kc_export std::string urlDecode(const std::string &);
 extern _kc_export void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsize);
 extern _kc_export void StringCRLFtoLF(const std::wstring &in, std::wstring *out);
@@ -111,10 +112,8 @@ template<typename T>
 std::vector<T> tokenize(const T &str, const T &delimiters)
 {
 	std::vector<T> tokens;
-
 	// skip delimiters at beginning.
    	typename T::size_type lastPos = str.find_first_not_of(delimiters, 0);
-
 	// find first "non-delimiter".
    	typename T::size_type pos = str.find_first_of(delimiters, lastPos);
 
@@ -122,15 +121,24 @@ std::vector<T> tokenize(const T &str, const T &delimiters)
    	{
        	// found a token, add it to the std::vector.
 		tokens.emplace_back(str.substr(lastPos, pos - lastPos));
-
        	// skip delimiters.  Note the "not_of"
        	lastPos = str.find_first_not_of(delimiters, pos);
-
        	// find next "non-delimiter"
        	pos = str.find_first_of(delimiters, lastPos);
    	}
 
 	return tokens;
+}
+
+/**
+ * Notes on use: Iff the program part to be edited can cope with duplicates in
+ * a vector already, do not bother with the conversion to set if @v has few
+ * elements.
+ */
+template<typename T, typename C = std::less<T>> std::set<T, C>
+vector_to_set(std::vector<T> &&v)
+{
+	return std::set<T, C>(std::make_move_iterator(v.begin()), std::make_move_iterator(v.end()));
 }
 
 template<typename T>
@@ -163,22 +171,43 @@ extern _kc_export bool kc_starts_with(const std::string &, const std::string &);
 extern _kc_export bool kc_istarts_with(const std::string &, const std::string &);
 extern _kc_export bool kc_ends_with(const std::string &, const std::string &);
 
-template<typename T> std::string kc_join(const T &v, const char *sep)
+template<typename Iter> std::string kc_join(Iter cur, Iter end, const char *sep)
 {
-	/* This is faster than std::copy(,,ostream_iterator(stringstream)); on glibc */
+	/* This is faster than std::copy(,,ostream_iterator(stringstream)); on gcc libstdc++ */
 	std::string s;
-	size_t z = 0;
-	for (const auto i : v)
-		z += i.size() + 1;
-	s.reserve(z);
-	for (const auto i : v) {
-		s += i;
+	using fr = std::remove_cv_t<std::remove_reference_t<decltype(*cur)>>;
+	static_assert(std::is_same<fr, std::string>::value ||
+		std::is_same<fr, const char *>::value ||
+		std::is_same<fr, char *>::value, "container thing must be some string");
+	if (cur != end)
+		s += *cur++;
+	while (cur != end) {
 		s += sep;
+		s += *cur++;
 	}
-	z = strlen(sep);
-	if (s.size() > z)
-		s.erase(s.size() - z, z);
 	return s;
+}
+
+template<typename Container> std::string kc_join(const Container &v, const char *sep)
+{
+	return kc_join(cbegin(v), cend(v), sep);
+}
+
+template<typename C, typename F> std::string
+kc_join(const C &v, const char *sep, F &&func)
+{
+	std::string result;
+	auto it = v.cbegin();
+	using fr = std::remove_reference_t<decltype(func(*it))>;
+	static_assert(std::is_same<fr, std::string>::value ||
+		std::is_same<fr, const char *>::value ||
+		std::is_same<fr, char *>::value, "func must return some string");
+	if (it == v.cend())
+		return result;
+	result += func(*it++);
+	while (it != v.cend())
+		result += sep + func(*it++);
+	return result;
 }
 
 extern _kc_export std::string base64_encode(const void *, unsigned int);
@@ -186,6 +215,11 @@ extern _kc_export std::string base64_decode(const std::string &);
 extern _kc_export std::string zcp_md5_final_hex(MD5_CTX *);
 extern _kc_export std::wstring string_strip_nuls(const std::wstring &);
 extern _kc_export std::string string_strip_crlf(const char *);
+extern _kc_export bool SymmetricIsCrypted(const char *);
+extern _kc_export std::string SymmetricDecrypt(const char *);
+extern _kc_export std::string content_type_get_charset(const char *in, const char *dflt);
+/* Permit unknown long options, move them to end of argv like arguments */
+extern _kc_export int my_getopt_long_permissive(int, char **, const char *, const struct option *, int *);
 
 } /* namespace */
 

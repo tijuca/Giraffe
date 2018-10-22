@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano.
 
@@ -14,7 +15,7 @@ from MAPI import Tags
 from MAPI.Tags import (
     PS_PUBLIC_STRINGS
 )
-from MAPI import MNID_STRING, MAPI_DISTLIST
+from MAPI import MNID_STRING, MAPI_DISTLIST, MNID_ID
 
 try:
     REV_TYPE
@@ -57,7 +58,7 @@ PSETID_AirSync = DEFINE_GUID(
     0x71035549, 0x0739, 0x4DCB, 0x91, 0x63, 0x00, 0xF0, 0x58, 0x0D, 0xBB, 0xDF
 )
 PSETID_UnifiedMessaging = DEFINE_GUID(
-    0x4442858E, 0xA9E3, 0x4E80,0xB9, 0x00, 0x31, 0x7A, 0x21, 0x0C, 0xC1, 0x5B
+    0x4442858E, 0xA9E3, 0x4E80, 0xB9, 0x00, 0x31, 0x7A, 0x21, 0x0C, 0xC1, 0x5B
 )
 PSETID_CONTACT_FOLDER_RECIPIENT = DEFINE_GUID(
     0x0AAA42FE, 0xC718, 0x101A, 0xE8, 0x85, 0x0B, 0x65, 0x1C, 0x24, 0x00, 0x00
@@ -66,10 +67,14 @@ PSETID_ZMT = DEFINE_GUID(
     0x8acdbf85, 0x4738, 0x4dc4, 0x94, 0xa9, 0xd4, 0x89, 0xa8, 0x3e, 0x5c, 0x41
 )
 PSETID_CalendarAssistant = DEFINE_GUID(
-    0x11000E07, 0xB51B, 0x40D6, 0xAF, 0x21, 0xCA,0xA8, 0x5E, 0xDA, 0xB1, 0xD0
+    0x11000E07, 0xB51B, 0x40D6, 0xAF, 0x21, 0xCA, 0xA8, 0x5E, 0xDA, 0xB1, 0xD0
 )
 PS_EC_IMAP = DEFINE_GUID(
     0x00f5f108, 0x8e3f, 0x46c7, 0xaf, 0x72, 0x5e, 0x20, 0x1c, 0x23, 0x49, 0xe7
+)
+
+PSETID_KC = DEFINE_GUID(
+    0x63aed8c8, 0x4049, 0x4b75, 0xbc, 0x88, 0x96, 0xdf, 0x9d, 0x72, 0x3f, 0x2f
 )
 
 NAMED_PROPS_INTERNET_HEADERS = [
@@ -84,6 +89,10 @@ NAMED_PROPS_ARCHIVER = [
     MAPINAMEID(PSETID_Archive, MNID_STRING, u'ref-item-entryid'),
     MAPINAMEID(PSETID_Archive, MNID_STRING, u'ref-prev-entryid'),
     MAPINAMEID(PSETID_Archive, MNID_STRING, u'flags')
+]
+
+NAMED_PROPS_KC = [
+    MAPINAMEID(PSETID_KC, MNID_ID, 0x0001)
 ]
 
 NAMED_PROP_CATEGORY = MAPINAMEID(PS_PUBLIC_STRINGS, MNID_STRING, u'Keywords')
@@ -105,7 +114,9 @@ GUID_NAMESPACE = {
     PSETID_UnifiedMessaging: 'unifiedmessaging',
     PSETID_CONTACT_FOLDER_RECIPIENT: 'contact_folder_recipient',
     PSETID_ZMT: 'zmt',
-    PSETID_CalendarAssistant: 'calendarassistant'
+    PSETID_CalendarAssistant: 'calendarassistant',
+    PSETID_KC: 'kc',
+    PS_PUBLIC_STRINGS: 'public',
 }
 NAMESPACE_GUID = dict((b, a) for (a, b) in GUID_NAMESPACE.items())
 
@@ -127,6 +138,8 @@ STR_GUID = {
     'PSETID_CONTACT_FOLDER_RECIPIENT': PSETID_CONTACT_FOLDER_RECIPIENT,
     'PSETID_ZMT': PSETID_ZMT,
     'PSETID_CalendarAssistant': PSETID_CalendarAssistant,
+    'PSETID_KC': PSETID_KC,
+    'PS_PUBLIC_STRINGS': PS_PUBLIC_STRINGS,
 }
 
 # XXX copied from common/ECDefs.h
@@ -225,3 +238,87 @@ RIGHT_NAME = {
 }
 
 NAME_RIGHT = dict((b, a) for (a, b) in RIGHT_NAME.items())
+
+URGENCY = {
+    0: u'low',
+    1: u'normal',
+    2: u'high'
+}
+
+REV_URGENCY = dict((b, a) for (a, b) in URGENCY.items())
+
+ASF_MEETING = 1
+ASF_RECEIVED = 2
+ASF_CANCELED = 4
+
+CODEPAGE_ENCODING = {
+# TODO unbeknownst to python, although one separate codec exists:
+#
+# https://bugs.python.org/file11214/ia5.py
+#
+# 20106: 'DIN_66003',
+# 20108: 'NS_4551-1',
+# 20107: 'SEN_850200_B',
+
+    950: 'big5',
+    50221: 'csISO2022JP',
+    51932: 'euc-jp',
+    51936: 'euc-cn',
+    51949: 'euc-kr',
+    949: 'euc-kr',
+    949: 'cp949',
+    949: 'ks_c_5601-1987',
+    936: 'gb18030',
+    936: 'gb2312',
+    936: 'GBK',
+    52936: 'hz',
+    852: 'ibm852',
+    866: 'ibm866',
+    50220: 'iso-2022-jp',
+    50222: 'iso-2022-jp',
+    50225: 'iso-2022-kr',
+    1252: 'windows-1252',
+    28591: 'iso-8859-1',
+    28592: 'iso-8859-2',
+    28593: 'iso-8859-3',
+    28594: 'iso-8859-4',
+    28595: 'iso-8859-5',
+    28596: 'iso-8859-6',
+    28597: 'iso-8859-7',
+    28598: 'iso-8859-8',
+    28599: 'iso-8859-9',
+    28603: 'iso-8859-13',
+    28605: 'iso-8859-15',
+    20866: 'koi8-r',
+    21866: 'koi8-u',
+    932: 'shift-jis',
+    932: 'shift_jis',
+    1200: 'utf-16-le',
+    1201: 'utf-16-be',
+    65000: 'utf-7',
+    65001: 'utf-8',
+    1250: 'windows-1250',
+    1251: 'windows-1251',
+    1253: 'windows-1253',
+    1254: 'windows-1254',
+    1255: 'windows-1255',
+    1256: 'windows-1256',
+    1257: 'windows-1257',
+    1258: 'windows-1258',
+    874: 'cp874',
+    20127: 'us-ascii',
+}
+
+NR_COLOR = { # PidLidAppointmentColor - only used by old clients
+    1: 'red',
+    2: 'blue',
+    3: 'green',
+    4: 'grey',
+    5: 'orange',
+    6: 'cyan',
+    7: 'olive',
+    8: 'purple',
+    9: 'teal',
+    10: 'yellow',
+}
+COLOR_NR = dict((b, a) for (a, b) in NR_COLOR.items())

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-only
 import magic
 import mimetypes
 import os.path
@@ -43,7 +44,9 @@ for (X, C) in DB:
     for Y in X.split(';'):
         CMD[Y] = C
 
-def setlimits():
+# python-coverage doesn't work for call-backs from thread created in C,
+# so skip coverage
+def setlimits(): # pragma: no cover
     resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY, MAX_MEMORY))
     resource.setrlimit(resource.RLIMIT_CPU, (MAX_TIME, MAX_TIME))
 
@@ -54,7 +57,7 @@ def convert(cmd, data, log):
     tmpdir = tempfile.mkdtemp()
     try:
         tmpfile = '%s/attachment' % tmpdir
-        f = file(tmpfile, 'wb')
+        f = open(tmpfile, 'wb')
         f.write(data)
         f.close()
         cmd = cmd % {
@@ -65,7 +68,8 @@ def convert(cmd, data, log):
         log.debug("executing command: '%s'" % cmd)
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=setlimits, env={"HOME": tmpdir})
         out, err = p.communicate()
-        if err: 
+        if err:
+            err = err.decode('utf-8', 'ignore')
             log.warning('output on stderr:\n'+err[:1024]+'..')
         if p.returncode != 0:
             log.warning('return code = %d' % p.returncode)

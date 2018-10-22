@@ -1,30 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ECFreeBusySupport.h"
-
 #include "ECFreeBusyUpdate.h"
 #include "ECFreeBusyData.h"
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
+#include <kopano/ECLogger.h>
 #include <mapiutil.h>
-
 #include "freebusyutil.h"
 #include <kopano/mapi_ptr.h>
 
@@ -55,11 +42,11 @@ HRESULT ECFreeBusySupport::Open(IMAPISession* lpMAPISession, IMsgStore* lpMsgSto
 
 	if(lpMAPISession == NULL)
 		return MAPI_E_INVALID_OBJECT;
-#ifdef DEBUG
+#ifdef KNOB144
 	if (lpMsgStore) {
 		memory_ptr<SPropValue> lpPropArray;
-		HrGetOneProp(lpMsgStore, PR_DISPLAY_NAME_A, &lpPropArray);
-		ec_log_debug("ECFreeBusySupport::Open", "Storename=%s", (lpPropArray && lpPropArray->ulPropTag == PR_DISPLAY_NAME_A) ? lpPropArray->Value.lpszA : "Error");
+		HrGetOneProp(lpMsgStore, PR_DISPLAY_NAME_A, &~lpPropArray);
+		ec_log_debug("ECFreeBusySupport::Open Storename=%s", (lpPropArray && lpPropArray->ulPropTag == PR_DISPLAY_NAME_A) ? lpPropArray->Value.lpszA : "Error");
 	}
 #endif
 

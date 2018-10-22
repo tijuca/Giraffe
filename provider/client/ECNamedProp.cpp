@@ -1,31 +1,18 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <mapitags.h>
 #include <mapidefs.h>
 #include <mapicode.h>
-
 #include <list>
 #include <kopano/ECLogger.h>
 #include "Mem.h"
 #include "ECNamedProp.h"
 #include "WSTransport.h"
+
+using namespace KC;
 
 /*
  * How our named properties work
@@ -37,7 +24,7 @@
  *
  * Normally, each GetIDsFromNames calls would have to consult the server for an ID, and then cache
  * and return the value to the client. This is a rather time-consuming thing to do as Outlook requests
- * quite a few different named properties at startup. We can make this much faster by hard-wiring 
+ * quite a few different named properties at startup. We can make this much faster by hard-wiring
  * a bunch of known named properties into the CLIENT-side DLL. This makes sure that most (say 90%) of
  * GetIDsFromNames calls can be handled locally without any reference to the server, while any other
  * (new) named properties can be handled in the standard way. This reduces client-server communications
@@ -49,12 +36,12 @@
 /*
  * Currently, serverside named properties are cached locally in a map<> object,
  * however, in the future, a bimap<> may be used to speed up reverse lookups (ie
- * getNamesFromIDs) but this is not used frequently so we can leave it like 
+ * getNamesFromIDs) but this is not used frequently so we can leave it like
  * this for now
  *
  * For the most part, this implementation is rather fast, (possible faster than
  * Exchange) due to the fact that we know which named properties are likely to be
- * requested. This means that we have 
+ * requested. This means that we have
  */
 
 /* Our local names
@@ -69,8 +56,7 @@
 
 static const struct _sLocalNames {
 	GUID guid;
-	LONG ulMin;
-	LONG ulMax;
+	LONG ulMin, ulMax;
 	ULONG ulMappedId; // mapped ID of the FIRST property in the range
 } sLocalNames[] = 	{{{ 0x62002, 0x0, 0x0, { 0xC0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x46 } }, 0x8200, 0x826F, 0x8000 },
 					{{ 0x62003, 0x0, 0x0, { 0xC0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x46 } }, 0x8100, 0x813F, 0x8070 },
@@ -126,34 +112,29 @@ HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
     const GUID *lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames,
     MAPINAMEID ***lpppPropNames)
 {
-	HRESULT			hr = hrSuccess;
-	unsigned int	i = 0;
-	LPSPropTagArray	lpsPropTags = NULL;
-	ecmem_ptr<MAPINAMEID *> lppPropNames, lppResolved;
-	ecmem_ptr<SPropTagArray> lpsUnresolved;
-	ULONG			cResolved = 0;
-	ULONG			cUnresolved = 0;
-
-	// Exchange doesn't support this, so neither do we
 	if (lppPropTags == nullptr || *lppPropTags == nullptr)
+		/* Exchange does not support this, so neither do we. */
 		return MAPI_E_TOO_BIG;
 
-	lpsPropTags = *lppPropTags;
+	ecmem_ptr<MAPINAMEID *> lppPropNames, lppResolved;
+	ecmem_ptr<SPropTagArray> lpsUnresolved;
+	unsigned int cResolved = 0, cUnresolved = 0;
 
+	auto lpsPropTags = *lppPropTags;
 	// Allocate space for properties
-	hr = ECAllocateBuffer(sizeof(LPMAPINAMEID) * lpsPropTags->cValues, &~lppPropNames);
+	auto hr = ECAllocateBuffer(sizeof(LPMAPINAMEID) * lpsPropTags->cValues, &~lppPropNames);
 	if (hr != hrSuccess)
 		return hr;
 
 	// Pass 1, local reverse mapping (FAST)
-	for (i = 0; i < lpsPropTags->cValues; ++i)
+	for (unsigned int i = 0; i < lpsPropTags->cValues; ++i)
 		if (ResolveReverseLocal(PROP_ID(lpsPropTags->aulPropTag[i]),
 		    lpPropSetGuid, ulFlags, lppPropNames,
 		    &lppPropNames[i]) != hrSuccess)
 			lppPropNames[i] = NULL;
 
 	// Pass 2, cache reverse mapping (FAST)
-	for (i = 0; i < lpsPropTags->cValues; ++i) {
+	for (unsigned int i = 0; i < lpsPropTags->cValues; ++i) {
 		if (lppPropNames[i] != NULL)
 			continue;
 		if (PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET)
@@ -168,7 +149,7 @@ HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
 
 	cUnresolved = 0;
 	// Pass 3, server reverse lookup (SLOW)
-	for (i = 0; i < lpsPropTags->cValues; ++i)
+	for (unsigned int i = 0; i < lpsPropTags->cValues; ++i)
 		if (lppPropNames[i] == NULL)
 			if(PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET) {
 				lpsUnresolved->aulPropTag[cUnresolved] = PROP_ID(lpsPropTags->aulPropTag[i]) - SERVER_NAMED_OFFSET;
@@ -184,19 +165,19 @@ HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
 		// Put the resolved values from the server into the cache
 		if (cResolved != cUnresolved)
 			return MAPI_E_CALL_FAILED;
-		for (i = 0; i < cResolved; ++i)
+		for (unsigned int i = 0; i < cResolved; ++i)
 			if(lppResolved[i] != NULL)
 				UpdateCache(lpsUnresolved->aulPropTag[i], lppResolved[i]);
 
 		// re-scan the cache
-		for (i = 0; i < lpsPropTags->cValues; ++i)
+		for (unsigned int i = 0; i < lpsPropTags->cValues; ++i)
 			if (lppPropNames[i] == NULL)
 				if (PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET)
 					ResolveReverseCache(PROP_ID(lpsPropTags->aulPropTag[i]) - SERVER_NAMED_OFFSET, lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]);
 	}
 
 	// Check for errors
-	for (i = 0; i < lpsPropTags->cValues; ++i)
+	for (unsigned int i = 0; i < lpsPropTags->cValues; ++i)
 		if(lppPropNames[i] == NULL)
 			hr = MAPI_W_ERRORS_RETURNED;
 
@@ -207,31 +188,29 @@ HRESULT ECNamedProp::GetNamesFromIDs(SPropTagArray **lppPropTags,
 
 HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags)
 {
-	HRESULT			hr = hrSuccess;
-	unsigned int	i=0;
+	if (cPropNames == 0 || lppPropNames == nullptr)
+		/* Exchange does not support this, so neither do we. */
+		return MAPI_E_TOO_BIG;
+
 	ecmem_ptr<SPropTagArray> lpsPropTagArray;
 	std::unique_ptr<MAPINAMEID *[]> lppPropNamesUnresolved;
 	ULONG			cUnresolved = 0;
 	ecmem_ptr<ULONG> lpServerIDs;
 
-	// Exchange doesn't support this, so neither do we
-	if (cPropNames == 0 || lppPropNames == nullptr)
-		return MAPI_E_TOO_BIG;
-
 	// Allocate memory for the return structure
-	hr = ECAllocateBuffer(CbNewSPropTagArray(cPropNames), &~lpsPropTagArray);
+	auto hr = ECAllocateBuffer(CbNewSPropTagArray(cPropNames), &~lpsPropTagArray);
 	if(hr != hrSuccess)
 		return hr;
 
 	lpsPropTagArray->cValues = cPropNames;
 
 	// Pass 1, resolve static (local) names (FAST)
-	for (i = 0; i < cPropNames; ++i)
+	for (unsigned int i = 0; i < cPropNames; ++i)
 		if(lppPropNames[i] == NULL || ResolveLocal(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]) != hrSuccess)
 			lpsPropTagArray->aulPropTag[i] = PROP_TAG(PT_ERROR, 0);
 
 	// Pass 2, resolve names from local cache (FAST)
-	for (i = 0; i < cPropNames; ++i)
+	for (unsigned int i = 0; i < cPropNames; ++i)
 		if (lppPropNames[i] != NULL && lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0))
 			ResolveCache(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]);
 
@@ -239,34 +218,33 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropName
 	lppPropNamesUnresolved.reset(new MAPINAMEID *[lpsPropTagArray->cValues]); // over-allocated
 
 	// Get a list of unresolved names
-	for (i = 0; i < cPropNames; ++i)
+	for (unsigned int i = 0; i < cPropNames; ++i)
 		if(lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0) && lppPropNames[i] != NULL ) {
 			lppPropNamesUnresolved[cUnresolved] = lppPropNames[i];
 			++cUnresolved;
 		}
 
 	if(cUnresolved) {
-		// Let the server resolve these names 
+		// Let the server resolve these names
 		hr = lpTransport->HrGetIDsFromNames(lppPropNamesUnresolved.get(), cUnresolved, ulFlags, &~lpServerIDs);
 		if(hr != hrSuccess)
 			return hr;
 
 		// Put the names into the local cache for all the IDs the server gave us
-		for (i = 0; i < cUnresolved; ++i)
+		for (unsigned int i = 0; i < cUnresolved; ++i)
 			if(lpServerIDs[i] != 0)
 				UpdateCache(lpServerIDs[i], lppPropNamesUnresolved[i]);
 
 		// Pass 4, re-resolve from local cache (FAST)
-		for (i = 0; i < cPropNames; ++i)
+		for (unsigned int i = 0; i < cPropNames; ++i)
 			if (lppPropNames[i] != NULL &&
 			    lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0))
 				ResolveCache(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]);
 	}
-	
+
 	// Finally, check for any errors left in the returned structure
 	hr = hrSuccess;
-
-	for (i = 0; i < cPropNames; ++i)
+	for (unsigned int i = 0; i < cPropNames; ++i)
 		if(lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0)) {
 			hr = MAPI_W_ERRORS_RETURNED;
 			break;
@@ -298,8 +276,6 @@ HRESULT ECNamedProp::ResolveLocal(MAPINAMEID *lpName, ULONG *ulPropTag)
 HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, const GUID *lpGuid,
     ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
-	HRESULT hr = MAPI_E_NOT_FOUND;
-
 	// Loop through the map to find the reverse-lookup of the named property. This could be speeded up by
 	// used a bimap (bi-directional map)
 
@@ -310,22 +286,20 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, const GUID *lpGuid,
 			if (lpGuid != nullptr)
 				assert(memcmp(lpGuid, p.first->lpguid, sizeof(GUID)) == 0); // TEST michel
 			// found it
-			hr = HrCopyNameId(p.first, lppName, lpBase);
-			break;
+			return HrCopyNameId(p.first, lppName, lpBase);
 		}
 	}
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, const GUID *lpGuid,
     ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
-	MAPINAMEID*	lpName = NULL; 
-
-	// Local mapping is only for MNID_ID
 	if (ulFlags & MAPI_NO_IDS)
+		/* Local mapping is only for MNID_ID */
 		return MAPI_E_NOT_FOUND;
 
+	MAPINAMEID *lpName = nullptr;
 	// Loop through the local names to see if we can reverse-map the id
 	for (size_t i = 0; i < ARRAY_SIZE(sLocalNames); ++i) {
 		bool y = (lpGuid == nullptr || memcmp(&sLocalNames[i].guid, lpGuid, sizeof(GUID)) == 0) &&
@@ -354,13 +328,12 @@ HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, const GUID *lpGuid,
 // Update the cache with the given data
 HRESULT ECNamedProp::UpdateCache(ULONG ulId, MAPINAMEID *lpName)
 {
-	HRESULT		hr = hrSuccess;
-	ecmem_ptr<MAPINAMEID> lpNameCopy;
-
 	if (mapNames.find(lpName) != mapNames.end())
-		// Already in the cache!
+		/* Already in the cache! */
 		return MAPI_E_NOT_FOUND;
-	hr = HrCopyNameId(lpName, &~lpNameCopy, NULL);
+
+	ecmem_ptr<MAPINAMEID> lpNameCopy;
+	auto hr = HrCopyNameId(lpName, &~lpNameCopy, nullptr);
 	if(hr != hrSuccess)
 		return hr;
 	mapNames[lpNameCopy.release()] = ulId;
@@ -374,10 +347,7 @@ HRESULT ECNamedProp::UpdateCache(ULONG ulId, MAPINAMEID *lpName)
 
 HRESULT ECNamedProp::ResolveCache(MAPINAMEID *lpName, ULONG *lpulPropTag)
 {
-	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
-
-	iterMap = mapNames.find(lpName);
-
+	auto iterMap = mapNames.find(lpName);
 	if (iterMap == mapNames.cend())
 		return MAPI_E_NOT_FOUND;
 	if (iterMap->second >= SERVER_MAX_NPID) {
@@ -395,28 +365,19 @@ HRESULT ECNamedProp::ResolveCache(MAPINAMEID *lpName, ULONG *lpulPropTag)
  */
 HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void *lpBase)
 {
-	HRESULT			hr = hrSuccess;
 	LPMAPINAMEID	lpDst = NULL;
-
-	if(lpBase == NULL)
-		hr = ECAllocateBuffer(sizeof(MAPINAMEID), (void **) &lpDst);
-	else
-		hr = ECAllocateMore(sizeof(MAPINAMEID), lpBase, (void **) &lpDst);
-
+	auto hr = ECAllocateMore(sizeof(MAPINAMEID), lpBase, reinterpret_cast<void **>(&lpDst));
 	if(hr != hrSuccess)
 		return hr;
 
 	lpDst->ulKind = lpSrc->ulKind;
-
 	if(lpSrc->lpguid) {
-		if(lpBase) 
+		if(lpBase)
 			hr = ECAllocateMore(sizeof(GUID), lpBase, (void **) &lpDst->lpguid);
-		else 
+		else
 			hr = ECAllocateMore(sizeof(GUID), lpDst, (void **) &lpDst->lpguid);
-
 		if(hr != hrSuccess)
 			goto exit;
-
 		memcpy(lpDst->lpguid, lpSrc->lpguid, sizeof(GUID));
 	} else {
 		lpDst->lpguid = NULL;
@@ -443,10 +404,8 @@ HRESULT ECNamedProp::HrCopyNameId(LPMAPINAMEID lpSrc, LPMAPINAMEID *lppDst, void
 	}
 
 	*lppDst = lpDst;
-
 exit:
 	if (hr != hrSuccess && lpBase == nullptr)
 		ECFreeBuffer(lpDst);
-
 	return hr;
 }

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -7,6 +8,7 @@ Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 
 import time
 import datetime
+import sys
 
 from MAPI import KEEP_OPEN_READWRITE
 from MAPI.Tags import (
@@ -19,6 +21,14 @@ from MAPI.Time import unixtime
 
 from .compat import repr as _repr, fake_unicode as _unicode
 from .errors import NotFoundError
+
+if sys.hexversion >= 0x03000000:
+    try:
+        from . import utils as _utils
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
+    import utils as _utils
 
 class OutOfOffice(object):
     """OutOfOffice class
@@ -43,7 +53,7 @@ class OutOfOffice(object):
     @enabled.setter
     def enabled(self, value):
         self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE, value)])
-        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.store.mapiobj)
 
     @property
     def subject(self):
@@ -60,7 +70,7 @@ class OutOfOffice(object):
             self.store.mapiobj.DeleteProps([PR_EC_OUTOFOFFICE_SUBJECT_W])
         else:
             self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_SUBJECT_W, _unicode(value))])
-        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.store.mapiobj)
 
     @property
     def message(self):
@@ -77,7 +87,7 @@ class OutOfOffice(object):
             self.store.mapiobj.DeleteProps([PR_EC_OUTOFOFFICE_MSG_W])
         else:
             self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_MSG_W, _unicode(value))])
-        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.store.mapiobj)
 
     @property
     def start(self):
@@ -94,7 +104,7 @@ class OutOfOffice(object):
         else:
             value = unixtime(time.mktime(value.timetuple()))
             self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_FROM, value)])
-        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.store.mapiobj)
 
     @property
     def end(self):
@@ -111,7 +121,7 @@ class OutOfOffice(object):
         else:
             value = unixtime(time.mktime(value.timetuple()))
             self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_UNTIL, value)])
-        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self.store.mapiobj)
 
     @property
     def period_desc(self): # XXX class Period?

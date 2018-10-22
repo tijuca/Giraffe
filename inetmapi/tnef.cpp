@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 /**
@@ -38,7 +26,6 @@
  *
  * -- Steve
  */
- 
 #include <kopano/platform.h>
 #include <memory>
 #include <cstdint>
@@ -50,7 +37,6 @@
 #include <kopano/Util.h>
 #include <kopano/charset/convert.h>
 #include <string>
-
 #include "tnef.h"
 
 namespace KC {
@@ -69,8 +55,7 @@ enum {
 // The mapping between Microsoft Mail IPM classes and those used in MAPI
 // see: http://msdn2.microsoft.com/en-us/library/ms527360.aspx
 static const struct _sClassMap {
-	const char *szScheduleClass;
-	const char *szMAPIClass;
+	const char *szScheduleClass, *szMAPIClass;
 } sClassMap[] = {
 	{ "IPM.Microsoft Schedule.MtgReq",		"IPM.Schedule.Meeting.Request" },
 	{ "IPM.Microsoft Schedule.MtgRespP",	"IPM.Schedule.Meeting.Resp.Pos" },
@@ -86,10 +71,8 @@ static const struct _sClassMap {
 static const char *FindMAPIClassByScheduleClass(const char *szSClass)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(sClassMap); ++i)
-		if(strcasecmp(szSClass, sClassMap[i].szScheduleClass) == 0) {
+		if (strcasecmp(szSClass, sClassMap[i].szScheduleClass) == 0)
 			return sClassMap[i].szMAPIClass;
-		}
-
 	return NULL;
 }
 
@@ -123,11 +106,9 @@ static bool PropTagInPropList(ULONG ulPropTag, const SPropTagArray *lpPropList)
  * @param[in,out]	lpMessage	TNEF properties will be saved to this message, and attachments will be create under this message.
  * @param[in]		lpStream	IStream object to the TNEF data
  */
-ECTNEF::ECTNEF(ULONG ulFlags, IMessage *lpMessage, IStream *lpStream) :
-	m_lpStream(lpStream), m_lpMessage(lpMessage)
-{
-	this->ulFlags = ulFlags;
-}
+ECTNEF::ECTNEF(ULONG f, IMessage *lpMessage, IStream *lpStream) :
+	m_lpStream(lpStream), m_lpMessage(lpMessage), ulFlags(f)
+{}
 
 /**
  * Read data from lpStream and set in memory as one large
@@ -145,18 +126,16 @@ ECTNEF::ECTNEF(ULONG ulFlags, IMessage *lpMessage, IStream *lpStream) :
 static HRESULT StreamToPropValue(IStream *lpStream, ULONG ulPropTag,
     LPSPropValue *lppPropValue)
 {
-	HRESULT			hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropValue;
 	STATSTG			sStatstg;
-	ULONG			ulRead = 0;
-	ULONG			ulTotal = 0;
+	ULONG ulRead = 0, ulTotal = 0;
 	BYTE *wptr = NULL;
 
 	if (lpStream == NULL || lppPropValue == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	if (PROP_TYPE(ulPropTag) != PT_BINARY && PROP_TYPE(ulPropTag) != PT_UNICODE)
 		return MAPI_E_INVALID_TYPE;
-	hr = lpStream->Stat(&sStatstg, 0);
+	auto hr = lpStream->Stat(&sStatstg, 0);
 	if(hr != hrSuccess)
 		return hr;
 	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropValue);
@@ -204,24 +183,20 @@ static HRESULT StreamToPropValue(IStream *lpStream, ULONG ulPropTag,
  * 							List of properties to exclude from the message
  * @return	MAPI error code
  */
-HRESULT ECTNEF::AddProps(ULONG ulFlags, const SPropTagArray *lpPropList)
+HRESULT ECTNEF::AddProps(ULONG flags, const SPropTagArray *lpPropList)
 {
-	HRESULT			hr = hrSuccess;
 	memory_ptr<SPropTagArray> lpPropListMessage;
-	memory_ptr<SPropValue> lpPropValue;
-	memory_ptr<SPropValue> lpStreamValue;
+	memory_ptr<SPropValue> lpPropValue, lpStreamValue;
 	SizedSPropTagArray(1, sPropTagArray);
-	unsigned int	i = 0;
-	bool			fPropTagInList = false;
 	ULONG			cValue = 0;
 
 	// Loop through all the properties on the message, and only
 	// add those that we want to add to the list
-	hr = m_lpMessage->GetPropList(MAPI_UNICODE, &~lpPropListMessage);
+	auto hr = m_lpMessage->GetPropList(MAPI_UNICODE, &~lpPropListMessage);
 	if (hr != hrSuccess)
 		return hr;
 
-	for (i = 0; i < lpPropListMessage->cValues; ++i) {
+	for (unsigned int i = 0; i < lpPropListMessage->cValues; ++i) {
 		/*
 		 * Do not send properties in 0x67XX range, since these seem to
 		 * be blacklisted in recent exchange servers, which causes
@@ -237,10 +212,9 @@ HRESULT ECTNEF::AddProps(ULONG ulFlags, const SPropTagArray *lpPropList)
 		   PROP_TYPE(lpPropListMessage->aulPropTag[i]) == PT_NULL)
 			continue;
 
-		fPropTagInList = PropTagInPropList(lpPropListMessage->aulPropTag[i], lpPropList);
-
-		bool a = ulFlags & TNEF_PROP_INCLUDE && fPropTagInList;
-		a     |= ulFlags & TNEF_PROP_EXCLUDE && !fPropTagInList;
+		bool fPropTagInList = PropTagInPropList(lpPropListMessage->aulPropTag[i], lpPropList);
+		bool a = flags & TNEF_PROP_INCLUDE && fPropTagInList;
+		a     |= flags & TNEF_PROP_EXCLUDE && !fPropTagInList;
 		if (!a)
 			continue;
 		sPropTagArray.cValues = 1;
@@ -273,14 +247,10 @@ HRESULT ECTNEF::AddProps(ULONG ulFlags, const SPropTagArray *lpPropList)
  * 
  * @retval	MAPI_E_CORRUPT_DATA TNEF stream input is broken, or other MAPI error codes
  */
-HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
+HRESULT ECTNEF::ExtractProps(ULONG flags, SPropTagArray *lpPropList)
 {
-	HRESULT hr = hrSuccess;
-	ULONG ulSignature = 0;
-	ULONG ulType = 0;
-	ULONG ulSize = 0;
-	unsigned short ulChecksum = 0;
-	unsigned short ulKey = 0;
+	ULONG ulSignature = 0, ulType = 0, ulSize = 0;
+	unsigned short ulChecksum = 0, ulKey = 0;
 	unsigned char ulComponent = 0;
 	memory_ptr<char> lpBuffer;
 	SPropValue sProp;
@@ -289,7 +259,7 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 	memory_ptr<SPropValue> lpProp;
 	std::unique_ptr<tnefattachment> lpTnefAtt;
 
-	hr = HrReadDWord(m_lpStream, &ulSignature);
+	auto hr = HrReadDWord(m_lpStream, &ulSignature);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -368,15 +338,19 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 			}
 		case 0x00050008: /* PR_OWNER_APPT_ID */
 			if(ulSize == 4 && lpBuffer) {
+				uint32_t tmp4;
 				sProp.ulPropTag = PR_OWNER_APPT_ID;
-				sProp.Value.l = *reinterpret_cast<LONG *>(lpBuffer.get());
+				memcpy(&tmp4, lpBuffer.get(), sizeof(tmp4));
+				sProp.Value.l = le32_to_cpu(tmp4);
 				m_lpMessage->SetProps(1, &sProp, NULL);
 			}
 			break;
 		case ATT_REQUEST_RES: /* PR_RESPONSE_REQUESTED */
 			if(ulSize == 2 && lpBuffer) {
+				uint16_t tmp2;
 				sProp.ulPropTag = PR_RESPONSE_REQUESTED;
-				sProp.Value.b = static_cast<bool>(*reinterpret_cast<short *>(lpBuffer.get()));
+				memcpy(&tmp2, lpBuffer.get(), sizeof(tmp2));
+				sProp.Value.b = le16_to_cpu(tmp2);
 				m_lpMessage->SetProps(1, &sProp, NULL);
 			}
 			break;
@@ -501,11 +475,8 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 {
 	HRESULT hr = hrSuccess;
 	SizedSPropTagArray(1, sPropTagArray);
-	ULONG cNames = 0;
+	ULONG cNames = 0, ulLen = 0, ulMVProp = 0, ulCount = 0;
 	memory_ptr<MAPINAMEID *> lppNames;
-	ULONG ulLen = 0;
-	ULONG ulMVProp = 0;
-	ULONG ulCount = 0;
 	convert_context converter;
 	std::u16string ucs2;
 
@@ -827,20 +798,18 @@ HRESULT ECTNEF::HrReadPropStream(const char *lpBuffer, ULONG ulSize,
 								 std::list<memory_ptr<SPropValue> > &proplist)
 {
 	ULONG ulRead = 0;
-	ULONG ulProps = 0;
 	memory_ptr<SPropValue> lpProp;
-	HRESULT hr = hrSuccess;
-
-	ulProps = *reinterpret_cast<const ULONG *>(lpBuffer);
+	uint32_t ulProps;
+	memcpy(&ulProps, lpBuffer, sizeof(ulProps));
+	ulProps = le32_to_cpu(ulProps);
 	lpBuffer += 4;
 	ulSize -= 4;
 
 	// Loop through all the properties in the data and add them to our internal list
 	while(ulProps) {
-		hr = HrReadSingleProp(lpBuffer, ulSize, &ulRead, &~lpProp);
+		auto hr = HrReadSingleProp(lpBuffer, ulSize, &ulRead, &~lpProp);
 		if(hr != hrSuccess)
-			break;
-
+			return hr;
 		ulSize -= ulRead;
 		lpBuffer += ulRead;
 		proplist.emplace_back(std::move(lpProp));
@@ -849,8 +818,7 @@ HRESULT ECTNEF::HrReadPropStream(const char *lpBuffer, ULONG ulSize,
 			// Skip padding
 			lpBuffer += 4 - (ulRead & 3);
 	}
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -866,17 +834,10 @@ HRESULT ECTNEF::HrReadPropStream(const char *lpBuffer, ULONG ulSize,
 HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
     ULONG *lpulRead, LPSPropValue *lppProp)
 {
-	HRESULT hr = hrSuccess;
-	ULONG ulPropTag = 0;
-	ULONG ulLen = 0;
-	ULONG ulOrigSize = ulSize;
-	ULONG ulIsNameId = 0;
-	ULONG ulCount = 0;
-	ULONG ulMVProp = 0;
+	ULONG ulCount = 0, ulOrigSize = ulSize;
 	memory_ptr<SPropValue> lpProp;
 	GUID sGuid;
-	MAPINAMEID sNameID;
-	LPMAPINAMEID lpNameID = &sNameID;
+	MAPINAMEID sNameID, *lpNameID = &sNameID;
 	memory_ptr<SPropTagArray> lpPropTags;
 	std::wstring strUnicodeName;
 	std::u16string ucs2;
@@ -886,10 +847,10 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 
 	uint32_t tmp4;
 	memcpy(&tmp4, lpBuffer, sizeof(tmp4));
-	ulPropTag = le32_to_cpu(tmp4);
+	unsigned int ulPropTag = le32_to_cpu(tmp4);
 	lpBuffer += sizeof(ULONG);
 	ulSize -= 4;
-	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpProp);
+	auto hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpProp);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -902,14 +863,14 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 		lpBuffer += sizeof(GUID);
 		ulSize -= sizeof(GUID);
 		memcpy(&tmp4, lpBuffer, sizeof(tmp4));
-		ulIsNameId = le32_to_cpu(tmp4);
+		unsigned int ulIsNameId = le32_to_cpu(tmp4);
 		lpBuffer += 4;
 		ulSize -= 4;
 
 		if(ulIsNameId != 0) {
 			// A string name follows
 			memcpy(&tmp4, lpBuffer, sizeof(tmp4));
-			ulLen = le32_to_cpu(tmp4);
+			unsigned int ulLen = le32_to_cpu(tmp4);
 			lpBuffer += 4;
 			ulSize -= 4;
 			if (ulLen > ulSize)
@@ -941,7 +902,7 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			return hr;
 
 		// Use the mapped ID, not the original ID. The original ID is discarded
-		ulPropTag = PROP_TAG(PROP_TYPE(ulPropTag), PROP_ID(lpPropTags->aulPropTag[0]));
+		ulPropTag = CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PROP_TYPE(ulPropTag));
 	}
 
 	if(ulPropTag & MV_FLAG) {
@@ -1013,7 +974,7 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 
 	lpProp->ulPropTag = ulPropTag;
 
-	for (ulMVProp = 0; ulMVProp < ulCount; ++ulMVProp) {
+	for (unsigned int ulMVProp = 0; ulMVProp < ulCount; ++ulMVProp) {
 		uint16_t tmp2;
 		switch(PROP_TYPE(ulPropTag) & ~MV_FLAG) {
 		case PT_I2:
@@ -1123,15 +1084,15 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			lpBuffer += 8;
 			ulSize -= 8;
 			break;
-		case PT_STRING8:
+		case PT_STRING8: {
 			if (ulSize < 8)
 				return MAPI_E_CORRUPT_DATA;
 			if((PROP_TYPE(ulPropTag) & MV_FLAG) == 0) {
     			lpBuffer += 4; // Skip next 4 bytes, they are always '1'
 	    		ulSize -= 4;
             }
-            memcpy(&ulLen, lpBuffer, sizeof(ULONG));
-			ulLen = le32_to_cpu(ulLen);
+			memcpy(&tmp4, lpBuffer, sizeof(tmp4));
+			unsigned int ulLen = le32_to_cpu(tmp4);
 			lpBuffer += 4; 
 			ulSize -= 4;
 
@@ -1158,8 +1119,8 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			lpBuffer += ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			ulSize -= ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			break;
-
-		case PT_UNICODE:
+		}
+		case PT_UNICODE: {
 			// Make sure we read UCS-2, since that is the format of PT_UNICODE in Win32.
 			if (ulSize < 8)
 				return MAPI_E_CORRUPT_DATA;
@@ -1167,8 +1128,8 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
     			lpBuffer += 4; // Skip next 4 bytes, they are always '1'
 	    		ulSize -= 4;
             }
-            memcpy(&ulLen, lpBuffer, sizeof(ULONG)); // Assumes 'len' in file is BYTES, not chars
-			ulLen = le32_to_cpu(ulLen);
+			memcpy(&tmp4, lpBuffer, sizeof(tmp4)); // Assumes 'len' in file is BYTES, not chars
+			unsigned int ulLen = le32_to_cpu(tmp4);
 			lpBuffer += 4;
 			ulSize -= 4;
 			if (ulSize < ulLen)
@@ -1197,17 +1158,17 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			lpBuffer += ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			ulSize -= ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			break;
-
+		}
 		case PT_OBJECT:			// PST sends PT_OBJECT data. Treat as PT_BINARY
-		case PT_BINARY:
+		case PT_BINARY: {
 			if (ulSize < 8)
 				return MAPI_E_CORRUPT_DATA;
 			if((PROP_TYPE(ulPropTag) & MV_FLAG) == 0) {
     			lpBuffer += 4;	// Skip next 4 bytes, it's always '1' (ULONG)
 	    		ulSize -= 4;
             }
-            memcpy(&ulLen, lpBuffer, sizeof(ULONG));
-			ulLen = le32_to_cpu(ulLen);
+			memcpy(&tmp4, lpBuffer, sizeof(tmp4));
+			unsigned int ulLen = le32_to_cpu(tmp4);
 			lpBuffer += 4;
 			ulSize -= 4;
 
@@ -1238,6 +1199,7 @@ HRESULT ECTNEF::HrReadSingleProp(const char *lpBuffer, ULONG ulSize,
 			lpBuffer += ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			ulSize -= ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			break;
+		}
 		case PT_CLSID:
 			if (ulSize < sizeof(GUID))
 				return MAPI_E_CORRUPT_DATA;
@@ -1293,10 +1255,9 @@ HRESULT ECTNEF::SetProps(ULONG cValues, LPSPropValue lpProps)
  * @param[in]	lpPropList		List of proptags to put in the TNEF stream of this attachment
  * @return MAPI error code
  */
-HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID,
+HRESULT ECTNEF::FinishComponent(ULONG flags, ULONG ulComponentID,
     const SPropTagArray *lpPropList)
 {
-    HRESULT hr = hrSuccess;
 	object_ptr<IAttach> lpAttach;
 	memory_ptr<SPropValue> lpProps, lpAttachProps, lpsNewProp;
 	object_ptr<IStream> lpStream;
@@ -1304,16 +1265,14 @@ HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID,
     AttachRendData sData;
 	static constexpr const SizedSPropTagArray(2, sptaTags) =
 		{2, {PR_ATTACH_METHOD, PR_RENDERING_POSITION}};
-	std::unique_ptr<tnefattachment> sTnefAttach;
-
-	sTnefAttach.reset(new(std::nothrow) tnefattachment);
+	auto sTnefAttach = make_unique_nt<tnefattachment>();
 	if (sTnefAttach == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	if (ulFlags != TNEF_COMPONENT_ATTACHMENT)
+	if (flags != TNEF_COMPONENT_ATTACHMENT)
 		return MAPI_E_NO_SUPPORT;
-	if (this->ulFlags != TNEF_ENCODE)
+	if (ulFlags != TNEF_ENCODE)
 		return MAPI_E_INVALID_PARAMETER;
-    hr = m_lpMessage->OpenAttach(ulComponentID, &IID_IAttachment, 0, &~lpAttach);
+	auto hr = m_lpMessage->OpenAttach(ulComponentID, &IID_IAttachment, 0, &~lpAttach);
     if(hr != hrSuccess)
 		return hr;
     
@@ -1388,14 +1347,11 @@ static inline bool is_embedded_msg(const std::list<memory_ptr<SPropValue>> &prop
  */
 HRESULT ECTNEF::Finish()
 {
-	HRESULT hr = hrSuccess;
 	STATSTG sStat;
-	ULONG ulChecksum;
+	ULONG ulChecksum, ulAttachNum;
 	LARGE_INTEGER zero = {{0,0}};
 	ULARGE_INTEGER uzero = {{0,0}};
 	// attachment vars
-	ULONG ulAttachNum;
-	object_ptr<IStream> lpAttStream;
 	object_ptr<IMessage> lpAttMessage;
 	SPropValue sProp;
 
@@ -1409,14 +1365,13 @@ HRESULT ECTNEF::Finish()
 			    PROP_ID(p->ulPropTag) == PROP_ID(PR_INTERNET_CPID))
   				m_lpMessage->SetProps(1, p, NULL);
 			// else, Property already exists, do *not* overwrite it
-
 		}
 		// Add all found attachments to message
 		for (const auto &att : lstAttachments) {
 			object_ptr<IAttach> lpAttach;
 			bool has_obj = false;
 
-			hr = m_lpMessage->CreateAttach(nullptr, 0, &ulAttachNum, &~lpAttach);
+			auto hr = m_lpMessage->CreateAttach(nullptr, 0, &ulAttachNum, &~lpAttach);
 			if (hr != hrSuccess)
 				return hr;
 				
@@ -1461,7 +1416,7 @@ HRESULT ECTNEF::Finish()
 				}
 
 				object_ptr<IStream> lpSubStream;
-				hr = CreateStreamOnHGlobal(nullptr, TRUE, &~lpSubStream);
+				hr = CreateStreamOnHGlobal(nullptr, true, &~lpSubStream);
 				if (hr != hrSuccess)
 					return hr;
 				hr = lpSubStream->Write(p->Value.bin.lpb, p->Value.bin.cb, NULL);
@@ -1510,7 +1465,7 @@ HRESULT ECTNEF::Finish()
 	}
 
 	// Write properties to stream
-	hr = HrWriteDWord(m_lpStream, TNEF_SIGNATURE);
+	auto hr = HrWriteDWord(m_lpStream, TNEF_SIGNATURE);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrWriteWord(m_lpStream, 0); // Write Key
@@ -1588,16 +1543,15 @@ HRESULT ECTNEF::Finish()
  * @retval MAPI_E_NOT_FOUND if stream was too short, other MAPI error code
  * @return MAPI error code
  */
-HRESULT ECTNEF::HrReadDWord(IStream *lpStream, ULONG *ulData)
+HRESULT ECTNEF::HrReadDWord(IStream *lpStream, uint32_t *value)
 {
-	HRESULT hr;
 	ULONG ulRead = 0;
-
-	hr = lpStream->Read(ulData, sizeof(unsigned int), &ulRead);
+	auto hr = lpStream->Read(value, sizeof(*value), &ulRead);
 	if(hr != hrSuccess)
 		return hr;
-	if (ulRead != sizeof(unsigned int))
+	if (ulRead != sizeof(*value))
 		return MAPI_E_NOT_FOUND;
+	*value = le32_to_cpu(*value);
 	return hrSuccess;
 }
 
@@ -1609,16 +1563,15 @@ HRESULT ECTNEF::HrReadDWord(IStream *lpStream, ULONG *ulData)
  * @retval MAPI_E_NOT_FOUND if stream was too short, other MAPI error code
  * @return MAPI error code
  */
-HRESULT ECTNEF::HrReadWord(IStream *lpStream, unsigned short *ulData)
+HRESULT ECTNEF::HrReadWord(IStream *lpStream, uint16_t *value)
 {
-	HRESULT hr;
 	ULONG ulRead = 0;
-
-	hr = lpStream->Read(ulData, sizeof(unsigned short), &ulRead);
+	auto hr = lpStream->Read(value, sizeof(*value), &ulRead);
 	if(hr != hrSuccess)
 		return hr;
 	if (ulRead != sizeof(unsigned short))
 		return MAPI_E_NOT_FOUND;
+	*value = le16_to_cpu(*value);
 	return hrSuccess;
 }
 
@@ -1632,10 +1585,8 @@ HRESULT ECTNEF::HrReadWord(IStream *lpStream, unsigned short *ulData)
  */
 HRESULT ECTNEF::HrReadByte(IStream *lpStream, unsigned char *ulData)
 {
-	HRESULT hr;
 	ULONG ulRead = 0;
-
-	hr = lpStream->Read(ulData, 1, &ulRead);
+	auto hr = lpStream->Read(ulData, 1, &ulRead);
 	if(hr != hrSuccess)
 		return hr;
 	if (ulRead != 1)
@@ -1656,14 +1607,11 @@ HRESULT ECTNEF::HrReadByte(IStream *lpStream, unsigned char *ulData)
 HRESULT ECTNEF::HrReadData(IStream *lpStream, void *data, size_t ulLen)
 {
 	auto lpData = static_cast<char *>(data);
-	HRESULT hr;
 	ULONG ulRead = 0;
-	ULONG ulToRead = 0;
 
 	while(ulLen) {
-		ulToRead = ulLen > 4096 ? 4096 : ulLen;
-
-		hr = lpStream->Read(lpData, ulToRead, &ulRead);
+		auto ulToRead = std::min(ulLen, static_cast<size_t>(4096));
+		auto hr = lpStream->Read(lpData, ulToRead, &ulRead);
 		if(hr != hrSuccess)
 			return hr;
 		if (ulRead != ulToRead)
@@ -1682,12 +1630,11 @@ HRESULT ECTNEF::HrReadData(IStream *lpStream, void *data, size_t ulLen)
  * @retval MAPI_E_NOT_FOUND if stream was not written the same bytes, other MAPI error code
  * @return MAPI error code
  */
-HRESULT ECTNEF::HrWriteDWord(IStream *lpStream, ULONG ulData)
+HRESULT ECTNEF::HrWriteDWord(IStream *lpStream, uint32_t value)
 {
-	HRESULT hr;
 	ULONG ulWritten = 0;
-
-	hr = lpStream->Write(&ulData, sizeof(unsigned int), &ulWritten);
+	value = cpu_to_le32(value);
+	auto hr = lpStream->Write(&value, sizeof(value), &ulWritten);
 	if(hr != hrSuccess)
 		return hr;
 	if (ulWritten != sizeof(unsigned int))
@@ -1703,12 +1650,11 @@ HRESULT ECTNEF::HrWriteDWord(IStream *lpStream, ULONG ulData)
  * @retval MAPI_E_NOT_FOUND if stream was not written the same bytes, other MAPI error code
  * @return MAPI error code
  */
-HRESULT ECTNEF::HrWriteWord(IStream *lpStream, unsigned short ulData)
+HRESULT ECTNEF::HrWriteWord(IStream *lpStream, uint16_t value)
 {
-	HRESULT hr;
 	ULONG ulWritten = 0;
-
-	hr = lpStream->Write(&ulData, sizeof(unsigned short), &ulWritten);
+	value = cpu_to_le16(value);
+	auto hr = lpStream->Write(&value, sizeof(value), &ulWritten);
 	if(hr != hrSuccess)
 		return hr;
 	if (ulWritten != sizeof(unsigned short))
@@ -1726,10 +1672,8 @@ HRESULT ECTNEF::HrWriteWord(IStream *lpStream, unsigned short ulData)
  */
 HRESULT ECTNEF::HrWriteByte(IStream *lpStream, unsigned char ulData)
 {
-	HRESULT hr;
 	ULONG ulWritten = 0;
-
-	hr = lpStream->Write(&ulData, 1, &ulWritten);
+	auto hr = lpStream->Write(&ulData, 1, &ulWritten);
 	if(hr != hrSuccess)
 		return hr;
 	if (ulWritten != 1)
@@ -1747,11 +1691,10 @@ HRESULT ECTNEF::HrWriteByte(IStream *lpStream, unsigned char ulData)
 HRESULT ECTNEF::HrWriteData(IStream *lpStream, const void *vdata, size_t ulLen)
 {
 	auto data = static_cast<const char *>(vdata);
-	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	while(ulLen > 0) {
-		hr = lpStream->Write(data, ulLen > 4096 ? 4096 : ulLen, &ulWritten);
+		auto hr = lpStream->Write(data, std::min(ulLen, static_cast<size_t>(4096)), &ulWritten);
 		if(hr != hrSuccess)
 			return hr;
 		ulLen -= ulWritten;
@@ -1770,7 +1713,6 @@ HRESULT ECTNEF::HrWriteData(IStream *lpStream, const void *vdata, size_t ulLen)
  */
 HRESULT ECTNEF::HrGetChecksum(IStream *lpStream, ULONG *lpulChecksum)
 {
-	HRESULT hr = hrSuccess;
 	ULONG ulChecksum = 0;
 	object_ptr<IStream> lpClone;
 	LARGE_INTEGER zero = {{0,0}};
@@ -1778,7 +1720,7 @@ HRESULT ECTNEF::HrGetChecksum(IStream *lpStream, ULONG *lpulChecksum)
 	unsigned char buffer[4096];
 	unsigned int i = 0;
 
-	hr = lpStream->Clone(&~lpClone);
+	auto hr = lpStream->Clone(&~lpClone);
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpClone->Seek(zero, STREAM_SEEK_SET, NULL);
@@ -1827,12 +1769,11 @@ ULONG ECTNEF::GetChecksum(const char *lpData, unsigned int ulLen) const
  */
 HRESULT ECTNEF::HrWriteBlock(IStream *lpDestStream, IStream *lpSourceStream, ULONG ulBlockID, ULONG ulLevel)
 {
-    HRESULT hr;
     ULONG ulChecksum = 0;
     LARGE_INTEGER zero = {{0,0}};
     STATSTG         sStat;
 
-    hr = HrWriteByte(lpDestStream, ulLevel);
+	auto hr = HrWriteByte(lpDestStream, ulLevel);
     if(hr != hrSuccess)
 		return hr;
     hr = HrGetChecksum(lpSourceStream, &ulChecksum);
@@ -1870,10 +1811,8 @@ HRESULT ECTNEF::HrWriteBlock(IStream *lpDestStream, IStream *lpSourceStream, ULO
 HRESULT ECTNEF::HrWriteBlock(IStream *lpDestStream, const char *lpData,
     unsigned int ulLen, ULONG ulBlockID, ULONG ulLevel)
 {
-    HRESULT hr = hrSuccess;
 	object_ptr<IStream> lpStream;
-    
-	hr = CreateStreamOnHGlobal(nullptr, TRUE, &~lpStream);
+	auto hr = CreateStreamOnHGlobal(nullptr, TRUE, &~lpStream);
     if (hr != hrSuccess)
 		return hr;
     hr = lpStream->Write(lpData, ulLen, NULL);
@@ -1894,22 +1833,19 @@ HRESULT ECTNEF::HrWriteBlock(IStream *lpDestStream, const char *lpData,
  */
 HRESULT ECTNEF::HrReadStream(IStream *lpStream, void *lpBase, BYTE **lppData, ULONG *lpulSize)
 {
-    HRESULT hr;
     STATSTG sStat;
-    BYTE *lpBuffer = NULL;
-    BYTE *lpWrite = NULL;
-    ULONG ulSize = 0;
-    ULONG ulRead = 0;
+	BYTE *lpBuffer = nullptr;
+	ULONG ulSize = 0, ulRead = 0;
 
 	if (lpStream == NULL || lpBase == NULL || lppData == NULL || lpulSize == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-    hr = lpStream->Stat(&sStat, STATFLAG_NONAME);
+	auto hr = lpStream->Stat(&sStat, STATFLAG_NONAME);
     if(hr != hrSuccess)
 		return hr;
     hr = MAPIAllocateMore(sStat.cbSize.QuadPart, lpBase, (void **)&lpBuffer);    
     if(hr != hrSuccess)
 		return hr;
-    lpWrite = lpBuffer;
+	auto lpWrite = lpBuffer;
     while(sStat.cbSize.QuadPart > 0) {
         hr = lpStream->Read(lpWrite, sStat.cbSize.QuadPart, &ulRead);
         if(hr != hrSuccess)

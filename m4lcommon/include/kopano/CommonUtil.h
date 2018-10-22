@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef COMMONUTIL_H
@@ -37,6 +25,16 @@
 #define CLIENT_VERSION_OLK2007			12
 #define CLIENT_VERSION_OLK2010			14
 #define CLIENT_VERSION_LATEST			CLIENT_VERSION_OLK2010 /* UPDATE ME */
+
+/**
+ * An enumeration for getting the localfreebusy from the calendar or from the free/busy data folder.
+ *
+ * @note it's also the array position of property PR_FREEBUSY_ENTRYIDS
+ */
+enum DGMessageType {
+	dgAssociated = 0,	/**< Localfreebusy message in default associated calendar folder */
+	dgFreebusydata = 1	/**< Localfreebusy message in Free/busy data folder */
+};
 
 /* darn, no sane place because of depend include on mapidefs.h */
 extern _kc_export bool operator==(const SBinary &, const SBinary &) noexcept;
@@ -75,9 +73,11 @@ extern _kc_export std::string ToQuotedBase64Header(const std::wstring &);
 extern HRESULT TestRestriction(const SRestriction *cond, ULONG nvals, const SPropValue *props, const ECLocale &, ULONG level = 0);
 extern _kc_export HRESULT TestRestriction(const SRestriction *cond, IMAPIProp *msg, const ECLocale &, ULONG level = 0);
 extern _kc_export HRESULT HrOpenUserMsgStore(LPMAPISESSION, const wchar_t *user, LPMDB *store);
+extern _kc_export HRESULT OpenLocalFBMessage(DGMessageType eDGMsgType, IMsgStore *lpMsgStore, bool bCreateIfMissing, IMessage **lppFBMessage);
+
 // Auto-accept settings
 extern _kc_export HRESULT SetAutoAcceptSettings(IMsgStore *, bool auto_accept, bool decline_conflict, bool decline_recurring);
-extern _kc_export HRESULT GetAutoAcceptSettings(IMsgStore *, bool *auto_accept, bool *decline_conflict, bool *decline_recurring);
+extern _kc_export HRESULT GetAutoAcceptSettings(IMsgStore *, bool *auto_accept, bool *decline_conflict, bool *decline_recurring, bool *autoprocess_ptr = nullptr);
 
 /**
  * NAMED PROPERTY utilities
@@ -120,16 +120,17 @@ private:
     std::vector<ULONG> lstTypes;
 };
 
-#define PROPMAP_DECL() ECPropMap m_propmap;
-#define PROPMAP_START(hint) ECPropMap m_propmap(hint);
-#define PROPMAP_NAMED_ID(name, type, guid, id) ULONG PROP_##name; m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
-#define PROPMAP_INIT(lpObject) do { hr = m_propmap.Resolve(lpObject); if (hr != hrSuccess) return hr; } while (false);
+#define PROPMAP_DECL() KC::ECPropMap m_propmap;
+#define PROPMAP_START(hint) KC::ECPropMap m_propmap(hint);
+#define PROPMAP_NAMED_ID(name, type, guid, id) ULONG PROP_##name; m_propmap.AddProp(&PROP_##name, type, KC::ECPropMapEntry(guid, id));
+#define PROPMAP_INIT(lpObject) do { auto propmap_hr = m_propmap.Resolve(lpObject); if (propmap_hr != hrSuccess) return propmap_hr; } while (false);
 #define PROPMAP_DEF_NAMED_ID(name) ULONG PROP_##name = 0;
-#define PROPMAP_INIT_NAMED_ID(name, type, guid, id) m_propmap.AddProp(&PROP_##name, type, ECPropMapEntry(guid, id));
+#define PROPMAP_INIT_NAMED_ID(name, type, guid, id) m_propmap.AddProp(&PROP_##name, type, KC::ECPropMapEntry(guid, id));
 
 class _kc_export KServerContext {
 	public:
 	HRESULT logon(const char *user = nullptr, const char *password = nullptr);
+	HRESULT inbox(IMAPIFolder **) const;
 
 	const char *m_app_misc = nullptr, *m_app_ver = PROJECT_VERSION, *m_host = nullptr;
 	const char *m_ssl_keyfile = nullptr, *m_ssl_keypass = nullptr;

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ARCHIVESTATEUPDATER_H_INCLUDED
@@ -27,17 +15,17 @@ namespace KC {
 /**
  * This class updates the current archive state to the should-be state.
  */
-class _kc_export ArchiveStateUpdater _kc_final {
+class _kc_export ArchiveStateUpdater final {
 public:
 	typedef ArchiveStateCollector::ArchiveInfo		ArchiveInfo;
 	typedef ArchiveStateCollector::ArchiveInfoMap	ArchiveInfoMap;
 
-	_kc_hidden static HRESULT Create(const ArchiverSessionPtr &, ECLogger *, const ArchiveInfoMap &, ArchiveStateUpdaterPtr *);
+	_kc_hidden static HRESULT Create(const ArchiverSessionPtr &, std::shared_ptr<ECLogger>, const ArchiveInfoMap &, ArchiveStateUpdaterPtr *);
 	HRESULT UpdateAll(unsigned int ulAttachFlags);
 	HRESULT Update(const tstring &userName, unsigned int ulAttachFlags);
 
 private:
-	_kc_hidden ArchiveStateUpdater(const ArchiverSessionPtr &, ECLogger *, const ArchiveInfoMap &);
+	_kc_hidden ArchiveStateUpdater(const ArchiverSessionPtr &, std::shared_ptr<ECLogger>, const ArchiveInfoMap &);
 	_kc_hidden HRESULT PopulateUserList(void);
 	_kc_hidden HRESULT PopulateFromContainer(LPABCONT container);
 	_kc_hidden HRESULT UpdateOne(const abentryid_t &user_id, const ArchiveInfo &, unsigned int attach_flags);
@@ -49,7 +37,7 @@ private:
 	_kc_hidden HRESULT FindArchiveEntry(const tstring &archive, const tstring &folder, SObjectEntry *obj_entry);
 
 	ArchiverSessionPtr	m_ptrSession;
-	object_ptr<ECLogger> m_lpLogger;
+	std::shared_ptr<ECLogger> m_lpLogger;
 	ArchiveInfoMap	m_mapArchiveInfo;
 };
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -16,9 +17,9 @@ from .errors import NotFoundError, DuplicateError
 if sys.hexversion >= 0x03000000:
     try:
         from . import utils as _utils
-    except ImportError:
-        _utils = sys.modules[__package__+'.utils']
-else:
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
     import utils as _utils
 
 class Quota(object):
@@ -124,4 +125,3 @@ class Quota(object):
 
     def __repr__(self):
         return _repr(self)
-

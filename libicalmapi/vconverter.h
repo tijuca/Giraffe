@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ICALMAPI_VCONVERTER_H
@@ -23,7 +11,6 @@
 #include "icalitem.h"
 #include <kopano/RecurrenceState.h>
 #include <kopano/charset/convert.h>
-
 #include <mapidefs.h>
 #include <libical/ical.h>
 
@@ -95,6 +82,7 @@ protected:
 	virtual HRESULT HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEvent, icaltimezone *lpicTZinfo, const std::string &strTZid, std::list<icalcomponent*> *lpEventList);
 	virtual HRESULT HrUpdateReminderTime(icalcomponent *lpicEvent, LONG lReminder);
 	virtual HRESULT HrGetExceptionMessage(LPMESSAGE lpMessage, time_t tStart, LPMESSAGE *lppMessage);
+	HRESULT resolve_organizer(std::wstring &email, std::wstring &name, std::string &type, unsigned int &cb, ENTRYID **entryid, bool force_mailuser = false);
 };
 
 HRESULT HrCopyString(convert_context& converter, std::string& strCharset, void *base, const char* lpszSrc, WCHAR** lppszDst);
