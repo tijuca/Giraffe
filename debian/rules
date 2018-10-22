@@ -64,8 +64,7 @@ override_dh_install:
 	# Install docs
 	$(MAKE) DESTDIR=$(INSTDIR) install -C $(DEB_BUILD_DIR)/swig/python/kopano
 	# Don't ship any .la files
-	rm -f $(INSTDIR)/usr/lib/*/*.la
-	rm -f $(INSTDIR)/usr/lib/*/kopano/*.la
+	find $(INSTDIR) -name '*.la' | xargs rm
 	# Make sure docs end up in kopano-server
 	mv $(INSTDIR)/usr/share/doc/kopano $(INSTDIR)/usr/share/doc/kopano-server
 
