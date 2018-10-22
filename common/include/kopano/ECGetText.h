@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECGetText_INCLUDED
@@ -20,18 +8,19 @@
 
 #include <kopano/zcdefs.h>
 #include <libintl.h>
+/* Input is always char * [C locale]. Output is either char * [C locale] or wchar_t * [Unicode] */
 #define KC_A(string) dcgettext("kopano", string, LC_MESSAGES)
-#define KC_W(string) kopano_dcgettext_wide("kopano", string)
+/* Often, this will be assigned to SPropValue::lpszW, so a non-const type is preferable */
+#define KC_W(string) const_cast<wchar_t *>(kopano_dcgettext_wide("kopano", string))
 
 namespace KC {
-	extern _kc_export LPWSTR kopano_dcgettext_wide(const char *domainname, const char *msgid);
+extern _kc_export const wchar_t *kopano_dcgettext_wide(const char *domain, const char *msg);
 }
 
-// This must go. Obviously someone was trying to be clever, but a macro named _
-// can cause all sorts of mischief that can be hard to trace. Unfortunately
-// it's in use in 51 different files all over the project, so changing it is
-// a bit of a bother. NS 16 October 2013
-#define _(string) KC_W(string)
-
+#ifdef UNICODE
+#	define KC_TX(s) KC_W(s)
+#else
+#	define KC_TX(s) KC_A(s)
+#endif
 
 #endif // ndef ECGetText_INCLUDED

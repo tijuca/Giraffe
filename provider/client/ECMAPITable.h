@@ -1,24 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECMAPITABLE_H
 #define ECMAPITABLE_H
 
-#include <kopano/zcdefs.h>
 #include <mutex>
 #include <kopano/ECUnknown.h>
 #include <kopano/Util.h>
@@ -27,50 +13,45 @@
 #include <set>
 #include <kopano/memory.hpp>
 
-using namespace KC;
-
 /*
  * This is the superclass which contains common code for the Hierarchy and Contents
  * tables implementations
  */
 
-class ECMAPITable _kc_final : public ECUnknown, public IMAPITable {
+class ECMAPITable final : public KC::ECUnknown, public IMAPITable {
 protected:
 	ECMAPITable(const std::string &name, ECNotifyClient *, ULONG flags);
 	virtual ~ECMAPITable();
 
-
 public:
 	static HRESULT Create(const std::string &name, ECNotifyClient *, ULONG flags, ECMAPITable **);
 	virtual HRESULT HrSetTableOps(WSTableView *lpTableOps, bool fLoad);
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual HRESULT QueryInterface(const IID &, void **) override;
 	virtual BOOL IsDeferred();
 	virtual HRESULT FlushDeferred(LPSRowSet *lppRowSet = NULL);
-
-	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG * lpulConnection);
-	virtual HRESULT Unadvise(ULONG ulConnection);
-	virtual HRESULT GetStatus(ULONG *lpulTableStatus, ULONG *lpulTableType);
-	virtual HRESULT SetColumns(const SPropTagArray *lpPropTagArray, ULONG ulFlags);
-	virtual HRESULT QueryColumns(ULONG ulFlags, LPSPropTagArray *lpPropTagArray);
-	virtual HRESULT GetRowCount(ULONG ulFlags, ULONG *lpulCount);
-	virtual HRESULT SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRowsSought) ;
-	virtual HRESULT SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator);
-	virtual HRESULT QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULONG *lpulDenominator);
+	virtual HRESULT GetLastError(HRESULT, ULONG flags, MAPIERROR **) override;
+	virtual HRESULT Advise(ULONG evt_mask, IMAPIAdviseSink *, ULONG *conn) override;
+	virtual HRESULT Unadvise(ULONG conn) override;
+	virtual HRESULT GetStatus(ULONG *tbl_status, ULONG *tbl_type) override;
+	virtual HRESULT SetColumns(const SPropTagArray *, ULONG flags) override;
+	virtual HRESULT QueryColumns(ULONG flags, SPropTagArray **) override;
+	virtual HRESULT GetRowCount(ULONG flags, ULONG *count) override;
+	virtual HRESULT SeekRow(BOOKMARK origin, LONG rows, LONG *sought) override;
+	virtual HRESULT SeekRowApprox(ULONG num, ULONG denom) override;
+	virtual HRESULT QueryPosition(ULONG *row, ULONG *num, ULONG *denom) override;
 	virtual HRESULT FindRow(const SRestriction *, BOOKMARK origin, ULONG flags) override;
 	virtual HRESULT Restrict(const SRestriction *, ULONG flags) override;
-	virtual HRESULT CreateBookmark(BOOKMARK* lpbkPosition);
-	virtual HRESULT FreeBookmark(BOOKMARK bkPosition);
-	virtual HRESULT SortTable(const SSortOrderSet *, ULONG flags);
-	virtual HRESULT QuerySortOrder(LPSSortOrderSet *lppSortCriteria);
-	virtual HRESULT QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppRows);
-	virtual HRESULT Abort();
-	virtual HRESULT ExpandRow(ULONG cbInstanceKey, LPBYTE pbInstanceKey, ULONG ulRowCount, ULONG ulFlags, LPSRowSet * lppRows, ULONG *lpulMoreRows);
-	virtual HRESULT CollapseRow(ULONG cbInstanceKey, LPBYTE pbInstanceKey, ULONG ulFlags, ULONG *lpulRowCount);
-	virtual HRESULT WaitForCompletion(ULONG ulFlags, ULONG ulTimeout, ULONG *lpulTableStatus);
-	virtual HRESULT GetCollapseState(ULONG ulFlags, ULONG cbInstanceKey, LPBYTE lpbInstanceKey, ULONG *lpcbCollapseState, LPBYTE *lppbCollapseState);
-	virtual HRESULT SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBYTE pbCollapseState, BOOKMARK *lpbkLocation);
-
+	virtual HRESULT CreateBookmark(BOOKMARK *pos) override;
+	virtual HRESULT FreeBookmark(BOOKMARK pos) override;
+	virtual HRESULT SortTable(const SSortOrderSet *, ULONG flags) override;
+	virtual HRESULT QuerySortOrder(SSortOrderSet **crit) override;
+	virtual HRESULT QueryRows(LONG rows, ULONG flags, SRowSet **) override;
+	virtual HRESULT Abort() override;
+	virtual HRESULT ExpandRow(ULONG ik_size, BYTE *instance_key, ULONG rows, ULONG flags, SRowSet **, ULONG *more) override;
+	virtual HRESULT CollapseRow(ULONG ik_size, BYTE *instance_key, ULONG flags, ULONG *rows) override;
+	virtual HRESULT WaitForCompletion(ULONG flags, ULONG timeout, ULONG *tbl_status) override;
+	virtual HRESULT GetCollapseState(ULONG flags, ULONG ik_size, BYTE *instance_key, ULONG *state_size, BYTE **state) override;
+	virtual HRESULT SetCollapseState(ULONG flags, ULONG state_size, BYTE *state, BOOKMARK *loc) override;
 	static HRESULT Reload(void *lpParam);
 
 private:
@@ -78,10 +59,9 @@ private:
 	KC::object_ptr<WSTableView> lpTableOps;
 	KC::object_ptr<ECNotifyClient> lpNotifyClient;
 	KC::memory_ptr<SSortOrderSet> lpsSortOrderSet;
-	ULONG				ulFlags; // Currently unused
 	std::set<ULONG>		m_ulConnectionList;
 	std::recursive_mutex m_hMutexConnectionList;
-	
+
 	// Deferred calls
 	KC::memory_ptr<SPropTagArray> m_lpSetColumns;
 	KC::memory_ptr<SRestriction> m_lpRestrict;

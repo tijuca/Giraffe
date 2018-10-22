@@ -1,28 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
+#include <climits>
 #include <cstdint>
 #include <cstdlib>
 #include <kopano/ECChannel.h>
 #include <kopano/stringutil.h>
 #include <csignal>
+#include <fcntl.h>
 #include <netdb.h>
 #include <poll.h>
 #include <sys/types.h>
@@ -35,10 +24,8 @@
 #ifdef LINUX
 #include <linux/rtnetlink.h>
 #endif
-
 #include <cerrno>
 #include <mapicode.h>
-
 #ifndef hrSuccess
 #define hrSuccess 0
 #endif
@@ -70,9 +57,9 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 	const char *szFile = nullptr, *szPath = nullptr;;
 	auto cert_file = lpConfig->GetSetting("ssl_certificate_file");
 	auto key_file = lpConfig->GetSetting("ssl_private_key_file");
-
-	std::unique_ptr<char> ssl_protocols(strdup(lpConfig->GetSetting("ssl_protocols")));
+	std::unique_ptr<char[], cstdlib_deleter> ssl_protocols(strdup(lpConfig->GetSetting("ssl_protocols")));
 	const char *ssl_ciphers = lpConfig->GetSetting("ssl_ciphers");
+	const char *ssl_curves = lpConfig->GetSetting("ssl_curves");
  	char *ssl_name = NULL;
  	int ssl_op = 0, ssl_include = 0, ssl_exclude = 0;
 #if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
@@ -83,7 +70,6 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 		ec_log_err("ECChannel::HrSetCtx(): no cert or key file");
 		return MAPI_E_CALL_FAILED;
 	}
-
 	auto key_fh = fopen(key_file, "r");
 	if (key_fh == nullptr) {
 		ec_log_err("ECChannel::HrSetCtx(): cannot open key file");
@@ -138,7 +124,11 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 		else if (strcasecmp(ssl_name, SSL_TXT_TLSV1_2) == 0)
 			ssl_proto = 0x10;
 #endif
-		else {
+#ifdef SSL_OP_NO_TLSv1_3
+		else if (strcasecmp(ssl_name, "TLSv1.3") == 0)
+			ssl_proto = 0x20;
+#endif
+		else if (!ssl_neg) {
 			ec_log_err("Unknown protocol \"%s\" in ssl_protocols setting", ssl_name);
 			hr = MAPI_E_CALL_FAILED;
 			goto exit;
@@ -169,6 +159,10 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 	if ((ssl_exclude & 0x10) != 0)
 		ssl_op |= SSL_OP_NO_TLSv1_2;
 #endif
+#ifdef SSL_OP_NO_TLSv1_3
+	if ((ssl_exclude & 0x20) != 0)
+		ssl_op |= SSL_OP_NO_TLSv1_3;
+#endif
 	if (ssl_protocols)
 		SSL_CTX_set_options(lpCTX, ssl_op);
 
@@ -187,25 +181,29 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
-	if (parseBool(lpConfig->GetSetting("ssl_prefer_server_ciphers"))) {
+	if (parseBool(lpConfig->GetSetting("ssl_prefer_server_ciphers")))
 		SSL_CTX_set_options(lpCTX, SSL_OP_CIPHER_SERVER_PREFERENCE);
+#if !defined(OPENSSL_NO_ECDH) && defined(SSL_CTX_set1_curves_list)
+	if (ssl_curves && SSL_CTX_set1_curves_list(lpCTX, ssl_curves) != 1) {
+		ec_log_err("Can not set SSL curve list to \"%s\": %s", ssl_curves, ERR_error_string(ERR_get_error(), 0));
+		hr = MAPI_E_CALL_FAILED;
+		goto exit;
 	}
 
-	SSL_CTX_set_default_verify_paths(lpCTX);
+	SSL_CTX_set_ecdh_auto(lpCTX, 1);
+#endif
 
+	SSL_CTX_set_default_verify_paths(lpCTX);
 	if (SSL_CTX_use_certificate_chain_file(lpCTX, cert_file) != 1) {
 		ec_log_err("SSL CTX certificate file error: %s", ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
 	if (SSL_CTX_use_PrivateKey_file(lpCTX, key_file, SSL_FILETYPE_PEM) != 1) {
 		ec_log_err("SSL CTX private key file error: %s", ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
 	if (SSL_CTX_check_private_key(lpCTX) != 1) {
 		ec_log_err("SSL CTX check private key error: %s", ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
@@ -219,19 +217,13 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig)
 
 	if (lpConfig->GetSetting("ssl_verify_file")[0])
 		szFile = lpConfig->GetSetting("ssl_verify_file");
-
 	if (lpConfig->GetSetting("ssl_verify_path")[0])
 		szPath = lpConfig->GetSetting("ssl_verify_path");
-
-	if (szFile || szPath) {
-		if (SSL_CTX_load_verify_locations(lpCTX, szFile, szPath) != 1)
-			ec_log_err("SSL CTX error loading verify locations: %s", ERR_error_string(ERR_get_error(), 0));
-	}
-
+	if ((szFile || szPath) && SSL_CTX_load_verify_locations(lpCTX, szFile, szPath) != 1)
+		ec_log_err("SSL CTX error loading verify locations: %s", ERR_error_string(ERR_get_error(), 0));
 exit:
 	if (hr != hrSuccess)
 		HrFreeCtx();
-
 	return hr;
 }
 
@@ -246,9 +238,6 @@ HRESULT ECChannel::HrFreeCtx() {
 ECChannel::ECChannel(int inputfd) :
 	fd(inputfd), peer_atxt(), peer_sockaddr()
 {
-	int flag = 1;
-	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&flag), sizeof(flag)) < 0)
-		/* silence Coverity */;
 }
 
 ECChannel::~ECChannel() {
@@ -276,9 +265,7 @@ HRESULT ECChannel::HrEnableTLS(void)
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
 	SSL_clear(lpSSL);
-
 	if (SSL_set_fd(lpSSL, fd) != 1) {
 		ec_log_err("ECChannel::HrEnableTLS(): SSL_set_fd failed");
 		hr = MAPI_E_CALL_FAILED;
@@ -291,99 +278,85 @@ HRESULT ECChannel::HrEnableTLS(void)
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
-
 exit:
 	if (hr != hrSuccess && lpSSL) {
 		SSL_shutdown(lpSSL);
 		SSL_free(lpSSL);
 		lpSSL = NULL;
 	}
-
 	return hr;
 }
 
-HRESULT ECChannel::HrGets(char *szBuffer, ULONG ulBufSize, ULONG *lpulRead) {
+HRESULT ECChannel::HrGets(char *szBuffer, size_t ulBufSize, size_t *lpulRead)
+{
 	char *lpRet = NULL;
 	int len = ulBufSize;
 
 	if (!szBuffer || !lpulRead)
 		return MAPI_E_INVALID_PARAMETER;
-
 	if (lpSSL)
 		lpRet = SSL_gets(szBuffer, &len);
 	else
 		lpRet = fd_gets(szBuffer, &len);
-
 	if (lpRet) {
 		*lpulRead = len;
 		return hrSuccess;
 	}
-
 	return MAPI_E_CALL_FAILED;
 }
 
-/** 
+/**
  * Read a line from a socket. Reads as much data until it encounters a
  * \n characters.
- * 
+ *
  * @param[out] strBuffer network data will be placed in this buffer
  * @param[in] ulMaxBuffer optional, default 65k, breaks reading after this limit is reached
- * 
+ *
  * @return MAPI_ERROR_CODE
  * @retval MAPI_E_TOO_BIG more data in the network buffer than requested to read
  */
-HRESULT ECChannel::HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer) {
-	HRESULT hr = hrSuccess;
-	ULONG ulRead = 0;
-
-	if(!strBuffer)
-		return MAPI_E_INVALID_PARAMETER;
-
+HRESULT ECChannel::HrReadLine(std::string &strBuffer, size_t ulMaxBuffer)
+{
+	size_t ulRead = 0;
 	char buffer[65536];
 
 	// clear the buffer before appending
-	strBuffer->clear();
-
+	strBuffer.clear();
 	do {
-		hr = HrGets(buffer, 65536, &ulRead);
+		auto hr = HrGets(buffer, 65536, &ulRead);
 		if (hr != hrSuccess)
-			break;
-
-		strBuffer->append(buffer, ulRead);
-		if (strBuffer->size() > ulMaxBuffer) {
-			hr = MAPI_E_TOO_BIG;
-			break;
-		}
+			return hr;
+		strBuffer.append(buffer, ulRead);
+		if (strBuffer.size() > ulMaxBuffer)
+			return MAPI_E_TOO_BIG;
 	} while (ulRead == 65535);	// zero-terminator is not counted
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECChannel::HrWriteString(const std::string & strBuffer) {
-	HRESULT hr = hrSuccess;
-
 	if (lpSSL) {
 		if (SSL_write(lpSSL, strBuffer.c_str(), (int)strBuffer.size()) < 1)
-			hr = MAPI_E_NETWORK_ERROR;
+			return MAPI_E_NETWORK_ERROR;
 	} else if (send(fd, strBuffer.c_str(), (int)strBuffer.size(), 0) < 1) {
-		hr = MAPI_E_NETWORK_ERROR;
+		return MAPI_E_NETWORK_ERROR;
 	}
-	return hr;
+	return hrSuccess;
 }
 
 /**
  * Writes a line of data to socket
  *
  * Function takes specified lenght of data from the pointer,
- * if length is not specified all the data of pointed by buffer is used. 
+ * if length is not specified all the data of pointed by buffer is used.
  * It then adds CRLF to the end of the data and writes it to the socket
  *
  * @param[in]	szBuffer	pointer to the data to be written to socket
  * @param[in]	len			optional paramter to specify lenght of data in szBuffer, if empty then all data of szBuffer is written to socket.
- * 
+ *
  * @retval		MAPI_E_CALL_FAILED	unable to write data to socket
  */
-HRESULT ECChannel::HrWriteLine(const char *szBuffer, int len) {
+HRESULT ECChannel::HrWriteLine(const char *szBuffer, size_t len)
+{
 	std::string strLine;
 
 	if (len == 0)
@@ -392,8 +365,7 @@ HRESULT ECChannel::HrWriteLine(const char *szBuffer, int len) {
 		strLine.assign(szBuffer, len);
 
 	strLine += "\r\n";
-	
-	return HrWriteString(strLine);
+	return HrWriteString(std::move(strLine));
 }
 
 HRESULT ECChannel::HrWriteLine(const std::string & strBuffer) {
@@ -405,43 +377,40 @@ HRESULT ECChannel::HrWriteLine(const std::string & strBuffer) {
  *
  * Read from socket and discard the data
  *
- * @param[in] ulByteCount Amount of bytes to discard 
+ * @param[in] ulByteCount Amount of bytes to discard
  *
  * @retval MAPI_E_NETWORK_ERROR Unable to read bytes.
  * @retval MAPI_E_CALL_FAILED Reading wrong amount of data.
  */
-HRESULT ECChannel::HrReadAndDiscardBytes(ULONG ulByteCount) {
-	ULONG ulTotRead = 0;
+HRESULT ECChannel::HrReadAndDiscardBytes(size_t ulByteCount)
+{
+	size_t ulTotRead = 0;
 	char szBuffer[4096];
 
 	while (ulTotRead < ulByteCount) {
-		ULONG ulBytesLeft = ulByteCount - ulTotRead;
-		ULONG ulRead = ulBytesLeft > sizeof szBuffer ? sizeof szBuffer : ulBytesLeft;
+		size_t ulBytesLeft = ulByteCount - ulTotRead;
+		auto ulRead = std::min(ulBytesLeft, sizeof(szBuffer));
 
 		if (lpSSL)
 			ulRead = SSL_read(lpSSL, szBuffer, ulRead);
 		else
 			ulRead = recv(fd, szBuffer, ulRead, 0);
 
-		if (ulRead == (ULONG)-1) {
+		if (ulRead == static_cast<size_t>(-1)) {
 			if (errno == EINTR)
 				continue;
-
 			return MAPI_E_NETWORK_ERROR;
 		}
-
 		if (ulRead == 0 || ulRead > ulByteCount)
 			return MAPI_E_NETWORK_ERROR;
-
 		ulTotRead += ulRead;
 	}
-
 	return (ulTotRead == ulByteCount) ? hrSuccess : MAPI_E_CALL_FAILED;
 }
 
-HRESULT ECChannel::HrReadBytes(char *szBuffer, ULONG ulByteCount) {
-	ULONG ulRead = 0;
-	ULONG ulTotRead = 0;
+HRESULT ECChannel::HrReadBytes(char *szBuffer, size_t ulByteCount)
+{
+	size_t ulRead = 0, ulTotRead = 0;
 
 	if(!szBuffer)
 		return MAPI_E_INVALID_PARAMETER;
@@ -452,34 +421,29 @@ HRESULT ECChannel::HrReadBytes(char *szBuffer, ULONG ulByteCount) {
 		else
 			ulRead = recv(fd, szBuffer + ulTotRead, ulByteCount - ulTotRead, 0);
 
-		if (ulRead == (ULONG)-1) {
+		if (ulRead == static_cast<size_t>(-1)) {
 			if (errno == EINTR)
 				continue;
-
 			return MAPI_E_NETWORK_ERROR;
 		}
-
 		if (ulRead == 0 || ulRead > ulByteCount)
 			return MAPI_E_NETWORK_ERROR;
-
 		ulTotRead += ulRead;
 	}
-
 	szBuffer[ulTotRead] = '\0';
-
 	return (ulTotRead == ulByteCount) ? hrSuccess : MAPI_E_CALL_FAILED;
 }
 
-HRESULT ECChannel::HrReadBytes(std::string * strBuffer, ULONG ulByteCount) {
-	HRESULT hr = hrSuccess;
+HRESULT ECChannel::HrReadBytes(std::string * strBuffer, size_t ulByteCount)
+{
 	std::unique_ptr<char[]> buffer;
 
-	if (strBuffer == nullptr)
+	if (strBuffer == nullptr || ulByteCount == SIZE_MAX)
 		return MAPI_E_INVALID_PARAMETER;
 	buffer.reset(new(std::nothrow) char[ulByteCount+1]);
 	if (buffer == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	hr = HrReadBytes(buffer.get(), ulByteCount);
+	auto hr = HrReadBytes(buffer.get(), ulByteCount);
 	if (hr != hrSuccess)
 		return hr;
 	strBuffer->assign(buffer.get(), ulByteCount);
@@ -487,7 +451,7 @@ HRESULT ECChannel::HrReadBytes(std::string * strBuffer, ULONG ulByteCount) {
 }
 
 HRESULT ECChannel::HrSelect(int seconds) {
-	struct pollfd pollfd = {fd, POLLIN | POLLRDHUP, 0};
+	struct pollfd pollfd = {fd, POLLIN, 0};
 
 	if(lpSSL && SSL_pending(lpSSL))
 		return hrSuccess;
@@ -499,23 +463,20 @@ HRESULT ECChannel::HrSelect(int seconds) {
 			 * to e.g. shut down as a result of SIGTERM.
 			 */
 			return MAPI_E_CANCEL;
-
 		return MAPI_E_NETWORK_ERROR;
 	}
-
 	if (res == 0)
 		return MAPI_E_TIMEOUT;
-
 	return hrSuccess;
 }
 
-/** 
+/**
  * read from buffer until \n is found, or buffer length is reached
  * return buffer always contains \0 in the end, so max read from network is *lpulLen -1
  *
  * @param[out] buf buffer to read network data in
  * @param[in,out] lpulLen input is max size to read, output is read bytes from network
- * 
+ *
  * @return NULL on error, or buf
  */
 char * ECChannel::fd_gets(char *buf, int *lpulLen) {
@@ -524,40 +485,32 @@ char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 
 	if (--len < 1)
 		return NULL;
-
 	do {
 		/*
 		 * Return NULL when we read nothing:
 		 * other side has closed its writing socket.
 		 */
 		int n = recv(fd, bp, len, MSG_PEEK);
-
 		if (n == 0)
 			return NULL;
-
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
-
 			return NULL;
 		}
-
-		if ((newline = (char *)memchr((void *)bp, '\n', n)) != NULL)
+		newline = static_cast<char *>(memchr(bp, '\n', n));
+		if (newline != nullptr)
 			n = newline - bp + 1;
 
 	retry:
 		int recv_n = recv(fd, bp, n, 0);
-
 		if (recv_n == 0)
 			return NULL;
-
 		if (recv_n == -1) {
 			if (errno == EINTR)
 				goto retry;
-
 			return NULL;
 		}
-
 		bp += recv_n;
 		len -= recv_n;
 	}
@@ -570,39 +523,34 @@ char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 		if(newline >= buf && *newline == '\r')
 			--bp;
 	}
-
 	*bp = '\0';
 	*lpulLen = (int)(bp - buf);
-
 	return buf;
 }
 
 char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 	char *newline, *bp = buf;
 	int len = *lpulLen;
-	int n = 0;
 
 	if (--len < 1)
 		return NULL;
-
 	do {
 		/*
 		 * Return NULL when we read nothing:
 		 * other side has closed its writing socket.
 		 */
-		if ((n = SSL_peek(lpSSL, bp, len)) <= 0)
+		int n = SSL_peek(lpSSL, bp, len);
+		if (n <= 0)
 			return NULL;
-
-		if ((newline = (char *)memchr((void *)bp, '\n', n)) != NULL)
+		newline = static_cast<char *>(memchr(bp, '\n', n));
+		if (newline != nullptr)
 			n = newline - bp + 1;
-
 		if ((n = SSL_read(lpSSL, bp, n)) < 0)
 			return NULL;
-
 		bp += n;
 		len -= n;
 	} while (!newline && len > 0);
-	
+
 	//remove the lf or crlf
 	if(newline){
 		--bp;
@@ -610,7 +558,6 @@ char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 		if(newline >= buf && *newline == '\r')
 			--bp;
 	}
-
 	*bp = '\0';
 	*lpulLen = (int)(bp - buf);
 	return buf;
@@ -790,16 +737,65 @@ int zcp_bindtodevice(int fd, const char *i)
 #endif
 }
 
-HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
+/**
+ * Create a PF_LOCAL socket for listening and return the fd.
+ */
+int ec_listen_localsock(const char *path, int *pfd, int mode)
 {
-	HRESULT hr = hrSuccess;
+	struct sockaddr_un sk;
+	if (strlen(path) + 1 >= sizeof(sk.sun_path)) {
+		ec_log_err("%s: \"%s\" is too long", __func__, path);
+		return -EINVAL;
+	}
+	struct stat sb;
+	auto ret = lstat(path, &sb);
+	if (ret == 0 && !S_ISSOCK(sb.st_mode)) {
+		ec_log_err("%s: file already exists, but it is not a socket", path);
+		return -EADDRINUSE;
+	}
+	unlink(path);
+	int fd = socket(PF_LOCAL, SOCK_STREAM, 0);
+	if (fd < 0) {
+		ec_log_err("%s: socket: %s", __func__, strerror(errno));
+		return -errno;
+	}
+	sk.sun_family = AF_LOCAL;
+	kc_strlcpy(sk.sun_path, path, sizeof(sk.sun_path));
+	ret = bind(fd, reinterpret_cast<const sockaddr *>(&sk), sizeof(sk));
+	if (ret < 0) {
+		int saved_errno = errno;
+		ec_log_err("%s: bind %s: %s", __func__, path, strerror(saved_errno));
+		close(fd);
+		return -(errno = saved_errno);
+	}
+	if (mode != static_cast<mode_t>(-1)) {
+		ret = chmod(path, mode);
+		if (ret < 0)
+			ec_log_err("chown %s: %s", path, strerror(errno));
+	}
+	ret = listen(fd, INT_MAX);
+	if (ret < 0) {
+		int saved_errno = errno;
+		ec_log_err("%s: listen: %s", __func__, strerror(saved_errno));
+		close(fd);
+		return -(errno = saved_errno);
+	}
+	*pfd = fd;
+	return 0;
+}
+
+/**
+ * Create PF_INET/PF_INET6 socket for listening and return the fd.
+ */
+int ec_listen_inet(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
+{
 	int fd = -1, opt = 1, ret;
 	struct addrinfo *sock_res = NULL, sock_hints;
 	const struct addrinfo *sock_addr, *sock_last = NULL;
 	char port_string[sizeof("65535")];
 
 	if (lpulListenSocket == nullptr || ulPort == 0 || szBind == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
+		return -EINVAL;
 
 	snprintf(port_string, sizeof(port_string), "%u", ulPort);
 	memset(&sock_hints, 0, sizeof(sock_hints));
@@ -811,9 +807,12 @@ HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
 	sock_hints.ai_socktype = SOCK_STREAM;
 	ret = getaddrinfo(*szBind == '\0' ? NULL : szBind,
 	      port_string, &sock_hints, &sock_res);
-	if (ret != 0) {
-		ec_log_err("getaddrinfo(%s,%u): %s", szBind, ulPort, gai_strerror(ret));
-		return MAPI_E_INVALID_PARAMETER;
+	if (ret == EAI_SYSTEM) {
+		ec_log_err("getaddrinfo [%s]:%u: %s", szBind, ulPort, strerror(errno));
+		return -errno;
+	} else if (ret != 0) {
+		ec_log_err("getaddrinfo [%s]:%u: %s", szBind, ulPort, gai_strerror(ret));
+		return -EINVAL;
 	}
 	sock_res = reorder_addrinfo_ipv6(sock_res);
 
@@ -853,13 +852,13 @@ HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
 			continue;
 		}
 
-		if (listen(fd, SOMAXCONN) < 0) {
-			ec_log_err("Unable to start listening on port %d: %s",
-				ulPort, strerror(errno));
-			hr = MAPI_E_NETWORK_ERROR;
+		if (listen(fd, INT_MAX) < 0) {
+			auto saved_errno = errno;
+			ec_log_err("Unable to start listening on socket [%s]:%d: %s",
+				szBind, ulPort, strerror(errno));
+			errno = saved_errno;
 			goto exit;
 		}
-
 		/*
 		 * Function signature currently only permits a single fd, so if
 		 * we have a good socket, try no more. The IPv6 socket is
@@ -869,30 +868,26 @@ HRESULT HrListen(const char *szBind, uint16_t ulPort, int *lpulListenSocket)
 		break;
 	}
 	if (fd < 0 && sock_last != NULL) {
-		ec_log_crit("Unable to create socket(%u,%u,%u) port %s: %s",
-			sock_last->ai_family, sock_last->ai_socktype,
-			sock_last->ai_protocol, port_string, strerror(errno));
-		hr = MAPI_E_NETWORK_ERROR;
+		ec_log_crit("Unable to create socket for [%s]:%u (family=%u protocol=%u): %s",
+			szBind, ulPort, sock_last->ai_family,
+			sock_last->ai_protocol, strerror(errno));
 		goto exit;
 	} else if (fd < 0) {
-		ec_log_err("no sockets proposed");
-		hr = MAPI_E_NETWORK_ERROR;
+		ec_log_err("OS proposed no sockets for \"[%s]:%u\"", szBind, ulPort);
+		errno = ENOENT;
 		goto exit;
 	}
-
 	*lpulListenSocket = fd;
-
 exit:
+	int saved_errno = errno;
 	if (sock_res != NULL)
 		freeaddrinfo(sock_res);
-	if (hr != hrSuccess && fd >= 0)
-		close(fd);
-	return hr;
+	errno = saved_errno;
+	return -errno;
 }
 
 HRESULT HrAccept(int ulListenFD, ECChannel **lppChannel)
 {
-	int socket = 0;
 	struct sockaddr_storage client;
 	std::unique_ptr<ECChannel> lpChannel;
 	socklen_t len = sizeof(client);
@@ -907,9 +902,7 @@ HRESULT HrAccept(int ulListenFD, ECChannel **lppChannel)
 		/* ignore - no harm in not having fastopen */;
 #endif
 	memset(&client, 0, sizeof(client));
-
-	socket = accept(ulListenFD, (struct sockaddr *)&client, &len);
-
+	auto socket = accept(ulListenFD, (struct sockaddr *)&client, &len);
 	if (socket == -1) {
 		ec_log_err("Unable to accept(): %s", strerror(errno));
 		return MAPI_E_NETWORK_ERROR;
@@ -921,40 +914,171 @@ HRESULT HrAccept(int ulListenFD, ECChannel **lppChannel)
 	return hrSuccess;
 }
 
-std::set<std::pair<std::string, uint16_t>>
-kc_parse_bindaddrs(const char *longline, uint16_t defport)
+static std::pair<std::string, uint16_t>
+ec_parse_bindaddr2(const char *spec)
 {
-	std::set<std::pair<std::string, uint16_t>> socks;
-
-	for (auto &&spec : tokenize(longline, ' ', true)) {
-		std::string host;
-		uint16_t port = defport;
-		char *e = nullptr;
-		auto x = spec.find('[');
-		auto y = spec.find(']', x + 1);
-		if (x == 0 && y != std::string::npos) {
-			host = spec.substr(x + 1, y - x - 1);
-			y = spec.find(':', y);
-			if (y != std::string::npos) {
-				port = strtoul(spec.c_str() + y + 1, &e, 10);
-				if (e == nullptr || *e != '\0')
-					continue;
-			}
-		} else {
-			y = spec.find(':');
-			if (y != std::string::npos) {
-				port = strtoul(spec.c_str() + y + 1, &e, 10);
-				if (e == nullptr || *e != '\0')
-					continue;
-				spec.erase(y);
-			}
-			host = std::move(spec);
-			if (host == "*")
-				host.clear();
-		}
-		socks.emplace(std::move(host), port);
+	char *e = nullptr;
+	if (*spec != '[') { /* ] */
+		/* IPv4 or hostname */
+		auto y = strchr(spec, ':');
+		if (y == nullptr)
+			return {spec, 0};
+		uint16_t port = strtoul(y + 1, &e, 10);
+		if (e == nullptr || *e != '\0')
+			return {"!", 0};
+		return {std::string(spec, y - spec), port};
 	}
-	return socks;
+	/* IPv6 */
+	auto y = strchr(spec + 1, ']');
+	if (y == nullptr)
+		return {"!", 0};
+	if (*++y == '\0')
+		return {std::string(spec + 1, y - spec - 2), 0};
+	if (*y != ':')
+		return {"!", 0};
+	uint16_t port = strtoul(y + 1, &e, 10);
+	if (e == nullptr || *e != '\0')
+		return {"!", 0};
+	return {std::string(spec + 1, y - spec - 2), port};
+}
+
+/**
+ * Tokenize bind specifier.
+ * @spec:	a string in the form of INETSPEC
+ *
+ * If @spec is not in the desired format, the parsed host will be "!". Absence
+ * of a port part will result in port being emitted as 0 - the caller needs to
+ * check for this, because unfiltered, this means "random port" to the OS.
+ */
+std::pair<std::string, uint16_t> ec_parse_bindaddr(const char *spec)
+{
+	auto parts = ec_parse_bindaddr2(spec);
+	if (parts.first == "*")
+		/* getaddrinfo/soap_bind want the empty string for wildcard binding */
+		parts.first.clear();
+	return parts;
+}
+
+/**
+ * Create a listening socket.
+ * @spec:	a string in the form of { INETSPEC | UNIXSPEC }
+ *
+ * INETSPEC := { hostname | ipv4-addr | "[" ipv6-addr "]" } [ ":" portnumber ]
+ * UNIXSPEC := "unix:" path
+ *
+ * NB: hostname and ipv4-addr are not specified to be enclosed in square
+ * brackets, but ec_parse_bindaddr2 does support it by chance, and
+ * dagent_listen()'s transformation of historic config directives (hopefully to
+ * be gone sooner than later) currently relies on it.
+ */
+int ec_listen_generic(const char *spec, int *pfd, int mode)
+{
+	if (strncmp(spec, "unix:", 5) == 0)
+		return ec_listen_localsock(spec + 5, pfd, mode);
+	auto parts = ec_parse_bindaddr(spec);
+	if (parts.first == "!" || parts.second == 0)
+		return -EINVAL;
+	return ec_listen_inet(parts.first.c_str(), parts.second, pfd);
+}
+
+bool ec_bindaddr_less::operator()(const std::string &a, const std::string &b) const
+{
+	auto p = ec_parse_bindaddr(a.c_str());
+	auto q = ec_parse_bindaddr(b.c_str());
+	if (p.first < q.first)
+		return true;
+	if (p.first == q.first && p.second < q.second)
+		return true;
+	return false;
+}
+
+/**
+ * Unset FD_CLOEXEC on listening sockets so that they survive an execve().
+ */
+void ec_reexec_prepare_sockets()
+{
+	for (int fd = 3; fd < INT_MAX; ++fd) {
+		int set = 0;
+		socklen_t setlen = sizeof(set);
+		auto ret = getsockopt(fd, SOL_SOCKET, SO_ACCEPTCONN, &set, &setlen);
+		if (ret < 0 && errno == EBADF)
+			break;
+		else if (ret < 0 || set == 0)
+			continue;
+		unsigned int flags = 0;
+		if (fcntl(fd, F_GETFD, &flags) == 0) {
+			flags &= ~FD_CLOEXEC;
+			fcntl(fd, F_SETFD, flags);
+		}
+	}
+}
+
+static int ec_fdtable_socket_ai(const struct addrinfo *ai,
+    struct sockaddr_storage *oaddr, socklen_t *olen)
+{
+	for (int fd = 3; fd < INT_MAX; ++fd) {
+		int set = 0;
+		socklen_t arglen = sizeof(set);
+		auto ret = getsockopt(fd, SOL_SOCKET, SO_ACCEPTCONN, &set, &arglen);
+		if (ret < 0 && errno == EBADF)
+			break;
+		else if (ret < 0 || set == 0)
+			continue;
+		struct sockaddr_storage addr{};
+		arglen = sizeof(addr);
+		ret = getsockname(fd, reinterpret_cast<struct sockaddr *>(&addr), &arglen);
+		if (ret < 0)
+			continue;
+		for (auto sk = ai; sk != nullptr; sk = sk->ai_next) {
+			if (arglen != sk->ai_addrlen ||
+			    memcmp(&addr, sk->ai_addr, arglen) != 0)
+				continue;
+			if (oaddr != nullptr) {
+				memset(oaddr, 0, sizeof(*oaddr));
+				memcpy(oaddr, sk->ai_addr, arglen);
+			}
+			if (olen != nullptr)
+				*olen = arglen;
+			fcntl(fd, F_SETFD, FD_CLOEXEC);
+			return fd;
+		}
+	}
+	return -1;
+}
+
+/**
+ * Search the file descriptor table for a listening socket matching
+ * the host:port specification, and return the fd and exact sockaddr.
+ *
+ * This somewhat convoluted search is necessary because some daemons
+ * have both plain and SSL sockets and must match each fd with the
+ * config directives.
+ */
+int ec_fdtable_socket(const char *spec, struct sockaddr_storage *oaddr,
+    socklen_t *olen)
+{
+	struct addrinfo hints{}, *res = nullptr;
+	hints.ai_flags    = AI_NUMERICHOST | AI_NUMERICSERV | AI_PASSIVE;
+	hints.ai_socktype = SOCK_STREAM;
+	if (strncmp(spec, "unix:", 5) == 0) {
+		struct sockaddr_un u{};
+		kc_strlcpy(u.sun_path, spec + 5, sizeof(u.sun_path));
+		hints.ai_family  = u.sun_family = AF_LOCAL;
+		hints.ai_addr    = reinterpret_cast<struct sockaddr *>(&u);
+		hints.ai_addrlen = sizeof(u) - sizeof(u.sun_path) + strlen(u.sun_path) + 1;
+		return ec_fdtable_socket_ai(&hints, oaddr, olen);
+	}
+	hints.ai_family = AF_UNSPEC;
+	auto parts = ec_parse_bindaddr(spec);
+	if (parts.first == "!" || parts.second == 0)
+		return -EINVAL;
+	auto ret = getaddrinfo(parts.first[0] == '\0' ? nullptr : parts.first.c_str(),
+	           std::to_string(parts.second).c_str(), &hints, &res);
+	if (ret != 0 || res == nullptr)
+		return -1;
+	ret = ec_fdtable_socket_ai(res, oaddr, olen);
+	freeaddrinfo(res);
+	return ret;
 }
 
 } /* namespace */

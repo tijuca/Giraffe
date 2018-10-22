@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef KOPANO_FSCK
@@ -22,7 +10,6 @@
 #include <string>
 #include <list>
 #include <set>
-#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 
 /*
@@ -41,35 +28,32 @@ public:
 	virtual ~Fsck(void) = default;
 	HRESULT ValidateMessage(LPMESSAGE lpMessage, const std::string &strName, const std::string &strClass);
 	HRESULT ValidateFolder(LPMAPIFOLDER lpFolder, const std::string &strName);
-
 	HRESULT AddMissingProperty(LPMESSAGE lpMessage, const std::string &strName, ULONG ulTag, __UPV Value);
 	HRESULT ReplaceProperty(LPMESSAGE lpMessage, const std::string &strName, ULONG ulTag, const std::string &strError, __UPV Value);
-
 	HRESULT DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged);
 	HRESULT DeleteMessage(LPMAPIFOLDER folder, const SPropValue *prop);
 	HRESULT ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
 	HRESULT ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
-
 	void PrintStatistics(const std::string &title);
 };
 
-class FsckCalendar _kc_final : public Fsck {
+class FsckCalendar final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
+	HRESULT ValidateItem(IMessage *, const std::string &cls) override;
 	HRESULT ValidateMinimalNamedFields(LPMESSAGE lpMessage);
 	HRESULT ValidateTimestamps(LPMESSAGE lpMessage);
 	HRESULT ValidateRecurrence(LPMESSAGE lpMessage);
 };
 
-class FsckContact _kc_final : public Fsck {
+class FsckContact final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
+	HRESULT ValidateItem(IMessage *, const std::string &cls) override;
 	HRESULT ValidateContactNames(LPMESSAGE lpMessage);
 };
 
-class FsckTask _kc_final : public Fsck {
+class FsckTask final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
+	HRESULT ValidateItem(IMessage *, const std::string &cls) override;
 	HRESULT ValidateMinimalNamedFields(LPMESSAGE lpMessage);
 	HRESULT ValidateTimestamps(LPMESSAGE lpMessage);
 	HRESULT ValidateCompletion(LPMESSAGE lpMessage);

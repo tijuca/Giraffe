@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 //////////////////////////////////////////////
@@ -469,7 +457,7 @@
 #endif
 
 #ifndef PR_7BIT_DISPLAY_NAME_W
-#define PR_7BIT_DISPLAY_NAME_W PROP_TAG(PT_UNICODE, PROP_ID(PR_7BIT_DISPLAY_NAME))
+#define PR_7BIT_DISPLAY_NAME_W CHANGE_PROP_TYPE(PR_7BIT_DISPLAY_NAME, PT_UNICODE)
 #endif
 
 #ifndef PR_ASSOCIATED
@@ -479,8 +467,6 @@
 #ifndef PR_PROCESSED
 #define PR_PROCESSED					PROP_TAG(PT_BOOLEAN, 0x7D01)
 #endif
-
-#define PR_PACKED_NAME_PROPS		PROP_TAG(PT_BINARY, 0x361C)
 
 #define PR_IPM_APPOINTMENT_ENTRYID	PROP_TAG(PT_BINARY, 0x36D0)
 #define PR_IPM_CONTACT_ENTRYID		PROP_TAG(PT_BINARY, 0x36D1)

@@ -1,26 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <pthread.h>
 #include <mapix.h>
 #include <ctime>
 #include <iostream>
-
+#include <kopano/timeutil.hpp>
 #include "ECMapiUtils.h"
 
 namespace KC {
@@ -28,7 +15,6 @@ namespace KC {
 // Returns the FILETIME as GM-time
 FILETIME vmimeDatetimeToFiletime(const vmime::datetime &dt)
 {
-	FILETIME sFiletime;
 	struct tm when;
 	int iYear, iMonth, iDay, iHour, iMinute, iSecond, iZone;
 
@@ -43,8 +29,7 @@ FILETIME vmimeDatetimeToFiletime(const vmime::datetime &dt)
 	when.tm_year	= iYear - 1900;
 	when.tm_isdst	= -1;		// ignore dst
 	auto lTmpTime = timegm(&when);
-	sFiletime = UnixTimeToFileTime(lTmpTime);
-	return sFiletime;
+	return UnixTimeToFileTime(lTmpTime);
 }
 
 vmime::datetime FiletimeTovmimeDatetime(const FILETIME &ft)
@@ -55,8 +40,7 @@ vmime::datetime FiletimeTovmimeDatetime(const FILETIME &ft)
 }
 
 static constexpr const struct {
-	const char *ext;
-	const char *mime_type;
+	const char *ext, *mime_type;
 } mime_types[] = {
 	{"bin", "application/octet-stream"},
 	{"exe", "application/octet-stream"},
@@ -112,7 +96,8 @@ static constexpr const struct {
 	{"qt", "video/quicktime"},
 	{"mov", "video/quicktime"},
 	{"avi", "video/x-msvideo"},
-	{"ics", "text/calendar"}
+	{"ics", "text/calendar"},
+	{"html", "text/html"},
 };
 
 const char *ext_to_mime_type(const char *ext, const char *def)

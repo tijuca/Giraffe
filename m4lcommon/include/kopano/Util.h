@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef UTIL_H
@@ -23,9 +11,8 @@
 #include <mapix.h>
 #include <edkmdb.h>
 #include <string>
-
 #include <kopano/ECDefs.h>
-
+#include <kopano/memory.hpp>
 #include <kopano/ustringutil.h>
 
 namespace KC {
@@ -128,25 +115,17 @@ class Util _kc_final {
 
 template<typename T> class alloc_wrap {
 	private:
-	T *obj;
+	object_ptr<T> obj;
 	public:
 	template<typename... ArgTp> alloc_wrap(ArgTp &&... args) :
 	    obj(new(std::nothrow) T(std::forward<ArgTp>(args)...))
-	{
-		if (obj != nullptr)
-			obj->AddRef();
-	}
-	~alloc_wrap()
-	{
-		if (obj != nullptr)
-			obj->Release();
-	}
+	{}
 	template<typename U> HRESULT put(U **p)
 	{
 		if (obj == nullptr)
 			return MAPI_E_NOT_ENOUGH_MEMORY;
 		obj->AddRef(); /* what QueryInterface would have done */
-		*p = obj;
+		*p = obj.get();
 		return hrSuccess;
 	}
 	template<typename Base> HRESULT as(const IID &iid, Base **p)

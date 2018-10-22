@@ -1,25 +1,11 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
+#include <clocale>
 #include <kopano/platform.h>
-
 #include <mapidefs.h>
 #include <mapitags.h>
-
 #include "kcore.hpp"
 #include "soapH.h"
 #include "ECDatabase.h"
@@ -117,7 +103,7 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		if (lpPropVal->__union != SOAP_UNION_propValData_hilo ||
 		    lpPropVal->Value.hilo == NULL)
 			return KCERR_INVALID_PARAMETER;
-		strColData = stringify(lpPropVal->Value.hilo->hi,false,true) + "," + stringify(lpPropVal->Value.hilo->lo);
+		strColData = stringify_signed(lpPropVal->Value.hilo->hi) + "," + stringify(lpPropVal->Value.hilo->lo);
 		*lpulColNr = VALUE_NR_HILO;
 		break;
 	case PT_APPTIME:
@@ -130,7 +116,7 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		if (lpPropVal->__union != SOAP_UNION_propValData_hilo ||
 		    lpPropVal->Value.hilo == NULL)
 			return KCERR_INVALID_PARAMETER;
-		strColData = stringify(lpPropVal->Value.hilo->hi,false,true) + "," + stringify(lpPropVal->Value.hilo->lo);
+		strColData = stringify_signed(lpPropVal->Value.hilo->hi) + "," + stringify(lpPropVal->Value.hilo->lo);
 		*lpulColNr = VALUE_NR_HILO;
 		break;
 	case PT_I8:
@@ -149,8 +135,7 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 			u8_ncpy(lpPropVal->Value.lpszA, TABLE_CAP_STRING, &strData);
 		else
 			strData = lpPropVal->Value.lpszA;
-		
-		strColData = "'" +  lpDatabase->Escape(lpDatabase->FilterBMP(strData)) + "'";
+		strColData = "'" +  lpDatabase->Escape(strData) + "'";
 		*lpulColNr = VALUE_NR_STRING;
 		break;
 	}
@@ -160,12 +145,11 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		    lpPropVal->Value.bin == NULL ||
 		    lpPropVal->Value.bin->__ptr == NULL)
 			return KCERR_INVALID_PARAMETER;
-
 		if (bTruncate && lpPropVal->Value.bin->__size > TABLE_CAP_BINARY)
 			ulSize = TABLE_CAP_BINARY;
 		else
 			ulSize = lpPropVal->Value.bin->__size;
-		
+
 		strColData = lpDatabase->EscapeBinary(lpPropVal->Value.bin->__ptr, ulSize);
 		*lpulColNr = VALUE_NR_BINARY;
 		break;
@@ -190,74 +174,62 @@ gsoap_size_t GetMVItemCount(struct propVal *lpPropVal)
 
 	switch (PROP_TYPE(lpPropVal->ulPropTag)) {
 	case PT_MV_I2:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvi || lpPropVal->Value.mvi.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvi &&
+		    lpPropVal->Value.mvi.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvi.__size;
 		break;
 	case PT_MV_LONG:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvl || lpPropVal->Value.mvl.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvl &&
+		    lpPropVal->Value.mvl.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvl.__size;
 		break;
 	case PT_MV_R4:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvflt || lpPropVal->Value.mvflt.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvflt &&
+		    lpPropVal->Value.mvflt.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvflt.__size;
 		break;
 	case PT_MV_DOUBLE:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvdbl &&
+		    lpPropVal->Value.mvdbl.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvdbl.__size;
 		break;
 	case PT_MV_CURRENCY:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvhilo &&
+		    lpPropVal->Value.mvhilo.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvhilo.__size;
 		break;
 	case PT_MV_APPTIME:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvdbl &&
+		    lpPropVal->Value.mvdbl.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvdbl.__size;
 		break;
 	case PT_MV_SYSTIME:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvhilo &&
+		    lpPropVal->Value.mvhilo.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvhilo.__size;
 		break;
 	case PT_MV_BINARY:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvbin &&
+		    lpPropVal->Value.mvbin.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvbin.__size;
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvszA || lpPropVal->Value.mvszA.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvszA &&
+		    lpPropVal->Value.mvszA.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvszA.__size;
 		break;
 	case PT_MV_CLSID:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvbin &&
+		    lpPropVal->Value.mvbin.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvbin.__size;
 		break;
 	case PT_MV_I8:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvli || lpPropVal->Value.mvli.__ptr == NULL)
-			ulSize = 0;
-		else
+		if (lpPropVal->__union == SOAP_UNION_propValData_mvli &&
+		    lpPropVal->Value.mvli.__ptr != nullptr)
 			ulSize = lpPropVal->Value.mvli.__size;
 		break;
 	default:
-		ulSize = 0;
 		break;
 	}
 
@@ -299,7 +271,7 @@ ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem
 		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo ||
 		    lpPropVal->Value.mvhilo.__ptr == NULL)
 			return KCERR_INVALID_PARAMETER;
-		strColData = stringify(lpPropVal->Value.mvhilo.__ptr[nItem].hi,false,true) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
+		strColData = stringify_signed(lpPropVal->Value.mvhilo.__ptr[nItem].hi) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
 		strColName = PROPCOL_HILO;
 		break;
 	case PT_MV_APPTIME:
@@ -313,7 +285,7 @@ ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem
 		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo ||
 		    lpPropVal->Value.mvhilo.__ptr == NULL)
 			return KCERR_INVALID_PARAMETER;
-		strColData = stringify(lpPropVal->Value.mvhilo.__ptr[nItem].hi,false,true) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
+		strColData = stringify_signed(lpPropVal->Value.mvhilo.__ptr[nItem].hi) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
 		strColName = PROPCOL_HILO;
 		break;
 	case PT_MV_BINARY:
@@ -328,7 +300,7 @@ ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem
 		if (lpPropVal->__union != SOAP_UNION_propValData_mvszA ||
 		    lpPropVal->Value.mvszA.__ptr == NULL)
 			return KCERR_INVALID_PARAMETER;
-		strColData = "'" + lpDatabase->Escape(lpDatabase->FilterBMP(lpPropVal->Value.mvszA.__ptr[nItem])) + "'";
+		strColData = "'" + lpDatabase->Escape(lpPropVal->Value.mvszA.__ptr[nItem]) + "'";
 		strColName = PROPCOL_STRING;
 		break;
 	case PT_MV_CLSID:
@@ -367,7 +339,6 @@ ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
 	if (lpRowData + ulSize < lpEnd + 1 + ulLen)
 		// not enough data from mysql
 		return KCERR_INVALID_PARAMETER;
-
 	lpstrData->assign(lpEnd + 1, ulLen);
 	*lpulLastPos = (lpEnd - lpRowData) + 1 + ulLen;
 	return erSuccess;
@@ -403,7 +374,6 @@ std::string GetPropColOrder(unsigned int ulPropTag,
 		else
 			strPropColOrder += "NULL";
 	}
-	
 	return strPropColOrder;
 }
 
@@ -415,7 +385,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	unsigned int ulLastPos;
 	std::string	strData;
 	unsigned int type = atoi(lpRow[FIELD_NR_TYPE]);
-	locale_t loc = createlocale(LC_NUMERIC, "C");
+	auto loc = newlocale(LC_NUMERIC_MASK, "C", nullptr);
 
 	if ((type & MVI_FLAG) == MVI_FLAG)
 		// Treat MVI as normal property
@@ -453,7 +423,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_b;
-		lpPropVal->Value.b = atoi(lpRow[FIELD_NR_ULONG]) ? true : false;
+		lpPropVal->Value.b = atoi(lpRow[FIELD_NR_ULONG]) != 0;
 		break;
 	case PT_DOUBLE:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
@@ -655,7 +625,6 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
-
 		lpPropVal->__union = SOAP_UNION_propValData_mvli;
 		lpPropVal->Value.mvli.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvli.__ptr = s_alloc<LONG64>(soap, lpPropVal->Value.mvli.__size);
@@ -671,7 +640,6 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	}
 
 	lpPropVal->ulPropTag = ulPropTag;
-
 exit:
 	freelocale(loc);
 	return er;

@@ -1,26 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include "phpconfig.h"
-
 #include <kopano/platform.h>
-
 #include <cmath>
 #include <mapiutil.h>
+#include <kopano/timeutil.hpp>
 
 extern "C" {
 	// Remove these defines to remove warnings
@@ -48,7 +34,6 @@ extern "C" {
 #include <mapitags.h>
 #include <mapicode.h>
 #include <edkmdb.h>
-
 #include "typeconversion.h"
 #include <kopano/charset/convert.h>
 
@@ -57,6 +42,7 @@ extern "C" {
 // Frees the buffer with MAPIFreeBuffer if lpBase is NOT set, we can't directly free data allocated with MAPIAllocateMore ..
 #define MAPI_FREE(lpbase, lpp) \
 	do { if (lpBase == nullptr) MAPIFreeBuffer(lpp); } while (false)
+#define BEFORE_PHP7_2(s) const_cast<char *>(s)
 
 using namespace KC;
 
@@ -145,7 +131,8 @@ HRESULT PHPArraytoSBinaryArray(zval * entryid_array , void *lpBase, SBinaryArray
 	return MAPI_G(hr);
 }
 
-HRESULT SBinaryArraytoPHPArray(SBinaryArray *lpBinaryArray, zval **ppvalRet TSRMLS_DC)
+HRESULT SBinaryArraytoPHPArray(const SBinaryArray *lpBinaryArray,
+    zval **ppvalRet TSRMLS_DC)
 {
 	unsigned int i = 0;
 	
@@ -1299,7 +1286,9 @@ exit:
 	return MAPI_G(hr);
 }
 
-HRESULT SRestrictiontoPHPArray(LPSRestriction lpRes, int level, zval **pret TSRMLS_DC) {
+HRESULT SRestrictiontoPHPArray(const SRestriction *lpRes, int level,
+    zval **pret TSRMLS_DC)
+{
 	zval *entry = NULL;
 	char key[16];
 	zval *array = NULL;
@@ -1494,7 +1483,8 @@ HRESULT SRestrictiontoPHPArray(LPSRestriction lpRes, int level, zval **pret TSRM
 *
 */
 
-HRESULT PropTagArraytoPHPArray(ULONG cValues, LPSPropTagArray lpPropTagArray, zval **pret TSRMLS_DC)
+HRESULT PropTagArraytoPHPArray(ULONG cValues,
+    const SPropTagArray *lpPropTagArray, zval **pret TSRMLS_DC)
 {
 	zval *zvalRet = NULL;
 	unsigned int i = 0;
@@ -1516,7 +1506,8 @@ HRESULT PropTagArraytoPHPArray(ULONG cValues, LPSPropTagArray lpPropTagArray, zv
 *
 *
 */
-HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zval **pret TSRMLS_DC)
+HRESULT PropValueArraytoPHPArray(ULONG cValues,
+    const SPropValue *pPropValueArray, zval **pret TSRMLS_DC)
 {
 	// return value
 	zval * zval_prop_value;
@@ -1525,11 +1516,11 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 	zval * zval_action_array;	// action converts
 	zval * zval_action_value;	// action converts
 	zval * zval_alist_value;	// adrlist in action convert
-	LPSPropValue pPropValue;
+	const SPropValue *pPropValue;
 	ULONG col, j;
 	char ulKey[16];
 	ACTIONS *lpActions = NULL;
-	LPSRestriction lpRestriction = NULL;
+	const SRestriction *lpRestriction = nullptr;
 	convert_context converter;
 
 	MAPI_G(hr) = hrSuccess;
@@ -1584,7 +1575,7 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 			break;
 
 		case PT_UNICODE:
-			add_assoc_string(zval_prop_value, pulproptag, converter.convert_to<char*>(pPropValue->Value.lpszW), 1);
+			add_assoc_string(zval_prop_value, pulproptag, BEFORE_PHP7_2(converter.convert_to<std::string>(pPropValue->Value.lpszW).c_str()), 1);
 			break;
 
 		case PT_BINARY:
@@ -1706,7 +1697,7 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 
 			for (j = 0; j < pPropValue->Value.MVszW.cValues; ++j) {
 				sprintf(ulKey, "%i", j);
-				add_assoc_string(zval_mvprop_value, ulKey, converter.convert_to<char*>(pPropValue->Value.MVszW.lppszW[j]), 1);
+				add_assoc_string(zval_mvprop_value, ulKey, BEFORE_PHP7_2(converter.convert_to<std::string>(pPropValue->Value.MVszW.lppszW[j]).c_str()), 1);
 			}
 
 			add_assoc_zval(zval_prop_value, pulproptag, zval_mvprop_value);
@@ -1803,7 +1794,8 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 	return MAPI_G(hr);
 }
 
-HRESULT RowSettoPHPArray(LPSRowSet lpRowSet, zval **pret TSRMLS_DC) {
+HRESULT RowSettoPHPArray(const SRowSet *lpRowSet, zval **pret TSRMLS_DC)
+{
 	zval	*zval_prop_value = NULL;
 	ULONG	crow	= 0;
 	zval 	*ret;
@@ -1827,7 +1819,8 @@ HRESULT RowSettoPHPArray(LPSRowSet lpRowSet, zval **pret TSRMLS_DC) {
 /*
  * Convert from READSTATE array to PHP. Returns a list of arrays, each containing "sourcekey" and "flags" per entry
  */
-HRESULT ReadStateArraytoPHPArray(ULONG cValues, LPREADSTATE lpReadStates, zval **ppvalRet TSRMLS_DC)
+HRESULT ReadStateArraytoPHPArray(ULONG cValues, const READSTATE *lpReadStates,
+    zval **ppvalRet TSRMLS_DC)
 {
 	zval *pvalRet;
 	unsigned int i=0;
@@ -1978,7 +1971,8 @@ exit:
 	return MAPI_G(hr);
 }
 
-HRESULT NotificationstoPHPArray(ULONG cNotifs, LPNOTIFICATION lpNotifs, zval **pret TSRMLS_DC)
+HRESULT NotificationstoPHPArray(ULONG cNotifs, const NOTIFICATION *lpNotifs,
+    zval **pret TSRMLS_DC)
 {
 	zval *zvalRet = NULL;
 	zval *zvalProps = NULL;

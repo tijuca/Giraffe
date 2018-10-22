@@ -1,24 +1,11 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <chrono>
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <kopano/ECLogger.h>
-
 #include <sys/select.h>
 #include <iconv.h>
 #include <cstring>
@@ -34,32 +21,19 @@
 #include <cstdlib>
 #include <cerrno>
 #include <climits>
-
 #include <string>
 #include <map>
 #include <vector>
-
 #ifndef HAVE_UUID_CREATE
 #	include <uuid/uuid.h>
 #else
 #	include <uuid.h>
 #endif
-#if defined(__linux__) && defined(__GLIBC__)
-#	include <cxxabi.h>
+#if defined(__GLIBC__) || defined(OPENBSD)
 #	include <execinfo.h>
+#	define WITH_BACKTRACE 1
 #endif
-#include "TmpPath.h"
-
-#ifdef __APPLE__
-// bsd
-#define ICONV_CONST const
-#elif OPENBSD
-// bsd
-#define ICONV_CONST const
-#else
-// linux
-#define ICONV_CONST
-#endif
+#include <kopano/fileutil.hpp>
 
 static bool rand_init_done = false;
 
@@ -77,23 +51,12 @@ HRESULT CoCreateGuid(LPGUID pNewGUID) {
 	if (!pNewGUID)
 		return MAPI_E_INVALID_PARAMETER;
 
+	static_assert(sizeof(GUID) == sizeof(uuid_t), "UUID type sizes mismatch");
 #if HAVE_UUID_CREATE
-#ifdef OPENBSD
-	uuid_t *g = NULL;
-	void *vp = NULL;
-	size_t n = 0;
-	// error codes are not checked!
-	uuid_create(&g);
-	uuid_make(g, UUID_MAKE_V1);
-	uuid_export(g, UUID_FMT_BIN, &vp, &n);
-	memcpy(pNewGUID, &vp, UUID_LEN_BIN);
-	uuid_destroy(g);
-#else
 	uuid_t g;
 	uint32_t uid_ret;
 	uuid_create(&g, &uid_ret);
 	memcpy(pNewGUID, &g, sizeof(g));
-#endif // OPENBSD
 #else
 	uuid_t g;
 	uuid_generate(g);
@@ -111,28 +74,10 @@ void GetSystemTimeAsFileTime(FILETIME *ft) {
 	ft->dwHighDateTime = now >> 32;
 }
 
-/** 
- * copies the path of the temp directory, including trailing /, into
- * given buffer.
- * 
- * @param[in] inLen size of buffer, inclusive \0 char
- * @param[in,out] lpBuffer buffer to place path in
- * 
- * @return length used or what would've been required if it would fit in lpBuffer
- */
-DWORD GetTempPath(DWORD inLen, char *lpBuffer) {
-	auto outLen = snprintf(lpBuffer, inLen, "%s/", KC::TmpPath::instance.getTempPath().c_str());
-	if (outLen > inLen)
-		return 0;
-
-	return outLen;
-}
-
 void Sleep(unsigned int msec) {
 	struct timespec ts;
-	unsigned int rsec;
 	ts.tv_sec = msec/1000;
-	rsec = msec - (ts.tv_sec*1000);
+	unsigned int rsec = msec - ts.tv_sec * 1000;
 	ts.tv_nsec = rsec*1000*1000;
 	nanosleep(&ts, NULL);
 }
@@ -145,37 +90,31 @@ static void rand_fail(void)
 	kill(0, SIGTERM);
 	exit(1);
 }
-	
+
 void rand_get(char *p, int n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
-
 	if (fd == -1)
 		rand_fail();
-	
+
 	// handle EINTR
 	while(n > 0)
 	{
 		int rc = read(fd, p, n);
-
 		if (rc == 0)
 			rand_fail();
-
 		if (rc == -1)
 		{
 			if (errno == EINTR)
 				continue;
-
 			rand_fail();
 		}
-
 		p += rc;
 		n -= rc;
 	}
-
 		close(fd);
 	}
-	
+
 void rand_init() {
 	if (rand_init_done)
 		return;
@@ -189,7 +128,6 @@ void rand_init() {
 int rand_mt() {
 	int dummy = 0;
 	rand_get((char *)&dummy, sizeof dummy);
-
 	if (dummy == INT_MIN)
 		dummy = INT_MAX;
 	else
@@ -218,9 +156,7 @@ namespace KC {
 time_t GetProcessTime()
 {
 	time_t t;
-
 	time(&t);
-
 	return t;
 }
 
@@ -228,6 +164,7 @@ std::vector<std::string> get_backtrace(void)
 {
 #define BT_MAX 256
 	std::vector<std::string> result;
+#ifdef WITH_BACKTRACE
 	void *addrlist[BT_MAX];
 	int addrlen = backtrace(addrlist, BT_MAX);
 	if (addrlen == 0)
@@ -236,6 +173,7 @@ std::vector<std::string> get_backtrace(void)
 	for (int i = 0; i < addrlen; ++i)
 		result.emplace_back(symbollist[i]);
 	free(symbollist);
+#endif
 	return result;
 #undef BT_MAX
 }
@@ -312,6 +250,18 @@ int ec_relocate_fd(int fd)
 		"%s. Keeping old number.", fd, typical_limit, strerror(errno));
 	dump_fdtable_summary(getpid());
 	return fd;
+}
+
+void le_to_cpu(SYSTEMTIME &s)
+{
+	s.wYear = le16_to_cpu(s.wYear);
+	s.wMonth = le16_to_cpu(s.wMonth);
+	s.wDayOfWeek = le16_to_cpu(s.wDayOfWeek);
+	s.wDay = le16_to_cpu(s.wDay);
+	s.wHour = le16_to_cpu(s.wHour);
+	s.wMinute = le16_to_cpu(s.wMinute);
+	s.wSecond = le16_to_cpu(s.wSecond);
+	s.wMilliseconds = le16_to_cpu(s.wMilliseconds);
 }
 
 } /* namespace */

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -11,7 +12,7 @@ class Address(object):
     """Address class"""
 
     def __init__(self, server=None, addrtype=None, name=None, email=None,
-            entryid=None, searchkey=None, props=None):
+                 entryid=None, searchkey=None, props=None):
         self.server = server
         self.addrtype = addrtype
         self._name = name
@@ -40,11 +41,8 @@ class Address(object):
             # cannot resolve email for deleted/non-existent user, so fallback
             # to searchkey
             # XXX make PR_SMTP_ADDRESS always contain email address?
-            if (not email and \
-                self._searchkey and \
-                b':' in self._searchkey \
-                and b'@' in self._searchkey
-               ):
+            if (not email and self._searchkey and
+                    b':' in self._searchkey and b'@' in self._searchkey):
                 email = self._searchkey.split(b':')[1].rstrip(b'\x00').decode('ascii').lower()
         else:
             email = self._email or u''

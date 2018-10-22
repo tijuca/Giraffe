@@ -1,38 +1,20 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <exception>
 #include <mutex>
+#include <utility>
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/stringutil.h>
-
 #include <string>
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
-
-// vmime
 #include <vmime/vmime.hpp>
 #include <vmime/textPartFactory.hpp>
 #include "mapiTextPart.h"
 #include <vmime/platforms/posix/posixHandler.hpp>
-
-// mapi
 #include <mapix.h>
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
@@ -40,7 +22,6 @@
 #include <edkmdb.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/charset/convert.h>
-// inetmapi
 #include <inetmapi/inetmapi.h>
 #include "VMIMEToMAPI.h"
 #include "MAPIToVMIME.h"
@@ -77,6 +58,8 @@ static void InitializeVMime()
 		return;
 
 	vmime::generationContext::getDefaultContext().setWrapMessageId(false);
+	/* Sucky Outlook _still_ does not know RFC 2231. */
+	vmime::generationContext::getDefaultContext().setEncodedParameterValueMode(vmime::generationContext::EncodedParameterValueModes::PARAMETER_VALUE_RFC2231_AND_RFC2047);
 	// need to have a unique indentifier in the mediaType
 	vmime::textPartFactory::getInstance()->registerType<vmime::mapiTextPart>(vmime::mediaType(vmime::mediaTypes::TEXT, "mapi"));
 	// init our random engine for random message id generation
@@ -155,12 +138,16 @@ HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore,
 		vmime::mailbox mbox;
 		mbox.parse("=?UTF-8?Q?a=c2=a0b_=28c@d.e=29?= <f@g.h>");
 		if (*mbox.getName().getWholeBuffer().c_str() == '\0')
-			ec_log_notice("Detected old libvmime (< 0.9.2.42). "
+			ec_log_notice("K-1242: Detected old libvmime (< 0.9.2.42). "
 			"Consider having it upgraded to be able to parse more broken mails (KC-1124).");
+		vmime::header hdr;
+		if (hdr.ReplyTo()->getValue<vmime::mailboxList>() == nullptr)
+			ec_log_notice("K-1243: Detected old libvmime that "
+			"is unable to parse multi-address Reply-To (KC-434).");
 	}
 
 	// fill mapi object from buffer
-	return VMIMEToMAPI(lpAddrBook, dopt).convertVMIMEToMAPI(input, lpMessage);
+	return VMIMEToMAPI(lpAddrBook, std::move(dopt)).convertVMIMEToMAPI(input, lpMessage);
 }
 
 // Read properties from lpMessage object and fill a buffer with internet rfc822 format message
@@ -235,8 +222,7 @@ HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
 		std::wstring wstrError = mToVM.getConversionError();
 		if (wstrError.empty())
 			wstrError = L"No error details specified";
-
-		mailer->setError(L"Conversion error: " + wstringify(hr, true) + L". " + wstrError + L". Your email is not sent at all and cannot be retried.");
+		mailer->setError(L"Conversion error: " + wstringify_hex(hr) + L". " + wstrError + L". Your email is not sent at all and cannot be retried.");
 		return hr;
 	}
 
@@ -285,14 +271,13 @@ HRESULT createIMAPBody(const std::string &input, IMessage *lpMessage, bool envel
 {
 	InitializeVMime();
 
+	VMIMEToMAPI obj;
 	auto vmMessage = vmime::make_shared<vmime::message>();
-	vmMessage->parse(input);
-
-	auto hr = VMIMEToMAPI().createIMAPBody(input, vmMessage, lpMessage);
+	vmMessage->parse(obj.m_parsectx, input);
+	auto hr = obj.createIMAPBody(input, vmMessage, lpMessage);
 	if (hr != hrSuccess || !envelope)
 		return hr;
-
-	return VMIMEToMAPI().createIMAPEnvelope(vmMessage, lpMessage);
+	return obj.createIMAPEnvelope(vmMessage, lpMessage);
 }
 
 } /* namespace */

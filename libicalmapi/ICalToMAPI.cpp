@@ -1,24 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-#include <kopano/zcdefs.h>
 #include <memory>
 #include <new>
 #include <kopano/platform.h>
 #include <kopano/ECRestriction.h>
+#include <kopano/hl.hpp>
 #include <kopano/memory.hpp>
 #include "ICalToMAPI.h"
 #include "vconverter.h"
@@ -41,18 +29,18 @@
 
 namespace KC {
 
-class ICalToMapiImpl _kc_final : public ICalToMapi {
+class ICalToMapiImpl final : public ICalToMapi {
 public:
 	/*
 	    - lpPropObj to lookup named properties
 	    - Addressbook (Global AddressBook for looking up users)
 	 */
 	ICalToMapiImpl(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients);
-	HRESULT ParseICal(const std::string& strIcal, const std::string& strCharset, const std::string& strServerTZ, IMailUser *lpMailUser, ULONG ulFlags) _kc_override;
-	ULONG GetItemCount(void) _kc_override;
-	HRESULT GetItemInfo(ULONG ulPosition, eIcalType *lpType, time_t *lptLastModified, SBinary *lpUid) _kc_override;
-	HRESULT GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMessage) _kc_override;
-	HRESULT GetFreeBusyInfo(time_t *lptstart, time_t *lptend, std::string *lpstrUId, std::list<std::string> **lplstUsers) _kc_override;
+	HRESULT ParseICal(const std::string &ical, const std::string &cset, const std::string &server_tz, IMailUser *, unsigned int flags) override;
+	unsigned int GetItemCount() override;
+	HRESULT GetItemInfo(unsigned int pos, eIcalType *, time_t *last_mod, SBinary *uid) override;
+	HRESULT GetItem(unsigned int pos, unsigned int flags, IMessage *) override;
+	HRESULT GetFreeBusyInfo(time_t *start, time_t *end, std::string *uid, std::list<std::string> **users) override;
 
 private:
 	void Clean();
@@ -143,8 +131,7 @@ HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string&
 	TIMEZONE_STRUCT ttTimeZone = {0};
 	timezone_map tzMap;
 	std::string strTZID;
-	icalitem *item = NULL;
-	icalitem *previtem = NULL;
+	icalitem *item = nullptr, *previtem = nullptr;
 
 	Clean();
 	if (m_lpNamedProps == NULL) {
@@ -343,8 +330,7 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 	memory_ptr<SPropTagArray> lpsPTA;
 	object_ptr<IMAPITable> lpAttachTable;
 	rowset_ptr lpRows;
-	SPropValue sStart = {0};
-	SPropValue sMethod = {0};
+	SPropValue sStart = {0}, sMethod = {0};
 
 	if (ulPosition >= m_vMessages.size() || lpMessage == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
@@ -575,7 +561,7 @@ HRESULT ICalToMapiImpl::SaveRecipList(const std::list<icalrecip> *lplstRecip,
 HRESULT ICalToMapiImpl::SaveAttendeesString(const std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage)
 {
 	std::wstring strAllAttendees, strToAttendees, strCCAttendees;
-	SPropValue lpsPropValue[3];
+	KPropbuffer<3> pv;
 
 	// Create attendees string
 	for (const auto &recip : *lplstRecip) {
@@ -595,13 +581,10 @@ HRESULT ICalToMapiImpl::SaveAttendeesString(const std::list<icalrecip> *lplstRec
 		strAllAttendees += recip.strName;
 	}
 
-	lpsPropValue[0].ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TOATTENDEESSTRING], PT_UNICODE);
-	lpsPropValue[0].Value.lpszW = (WCHAR*)strToAttendees.c_str();
-	lpsPropValue[1].ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_CCATTENDEESSTRING], PT_UNICODE);
-	lpsPropValue[1].Value.lpszW = (WCHAR*)strCCAttendees.c_str();
-	lpsPropValue[2].ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ALLATTENDEESSTRING], PT_UNICODE);
-	lpsPropValue[2].Value.lpszW = (WCHAR*)strAllAttendees.c_str();
-	return lpMessage->SetProps(3, lpsPropValue, nullptr);
+	pv.set(0, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TOATTENDEESSTRING], PT_UNICODE), std::move(strToAttendees));
+	pv.set(1, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_CCATTENDEESSTRING], PT_UNICODE), std::move(strCCAttendees));
+	pv.set(2, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ALLATTENDEESSTRING], PT_UNICODE), std::move(strAllAttendees));
+	return lpMessage->SetProps(3, pv.get(), nullptr);
 }
 
 } /* namespace */

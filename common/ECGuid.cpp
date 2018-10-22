@@ -1,27 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <initguid.h>
 
 /*
  * All the IID_* symbols are created here
  */
-
 #define USES_IID_IMSProvider
 #define USES_IID_IXPProvider
 #define USES_IID_IABProvider
@@ -42,9 +28,6 @@
 #define USES_IID_IStream
 #define USES_IID_IStorage
 #define USES_IID_IMessageRaw
-
-// quick linux hack
-#define ECDEBUGCLIENT_USES_UIDS
 
 //Trace info
 #define USES_IID_IMAPISession
@@ -112,6 +95,7 @@
 #define USES_PSETID_Kopano_CalDav	//used in caldav
 #define USES_PSETID_Archive
 #define USES_PSETID_CalendarAssistant
+#define USES_PSETID_KC
 #define USES_GUID_Dilkie
 #define USES_IID_IMAPIClientShutdown
 #define USES_IID_IMAPIProviderShutdown
@@ -139,7 +123,6 @@
 #define USES_IID_IFreeBusyData
 #define USES_IID_IFreeBusySupport
 #define USES_IID_IFreeBusyUpdate
-#define USES_pbGlobalProfileSectionGuid
 
 #include <mapiguid.h>
 #include <edkguid.h>

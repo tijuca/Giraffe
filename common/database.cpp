@@ -1,19 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005-2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU Affero General Public License, version 3, as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
- * for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -74,6 +65,32 @@ DB_LENGTHS DB_RESULT::fetch_row_lengths(void)
 KDatabase::KDatabase(void)
 {
 	memset(&m_lpMySQL, 0, sizeof(m_lpMySQL));
+}
+
+/**
+ * Raise the GROUP CONCAT limit of the server if that is too low.
+ * @limit:	new GC limit
+ * @reconnect:	whether autoreconnect is desired for this DB object
+ */
+HRESULT KDatabase::setup_gcm(size_t limit, bool reconnect)
+{
+	DB_RESULT result;
+	if (DoSelect("SHOW SESSION VARIABLES LIKE 'group_concat_max_len'", &result) != 0)
+		return 0;
+	auto row = result.fetch_row();
+	if (row == nullptr || row[0] == nullptr || row[1] == nullptr)
+		return 0;
+	auto gcm = strtoul(row[1], nullptr, 0);
+	if (limit <= gcm)
+		return 0; /* server already has a better limit */
+	auto query = "SET SESSION group_concat_max_len=" + stringify(limit);
+	if (Query(query) != 0) {
+		ec_log_crit("%s: raising group_concat_max_len to %zu failed: %s", __func__, limit, GetError());
+		return KCERR_DATABASE_ERROR;
+	}
+	if (reconnect)
+		mysql_options(&m_lpMySQL, MYSQL_INIT_COMMAND, query.c_str());
+	return 0;
 }
 
 ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
@@ -142,21 +159,12 @@ ECRESULT KDatabase::Connect(ECConfig *cfg, bool reconnect,
 		ec_log_warn("max_allowed_packet is smaller than 16M (%d). You are advised to increase this value by adding max_allowed_packet=16M in the [mysqld] section of my.cnf.", m_ulMaxAllowedPacket);
 
 	m_bConnected = true;
-	if (mysql_set_character_set(&m_lpMySQL, "utf8")) {
-		ec_log_err("Unable to set character set to \"utf8\"");
+	if (mysql_set_character_set(&m_lpMySQL, "utf8mb4")) {
+		ec_log_err("Unable to set character set to \"utf8mb4\"");
 		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
-	if (gcm > 0) {
-		query = "SET SESSION group_concat_max_len = " + stringify(gcm);
-		if (Query(query) != 0) {
-			ec_log_crit("KDatabase::Connect(): group_concat_max_len set fail: %s", GetError());
-			er = KCERR_DATABASE_ERROR;
-			goto exit;
-		}
-	}
-	if (reconnect)
-		mysql_options(&m_lpMySQL, MYSQL_INIT_COMMAND, query.c_str());
+	er = setup_gcm(gcm, reconnect);
  exit:
 	if (er != erSuccess)
 		Close();
@@ -196,8 +204,7 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 	if (er != erSuccess)
 		return er;
 
-	std::string query;
-	query = "CREATE DATABASE IF NOT EXISTS `" +
+	auto query = "CREATE DATABASE IF NOT EXISTS `" +
 	        std::string(cfg->GetSetting("mysql_database")) + "`";
 	if (Query(query) != erSuccess) {
 		ec_log_err("Unable to create database: %s", GetError());
@@ -207,7 +214,6 @@ ECRESULT KDatabase::CreateDatabase(ECConfig *cfg, bool reconnect)
 	er = DoInsert(query);
 	if (er != erSuccess)
 		return er;
-
 	ec_log_info("Database structure has been created");
 	return erSuccess;
 }
@@ -229,18 +235,15 @@ ECRESULT KDatabase::CreateTables(ECConfig *cfg)
 			ec_log_err("Error running query %s", query.c_str());
 			return er;
 		}
-
 		if (result.get_num_rows() > 0) {
 			ec_log_debug("Table \"%s\" exists", tables[i].lpComment);
 			continue;
 		}
-
 		ec_log_info("Create table: %s", tables[i].lpComment);
 		er = DoInsert(format(tables[i].lpSQL, engine));
 		if (er != erSuccess)
 			return er;
 	}
-
 	return erSuccess;
 }
 
@@ -318,11 +321,7 @@ ECRESULT KDatabase::DoSelect(const std::string &q, DB_RESULT *res_p,
 	}
 
 	ECRESULT er = erSuccess;
-	DB_RESULT res;
-	if (stream)
-		res = DB_RESULT(this, mysql_use_result(&m_lpMySQL));
-	else
-		res = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
+	DB_RESULT res(this, stream ? mysql_use_result(&m_lpMySQL) : mysql_store_result(&m_lpMySQL));
 	if (res == nullptr) {
 		if (!m_bSuppressLockErrorLogging ||
 		    GetLastError() == DB_E_UNKNOWN)
@@ -397,8 +396,7 @@ ECRESULT KDatabase::DoUpdate(const std::string &q, unsigned int *aff)
 std::string KDatabase::Escape(const std::string &s)
 {
 	auto size = s.length() * 2 + 1;
-	std::unique_ptr<char[]> esc(new char[size]);
-
+	auto esc = std::make_unique<char[]>(size);
 	memset(esc.get(), 0, size);
 	mysql_real_escape_string(&m_lpMySQL, esc.get(), s.c_str(), s.length());
 	return esc.get();
@@ -407,8 +405,7 @@ std::string KDatabase::Escape(const std::string &s)
 std::string KDatabase::EscapeBinary(const void *data, size_t len)
 {
 	auto size = len * 2 + 1;
-	std::unique_ptr<char[]> esc(new char[size]);
-
+	auto esc = std::make_unique<char[]>(size);
 	memset(esc.get(), 0, size);
 	mysql_real_escape_string(&m_lpMySQL, esc.get(), reinterpret_cast<const char *>(data), len);
 	return "'" + std::string(esc.get()) + "'";
@@ -458,7 +455,7 @@ ECRESULT KDatabase::InitEngine(bool reconnect)
 		return KCERR_DATABASE_ERROR;
 	}
 	m_bMysqlInitialize = true;
-	my_bool value = reconnect;
+	char value = reconnect;
 	mysql_options(&m_lpMySQL, MYSQL_OPT_RECONNECT, &value);
 	return erSuccess;
 }
@@ -509,7 +506,7 @@ ECRESULT KDatabase::Query(const std::string &q)
 	/* Callers without reconnect will emit different messages. */
 	auto ers = mysql_error(&m_lpMySQL);
 #ifdef HAVE_MYSQL_GET_OPTION
-	my_bool reconn = false;
+	char reconn = false;
 	if (mysql_get_option(&m_lpMySQL, MYSQL_OPT_RECONNECT, &reconn) == 0 && reconn)
 #else
 	if (m_lpMySQL.reconnect)
@@ -529,6 +526,11 @@ ECRESULT KDatabase::I_Update(const std::string &q, unsigned int *aff)
 	if (aff != nullptr)
 		*aff = GetAffectedRows();
 	return erSuccess;
+}
+
+kd_trans KDatabase::Begin(ECRESULT &res)
+{
+	return Query("BEGIN") == 0 ? kd_trans(*this, res) : kd_trans();
 }
 
 class kd_noop_trans final : public kt_completion {

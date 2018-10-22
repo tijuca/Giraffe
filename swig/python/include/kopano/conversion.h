@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef CONVERSION_H
@@ -21,7 +9,6 @@
 #include <edkmdb.h>		// LPREADSTATE
 #include <kopano/ECDefs.h>	// ECUSER
 using namespace KC;
-typedef ECUSERCLIENTUPDATESTATUS *LPECUSERCLIENTUPDATESTATUS;
 typedef ECSVRNAMELIST *LPECSVRNAMELIST;
 typedef ECSERVERLIST *LPECSERVERLIST;
 typedef ECQUOTASTATUS *LPECQUOTASTATUS;
@@ -119,9 +106,6 @@ ECQUOTA *Object_to_LPECQUOTA(PyObject *);
 PyObject *Object_from_LPECQUOTA(ECQUOTA *lpQuota);
 
 PyObject *Object_from_LPECQUOTASTATUS(ECQUOTASTATUS *lpQuotaStatus);
-
-PyObject *Object_from_LPECUSERCLIENTUPDATESTATUS(ECUSERCLIENTUPDATESTATUS *lpECUCUS);
-
 LPROWLIST		List_to_LPROWLIST(PyObject *, ULONG ulFlags = CONV_COPY_SHALLOW);
 
 ECSVRNAMELIST *List_to_LPECSVRNAMELIST(PyObject *object);

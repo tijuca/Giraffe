@@ -1,27 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECSCHEDULER_H
 #define ECSCHEDULER_H
 
 #include <kopano/zcdefs.h>
 #include <condition_variable>
 #include <mutex>
-#include <kopano/ECLogger.h>
 #include <kopano/memory.hpp>
 #include <pthread.h>
 #include <list>
@@ -49,9 +35,8 @@ typedef std::list<ECSCHEDULE> ECScheduleList;
 
 class _kc_export ECScheduler _kc_final {
 public:
-	ECScheduler(ECLogger *lpLogger);
+	ECScheduler();
 	~ECScheduler(void);
-
 	HRESULT AddSchedule(eSchedulerType eType, unsigned int ulBeginCycle, void* (*lpFunction)(void*), void* lpData = NULL);
 
 private:
@@ -59,8 +44,7 @@ private:
 	_kc_hidden static void *ScheduleThread(void *tmp_scheduler);
 
 	ECScheduleList		m_listScheduler;
-	object_ptr<ECLogger> m_lpLogger;
-	bool m_bExit = false;
+	bool m_thread_active = false, m_bExit = false;
 	std::mutex m_hExitMutex; /* Mutex needed for the release signal */
 	std::condition_variable m_hExitSignal; /* Signal that should be sent to the Scheduler when to exit */
 	std::recursive_mutex m_hSchedulerMutex; /* Mutex for the locking of the scheduler */

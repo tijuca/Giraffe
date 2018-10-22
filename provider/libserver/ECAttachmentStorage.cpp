@@ -1,21 +1,9 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <string>
@@ -23,27 +11,29 @@
 #include <climits>
 #include <mapidefs.h>
 #include <cerrno>
-
 #include <algorithm>
-#include <kopano/lockhelper.hpp>
+#include <dirent.h>
 #include <fcntl.h>
-
 #include <zlib.h>
-
 #include <ECSerializer.h>
-
 #include <sys/types.h>
 #include <sys/stat.h>
-	#include <unistd.h>
-
+#include <unistd.h>
+#include <libHX/io.h>
+#include <libHX/string.h>
 #include "ECAttachmentStorage.h"
 #include "SOAPUtils.h"
 #include <kopano/ECLogger.h>
 #include <kopano/MAPIErrors.h>
+#include <kopano/fileutil.hpp>
 #include <mapitags.h>
+#include <kopano/scope.hpp>
 #include <kopano/stringutil.h>
+#include <openssl/sha.h>
 #include "StreamUtil.h"
 #include "ECS3Attachment.h"
+
+using namespace std::string_literals;
 
 namespace KC {
 
@@ -52,16 +42,90 @@ class ECDatabaseAttachmentConfig final : public ECAttachmentConfig {
 	virtual ECAttachmentStorage *new_handle(ECDatabase *) override;
 };
 
-class ECFileAttachmentConfig final : public ECAttachmentConfig {
+class ECFileAttachmentConfig : public ECAttachmentConfig {
 	public:
-	virtual ECRESULT init(ECConfig *) override;
+	virtual ECRESULT init(std::shared_ptr<ECConfig>) override;
 	virtual ECAttachmentStorage *new_handle(ECDatabase *) override;
 
-	private:
+	protected:
 	std::string m_dir;
 	unsigned int m_complvl;
 	bool m_sync_files;
 };
+
+class ECFileAttachment : public ECAttachmentStorage {
+	public:
+	ECFileAttachment(ECDatabase *, const std::string &basepath, unsigned int compr_lvl, bool sync);
+
+	protected:
+	virtual ~ECFileAttachment(void);
+
+	/* Single Instance Attachment handlers */
+	virtual ECRESULT LoadAttachmentInstance(struct soap *, const ext_siid &, size_t *, unsigned char **) override;
+	virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *, ECSerializer *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, unsigned char *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, ECSerializer *) override;
+	virtual ECRESULT DeleteAttachmentInstances(const std::list<ext_siid> &, bool replace) override;
+	virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) override;
+	virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *size, bool *compr = nullptr) override;
+	virtual kd_trans Begin(ECRESULT &) override;
+	virtual ECRESULT Commit() override;
+	virtual ECRESULT Rollback() override;
+	ECRESULT save_instance_data(const std::string &filename, int fd, unsigned int propid, size_t z, unsigned char *data, bool comp);
+
+	size_t attachment_size_safety_limit;
+	bool force_changes_to_disk;
+
+	/* helper functions for transacted deletion */
+	bool VerifyInstanceSize(const ext_siid &, size_t expected_size, const std::string &filename);
+	void give_filesize_hint(const int fd, const off_t len);
+	void my_readahead(int fd);
+
+	std::string m_basepath;
+
+	private:
+	std::string CreateAttachmentFilename(const ext_siid &, bool compressed);
+	ECRESULT MarkAttachmentForDeletion(const ext_siid &);
+	ECRESULT DeleteMarkedAttachment(const ext_siid &);
+	ECRESULT RestoreMarkedAttachment(const ext_siid &);
+
+	int m_dirFd = -1;
+	DIR *m_dirp = nullptr;
+	bool m_bTransaction = false;
+	std::set<ext_siid> m_setNewAttachment, m_setDeletedAttachment, m_setMarkedAttachment;
+};
+
+class ECFileAttachmentConfig2 final : public ECFileAttachmentConfig {
+	public:
+	ECFileAttachmentConfig2(const GUID &);
+	virtual ECAttachmentStorage *new_handle(ECDatabase *) override;
+
+	protected:
+	std::string m_server_guid;
+
+	friend class ECFileAttachment2;
+};
+
+class ECFileAttachment2 final : public ECFileAttachment {
+	public:
+	ECFileAttachment2(ECFileAttachmentConfig2 &, ECDatabase *, const std::string &basepath, unsigned int complvl, bool sync);
+
+	protected:
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, unsigned char *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, ECSerializer *) override;
+	virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *, bool *) override;
+	virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) override;
+	virtual ECRESULT LoadAttachmentInstance(struct soap *, const ext_siid &, size_t *, unsigned char **) override;
+	virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *, ECSerializer *) override;
+	ECFileAttachmentConfig2 &m_config;
+};
+
+struct at2_layout {
+	std::string ident, base_dir, content_file;
+	std::string intent_dir, intent_ref, holder_dir, holder_ref;
+};
+
+static const char fa_hex[] = "0123456789abcdef";
 
 using std::string;
 
@@ -87,19 +151,99 @@ using std::string;
  * and simply request the dagent to resend the attachment and to obtain a new attachment id.
  */
 
-// Generic Attachment storage
-ECAttachmentStorage::ECAttachmentStorage(ECDatabase *lpDatabase, unsigned int ulCompressionLevel)
-	: m_lpDatabase(lpDatabase)
-{
-	m_bFileCompression = ulCompressionLevel != 0;
+static constexpr const size_t UAS_FILENAME_BUFSIZE = SHA256_DIGEST_LENGTH * 2 + 2;
 
+/*
+ * UAS:
+ *
+ * Deduplication naturally happens only when saving attachments. A globally
+ * unique name (ident) is derived from the data stream (either hash or some
+ * other mechanism). This derivation is repeatable in general, i.e. it should
+ * give the same result for the same input data. Changing the derivation
+ * function causes a one-time boundary - past attachments won't be considered
+ * as candidates to link to - but otherwise no ill effect. This way, hash types
+ * and directory layouts can be changed at practically any time.
+ *
+ * Two types of globally unique name exist:
+ *
+ * S-type: A name based on server GUID (unique) and SIID
+ * (unique within server). It is not globally discoverable, and is used for
+ * temporary directories and when uploads conflict.
+ *
+ * H-type: A name based on data contents only.
+ */
+
+static struct at2_layout uas_server_layout(const std::string &root,
+    const std::string &sguid, const ext_siid &i)
+{
+	unsigned int n = i.siid % 256, m = n / 256 % 256;
+	struct at2_layout e;
+	e.ident        = "XX/XX/s" + sguid + "i" + stringify(i.siid);
+	e.ident[0]     = fa_hex[(n>>4)&0xF0];
+	e.ident[1]     = fa_hex[n&0x0F];
+	e.ident[3]     = fa_hex[(m>>4)&0xF0];
+	e.ident[4]     = fa_hex[m&0x0F];
+	e.base_dir     = root + "/" + e.ident;
+	e.content_file = e.base_dir + "/content";
+	e.intent_dir   = e.base_dir + "/intent";
+	e.intent_ref   = e.intent_dir + "/s" + sguid + "i" + stringify(i.siid);
+	e.holder_dir   = e.base_dir + "/holder";
+	e.holder_ref   = e.holder_dir + "/s" + sguid + "i" + stringify(i.siid);
+	return e;
+}
+
+static struct at2_layout uas_hash_layout(const std::string &root,
+    const std::string &sguid, const ext_siid &i)
+{
+	struct at2_layout e;
+	e.ident        = i.filename;
+	e.base_dir     = root + "/" + e.ident;
+	e.content_file = e.base_dir + "/content";
+	e.intent_dir   = e.base_dir + "/intent";
+	e.intent_ref   = e.intent_dir + "/s" + sguid + "i" + stringify(i.siid);
+	e.holder_dir   = e.base_dir + "/holder";
+	e.holder_ref   = e.holder_dir + "/s" + sguid + "i" + stringify(i.siid);
+	return e;
+}
+
+static std::string uas_md_to_ident(const std::string &md)
+{
+	assert(md.size() == SHA256_DIGEST_LENGTH);
+	std::string name;
+	name.resize(UAS_FILENAME_BUFSIZE);
+	name[0] = fa_hex[(md[0] & 0xF0) >> 4];
+	name[1] = fa_hex[md[0] & 0x0F];
+	name[2] = '/';
+	name[3] = fa_hex[(md[1] & 0xF0) >> 4];
+	name[4] = fa_hex[md[1] & 0x0F];
+	name[5] = '/';
+	unsigned int j = 6;
+	for (unsigned int i = 2; i < sizeof(md); ++i) {
+		name[j++] = fa_hex[(md[i] & 0xF0) >> 4];
+		name[j++] = fa_hex[md[i] & 0x0F];
+	}
+	return name;
+}
+
+static std::string uas_data_to_ident(const void *data, size_t dsize)
+{
+	unsigned char md[SHA256_DIGEST_LENGTH];
+	SHA256(static_cast<const unsigned char *>(data), dsize, md);
+	return uas_md_to_ident(std::string(reinterpret_cast<char *>(md), sizeof(md)));
+}
+
+// Generic Attachment storage
+ECAttachmentStorage::ECAttachmentStorage(ECDatabase *lpDatabase, unsigned int ulCompressionLevel) :
+	m_lpDatabase(lpDatabase), m_bFileCompression(ulCompressionLevel != 0)
+{
 	if (ulCompressionLevel > Z_BEST_COMPRESSION)
 		ulCompressionLevel = Z_BEST_COMPRESSION;
 
 	m_CompressionLevel = stringify(ulCompressionLevel);
 }
 
-ECRESULT ECAttachmentConfig::create(ECConfig *config, ECAttachmentConfig **atcp)
+ECRESULT ECAttachmentConfig::create(const GUID &sguid,
+    std::shared_ptr<ECConfig> config, ECAttachmentConfig **atcp)
 {
 	auto type = config->GetSetting("attachment_storage");
 	std::unique_ptr<ECAttachmentConfig> a;
@@ -107,6 +251,8 @@ ECRESULT ECAttachmentConfig::create(ECConfig *config, ECAttachmentConfig **atcp)
 		a.reset(new(std::nothrow) ECDatabaseAttachmentConfig);
 	} else if (strcmp(type, "files") == 0) {
 		a.reset(new(std::nothrow) ECFileAttachmentConfig);
+	} else if (strcmp(type, "files_v2") == 0) {
+		a.reset(new(std::nothrow) ECFileAttachmentConfig2(sguid));
 	} else if (strcmp(type, "s3") == 0) {
 #ifdef HAVE_LIBS3_H
 		a.reset(new(std::nothrow) ECS3Config);
@@ -132,7 +278,7 @@ ECAttachmentStorage *ECDatabaseAttachmentConfig::new_handle(ECDatabase *db)
 	return new(std::nothrow) ECDatabaseAttachment(db);
 }
 
-ECRESULT ECFileAttachmentConfig::init(ECConfig *config)
+ECRESULT ECFileAttachmentConfig::init(std::shared_ptr<ECConfig> config)
 {
 	auto dir = config->GetSetting("attachment_path");
 	if (dir == nullptr) {
@@ -152,48 +298,47 @@ ECAttachmentStorage *ECFileAttachmentConfig::new_handle(ECDatabase *db)
 	return new(std::nothrow) ECFileAttachment(db, m_dir, m_complvl, m_sync_files);
 }
 
-/** 
+/**
  * Gets the instance id for a given hierarchy id and prop tag.
- * 
+ *
  * @param[in] ulObjId Id from the hierarchy table
  * @param[in] ulTag Proptag of the instance data
  * @param[out] lpulInstanceId Id to use as instanceid
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::GetSingleInstanceId(ULONG ulObjId, ULONG ulTag,
     ext_siid *esid)
-{	
+{
 	DB_RESULT lpDBResult;
-	DB_ROW lpDBRow = NULL;
 	std::string strQuery =
-		"SELECT `instanceid` "
+		"SELECT `instanceid`, `filename` "
 		"FROM `singleinstances` "
 		"WHERE `hierarchyid` = " + stringify(ulObjId) + " AND `tag` = " + stringify(ulTag) + " LIMIT 1";
 
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::GetSingleInstanceId(): DoSelect() failed %x", er);
-		return er;
-	}
-
-	lpDBRow = lpDBResult.fetch_row();
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::GetSingleInstanceId(): DoSelect() failed", er);
+	auto lpDBRow = lpDBResult.fetch_row();
 	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
-		// ec_log_err("ECAttachmentStorage::GetSingleInstanceId(): FetchRow() failed %x", er);
+		// ec_perror("ECAttachmentStorage::GetSingleInstanceId(): FetchRow() failed", er);
 		return KCERR_NOT_FOUND;
-	if (esid != nullptr)
+	if (esid != nullptr) {
 		esid->siid = atoi(lpDBRow[0]);
+		if (lpDBRow[1] != nullptr)
+			esid->filename = lpDBRow[1];
+	}
 	return erSuccess;
 }
 
-/** 
+/**
  * Get all instance ids from a list of hierarchy ids, independent of
  * the proptag.
  * @todo this should be for a given tag, or we should return the tags too (map<InstanceID, ulPropId>)
- * 
+ *
  * @param[in] lstObjIds list of hierarchy ids
  * @param[out] lstAttachIds list of unique corresponding instance ids
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::GetSingleInstanceIds(const std::list<ULONG> &lstObjIds,
@@ -207,16 +352,9 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceIds(const std::list<ULONG> &lstOb
 	if (lstObjIds.empty())
 		return erSuccess;
 	std::string strQuery =
-		"SELECT DISTINCT `instanceid` "
+		"SELECT DISTINCT `instanceid`, `filename` "
 		"FROM `singleinstances` "
-		"WHERE `hierarchyid` IN (";
-	for (auto i = lstObjIds.cbegin(); i != lstObjIds.cend(); ++i) {
-		if (i != lstObjIds.cbegin())
-			strQuery += ",";
-		strQuery += stringify(*i);
-	}
-
-	strQuery += ")";
+		"WHERE `hierarchyid` IN (" + kc_join(lstObjIds, ",", stringify) + ")";
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
@@ -226,18 +364,19 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceIds(const std::list<ULONG> &lstOb
 			ec_log_err("ECAttachmentStorage::GetSingleInstanceIds(): column contains NULL");
 			return KCERR_DATABASE_ERROR;
 		}
-		lstInstanceIds.emplace_back(atoi(lpDBRow[0]));
+		lstInstanceIds.emplace_back(atoui(lpDBRow[0]),
+			lpDBRow[1] != nullptr ? lpDBRow[1] : "");
 	}
 	*lstAttachIds = std::move(lstInstanceIds);
 	return erSuccess;
 }
 
-/** 
+/**
  * Get all HierarchyIDs for a given InstanceID.
- * 
+ *
  * @param[in] ulInstanceId InstanceID to get HierarchyIDs for
  * @param[out] lplstObjIds List of all HierarchyIDs which link to the single instance
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::GetSingleInstanceParents(ULONG ulInstanceId,
@@ -246,8 +385,8 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceParents(ULONG ulInstanceId,
 	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
 	std::list<ext_siid> lstObjIds;
-	std::string strQuery =
-		"SELECT DISTINCT `hierarchyid` "
+	auto strQuery =
+		"SELECT DISTINCT `hierarchyid`, `filename` "
 		"FROM `singleinstances` "
 		"WHERE `instanceid` = " + stringify(ulInstanceId);
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
@@ -259,24 +398,24 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceParents(ULONG ulInstanceId,
 			ec_log_err("ECAttachmentStorage::GetSingleInstanceParents(): column contains NULL");
 			return KCERR_DATABASE_ERROR;
 		}
-		lstObjIds.emplace_back(atoi(lpDBRow[0]));
+		lstObjIds.emplace_back(atoui(lpDBRow[0]),
+			lpDBRow[1] != nullptr ? lpDBRow[1] : "");
 	}
 	*lplstObjIds = std::move(lstObjIds);
 	return erSuccess;
 }
 
-/** 
+/**
  * Checks if there are no references to a given InstanceID anymore.
- * 
+ *
  * @param ulInstanceId InstanceID to check
  * @param bOrphan true if instance isn't referenced anymore
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::IsOrphanedSingleInstance(const ext_siid &ulInstanceId, bool *bOrphan)
 {
 	DB_RESULT lpDBResult;
-	DB_ROW lpDBRow = NULL;
 	std::string strQuery =
 		"SELECT `instanceid` "
 		"FROM `singleinstances` "
@@ -285,7 +424,7 @@ ECRESULT ECAttachmentStorage::IsOrphanedSingleInstance(const ext_siid &ulInstanc
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		return er;
-	lpDBRow = lpDBResult.fetch_row();
+	auto lpDBRow = lpDBResult.fetch_row();
 	/*
 	 * No results: Single Instance ID has been cleared (refcount = 0)
 	 */
@@ -293,13 +432,13 @@ ECRESULT ECAttachmentStorage::IsOrphanedSingleInstance(const ext_siid &ulInstanc
 	return erSuccess;
 }
 
-/** 
+/**
  * Make a list of all orphaned instances for a list of given InstanceIDs.
- * 
+ *
  * @param[in] lstAttachments List of instance ids to check
  * @param[out] lplstOrphanedAttachments List of orphaned instance ids
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECAttachmentStorage::GetOrphanedSingleInstances(const std::list<ext_siid> &lstInstanceIds,
     std::list<ext_siid> *lplstOrphanedInstanceIds)
@@ -307,21 +446,14 @@ ECRESULT ECAttachmentStorage::GetOrphanedSingleInstances(const std::list<ext_sii
 	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
 	std::string strQuery =
-		"SELECT DISTINCT `instanceid` "
+		"SELECT DISTINCT `instanceid`, `filename` "
 		"FROM `singleinstances` "
-		"WHERE `instanceid` IN ( ";
-	for (auto i = lstInstanceIds.cbegin(); i != lstInstanceIds.cend(); ++i) {
-		if (i != lstInstanceIds.cbegin())
-			strQuery += ",";
-		strQuery += stringify(i->siid);
-	}
-	strQuery +=	")";
+		"WHERE `instanceid` IN (" +
+		kc_join(lstInstanceIds, ",", [](const auto &i) { return stringify(i.siid); }) +
+		")";
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::GetOrphanedSingleInstances(): DoSelect failed %x", er);
-		return er;
-	}
-
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::GetOrphanedSingleInstances(): DoSelect failed", er);
 	/* First make a full copy of the list of Single Instance IDs */
 	lplstOrphanedInstanceIds->assign(lstInstanceIds.begin(), lstInstanceIds.end());
 
@@ -334,17 +466,18 @@ ECRESULT ECAttachmentStorage::GetOrphanedSingleInstances(const std::list<ext_sii
 			ec_log_err("ECAttachmentStorage::GetOrphanedSingleInstances(): column contains NULL");
 			return KCERR_DATABASE_ERROR;
 		}
-		lplstOrphanedInstanceIds->remove(ext_siid(atoui(lpDBRow[0])));
+		lplstOrphanedInstanceIds->remove(ext_siid(atoui(lpDBRow[0]),
+			lpDBRow[1] != nullptr ? lpDBRow[1] : ""));
 	}
 	return erSuccess;
 }
 
-/** 
+/**
  * For a given hierarchy id, check if this has a valid instance id
- * 
+ *
  * @param[in] ulObjId hierarchy id to check instance for
  * @param[in] ulPropId property id to check instance for
- * 
+ *
  * @return instance present
  */
 bool ECAttachmentStorage::ExistAttachment(ULONG ulObjId, ULONG ulPropId)
@@ -368,15 +501,15 @@ bool ECAttachmentStorage::ExistAttachmentInstance(ULONG ins_id)
 	return result.get_num_rows() > 0;
 }
 
-/** 
+/**
  * Retrieve a large property from the storage, return data as blob.
- * 
+ *
  * @param[in] soap Use soap for allocations. Returned data can directly be used to return to the client.
  * @param[in] ulObjId HierarchyID to load property for
  * @param[in] ulPropId property id to load
  * @param[out] lpiSize size of the property
  * @param[out] lppData data of the property
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::LoadAttachment(struct soap *soap, ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, unsigned char **lppData)
@@ -391,14 +524,14 @@ ECRESULT ECAttachmentStorage::LoadAttachment(struct soap *soap, ULONG ulObjId, U
 	return LoadAttachmentInstance(soap, ulInstanceId, lpiSize, lppData);
 }
 
-/** 
+/**
  * Retrieve a large property from the storage, return data in a serializer.
- * 
+ *
  * @param[in] ulObjId HierarchyID to load property for
  * @param[in] ulPropId property id to load
  * @param[out] lpiSize size of the property
  * @param[out] lpSink Write in this serializer
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::LoadAttachment(ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, ECSerializer *lpSink)
@@ -413,16 +546,16 @@ ECRESULT ECAttachmentStorage::LoadAttachment(ULONG ulObjId, ULONG ulPropId, size
 	return LoadAttachmentInstance(ulInstanceId, lpiSize, lpSink);
 }
 
-/** 
+/**
  * Save a property of a specific object from a given blob, optionally remove previous data.
- * 
+ *
  * @param[in] ulObjId HierarchyID of object
  * @param[in] ulPropId PropertyID to save
  * @param[in] bDeleteOld Remove old data before saving the new
  * @param[in] iSize size of lpData
  * @param[in] lpData data of the property
  * @param[out] lpulInstanceId InstanceID for the data (optional)
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, unsigned char *lpData, ULONG *lpulInstanceId)
@@ -447,11 +580,13 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 		"(" + stringify(ulObjId) + ", " + stringify(ulPropId) + ")";
 	ext_siid esid;
 	auto er = m_lpDatabase->DoInsert(strQuery, &esid.siid);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
-		return er;
-	}
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::SaveAttachment(): DoInsert failed", er);
 	er = SaveAttachmentInstance(esid, ulPropId, iSize, lpData);
+	if (er != erSuccess)
+		return er;
+	strQuery = "UPDATE `singleinstances` SET `filename`='" + m_lpDatabase->Escape(esid.filename) + "' WHERE `instanceid`=" + stringify(esid.siid);
+	er = m_lpDatabase->DoUpdate(strQuery);
 	if (er != erSuccess)
 		return er;
 	if (lpulInstanceId)
@@ -459,16 +594,16 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 	return erSuccess;
 }
 
-/** 
+/**
  * Save a property of a specific object from a serializer, optionally remove previous data.
- * 
+ *
  * @param[in] ulObjId HierarchyID of object
  * @param[in] ulPropId Property to save
  * @param[in] bDeleteOld Remove old data before saving the new
  * @param[in] iSize size in lpSource
  * @param[in] lpSource serializer to read data from
  * @param[out] lpulInstanceId InstanceID for the data (optional)
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, ECSerializer *lpSource, ULONG *lpulInstanceId)
@@ -491,11 +626,13 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 		"(" + stringify(ulObjId) + ", " + stringify(ulPropId) + ")";
 	ext_siid esid;
 	auto er = m_lpDatabase->DoInsert(strQuery, &esid.siid);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
-		return er;
-	}
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::SaveAttachment(): DoInsert failed", er);
 	er = SaveAttachmentInstance(esid, ulPropId, iSize, lpSource);
+	if (er != erSuccess)
+		return er;
+	strQuery = "UPDATE `singleinstances` SET `filename`='" + m_lpDatabase->Escape(esid.filename) + "' WHERE `instanceid`=" + stringify(esid.siid);
+	er = m_lpDatabase->DoUpdate(strQuery);
 	if (er != erSuccess)
 		return er;
 	if (lpulInstanceId)
@@ -503,16 +640,16 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 	return erSuccess;
 }
 
-/** 
+/**
  * Save a property of an object with a given instance id, optionally remove previous data.
- * 
+ *
  * @param[in] ulObjId HierarchyID of object
  * @param[in] ulPropId Property of object
  * @param[in] bDeleteOld Remove old data before saving the new
  * @param[in] ulInstanceId Instance id to link
  * @param[out] lpulInstanceId Same number as in ulInstanceId
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, ULONG ulInstanceId, ULONG *lpulInstanceId)
 {
@@ -547,15 +684,15 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 	return erSuccess;
 }
 
-/** 
+/**
  * Make a copy of attachment data for a given object.
  *
  * In reality, the data is not copied, but an extra singleinstance
  * entry is added for the new hierarchyid.
- * 
+ *
  * @param[in] ulObjId Source hierarchy id to instance data from
  * @param[in] ulNewObjId Additional hierarchy id which has the same data
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::CopyAttachment(ULONG ulObjId, ULONG ulNewObjId)
@@ -565,21 +702,21 @@ ECRESULT ECAttachmentStorage::CopyAttachment(ULONG ulObjId, ULONG ulNewObjId)
 	 * no need to really physically store the attachment twice.
 	 */
 	std::string strQuery =
-		"INSERT INTO `singleinstances` (`hierarchyid`, `instanceid`, `tag`) "
-			"SELECT " + stringify(ulNewObjId) + ", `instanceid`, `tag` "
+		"INSERT INTO `singleinstances` (`hierarchyid`, `instanceid`, `tag`, `filename`) "
+			"SELECT " + stringify(ulNewObjId) + ", `instanceid`, `tag`, `filename` "
 			"FROM `singleinstances` "
 			"WHERE `hierarchyid` = " + stringify(ulObjId);
 	auto er = m_lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		ec_log_err("ECAttachmentStorage::CopyAttachment(): DoInsert failed %x", er);
+		return ec_perror("ECAttachmentStorage::CopyAttachment(): DoInsert failed", er);
 	return er;
 }
 
-/** 
+/**
  * Delete all properties of given list of hierarchy ids.
- * 
+ *
  * @param[in] lstDeleteObjects list of hierarchy ids to delete singleinstance data for
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::DeleteAttachments(const std::list<ULONG> &lstDeleteObjects)
@@ -599,20 +736,11 @@ ECRESULT ECAttachmentStorage::DeleteAttachments(const std::list<ULONG> &lstDelet
 	 */
 	std::string strQuery =
 		"DELETE FROM `singleinstances` "
-		"WHERE `hierarchyid` IN (";
-	for (auto i = lstDeleteObjects.cbegin(); i != lstDeleteObjects.cend(); ++i) {
-		if (i != lstDeleteObjects.cbegin())
-			strQuery += ",";
-		strQuery += stringify(*i);
-	}
-	strQuery += ")";
-
+		"WHERE `hierarchyid` IN (" +
+		kc_join(lstDeleteObjects, ",", stringify) + ")";
 	er = m_lpDatabase->DoDelete(strQuery);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::DeleteAttachments(): DoDelete failed %x", er);
-		return er;
-	}
-
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::DeleteAttachments(): DoDelete failed", er);
 	/*
 	 * Get the list of orphaned Single Instance IDs which we can delete.
 	 */
@@ -627,26 +755,26 @@ ECRESULT ECAttachmentStorage::DeleteAttachments(const std::list<ULONG> &lstDelet
 	return erSuccess;
 }
 
-/** 
+/**
  * Delete one single instance property of an object.
  * public interface version
- * 
+ *
  * @param[in] ulObjId HierarchyID of object to delete single instance property from
  * @param[in] ulPropId Property of object to remove
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECAttachmentStorage::DeleteAttachment(ULONG ulObjId, ULONG ulPropId) {
 	return DeleteAttachment(ulObjId, ulPropId, false);
 }
 
-/** 
+/**
  * Delete one single instance property of an object.
- * 
+ *
  * @param[in] ulObjId HierarchyID of object to delete single instance property from
  * @param[in] ulPropId Property of object to remove
  * @param[in] bReplace Flag used for transations in ECFileStorage
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::DeleteAttachment(ULONG ulObjId, ULONG ulPropId, bool bReplace)
@@ -674,29 +802,23 @@ ECRESULT ECAttachmentStorage::DeleteAttachment(ULONG ulObjId, ULONG ulPropId, bo
 		"AND `tag` = " + stringify(ulPropId);
 
 	er = m_lpDatabase->DoDelete(strQuery);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::DeleteAttachment(): DoDelete failed %x", er);
-		return er;
-	}
-
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::DeleteAttachment(): DoDelete failed", er);
 	/*
 	 * Check if the attachment can be permanently deleted.
 	 */
-	if (IsOrphanedSingleInstance(ulInstanceId, &bOrphan) == erSuccess && bOrphan) {
-		er = DeleteAttachmentInstance(ulInstanceId, bReplace);
-		if (er != erSuccess)
-			return er;
-	}
-	return erSuccess;
+	if (IsOrphanedSingleInstance(ulInstanceId, &bOrphan) != erSuccess || !bOrphan)
+		return erSuccess;
+	return DeleteAttachmentInstance(ulInstanceId, bReplace);
 }
 
-/** 
+/**
  * Get the size of a large property of a specific object
- * 
+ *
  * @param[in] ulObjId HierarchyID of object
  * @param[in] ulPropId PropertyID of object
  * @param[out] lpulSize size of property
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECAttachmentStorage::GetSize(ULONG ulObjId, ULONG ulPropId, size_t *lpulSize)
@@ -721,51 +843,40 @@ ECDatabaseAttachment::ECDatabaseAttachment(ECDatabase *lpDatabase) :
 {
 }
 
-/** 
+/**
  * Load instance data using soap and return as blob.
- * 
+ *
  * @param[in] soap soap to use memory allocations for
  * @param[in] ulInstanceId InstanceID to load
  * @param[out] lpiSize size in lppData
  * @param[out] lppData data of instance
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap,
     const ext_siid &ulInstanceId, size_t *lpiSize, unsigned char **lppData)
 {
-	size_t iSize = 0;
 	size_t iReadSize = 0;
-	unsigned char *lpData = NULL;
 	DB_RESULT lpDBResult;
-	DB_ROW lpDBRow = NULL;
-	DB_LENGTHS lpDBLen = NULL;
 
 	// we first need to know the complete size of the attachment (some old databases don't have the correct chunk size)
 	auto strQuery = "SELECT SUM(LENGTH(val_binary)) FROM lob WHERE instanceid = " + stringify(ulInstanceId.siid);
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
-		return er;
-	}
-
-	lpDBRow = lpDBResult.fetch_row();
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed", er);
+	auto lpDBRow = lpDBResult.fetch_row();
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		ec_log_err("ECDatabaseAttachment::LoadAttachmentInstance(): no row returned");
 		return KCERR_DATABASE_ERROR;
 	}
 
-	iSize = strtoul(lpDBRow[0], NULL, 0);
-
+	size_t iSize = strtoul(lpDBRow[0], NULL, 0);
 	// get all chunks
 	strQuery = "SELECT val_binary FROM lob WHERE instanceid = " + stringify(ulInstanceId.siid) + " ORDER BY chunkid";
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect(2) failed %x", er);
-		return er;
-	}
-
-	lpData = s_alloc<unsigned char>(soap, iSize);
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect(2) failed", er);
+	auto lpData = s_alloc<unsigned char>(soap, iSize);
 	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		if (lpDBRow[0] == NULL) {
 			// broken attachment!
@@ -773,8 +884,7 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap,
 			ec_log_err("ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
 			goto exit;
 		}
-
-		lpDBLen = lpDBResult.fetch_row_lengths();
+		auto lpDBLen = lpDBResult.fetch_row_lengths();
 		memcpy(lpData + iReadSize, lpDBRow[0], lpDBLen[0]);
 		iReadSize += lpDBLen[0];
 	}
@@ -788,14 +898,14 @@ exit:
 	return er;
 }
 
-/** 
+/**
  * Load instance data using a serializer.
- * 
+ *
  * @param[in] ulInstanceId InstanceID to load
  * @param[out] lpiSize size written in in lpSink
  * @param[in] lpSink serializer to write in
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(const ext_siid &ulInstanceId,
     size_t *lpiSize, ECSerializer *lpSink)
@@ -803,15 +913,12 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(const ext_siid &ulInstance
 	size_t iReadSize = 0;
 	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
-	DB_LENGTHS lpDBLen = NULL;
 
 	// get all chunks
 	auto strQuery = "SELECT val_binary FROM lob WHERE instanceid = " + stringify(ulInstanceId.siid) + " ORDER BY chunkid";
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess) {
-		ec_log_err("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
-		return er;
-	}
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed", er);
 
 	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		if (lpDBRow[0] == NULL) {
@@ -819,13 +926,10 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(const ext_siid &ulInstance
 			ec_log_err("ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
 			return KCERR_DATABASE_ERROR;
 		}
-		lpDBLen = lpDBResult.fetch_row_lengths();
+		auto lpDBLen = lpDBResult.fetch_row_lengths();
 		er = lpSink->Write(lpDBRow[0], 1, lpDBLen[0]);
-		if (er != erSuccess) {
-			ec_log_err("ECAttachmentStorage::LoadAttachmentInstance(): Write failed %x", er);
-			return er;
-		}
-
+		if (er != erSuccess)
+			return ec_perror("ECAttachmentStorage::LoadAttachmentInstance(): Write failed", er);
 		iReadSize += lpDBLen[0];
 	}
 
@@ -833,30 +937,26 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(const ext_siid &ulInstance
 	return erSuccess;
 }
 
-/** 
+/**
  * Save a property in a new instance from a blob
  *
  * @note Property id here is actually useless, but legacy requires
  * this. Removing the `tag` column from the database would require a
  * database update on the lob table, which would make database
  * attachment users very unhappy.
- * 
+ *
  * @param[in] ulInstanceId InstanceID to save data under
  * @param[in] ulPropId PropertyID to save
  * @param[in] iSize size of lpData
  * @param[in] lpData Data of property
- * 
+ *
  * @return Kopano error code
  */
-ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
+ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ext_siid &ulInstanceId,
     ULONG ulPropId, size_t iSize, unsigned char *lpData)
 {
-	std::string strQuery;
-
 	// make chunks of 393216 bytes (384*1024)
-	size_t iSizeLeft = iSize;
-	size_t iPtr = 0;
-	size_t ulChunk = 0;
+	size_t iSizeLeft = iSize, iPtr = 0, ulChunk = 0;
 
 	do {
 		size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
@@ -865,10 +965,8 @@ ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(const ext_siid &ulInstance
 			", " + m_lpDatabase->EscapeBinary(lpData + iPtr, iChunkSize) + ")";
 
 		auto er = m_lpDatabase->DoInsert(strQuery);
-		if (er != erSuccess) {
-			ec_log_err("ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
-			return er;
-		}
+		if (er != erSuccess)
+			return ec_perror("ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed", er);
 		++ulChunk;
 		iSizeLeft -= iChunkSize;
 		iPtr += iChunkSize;
@@ -877,29 +975,28 @@ ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(const ext_siid &ulInstance
 	return erSuccess;
 }
 
-/** 
+/**
  * Save a property in a new instance from a serializer
  *
  * @note Property id here is actually useless, but legacy requires
  * this. Removing the `tag` column from the database would require a
  * database update on the lob table, which would make database
  * attachment users very unhappy.
- * 
+ *
  * @param[in] ulInstanceId InstanceID to save data under
  * @param[in] ulPropId PropertyID to save
  * @param[in] iSize size in lpSource
  * @param[in] lpSource serializer to read data from
- * 
+ *
  * @return Kopano error code
  */
-ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
+ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ext_siid &ulInstanceId,
     ULONG ulPropId, size_t iSize, ECSerializer *lpSource)
 {
 	unsigned char szBuffer[CHUNK_SIZE] = {0};
 
 	// make chunks of 393216 bytes (384*1024)
-	size_t iSizeLeft = iSize;
-	size_t ulChunk = 0;
+	size_t iSizeLeft = iSize, ulChunk = 0;
 
 	while (iSizeLeft > 0) {
 		size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
@@ -912,45 +1009,35 @@ ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(const ext_siid &ulInstance
 			", " + m_lpDatabase->EscapeBinary(szBuffer, iChunkSize) + ")";
 
 		er = m_lpDatabase->DoInsert(strQuery);
-		if (er != erSuccess) {
-			ec_log_err("ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
-			return er;
-		}
+		if (er != erSuccess)
+			return ec_perror("ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed", er);
 		++ulChunk;
 		iSizeLeft -= iChunkSize;
 	}
 	return erSuccess;
 }
 
-/** 
+/**
  * Delete given instances from the database
- * 
+ *
  * @param[in] lstDeleteInstances List of instance ids to remove from the database
  * @param[in] bReplace unused, see ECFileAttachment
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECDatabaseAttachment::DeleteAttachmentInstances(const std::list<ext_siid> &lstDeleteInstances, bool bReplace)
 {
-	std::string strQuery = (std::string)"DELETE FROM lob WHERE instanceid IN (";
-	for (auto iterDel = lstDeleteInstances.cbegin();
-	     iterDel != lstDeleteInstances.cend(); ++iterDel) {
-		if (iterDel != lstDeleteInstances.cbegin())
-			strQuery += ",";
-		strQuery += stringify(iterDel->siid);
-	}
-
-	strQuery += ")";
-	return m_lpDatabase->DoDelete(strQuery);
+	return m_lpDatabase->DoDelete("DELETE FROM lob WHERE instanceid IN ("s +
+		kc_join(lstDeleteInstances, ",", [](const auto &i) { return stringify(i.siid); }) + ")");
 }
 
-/** 
+/**
  * Delete a single instanceid from the database
- * 
+ *
  * @param[in] ulInstanceId instance id to remove
  * @param[in] bReplace unused, see ECFileAttachment
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECDatabaseAttachment::DeleteAttachmentInstance(const ext_siid &ulInstanceId, bool bReplace)
 {
@@ -958,33 +1045,28 @@ ECRESULT ECDatabaseAttachment::DeleteAttachmentInstance(const ext_siid &ulInstan
 	return m_lpDatabase->DoDelete(strQuery);
 }
 
-/** 
+/**
  * Return the size of an instance
- * 
+ *
  * @param[in] ulInstanceId InstanceID to check the size for
  * @param[out] lpulSize Size of the instance
  * @param[out] lpbCompressed unused, see ECFileAttachment
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECDatabaseAttachment::GetSizeInstance(const ext_siid &ulInstanceId,
     size_t *lpulSize, bool *lpbCompressed)
 {
 	DB_RESULT lpDBResult;
-	DB_ROW lpDBRow = NULL; 
 	auto strQuery = "SELECT SUM(LENGTH(val_binary)) FROM lob WHERE instanceid = " + stringify(ulInstanceId.siid);
-	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult); 
-	if (er != erSuccess)  {
-		ec_log_err("ECAttachmentStorage::GetSizeInstance(): DoSelect failed %x", er);
-		return er;
-	}
-
-	lpDBRow = lpDBResult.fetch_row();
-	if (lpDBRow == NULL || lpDBRow[0] == NULL) { 
+	auto er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		return ec_perror("ECAttachmentStorage::GetSizeInstance(): DoSelect failed", er);
+	auto lpDBRow = lpDBResult.fetch_row();
+	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		ec_log_err("ECDatabaseAttachment::GetSizeInstance(): now row or column contained NULL");
 		return KCERR_DATABASE_ERROR;
-	} 
- 	 
+	}
 	*lpulSize = strtoul(lpDBRow[0], NULL, 0);
 	if (lpbCompressed)
 		*lpbCompressed = false;
@@ -1009,15 +1091,14 @@ ECRESULT ECDatabaseAttachment::Rollback()
 // Attachment storage is in separate files
 ECFileAttachment::ECFileAttachment(ECDatabase *lpDatabase,
     const std::string &basepath, unsigned int ulCompressionLevel,
-    const bool force_changes_to_disk) :
+    bool sync_to_disk) :
 	ECAttachmentStorage(lpDatabase, ulCompressionLevel),
 	m_basepath(basepath)
 {
 	if (m_basepath.empty())
 		m_basepath = "/var/lib/kopano";
-
-	this -> force_changes_to_disk = force_changes_to_disk;
-	if (force_changes_to_disk) {
+	force_changes_to_disk = sync_to_disk;
+	if (sync_to_disk) {
 		m_dirp = opendir(m_basepath.c_str());
 
 		if (m_dirp)
@@ -1050,15 +1131,14 @@ static ssize_t gzread_retry(gzFile fp, void *data, size_t uclen)
 		return 0;
 
 	while (uclen > 0) {
-		int chunk_size = (uclen > INT_MAX) ? INT_MAX : uclen;
+		auto chunk_size = std::min(uclen, static_cast<size_t>(INT_MAX));
 		int ret = gzread(fp, buf, chunk_size);
 
 		/*
 		 * Save @errno now, since gzerror() code looks prone to
 		 * reset it.
 		 */
-		int saved_errno = errno;
-		int zerror;
+		int saved_errno = errno, zerror;
 		const char *zerrstr = gzerror(fp, &zerror);
 
 		if (ret < 0 && zerror == Z_ERRNO &&
@@ -1097,10 +1177,9 @@ static ssize_t gzwrite_retry(gzFile fp, const void *data, size_t uclen)
 		return 0;
 
 	while (uclen > 0) {
-		int chunk_size = (uclen > INT_MAX) ? INT_MAX : uclen;
+		auto chunk_size = std::min(uclen, static_cast<size_t>(INT_MAX));
 		int ret = gzwrite(fp, buf, chunk_size);
-		int saved_errno = errno;
-		int zerror;
+		int saved_errno = errno, zerror;
 		const char *zerrstr = gzerror(fp, &zerror);
 
 		if (ret < 0 && zerror == Z_ERRNO &&
@@ -1150,27 +1229,26 @@ bool ECFileAttachment::VerifyInstanceSize(const ext_siid &instanceId,
 	return true;
 }
 
-/** 
+/**
  * Load instance data using soap and return as blob.
- * 
+ *
  * @param[in] soap soap to use memory allocations for
  * @param[in] ulInstanceId InstanceID to load
  * @param[out] lpiSize size in lppData
  * @param[out] lppData data of instance
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::LoadAttachmentInstance(struct soap *soap,
     const ext_siid &ulInstanceId, size_t *lpiSize, unsigned char **lppData)
 {
 	ECRESULT er = erSuccess;
-	string filename;
 	unsigned char *lpData = NULL;
 	bool bCompressed = m_bFileCompression;
 	gzFile gzfp = NULL;
 
 	*lpiSize = 0;
-	filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
+	auto filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
 	int fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0 && errno != ENOENT) {
 		/* Access problems */
@@ -1320,25 +1398,20 @@ exit:
 		delete [] lpData;
 
 	if (gzfp)
-	{
 		gzclose(gzfp);
-		fd = -1;
-	}
-
-	if (fd != -1)
+	else if (fd >= 0)
 		close(fd);
-
 	return er;
 }
 
-/** 
+/**
  * Load instance data using a serializer.
- * 
+ *
  * @param[in] ulInstanceId InstanceID to load
  * @param[out] lpiSize size written in in lpSink
  * @param[in] lpSink serializer to write in
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECFileAttachment::LoadAttachmentInstance(const ext_siid &ulInstanceId,
     size_t *lpiSize, ECSerializer *lpSink)
@@ -1346,12 +1419,11 @@ ECRESULT ECFileAttachment::LoadAttachmentInstance(const ext_siid &ulInstanceId,
 	ECRESULT er = erSuccess;
 	bool bCompressed = false;
 	char buffer[CHUNK_SIZE];
-	int fd = -1;
 	gzFile gzfp = NULL;
 
 	*lpiSize = 0;
 	auto filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
-	fd = open(filename.c_str(), O_RDONLY);
+	auto fd = open(filename.c_str(), O_RDONLY);
 	if (fd < 0 && errno != ENOENT) {
 		/* Access problems */
 		ec_log_err("K-1563: cannot open attachment \"%s\": %s", filename.c_str(), strerror(errno));
@@ -1504,32 +1576,21 @@ static bool EvaluateCompressibleness(const uint8_t *const lpData, const size_t i
 	return true;
 }
 
-/** 
+/**
  * Save a property in a new instance from a blob
  *
  * @param[in] ulInstanceId InstanceID to save data under
  * @param[in] ulPropId unused, required by interface, see ECDatabaseAttachment
  * @param[in] iSize size of lpData
  * @param[in] lpData Data of property
- * 
+ *
  * @return Kopano error code
  */
-ECRESULT ECFileAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
-    ULONG ulPropId, size_t iSize, unsigned char *lpData)
+ECRESULT ECFileAttachment::save_instance_data(const std::string &filename, int fd,
+    ULONG ulPropId, size_t iSize, unsigned char *lpData, bool compressAttachment)
 {
-	bool compressible = EvaluateCompressibleness(lpData, iSize);
-
-	bool compressAttachment = compressible ? m_bFileCompression && iSize : false;
-
 	ECRESULT er = erSuccess;
-	auto filename = CreateAttachmentFilename(ulInstanceId, compressAttachment);
 	gzFile gzfp = NULL;
-	int fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR | S_IRGRP);
-	if (fd < 0) {
-		ec_log_err("Unable to open attachment \"%s\" for writing: %s", filename.c_str(), strerror(errno));
-		er = KCERR_DATABASE_ERROR;
-		goto exit;
-	}
 
 	// no need to remove the file, just overwrite it
 	if (compressAttachment) {
@@ -1559,10 +1620,6 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
 			goto exit;
 		}
 	}
-
-	// set in transaction before disk full check to remove empty file
-	if(m_bTransaction)
-		m_setNewAttachment.emplace(ulInstanceId);
 exit:
 	if (gzfp != NULL) {
 		int ret = gzclose(gzfp);
@@ -1578,17 +1635,34 @@ exit:
 	return er;
 }
 
+ECRESULT ECFileAttachment::SaveAttachmentInstance(ext_siid &instance,
+    unsigned int propid, size_t dsize, unsigned char *data)
+{
+	auto comp = EvaluateCompressibleness(data, dsize) ? m_bFileCompression && dsize > 0 : false;
+	auto filename = CreateAttachmentFilename(instance, comp);
+	int fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR | S_IRGRP);
+	if (fd < 0) {
+		ec_log_err("Unable to open attachment \"%s\" for writing: %s", filename.c_str(), strerror(errno));
+		return KCERR_DATABASE_ERROR;
+	}
+	auto ret = save_instance_data(filename, fd, propid, dsize, data, comp);
+	if (ret == erSuccess && m_bTransaction)
+		/* set in transaction before disk full check to remove empty file */
+		m_setNewAttachment.emplace(instance);
+	return ret;
+}
+
 /** 
  * Save a property in a new instance from a serializer
- * 
+ *
  * @param[in] ulInstanceId InstanceID to save data under
  * @param[in] ulPropId unused, required by interface, see ECDatabaseAttachment
  * @param[in] iSize size in lpSource
  * @param[in] lpSource serializer to read data from
- * 
+ *
  * @return Kopano error code
  */
-ECRESULT ECFileAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
+ECRESULT ECFileAttachment::SaveAttachmentInstance(ext_siid &ulInstanceId,
     ULONG ulPropId, size_t iSize, ECSerializer *lpSource)
 {
 	ECRESULT er = erSuccess;
@@ -1640,8 +1714,7 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
 
 		if (er == erSuccess) {
 			if (gzflush(gzfp, 0)) {
-				int saved_errno = errno;
-				int zerror;
+				int saved_errno = errno, zerror;
 				const char *zstrerr = gzerror(gzfp, &zerror);
 				ec_log_err("gzflush failed: %s (%d)", zstrerr, zerror);
 				if (zerror == Z_ERRNO)
@@ -1692,11 +1765,9 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(const ext_siid &ulInstanceId,
 			iSizeLeft -= iChunkSize;
 		}
 
-		if (er == erSuccess) {
-			if (force_changes_to_disk && !force_buffers_to_disk(fd)) {
-				ec_log_warn("Problem syncing file \"%s\": %s", filename.c_str(), strerror(errno));
-				er = KCERR_DATABASE_ERROR;
-			}
+		if (er == erSuccess && force_changes_to_disk && !force_buffers_to_disk(fd)) {
+			ec_log_warn("Problem syncing file \"%s\": %s", filename.c_str(), strerror(errno));
+			er = KCERR_DATABASE_ERROR;
 		}
 
 		close(fd);
@@ -1712,12 +1783,12 @@ exit:
 	return er;
 }
 
-/** 
+/**
  * Delete given instances from the filesystem
- * 
+ *
  * @param[in] lstDeleteInstances List of instance ids to remove from the filesystem
  * @param[in] bReplace Transaction marker
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::DeleteAttachmentInstances(const std::list<ext_siid> &lstDeleteInstances, bool bReplace)
@@ -1725,7 +1796,7 @@ ECRESULT ECFileAttachment::DeleteAttachmentInstances(const std::list<ext_siid> &
 	int errors = 0;
 
 	for (const auto &del_id : lstDeleteInstances) {
-		auto er = this->DeleteAttachmentInstance(del_id, bReplace);
+		auto er = DeleteAttachmentInstance(del_id, bReplace);
 		if (er != erSuccess)
 			++errors;
 	}
@@ -1736,11 +1807,11 @@ ECRESULT ECFileAttachment::DeleteAttachmentInstances(const std::list<ext_siid> &
 	return errors == 0 ? erSuccess : KCERR_DATABASE_ERROR;
 }
 
-/** 
+/**
  * Mark a file deleted by renaming it
- * 
+ *
  * @param[in] ulInstanceId instance id to mark
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::MarkAttachmentForDeletion(const ext_siid &ulInstanceId)
@@ -1766,11 +1837,11 @@ ECRESULT ECFileAttachment::MarkAttachmentForDeletion(const ext_siid &ulInstanceI
 	return KCERR_DATABASE_ERROR;
 }
 
-/** 
+/**
  * Revert a delete marked instance
- * 
+ *
  * @param[in] ulInstanceId instance id to restore
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::RestoreMarkedAttachment(const ext_siid &ulInstanceId)
@@ -1778,14 +1849,12 @@ ECRESULT ECFileAttachment::RestoreMarkedAttachment(const ext_siid &ulInstanceId)
 	auto filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression);
 	if(rename(string(filename+".deleted").c_str(), filename.c_str()) == 0)
 		return erSuccess;
-
 	if (errno == ENOENT) {
 		// retry with another filename
 		filename = CreateAttachmentFilename(ulInstanceId, !m_bFileCompression);
 		if(rename(string(filename+".deleted").c_str(), filename.c_str()) == 0)
 			return erSuccess;
 	}
-	
     if (errno == EACCES || errno == EPERM)
 		return KCERR_NO_ACCESS;
     else if (errno == ENOENT)
@@ -1794,11 +1863,11 @@ ECRESULT ECFileAttachment::RestoreMarkedAttachment(const ext_siid &ulInstanceId)
 	return KCERR_DATABASE_ERROR;
 }
 
-/** 
+/**
  * Delete a marked instance from the filesystem
- * 
+ *
  * @param[in] ulInstanceId instance id to remove
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::DeleteMarkedAttachment(const ext_siid &ulInstanceId)
@@ -1823,59 +1892,56 @@ ECRESULT ECFileAttachment::DeleteMarkedAttachment(const ext_siid &ulInstanceId)
 	return erSuccess;
 }
 
-/** 
+/**
  * Delete a single instanceid from the filesystem
- * 
+ *
  * @param[in] ulInstanceId instance id to remove
  * @param[in] bReplace Transaction marker
- * 
- * @return 
+ *
+ * @return
  */
 ECRESULT ECFileAttachment::DeleteAttachmentInstance(const ext_siid &ulInstanceId, bool bReplace)
 {
 	ECRESULT er = erSuccess;
 	auto filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression);
-   
-	if(m_bTransaction) {
-		if (bReplace) {
-			er = MarkAttachmentForDeletion(ulInstanceId);
-			if (er != erSuccess && er != KCERR_NOT_FOUND) {
-				assert(false);
-				return er;
-			} else if(er != KCERR_NOT_FOUND) {
-				 m_setMarkedAttachment.emplace(ulInstanceId);
-			}
 
-			er = erSuccess;
-		} else {
+	if(m_bTransaction) {
+		if (!bReplace) {
 			m_setDeletedAttachment.emplace(ulInstanceId);
+			return er;
 		}
-		return er;
+		er = MarkAttachmentForDeletion(ulInstanceId);
+		if (er != erSuccess && er != KCERR_NOT_FOUND) {
+			assert(false);
+			return er;
+		} else if (er != KCERR_NOT_FOUND) {
+			 m_setMarkedAttachment.emplace(ulInstanceId);
+		}
+		return erSuccess;
 	}
 
-	if (unlink(filename.c_str()) != 0) {
-		if (errno == ENOENT){
-			filename = CreateAttachmentFilename(ulInstanceId, !m_bFileCompression);
-			if (unlink(filename.c_str()) == 0)
-				return erSuccess;
-		}
-
-		if (errno == EACCES || errno == EPERM)
-			er = KCERR_NO_ACCESS;
-		else if (errno != ENOENT) { // ignore "file not found" error
-			er = KCERR_DATABASE_ERROR;
-			ec_log_err("ECFileAttachment::DeleteAttachmentInstance() id %u fail", ulInstanceId.siid);
-		}
+	if (unlink(filename.c_str()) == 0)
+		return er;
+	if (errno == ENOENT) {
+		filename = CreateAttachmentFilename(ulInstanceId, !m_bFileCompression);
+		if (unlink(filename.c_str()) == 0)
+			return erSuccess;
+	}
+	if (errno == EACCES || errno == EPERM)
+		er = KCERR_NO_ACCESS;
+	else if (errno != ENOENT) { // ignore "file not found" error
+		er = KCERR_DATABASE_ERROR;
+		ec_log_err("ECFileAttachment::DeleteAttachmentInstance() id %u fail", ulInstanceId.siid);
 	}
 	return er;
 }
 
-/** 
+/**
  * Return a filename for an instance id
- * 
+ *
  * @param[in] ulInstanceId instance id to convert to a filename
  * @param[in] bCompressed add compression marker to filename
- * 
+ *
  * @return Kopano error code
  */
 std::string ECFileAttachment::CreateAttachmentFilename(const ext_siid &esid, bool bCompressed)
@@ -1889,13 +1955,13 @@ std::string ECFileAttachment::CreateAttachmentFilename(const ext_siid &esid, boo
 	return filename;
 }
 
-/** 
+/**
  * Return the size of an instance
- * 
+ *
  * @param[in] ulInstanceId InstanceID to check the size for
  * @param[out] lpulSize Size of the instance
  * @param[out] lpbCompressed the instance was compressed
- * 
+ *
  * @return Kopano error code
  */
 ECRESULT ECFileAttachment::GetSizeInstance(const ext_siid &ulInstanceId,
@@ -1996,7 +2062,7 @@ ECRESULT ECFileAttachment::Commit()
 {
 	ECRESULT er = erSuccess;
 	bool bError = false;
-	
+
 	if(!m_bTransaction) {
 		assert(false);
 		return erSuccess;
@@ -2004,7 +2070,6 @@ ECRESULT ECFileAttachment::Commit()
 
 	// Disable the transaction
 	m_bTransaction = false;
-
 	// Delete the attachments
 	for (const auto &att_id : m_setDeletedAttachment)
 		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
@@ -2019,7 +2084,6 @@ ECRESULT ECFileAttachment::Commit()
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECFileAttachment::Commit() error during commit");
 	}
-
 	m_setNewAttachment.clear();
 	m_setDeletedAttachment.clear();
 	m_setMarkedAttachment.clear();
@@ -2037,10 +2101,8 @@ ECRESULT ECFileAttachment::Rollback()
 
 	// Disable the transaction
 	m_bTransaction = false;
-
 	// Don't delete the attachments
 	m_setDeletedAttachment.clear();
-	
 	// Remove the created attachments
 	for (const auto &att_id : m_setNewAttachment)
 		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
@@ -2052,12 +2114,338 @@ ECRESULT ECFileAttachment::Rollback()
 
 	m_setNewAttachment.clear();
 	m_setMarkedAttachment.clear();
-	
 	if (bError) {
 		assert(false);
 		ec_log_err("ECFileAttachment::Rollback() error");
 		return KCERR_DATABASE_ERROR;
 	}
+	return erSuccess;
+}
+
+ECFileAttachmentConfig2::ECFileAttachmentConfig2(const GUID &g) :
+	m_server_guid(strToLower(bin2hex(sizeof(g), &g)))
+{}
+
+ECAttachmentStorage *ECFileAttachmentConfig2::new_handle(ECDatabase *db)
+{
+	return new(std::nothrow) ECFileAttachment2(*this, db, m_dir, m_complvl, m_sync_files);
+}
+
+ECFileAttachment2::ECFileAttachment2(ECFileAttachmentConfig2 &acf,
+    ECDatabase *db, const std::string &basepath, unsigned int complvl,
+    bool sync) :
+	ECFileAttachment(db, basepath, complvl, sync), m_config(acf)
+{}
+
+ECRESULT ECFileAttachment2::SaveAttachmentInstance(ext_siid &instance,
+    ULONG propid, size_t dsize, unsigned char *data)
+{
+	instance.filename = uas_data_to_ident(data, dsize);
+	bool uploaded = false;
+	auto sl = uas_server_layout(m_basepath, m_config.m_server_guid, instance);
+	auto hl = uas_hash_layout(m_basepath, m_config.m_server_guid, instance);
+	int retries  = 3;
+	auto cleanup = make_scope_success([&]() {
+		if (uploaded)
+			HX_rrmdir(sl.base_dir.c_str());
+	});
+
+	do {
+		int x = open(hl.intent_ref.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRWUG);
+		if (x >= 0) {
+			close(x);
+			x = rename(hl.intent_ref.c_str(), hl.holder_ref.c_str());
+			if (x == 0)
+				break;
+			if (x < 0 && errno == ENOENT) {
+				/* not using CreatePath, don't want it recursive */
+				x = mkdir(hl.holder_dir.c_str(), S_IRWXU | S_IRWXG);
+				if (x == 0 || errno == EEXIST) {
+					x = rename(hl.intent_ref.c_str(), hl.holder_ref.c_str());
+					if (x == 0)
+						break;
+				}
+			}
+		}
+
+		if (!uploaded) {
+			auto ret = CreatePath(sl.intent_dir.c_str(), S_IRWXUG);
+			if (ret != 0 && errno != EEXIST) {
+				ec_log_err("K-1299: mkdir -p \"%s\": %s", sl.intent_dir.c_str(), GetMAPIErrorMessage(ret));
+				return ret;
+			}
+			uploaded = true;
+			ret = CreatePath(sl.holder_dir.c_str(), S_IRWXUG);
+			if (ret != 0 && errno != EEXIST) {
+				ec_log_err("K-1298: mkdir -p \"%s\": %s", sl.holder_dir.c_str(), GetMAPIErrorMessage(ret));
+				return ret;
+			}
+			int fd = open(sl.content_file.c_str(), O_WRONLY | O_CREAT, S_IRWUG);
+			if (fd < 0) {
+				ec_log_err("K-1297: open \"%s\": %s", sl.content_file.c_str(), strerror(errno));
+				return KCERR_DATABASE_ERROR;
+			}
+			ret = save_instance_data(sl.content_file, fd, propid, dsize, data, false); /* closes fd */
+			if (ret != erSuccess) {
+				ec_log_err("K-1296: save_instance_data \"%s\": %s", sl.content_file.c_str(), GetMAPIErrorMessage(ret));
+				close(fd);
+				return ret;
+			}
+			fd = open(sl.holder_ref.c_str(), O_WRONLY | O_CREAT, S_IRWUG);
+			if (fd < 0) {
+				ec_log_err("K-1295: open \"%s\": %s", sl.holder_ref.c_str(), strerror(errno));
+				return KCERR_DATABASE_ERROR;
+			}
+			close(fd);
+		}
+
+		std::unique_ptr<char[], cstdlib_deleter> enclosing_dir(HX_dirname(hl.base_dir.c_str()));
+		auto ret = CreatePath(enclosing_dir.get());
+		if (ret != hrSuccess) {
+			ec_log_err("K-1294: mkdir -p \"%s\": %s", enclosing_dir.get(), GetMAPIErrorMessage(ret));
+			return ret;
+		}
+		x = rename(sl.base_dir.c_str(), hl.base_dir.c_str());
+		if (x == 0) {
+			uploaded = false;
+			break;
+		}
+		if (errno != EEXIST) {
+			ec_log_debug("K-1293: rename \"%s\" -> \"%s\": %s",
+				sl.base_dir.c_str(), hl.base_dir.c_str(), strerror(errno));
+			return KCERR_DATABASE_ERROR;
+		}
+		pthread_yield();
+		if (--retries == 0)
+			break;
+	} while (true);
+
+	instance.filename = (uploaded && retries <= 0) ? std::move(sl.ident) : std::move(hl.ident);
+	return erSuccess;
+}
+
+/**
+ * Streaming support. This is only used when importing messages
+ * through ECExchange*, it is not used by normal e-mail receiption or
+ * e.g. when saving a draft.
+ */
+ECRESULT ECFileAttachment2::SaveAttachmentInstance(ext_siid &instance,
+    ULONG propid, size_t dsize, ECSerializer *src)
+{
+	bool uploaded = false;
+	auto sl = uas_server_layout(m_basepath, m_config.m_server_guid, instance);
+	decltype(sl) hl;
+
+	/*
+	 * Data is just arriving. It is put into a file (lest it would have to
+	 * be held in memory) while the hash is being computed.
+	 */
+	SHA256_CTX shactx;
+	SHA256_Init(&shactx);
+
+	auto ret = CreatePath(sl.intent_dir.c_str(), S_IRWXUG);
+	if (ret != 0 && errno != EEXIST) {
+		ec_log_err("K-1292: mkdir \"%s\": %s", sl.intent_dir.c_str(), strerror(errno));
+		return ret;
+	}
+	uploaded = true;
+	auto cleanup = make_scope_success([&]() {
+		if (uploaded)
+			HX_rrmdir(sl.base_dir.c_str());
+	});
+	ret = CreatePath(sl.holder_dir.c_str(), S_IRWXUG);
+	if (ret != 0 && errno != EEXIST) {
+		ec_log_err("K-1291: mkdir \"%s\": %s", sl.holder_dir.c_str(), strerror(errno));
+		return ret;
+	}
+	int fd = open(sl.content_file.c_str(), O_WRONLY | O_CREAT, S_IRWUG);
+	if (fd < 0) {
+		ec_log_err("K-1290: open \"%s\": %s", sl.content_file.c_str(), strerror(errno));
+		return MAPI_E_DISK_ERROR;
+	}
+
+	give_filesize_hint(fd, dsize);
+	while (dsize > 0) {
+		size_t chunk_size = std::min(static_cast<size_t>(CHUNK_SIZE), dsize);
+		char buffer[CHUNK_SIZE];
+		ret = src->Read(buffer, 1, chunk_size);
+		if (ret != erSuccess) {
+			close(fd);
+			return ret;
+		}
+		SHA256_Update(&shactx, buffer, chunk_size);
+		ssize_t did_write = write_retry(fd, buffer, chunk_size);
+		if (did_write != static_cast<ssize_t>(chunk_size)) {
+			ec_log_err("K-1289: Unable to write bytes to attachment \"%s\": %s.",
+				sl.content_file.c_str(), strerror(errno));
+			close(fd);
+			return KCERR_DATABASE_ERROR;
+		}
+		dsize -= chunk_size;
+	}
+
+	close(fd);
+	unsigned char shasum[SHA256_DIGEST_LENGTH];
+	SHA256_Final(shasum, &shactx);
+	instance.filename = uas_md_to_ident(std::string(reinterpret_cast<char *>(shasum), sizeof(shasum)));
+	hl = uas_hash_layout(m_basepath, m_config.m_server_guid, instance);
+	fd = open(sl.holder_ref.c_str(), O_WRONLY | O_CREAT, S_IRWUG);
+	if (fd < 0) {
+		ec_log_err("K-1288: open \"%s\": %s", sl.holder_ref.c_str(), strerror(errno));
+		return MAPI_E_DISK_ERROR;
+	}
+	close(fd);
+
+	std::unique_ptr<char[], cstdlib_deleter> enclosing_dir(HX_dirname(hl.base_dir.c_str()));
+	ret = CreatePath(enclosing_dir.get());
+	if (ret != hrSuccess) {
+		ec_log_err("K-1287: mkdir -p \"%s\": %s", enclosing_dir.get(), GetMAPIErrorMessage(ret));
+		return ret;
+	}
+
+	int retries = 3;
+	do {
+		int x = rename(sl.base_dir.c_str(), hl.base_dir.c_str());
+		if (x == 0) {
+			uploaded = false;
+			break;
+		}
+		if (errno != EEXIST) {
+			ec_log_debug("K-1286: rename \"%s\" -> \"%s\": %s",
+				sl.base_dir.c_str(), hl.base_dir.c_str(), strerror(errno));
+			return KCERR_DATABASE_ERROR;
+		}
+		pthread_yield();
+		if (--retries == 0)
+			break;
+
+		int fd = open(hl.intent_ref.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRWUG);
+		if (fd >= 0) {
+			close(fd);
+			fd = open(hl.holder_ref.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRWUG);
+			if (fd >= 0) {
+				close(fd);
+				unlink(hl.intent_ref.c_str());
+				break;
+			}
+		}
+	} while (true);
+
+	instance.filename = (uploaded && retries <= 0) ? std::move(sl.ident) : std::move(hl.ident);
+	return erSuccess;
+}
+
+ECRESULT ECFileAttachment2::GetSizeInstance(const ext_siid &inst,
+    size_t *size, bool *comp)
+{
+	auto content_file = m_basepath + "/" + inst.filename + "/content";
+	struct stat sb;
+	auto ret = stat(content_file.c_str(), &sb);
+	if (ret != 0)
+		return MAPI_E_DISK_ERROR;
+	if (size != nullptr)
+		*size = sb.st_size;
+	if (comp != nullptr)
+		*comp = false;
+	return erSuccess;
+}
+
+ECRESULT ECFileAttachment2::DeleteAttachmentInstance(const ext_siid &i, bool replace)
+{
+	auto hl = uas_hash_layout(m_basepath, m_config.m_server_guid, i);
+	auto ret = unlink(hl.holder_ref.c_str());
+	if (ret != 0) {
+		if (errno == ENOENT) {
+			ec_log_err("K-1290: Huh, \"%s\" already gone", hl.holder_ref.c_str());
+		} else {
+			ec_log_err("K-1289: unlink \"%s\": %s", hl.holder_ref.c_str(), strerror(errno));
+			return MAPI_E_DISK_ERROR;
+		}
+	}
+	ret = rmdir(hl.holder_dir.c_str());
+	if (ret != 0) {
+		if (errno == ENOTEMPTY)
+			/* normal condition: other holder exists */;
+		else
+			ec_log_err("K-1288: rmdir \"%s\": %s", hl.holder_dir.c_str(), strerror(errno));
+		return erSuccess;
+	}
+	ret = rmdir(hl.intent_dir.c_str());
+	if (ret != 0) {
+		if (errno == ENOTEMPTY)
+			/* normal condition: other writer signalled new intent to link */;
+		else
+			ec_log_err("K-1287: rmdir \"%s\": %s", hl.intent_dir.c_str(), strerror(errno));
+		return erSuccess;
+	}
+	HX_rrmdir(hl.base_dir.c_str());
+	return erSuccess;
+}
+
+ECRESULT ECFileAttachment2::LoadAttachmentInstance(struct soap *soap,
+    const ext_siid &instance, size_t *dsize, unsigned char **data)
+{
+	*dsize = 0;
+	auto ctf = m_basepath + "/" + instance.filename.c_str() + "/content";
+	int fd = open(ctf.c_str(), O_RDONLY);
+	if (fd < 0) {
+		ec_log_err("K-1286: open \"%s\": %s", ctf.c_str(), strerror(errno));
+		return KCERR_NO_ACCESS;
+	}
+	my_readahead(fd);
+	struct stat sb;
+	if (fstat(fd, &sb) < 0) {
+		ec_log_err("K-1285: fstat: %s", strerror(errno));
+		close(fd);
+		*dsize = 0;
+		*data  = s_alloc<unsigned char>(soap, 0);
+		return KCERR_NO_ACCESS;
+	}
+	*data = s_alloc<unsigned char>(soap, sb.st_size);
+	auto rd = read_retry(fd, *data, sb.st_size);
+	if (rd < 0) {
+		ec_log_err("K-1284: read: %s", strerror(errno));
+		*dsize = 0;
+		close(fd);
+		return KCERR_NO_ACCESS;
+	} else if (rd < std::min(static_cast<ssize_t>(sb.st_size), static_cast<ssize_t>(SSIZE_MAX))) {
+		ec_log_err("K-1283: short read on \"%s\"", instance.filename.c_str());
+		*dsize = rd;
+	} else {
+		*dsize = sb.st_size;
+	}
+	close(fd);
+	return erSuccess;
+}
+
+ECRESULT ECFileAttachment2::LoadAttachmentInstance(const ext_siid &instance,
+    size_t *dsize, ECSerializer *sink)
+{
+	*dsize = 0;
+	auto ctf = m_basepath + "/" + instance.filename.c_str() + "/content";
+	int fd = open(ctf.c_str(), O_RDONLY);
+	if (fd < 0 && errno == ENOENT) {
+		return KCERR_NOT_FOUND;
+	} else if (fd < 0) {
+		/* Access problems */
+		ec_log_err("K-1286: open \"%s\": %s", ctf.c_str(), strerror(errno));
+		return KCERR_NO_ACCESS;
+	}
+	my_readahead(fd);
+	while (true) {
+		char buffer[CHUNK_SIZE];
+		ssize_t rd = read_retry(fd, buffer, sizeof(buffer));
+		if (rd < 0) {
+			ec_log_err("K-1284: read: %s", strerror(errno));
+			close(fd);
+			return KCERR_DATABASE_ERROR;
+		} else if (rd == 0) {
+			break;
+		}
+		sink->Write(buffer, 1, rd);
+		*dsize += rd;
+	}
+	close(fd);
 	return erSuccess;
 }
 

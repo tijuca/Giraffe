@@ -1,29 +1,14 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <string>
 #include <utility>
 #include <mapitags.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
-
 #include <libintl.h>
-
 #include "ECMAPI.h"
 #include <kopano/stringutil.h>
 #include "SOAPUtils.h"
@@ -35,18 +20,15 @@
 #include "ECUserManagement.h"
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
-#include "ECLockManager.h"
-
 #include <edkmdb.h>
 #include <kopano/mapiext.h>
+#include <kopano/ECGetText.h>
 
-#define _(string) dcgettext("kopano", string, LC_MESSAGES)
+using namespace std::string_literals;
 
 namespace KC {
 
-extern ECSessionManager*	g_lpSessionManager;
-
-ECRESULT ECGenProps::GetMVPropSubquery(unsigned int ulPropTagRequested, std::string &subquery) 
+ECRESULT ECGenProps::GetMVPropSubquery(unsigned int ulPropTagRequested, std::string &subquery)
 {
 	unsigned int ulType = PROP_TYPE(ulPropTagRequested);
 
@@ -82,7 +64,7 @@ ECRESULT ECGenProps::GetMVPropSubquery(unsigned int ulPropTagRequested, std::str
 	}
 }
 
-ECRESULT ECGenProps::GetPropSubquery(unsigned int ulPropTagRequested, std::string &subquery) 
+ECRESULT ECGenProps::GetPropSubquery(unsigned int ulPropTagRequested, std::string &subquery)
 {
 	switch(ulPropTagRequested) {
 	case PR_PARENT_DISPLAY_W:
@@ -200,7 +182,7 @@ ECRESULT ECGenProps::IsPropComputedUncached(unsigned int ulPropTag, unsigned int
 
 // These are properties that are never written to the 'properties' table; ie they are never directly queried. This
 // is not the same as the generated properties, as they may access data in the database to *create* a generated
-// property. 
+// property.
 ECRESULT ECGenProps::IsPropRedundant(unsigned int ulPropTag, unsigned int ulObjType)
 {
     switch(PROP_ID(ulPropTag)) {
@@ -262,13 +244,13 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 		return erSuccess;
 	case PROP_ID(PR_NORMALIZED_SUBJECT): {
     	if(lpPropVal->ulPropTag != PR_SUBJECT) {
-    		lpPropVal->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(PR_NORMALIZED_SUBJECT));
+			lpPropVal->ulPropTag = CHANGE_PROP_TYPE(PR_NORMALIZED_SUBJECT, PT_ERROR);
     		lpPropVal->Value.ul = KCERR_NOT_FOUND;
     		lpPropVal->__union = SOAP_UNION_propValData_ul;
 			return erSuccess;
 		}
 		lpPropVal->ulPropTag = ulPropTagRequested;
-		// Check for RE, FWD and similar muck at the start of the subject line   		
+		// Check for RE, FWD and similar muck at the start of the subject line
 		const char *lpszColon = strchr(lpPropVal->Value.lpszA, ':');
 		if (lpszColon == nullptr)
 			return erSuccess;
@@ -321,11 +303,8 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
     unsigned int ulParentId, unsigned int ulObjType, struct propVal *lpPropVal)
 {
 	ECRESULT		er = erSuccess;
-	unsigned int	ulRights = 0;
-	bool			bOwner = false;
-	bool			bAdmin = false;
-	unsigned int	ulFlags = 0;
-	unsigned int	ulUserId = 0;
+	bool bOwner = false, bAdmin = false;
+	unsigned int ulRights = 0, ulFlags = 0, ulUserId = 0;
 	char*			lpStoreName = NULL;
 	struct propVal sPropVal;
 	struct propValArray sPropValArray;
@@ -610,7 +589,6 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 		// someone else is accessing your store, so check their rights
 		ulRights = 0;
 		sec->GetObjectPermission(ulObjId, &ulRights); // skip error checking, ulRights = 0
-
 		// will be false when someone else created this object in this store (or true if you're that someone)
 		bOwner = sec->IsOwner(ulObjId) == erSuccess;
 
@@ -618,7 +596,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 		case MAPI_FOLDER:
 			if ((ulRights & ecRightsReadAny) == ecRightsReadAny)
 				sPropVal.Value.ul |= MAPI_ACCESS_READ;
-			if (bOwner == true || (ulRights & ecRightsFolderAccess) == ecRightsFolderAccess)
+			if (bOwner || (ulRights & ecRightsFolderAccess) == ecRightsFolderAccess)
 				sPropVal.Value.ul |= MAPI_ACCESS_DELETE | MAPI_ACCESS_MODIFY;
 
 			if (ulFlags != FOLDER_SEARCH) //FOLDER_GENERIC, FOLDER_ROOT
@@ -629,7 +607,8 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 					sPropVal.Value.ul |= MAPI_ACCESS_CREATE_CONTENTS;
 
 				// olk2k7 fix: if we have delete access, we must set create contents access (eventhough an actual saveObject will still be denied) for deletes to work.
-				if ((ulRights & ecRightsDeleteAny) == ecRightsDeleteAny || (bOwner == true && (ulRights & ecRightsDeleteOwned) == ecRightsDeleteOwned))
+				if ((ulRights & ecRightsDeleteAny) == ecRightsDeleteAny ||
+				    (bOwner && (ulRights & ecRightsDeleteOwned) == ecRightsDeleteOwned))
 					sPropVal.Value.ul |= MAPI_ACCESS_CREATE_CONTENTS;
 				if ((ulRights & ecRightsFolderAccess) == ecRightsFolderAccess)
 					sPropVal.Value.ul |= MAPI_ACCESS_CREATE_ASSOCIATED;
@@ -638,9 +617,11 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap,
 		case MAPI_MESSAGE:
 			if ((ulRights & ecRightsReadAny) == ecRightsReadAny)
 				sPropVal.Value.ul |= MAPI_ACCESS_READ;
-			if ((ulRights & ecRightsEditAny) == ecRightsEditAny || (bOwner == true && (ulRights & ecRightsEditOwned) == ecRightsEditOwned))
+			if ((ulRights & ecRightsEditAny) == ecRightsEditAny ||
+			    (bOwner && (ulRights & ecRightsEditOwned) == ecRightsEditOwned))
 				sPropVal.Value.ul |= MAPI_ACCESS_MODIFY;
-			if ((ulRights & ecRightsDeleteAny) == ecRightsDeleteAny || (bOwner == true && (ulRights & ecRightsDeleteOwned) == ecRightsDeleteOwned))
+			if ((ulRights & ecRightsDeleteAny) == ecRightsDeleteAny ||
+			    (bOwner && (ulRights & ecRightsDeleteOwned) == ecRightsDeleteOwned))
 				sPropVal.Value.ul |= MAPI_ACCESS_DELETE;
 			break;
 		default:
@@ -708,7 +689,6 @@ exit:
 		if (er != erSuccess)
 			FreePropVal(&sPropVal, false);
 	}
-
 	return er;
 }
 
@@ -749,8 +729,7 @@ ECRESULT ECGenProps::IsOrphanStore(ECSession* lpSession, unsigned int ulObjId, b
  */
 ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsigned int ulStoreId, unsigned int ulStoreType, char** lppStoreName)
 {
-	unsigned int		ulUserId = 0;
-	unsigned int	    ulCompanyId = 0;
+	unsigned int ulUserId = 0, ulCompanyId = 0;
 	struct propValArray sPropValArray;
 	struct propTagArray sPropTagArray;
 	std::string strFormat;
@@ -760,7 +739,6 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 	auto er = sec->GetStoreOwner(ulStoreId, &ulUserId);
 	if (er != erSuccess)
 		goto exit;
-
 	// get the companyid to which the logged in user belongs to.
 	er = sec->GetUserCompany(&ulCompanyId);
 	if (er != erSuccess)
@@ -768,7 +746,7 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 
 	// When the userid belongs to a company or group everybody, the store is considered a public store.
 	if(ulUserId == KOPANO_UID_EVERYONE || ulUserId == ulCompanyId) {
-	    strFormat = _("Public Folders");
+		strFormat = KC_A("Public Folders");
 	} else {
 		sPropTagArray.__ptr = s_alloc<unsigned int>(nullptr, 3);
         sPropTagArray.__ptr[0] = PR_DISPLAY_NAME;
@@ -808,18 +786,16 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
         }
 
 		if (ulStoreType == ECSTORE_TYPE_PRIVATE)
-			strFormat = std::string(_("Inbox")) + " - " + strFormat;
+			strFormat = KC_A("Inbox") + " - "s + strFormat;
 		else if (ulStoreType == ECSTORE_TYPE_ARCHIVE)
-			strFormat = std::string(_("Archive")) + " - " + strFormat;
+			strFormat = KC_A("Archive") + " - "s + strFormat;
 		else
 			assert(false);
     }
-    
+
 	lpStoreName = s_alloc<char>(soap, strFormat.size() + 1);
 	strcpy(lpStoreName, strFormat.c_str());
-
 	*lppStoreName = lpStoreName;
-
 exit:
 	s_free(nullptr, sPropTagArray.__ptr);
 	return er;

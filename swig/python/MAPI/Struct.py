@@ -1,4 +1,5 @@
 # -*- indent-tabs-mode: nil -*-
+# SPDX-License-Identifier: AGPL-3.0-only
 
 import inspect
 import sys
@@ -334,15 +335,6 @@ class ECCOMPANY(MAPIStruct):
         self.CompanyID = CompanyID
         self.MVPropMap = MVPropMap
         self.AdministratorID = AdministratorID
-
-class ECUSERCLIENTUPDATESTATUS(MAPIStruct):
-    def __init__(self, TrackId, Updatetime, Currentversion, Latestversion, Computername, Status):
-        self.TrackId = TrackId
-        self.Updatetime = Updatetime
-        self.Currentversion = Currentversion
-        self.Latestversion = Latestversion
-        self.Computername = Computername
-        self.Status = Status
 
 class ECSERVER(MAPIStruct):
     def __init__(self, Name, FilePath, HttpPath, SslPath, PreferedPath, Flags):

@@ -1,59 +1,34 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <cstdint>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
-
 #include <kopano/ECGetText.h>
 #include <kopano/memory.hpp>
 #include <memory>
 #include <string>
 #include <utility>
 #include <cassert>
-
 #include "kcore.hpp"
 #include "Mem.h"
-
 #include "ECMSProvider.h"
-#include "ECABProvider.h"
+#include "ECABContainer.h"
 #include <iostream>
 #include <kopano/ecversion.h>
-
-#include <kopano/ECDebug.h>
 #include <kopano/stringutil.h>
-
 #include <kopano/ECLogger.h>
-
 #include <kopano/ECGuid.h>
 #include <kopano/MAPIErrors.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-
 #include <kopano/mapi_ptr.h>
-
 #include "SSLUtil.h"
 #include "ClientUtil.h"
-
 #include "EntryPoint.h"
-
 #include <kopano/charset/convstring.h>
 
 using namespace KC;
@@ -71,10 +46,9 @@ struct initprov {
 	object_ptr<WSTransport> transport;
 	unsigned int count, eid_size, wrap_eid_size;
 	SPropValue prop[6];
-	EntryIdPtr eid;
+	EntryIdPtr eid, wrap_eid;
 	/* referenced from prop[n] */
 	memory_ptr<wchar_t> store_name;
-	EntryIdPtr wrap_eid;
 	memory_ptr<ABEID> abe_id;
 };
 
@@ -97,7 +71,6 @@ public:
     }
     ~CKopanoApp() {
         ssl_threading_cleanup();
-
 		RemoveAllProviders(&g_mapProviders);
     }
 };
@@ -129,7 +102,7 @@ HRESULT MSProviderInit(HINSTANCE hInstance, LPMALLOC pmalloc,
 	if (ulMAPIver != CURRENT_SPI_VERSION)
 		return MAPI_E_VERSION;
 	*lpulProviderVer = CURRENT_SPI_VERSION;
-	
+
 	// Save the pointers for later use
 	_pmalloc = pmalloc;
 	_pfnAllocBuf = pfnAllocBuf;
@@ -142,7 +115,7 @@ HRESULT MSProviderInit(HINSTANCE hInstance, LPMALLOC pmalloc,
 	auto hr = ECMSProviderSwitch::Create(ulFlags, &~lpMSProvider);
 	if(hr != hrSuccess)
 		return hr;
-	return lpMSProvider->QueryInterface(IID_IMSProvider, reinterpret_cast<void **>(ppmsp)); 
+	return lpMSProvider->QueryInterface(IID_IMSProvider, reinterpret_cast<void **>(ppmsp));
 }
 
 /**
@@ -220,7 +193,6 @@ initprov_service(struct initprov &d, const sGlobalProfileProps &profprop)
 
 	/* This should be a real URL */
 	assert(redir_srv.compare(0, 9, "pseudo://") != 0);
-
 	if (d.provadm == NULL || redir_srv.empty())
 		return hrSuccess;
 
@@ -310,7 +282,6 @@ static HRESULT initprov_storearc(struct initprov &d)
 	      &~alt_transport);
 	if (ret != hrSuccess)
 		return ret;
-
 	d.transport = std::move(alt_transport);
 	return d.transport->HrResolveTypedStore(convstring::from_SPropValue(name),
 	       ECSTORE_TYPE_ARCHIVE, &d.eid_size, &~d.eid);
@@ -410,28 +381,25 @@ HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider,
     IProfSect *lpProfSect, const sGlobalProfileProps &sProfileProps,
     ULONG *lpcStoreID, ENTRYID **lppStoreID)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> ptrPropValueResourceType, dspname, tpprop;
 	SPropValuePtr	ptrPropValueProviderUid;
 	std::string		strServiceName;
-	ULONG			ulResourceType=0;
 	struct initprov d;
 	d.provadm = lpAdminProvider;
 	d.profsect = lpProfSect;
 	d.count = d.eid_size = 0;
 
 	if (d.provadm != NULL) {
-		hr = GetServiceName(d.provadm, &strServiceName);
+		auto hr = GetServiceName(d.provadm, &strServiceName);
 		if (hr != hrSuccess)
 			return hr;
 	} else {
 		SPropValuePtr psn;
-		hr = HrGetOneProp(d.profsect, PR_SERVICE_NAME_A, &~psn);
+		auto hr = HrGetOneProp(d.profsect, PR_SERVICE_NAME_A, &~psn);
 		if(hr == hrSuccess)
 			strServiceName = psn->Value.lpszA;
-		hr = hrSuccess;
 	}
-	hr = HrGetOneProp(d.profsect, PR_RESOURCE_TYPE, &~ptrPropValueResourceType);
+	auto hr = HrGetOneProp(d.profsect, PR_RESOURCE_TYPE, &~ptrPropValueResourceType);
 	if (hr != hrSuccess)
 		// Ignore this provider; apparently it has no resource type, so just skip it
 		return hrSuccess;
@@ -441,7 +409,7 @@ HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider,
 	else
 		d.provuid = nullptr;
 
-	ulResourceType = ptrPropValueResourceType->Value.l;
+	unsigned int ulResourceType = ptrPropValueResourceType->Value.l;
 	hr = HrGetOneProp(d.profsect, PR_DISPLAY_NAME_A, &~dspname);
 	ec_log_debug("Initializing provider \"%s\"",
 		dspname != nullptr ? dspname->Value.lpszA : "(unnamed)");
@@ -504,12 +472,10 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 	auto hr = lpAdminProviders->GetProviderTable(0, &~ptrTable);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Get the rows
 	hr = ptrTable->QueryRows(0xFF, 0, &~ptrRows);
 	if(hr != hrSuccess)
 		return hr;
-
 	//Check if exist one or more rows
 	if (ptrRows.size() == 0)
 		return MAPI_E_NOT_FOUND;
@@ -526,7 +492,6 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 		hr = lpAdminProviders->OpenProfileSection((MAPIUID *)lpsProviderUID->Value.bin.lpb, nullptr, MAPI_MODIFY, &~ptrProfSect);
 		if(hr != hrSuccess)
 			return hr;
-
 		// Set already PR_PROVIDER_UID, ignore error
 		HrSetOneProp(ptrProfSect, lpsProviderUID);
 		hr = InitializeProvider(lpAdminProviders, ptrProfSect, sProfileProps, nullptr, nullptr);
@@ -552,25 +517,18 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
     LPPROVIDERADMIN lpAdminProviders, MAPIERROR **lppMapiError)
 {
 	HRESULT			hr = erSuccess;
-	std::string		strServerName;
-	std::wstring	strUserName;
-	std::wstring	strUserPassword;
-	std::string		strServerPort;
-	std::string		strType;
-	std::string		strDefStoreServer;
+	std::string strServerName, strDefStoreServer;
+	std::wstring strUserName, strUserPassword;
 	sGlobalProfileProps	sProfileProps;
 	std::basic_string<TCHAR> strError;
-
-	ProfSectPtr		ptrGlobalProfSect;
-	ProfSectPtr		ptrProfSect;
+	ProfSectPtr ptrGlobalProfSect, ptrProfSect;
 	MAPISessionPtr	ptrSession;
 	object_ptr<WSTransport> lpTransport;
 	memory_ptr<SPropValue> lpsPropValue;
-	bool			bShowDialog = false;
+	bool bShowDialog = false, bInitStores = true;
 	memory_ptr<BYTE> lpDelegateStores;
 	ULONG			cDelegateStores = 0;
 	convert_context	converter;
-	bool bInitStores = true;
 	SPropValue spv;
 
 	_hInstance = hInst;
@@ -587,9 +545,7 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 	}
 
 	// Logon defaults
-	strType = "http";
-	strServerPort ="236";
-
+	std::string strType = "http", strServerPort = "236";
 	switch(ulContext) {
 	case MSG_SERVICE_INSTALL:
 		hr = hrSuccess;
@@ -602,9 +558,7 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 		break;
 	case MSG_SERVICE_PROVIDER_DELETE:
 		hr = hrSuccess;
-
 		//FIXME: delete Offline database
-
 		break;
 	case MSG_SERVICE_CONFIGURE:
 		//bShowAllSettingsPages = true;
@@ -614,10 +568,8 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 		hr = lpAdminProviders->OpenProfileSection(reinterpret_cast<const MAPIUID *>(&pbGlobalProfileSectionGuid), nullptr, MAPI_MODIFY, &~ptrGlobalProfSect);
 		if(hr != hrSuccess)
 			return hr;
-
 		if(cvals) {
 			hr = ptrGlobalProfSect->SetProps(cvals, pvals, NULL);
-
 			if(hr != hrSuccess)
 				return hr;
 		}
@@ -657,7 +609,7 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 		{
 			if ((bShowDialog && ulFlags & SERVICE_UI_ALLOWED) || ulFlags & SERVICE_UI_ALWAYS)
 				hr = MAPI_E_USER_CANCEL;
-						
+
 			if(!(ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS) && (strServerName.empty() || sProfileProps.strUserName.empty())){
 				hr = MAPI_E_UNCONFIGURED;
 				goto exit2;
@@ -681,7 +633,6 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 			}else {
 				break; // Everything is oke
 			}
-			
 
 			// On incorrect password, and UI allowed, show incorrect password error
 			if((ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS)) {
@@ -692,12 +643,11 @@ extern "C" HRESULT MSGServiceEntry(HINSTANCE hInst,
 			}else if(!(ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS)){
 				// Do not reset the logon error from HrLogon()
 				// The DAgent uses this value to determain if the delivery is fatal or not
-				// 
+				//
 				// Although this error is not in the online spec from MS, it should not really matter .... right?
 				// hr = MAPI_E_UNCONFIGURED;
 				goto exit2;
 			}
-
 		}// while(1)
 
 		if(bInitStores) {

@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <new>
 #include "ECMessageStreamImporterIStreamAdapter.h"
@@ -23,7 +10,7 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Create(WSMessageStreamImporter *l
 {
 	if (lpStreamImporter == NULL || lppStream == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	return alloc_wrap<ECMessageStreamImporterIStreamAdapter>(lpStreamImporter)
+	return KC::alloc_wrap<ECMessageStreamImporterIStreamAdapter>(lpStreamImporter)
 	       .as(IID_IStream, reinterpret_cast<void **>(lppStream));
 }
 
@@ -43,21 +30,16 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Read(void* /*pv*/, ULONG /*cb*/, 
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Write(const void *pv, ULONG cb, ULONG *pcbWritten)
 {
-	HRESULT hr;
-
 	if (!m_ptrSink) {
-		hr = m_ptrStreamImporter->StartTransfer(&~m_ptrSink);
+		auto hr = m_ptrStreamImporter->StartTransfer(&~m_ptrSink);
 		if (hr != hrSuccess)
 			return hr;
 	}
-
-	hr = m_ptrSink->Write((LPVOID)pv, cb);
+	auto hr = m_ptrSink->Write(pv, cb);
 	if (hr != hrSuccess)
 		return hr;
-
 	if (pcbWritten)
 		*pcbWritten = cb;
-
 	return hrSuccess;
 }
 
@@ -79,15 +61,12 @@ HRESULT ECMessageStreamImporterIStreamAdapter::CopyTo(IStream* /*pstm*/, ULARGE_
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Commit(DWORD /*grfCommitFlags*/)
 {
-	HRESULT hr;
 	HRESULT hrAsync = hrSuccess;
 
 	if (m_ptrSink == NULL)
 		return MAPI_E_UNCONFIGURED;
-
 	m_ptrSink.reset();
-
-	hr = m_ptrStreamImporter->GetAsyncResult(&hrAsync);
+	auto hr = m_ptrStreamImporter->GetAsyncResult(&hrAsync);
 	if (hr == hrSuccess)
 		hr = hrAsync;
 	return hr;
@@ -99,7 +78,6 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Revert(void)
 }
 
 HRESULT ECMessageStreamImporterIStreamAdapter::LockRegion(ULARGE_INTEGER /*libOffset*/, ULARGE_INTEGER /*cb*/, DWORD /*dwLockType*/)
-
 {
 	return MAPI_E_NO_SUPPORT;
 }

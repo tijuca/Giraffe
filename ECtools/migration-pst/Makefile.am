@@ -3,10 +3,16 @@
 dist_sbin_SCRIPTS = kopano-migration-pst
 
 EXTRA_DIST = setup.py \
-	kopano_migration_pst/__init__.py
+	setup.cfg \
+	kopano_migration_pst/__init__.py \
+	kopano_migration_pst/version.py
 
 install-exec-local:
-	cd ${srcdir} && ${PYTHON} setup.py \
+	rm -Rf staging
+	${MKDIR_P} staging
+	cp -a ${srcdir}/setup.py ${srcdir}/setup.cfg ${srcdir}/kopano_migration_pst staging/
+	cp -a kopano_migration_pst/version.py staging/kopano_migration_pst/
+	cd staging/ && ${PYTHON} setup.py \
 		build --build-base="${abs_builddir}/build" \
 		install -f $${DESTDIR+--root=${DESTDIR}} \
 		--prefix ${prefix} --install-purelib ${pythondir}
@@ -14,4 +20,4 @@ install-exec-local:
 
 uninstall-local:
 	rm -Rf ${DESTDIR}${pythondir}/kopano_migration_pst \
-		${DESTDIR}${pythondir}/kopano_migration_pst-0*.egg-info
+		${DESTDIR}${pythondir}/kopano_migration_pst-*.egg-info

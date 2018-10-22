@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <string>
 #include <cstring>
@@ -23,7 +10,6 @@
 #include <edkmdb.h>
 #include <kopano/ECGuid.h>
 #include "kcore.hpp"
-
 #include "SOAPUtils.h"
 #include "SOAPAlloc.h"
 #include <kopano/stringutil.h>
@@ -127,7 +113,6 @@ private:
 
 void FreeSortOrderArray(struct sortOrderArray *lpsSortOrder)
 {
-
 	if(lpsSortOrder == NULL)
 		return;
 	s_free(nullptr, lpsSortOrder->__ptr);
@@ -139,10 +124,8 @@ int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
 {
 	if(lpsSortOrder1 == NULL && lpsSortOrder2 == NULL)
 		return 0; // both NULL
-
 	if(lpsSortOrder1 == NULL || lpsSortOrder2 == NULL)
 		return -1; // not equal due to one of them being NULL
-
 	if(lpsSortOrder1->__size != lpsSortOrder2->__size)
 		return twcmp(lpsSortOrder1->__size, lpsSortOrder2->__size);
 
@@ -152,7 +135,6 @@ int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
 		if(lpsSortOrder1->__ptr[i].ulOrder != lpsSortOrder2->__ptr[i].ulOrder)
 			return -1;
 	}
-
 	// Exact match
 	return 0;
 }
@@ -160,11 +142,10 @@ int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
 ECRESULT CopyPropTagArray(struct soap *soap,
     const struct propTagArray *lpPTsSrc, struct propTagArray **lppsPTsDst)
 {
-	struct propTagArray* lpPTsDst = NULL;
-
-	if (lppsPTsDst == NULL || lpPTsSrc == NULL)
+	if (lppsPTsDst == nullptr || lpPTsSrc == nullptr)
 		return KCERR_INVALID_PARAMETER;
 
+	struct propTagArray *lpPTsDst = nullptr;
 	lpPTsDst = s_alloc<struct propTagArray>(soap);
 	lpPTsDst->__size = lpPTsSrc->__size;
 
@@ -174,14 +155,12 @@ ECRESULT CopyPropTagArray(struct soap *soap,
 	} else {
 		lpPTsDst->__ptr = NULL;
 	}
-
 	*lppsPTsDst = lpPTsDst;
 	return erSuccess;
 }
 
 void FreePropTagArray(struct propTagArray *lpsPropTags, bool bFreeBase)
 {
-
 	if(lpsPropTags == NULL)
 		return;
 	s_free(nullptr, lpsPropTags->__ptr);
@@ -201,13 +180,10 @@ struct propVal *FindProp(const struct propValArray *lpPropValArray,
 {
 	if (lpPropValArray == NULL)
 		return NULL;
-
-	for (gsoap_size_t i = 0; i < lpPropValArray->__size; ++i) {
+	for (gsoap_size_t i = 0; i < lpPropValArray->__size; ++i)
 		if (lpPropValArray->__ptr[i].ulPropTag == ulPropTag ||
 			(PROP_TYPE(ulPropTag) == PT_UNSPECIFIED && PROP_ID(lpPropValArray->__ptr[i].ulPropTag) == PROP_ID(ulPropTag)))
 			return &lpPropValArray->__ptr[i];
-	}
-
 	return NULL;
 }
 
@@ -217,7 +193,6 @@ this function check if the right proptag with the value and is't null
 static ECRESULT PropCheck(const struct propVal *lpProp)
 {
 	ECRESULT er = erSuccess;
-
 	if(lpProp == NULL)
 		return KCERR_INVALID_PARAMETER;
 
@@ -266,34 +241,23 @@ static ECRESULT PropCheck(const struct propVal *lpProp)
 	case PT_STRING8:
 		if(lpProp->__union != SOAP_UNION_propValData_lpszA)
 			er = KCERR_INVALID_PARAMETER;
-		else {
-			if(lpProp->Value.lpszA == NULL)
-				er = KCERR_INVALID_PARAMETER;
-			else
-				er = erSuccess;
-		}
+		else if (lpProp->Value.lpszA == nullptr)
+			er = KCERR_INVALID_PARAMETER;
+		else
+			er = erSuccess;
 		break;
 	case PT_BINARY:
 		if(lpProp->__union != SOAP_UNION_propValData_bin)
 			er = KCERR_INVALID_PARAMETER;
-		else {
-			if(lpProp->Value.bin->__size > 0)
-			{
-				if(lpProp->Value.bin->__ptr == NULL)
-					er = KCERR_INVALID_PARAMETER;
-			}
-		}
+		else if (lpProp->Value.bin->__size > 0 && lpProp->Value.bin->__ptr == nullptr)
+			er = KCERR_INVALID_PARAMETER;
 		break;
 	case PT_CLSID:
 		if(lpProp->__union != SOAP_UNION_propValData_bin)
 			er = KCERR_INVALID_PARAMETER;
-		else {
-			if(lpProp->Value.bin->__size > 0)
-			{
-				if(lpProp->Value.bin->__ptr == NULL || (lpProp->Value.bin->__size%sizeof(GUID)) != 0)
-					er = KCERR_INVALID_PARAMETER;
-			}
-		}
+		else if (lpProp->Value.bin->__size > 0 &&
+		    (lpProp->Value.bin->__ptr == nullptr || lpProp->Value.bin->__size % sizeof(GUID) != 0))
+			er = KCERR_INVALID_PARAMETER;
 		break;
 
 		// TODO: check __ptr pointers?
@@ -368,10 +332,8 @@ static ECRESULT CompareABEID(const struct propVal *lpProp1,
 	if (peid1->ulVersion == peid2->ulVersion) {
 		if (lpProp1->Value.bin->__size != lpProp2->Value.bin->__size)
 			iResult = twcmp(lpProp1->Value.bin->__size, lpProp2->Value.bin->__size);
-
 		else if (peid1->ulVersion == 0)
 			iResult = twcmp(peid1->ulId, peid2->ulId);
-		
 		else
 			iResult = strcmp((const char *)peid1->szExId, (const char *)peid2->szExId);
 	} else {
@@ -386,10 +348,8 @@ static ECRESULT CompareABEID(const struct propVal *lpProp1,
 
 	if (iResult == 0)
 		iResult = (int)(peid1->ulType - peid2->ulType);
-
 exit:
 	*lpCompareResult = iResult;
-
 	return er;
 }
 
@@ -397,11 +357,19 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
     const struct propVal *lpProp2, const ECLocale &locale,
     int *lpCompareResult)
 {
+	if (lpProp1 == nullptr || lpProp2 == nullptr ||
+	    lpCompareResult == nullptr)
+		return KCERR_INVALID_PARAMETER;
+	auto ulPropTag1 = NormalizePropTag(lpProp1->ulPropTag);
+	auto ulPropTag2 = NormalizePropTag(lpProp2->ulPropTag);
+	if (PROP_TYPE(ulPropTag1) != PROP_TYPE(ulPropTag2))
+		/* Treat this as equal */
+		return KCERR_INVALID_PARAMETER;
+	if (PropCheck(lpProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
+		return KCERR_INVALID_PARAMETER;
+
 	ECRESULT	er = erSuccess;
 	int			nCompareResult = 0;
-	unsigned int ulPropTag1;
-	unsigned int ulPropTag2;
-
 	// List of prperties that get special treatment
 	static const struct {
 		ULONG		ulPropTag;
@@ -409,20 +377,6 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 	} sSpecials[] = {
 		{PR_ADDRESS_BOOK_ENTRYID, &CompareABEID},
 	};
-
-	if (lpProp1 == NULL || lpProp2 == NULL || lpCompareResult == NULL)
-		return KCERR_INVALID_PARAMETER;
-
-	ulPropTag1 = NormalizePropTag(lpProp1->ulPropTag);
-	ulPropTag2 = NormalizePropTag(lpProp2->ulPropTag);
-
-	if (PROP_TYPE(ulPropTag1) != PROP_TYPE(ulPropTag2))
-		// Treat this as equal
-		return KCERR_INVALID_PARAMETER;
-
-	// check soap union types and null pointers
-	if (PropCheck(lpProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
-		return KCERR_INVALID_PARAMETER;
 
 	// First check if the any of the properties is in the sSpecials list
 	for (size_t x = 0; x < ARRAY_SIZE(sSpecials); ++x) {
@@ -480,13 +434,12 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		break;
 	case PT_UNICODE:
 	case PT_STRING8:
-		if (lpProp1->Value.lpszA && lpProp2->Value.lpszA)
-			if(PROP_ID(lpProp2->ulPropTag) == PROP_ID(PR_ANR))
-				nCompareResult = u8_istartswith(lpProp1->Value.lpszA, lpProp2->Value.lpszA, locale);
-			else
-				nCompareResult = u8_icompare(lpProp1->Value.lpszA, lpProp2->Value.lpszA, locale);
-		else
+		if (lpProp1->Value.lpszA == nullptr || lpProp2->Value.lpszA == nullptr)
 			nCompareResult = lpProp1->Value.lpszA != lpProp2->Value.lpszA;
+		else if (PROP_ID(lpProp2->ulPropTag) == PROP_ID(PR_ANR))
+			nCompareResult = u8_istartswith(lpProp1->Value.lpszA, lpProp2->Value.lpszA, locale);
+		else
+			nCompareResult = u8_icompare(lpProp1->Value.lpszA, lpProp2->Value.lpszA, locale);
 		break;
 	case PT_SYSTIME:
 	case PT_CURRENCY:
@@ -508,127 +461,129 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		break;
 
 	case PT_MV_I2:
-		if (lpProp1->Value.mvi.__size == lpProp2->Value.mvi.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvi.__size; ++i) {
-				nCompareResult = twcmp(lpProp1->Value.mvi.__ptr[i], lpProp2->Value.mvi.__ptr[i]);
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvi.__size != lpProp2->Value.mvi.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvi.__size, lpProp2->Value.mvi.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvi.__size; ++i) {
+			nCompareResult = twcmp(lpProp1->Value.mvi.__ptr[i], lpProp2->Value.mvi.__ptr[i]);
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_LONG:
-		if (lpProp1->Value.mvl.__size == lpProp2->Value.mvl.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvl.__size; ++i) {
-				if(lpProp1->Value.mvl.__ptr[i] == lpProp2->Value.mvl.__ptr[i])
-                    nCompareResult = 0;
-				else if(lpProp1->Value.mvl.__ptr[i] < lpProp2->Value.mvl.__ptr[i])
-					nCompareResult = -1;
-				else
-					nCompareResult = 1;
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvl.__size != lpProp2->Value.mvl.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvl.__size, lpProp2->Value.mvl.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvl.__size; ++i) {
+			if (lpProp1->Value.mvl.__ptr[i] == lpProp2->Value.mvl.__ptr[i])
+				nCompareResult = 0;
+			else if (lpProp1->Value.mvl.__ptr[i] < lpProp2->Value.mvl.__ptr[i])
+				nCompareResult = -1;
+			else
+				nCompareResult = 1;
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_R4:
-		if (lpProp1->Value.mvflt.__size == lpProp2->Value.mvflt.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvflt.__size; ++i) {
-				if(lpProp1->Value.mvflt.__ptr[i] == lpProp2->Value.mvflt.__ptr[i])
-					nCompareResult = 0;
-				else if(lpProp1->Value.mvflt.__ptr[i] < lpProp2->Value.mvflt.__ptr[i])
-					nCompareResult = -1;
-				else
-					nCompareResult = 1;
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvflt.__size != lpProp2->Value.mvflt.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvflt.__size, lpProp2->Value.mvflt.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvflt.__size; ++i) {
+			if (lpProp1->Value.mvflt.__ptr[i] == lpProp2->Value.mvflt.__ptr[i])
+				nCompareResult = 0;
+			else if (lpProp1->Value.mvflt.__ptr[i] < lpProp2->Value.mvflt.__ptr[i])
+				nCompareResult = -1;
+			else
+				nCompareResult = 1;
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
-		if (lpProp1->Value.mvdbl.__size == lpProp2->Value.mvdbl.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvdbl.__size; ++i) {
-				if(lpProp1->Value.mvdbl.__ptr[i] == lpProp2->Value.mvdbl.__ptr[i])
-					nCompareResult = 0;
-				else if(lpProp1->Value.mvdbl.__ptr[i] < lpProp2->Value.mvdbl.__ptr[i])
-					nCompareResult = -1;
-				else
-					nCompareResult = 1;
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvdbl.__size != lpProp2->Value.mvdbl.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvdbl.__size, lpProp2->Value.mvdbl.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvdbl.__size; ++i) {
+			if (lpProp1->Value.mvdbl.__ptr[i] == lpProp2->Value.mvdbl.__ptr[i])
+				nCompareResult = 0;
+			else if (lpProp1->Value.mvdbl.__ptr[i] < lpProp2->Value.mvdbl.__ptr[i])
+				nCompareResult = -1;
+			else
+				nCompareResult = 1;
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_I8:
-		if (lpProp1->Value.mvli.__size == lpProp2->Value.mvli.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvli.__size; ++i) {
-				if(lpProp1->Value.mvli.__ptr[i] == lpProp2->Value.mvli.__ptr[i])
-					nCompareResult = 0;
-				else if(lpProp1->Value.mvli.__ptr[i] < lpProp2->Value.mvli.__ptr[i])
-					nCompareResult = -1;
-				else
-					nCompareResult = 1;
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvli.__size != lpProp2->Value.mvli.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvli.__size, lpProp2->Value.mvli.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvli.__size; ++i) {
+			if (lpProp1->Value.mvli.__ptr[i] == lpProp2->Value.mvli.__ptr[i])
+				nCompareResult = 0;
+			else if (lpProp1->Value.mvli.__ptr[i] < lpProp2->Value.mvli.__ptr[i])
+				nCompareResult = -1;
+			else
+				nCompareResult = 1;
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_SYSTIME:
 	case PT_MV_CURRENCY:
-		if (lpProp1->Value.mvhilo.__size == lpProp2->Value.mvhilo.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvhilo.__size; ++i) {
-				if(lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo < lpProp2->Value.mvhilo.__ptr[i].lo)
-					nCompareResult = -1;
-				else if(lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo > lpProp2->Value.mvhilo.__ptr[i].lo)
-					nCompareResult = 1;
-				else
-					nCompareResult = twcmp(lpProp1->Value.mvhilo.__ptr[i].hi, lpProp2->Value.mvhilo.__ptr[i].hi);
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvhilo.__size != lpProp2->Value.mvhilo.__size) {
 			nCompareResult = lpProp1->Value.mvhilo.__size == lpProp2->Value.mvhilo.__size;
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvhilo.__size; ++i) {
+			if (lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo < lpProp2->Value.mvhilo.__ptr[i].lo)
+				nCompareResult = -1;
+			else if (lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo > lpProp2->Value.mvhilo.__ptr[i].lo)
+				nCompareResult = 1;
+			else
+				nCompareResult = twcmp(lpProp1->Value.mvhilo.__ptr[i].hi, lpProp2->Value.mvhilo.__ptr[i].hi);
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_CLSID:
 	case PT_MV_BINARY:
-		if (lpProp1->Value.mvbin.__size == lpProp2->Value.mvbin.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvbin.__size; ++i) {
-				if(lpProp1->Value.mvbin.__ptr[i].__ptr && lpProp2->Value.mvbin.__ptr[i].__ptr &&
-				   lpProp1->Value.mvbin.__ptr[i].__size && lpProp2->Value.mvbin.__ptr[i].__size &&
-				   lpProp1->Value.mvbin.__ptr[i].__size == lpProp2->Value.mvbin.__ptr[i].__size)
-					nCompareResult = memcmp(lpProp1->Value.mvbin.__ptr[i].__ptr, lpProp2->Value.mvbin.__ptr[i].__ptr, lpProp1->Value.mvbin.__ptr[i].__size);
-				else
-					nCompareResult = twcmp(lpProp1->Value.mvbin.__ptr[i].__size, lpProp2->Value.mvbin.__ptr[i].__size);
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvbin.__size != lpProp2->Value.mvbin.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvbin.__size, lpProp2->Value.mvbin.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvbin.__size; ++i) {
+			if (lpProp1->Value.mvbin.__ptr[i].__ptr && lpProp2->Value.mvbin.__ptr[i].__ptr &&
+			    lpProp1->Value.mvbin.__ptr[i].__size && lpProp2->Value.mvbin.__ptr[i].__size &&
+			    lpProp1->Value.mvbin.__ptr[i].__size == lpProp2->Value.mvbin.__ptr[i].__size)
+				nCompareResult = memcmp(lpProp1->Value.mvbin.__ptr[i].__ptr, lpProp2->Value.mvbin.__ptr[i].__ptr, lpProp1->Value.mvbin.__ptr[i].__size);
+			else
+				nCompareResult = twcmp(lpProp1->Value.mvbin.__ptr[i].__size, lpProp2->Value.mvbin.__ptr[i].__size);
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
-		if (lpProp1->Value.mvszA.__size == lpProp2->Value.mvszA.__size) {
-			for (gsoap_size_t i = 0; i < lpProp1->Value.mvszA.__size; ++i) {
-				if (lpProp1->Value.mvszA.__ptr[i] && lpProp2->Value.mvszA.__ptr[i])
-					nCompareResult =u8_icompare(lpProp1->Value.mvszA.__ptr[i], lpProp2->Value.mvszA.__ptr[i], locale);
-				else
-					nCompareResult = lpProp1->Value.mvszA.__ptr[i] != lpProp2->Value.mvszA.__ptr[i];
-
-				if(nCompareResult != 0)
-					break;
-			}
-		} else
+		if (lpProp1->Value.mvszA.__size != lpProp2->Value.mvszA.__size) {
 			nCompareResult = twcmp(lpProp1->Value.mvszA.__size, lpProp2->Value.mvszA.__size);
+			break;
+		}
+		for (gsoap_size_t i = 0; i < lpProp1->Value.mvszA.__size; ++i) {
+			if (lpProp1->Value.mvszA.__ptr[i] && lpProp2->Value.mvszA.__ptr[i])
+				nCompareResult =u8_icompare(lpProp1->Value.mvszA.__ptr[i], lpProp2->Value.mvszA.__ptr[i], locale);
+			else
+				nCompareResult = lpProp1->Value.mvszA.__ptr[i] != lpProp2->Value.mvszA.__ptr[i];
+			if (nCompareResult != 0)
+				break;
+		}
 		break;
 	default:
 		return KCERR_INVALID_PARAMETER;
@@ -647,23 +602,20 @@ ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1,
     const struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale,
     bool *lpfMatch)
 {
-	ECRESULT er;
+	if (lpMVProp1 == nullptr || lpProp2 == nullptr || lpfMatch == nullptr)
+		return KCERR_INVALID_PARAMETER;
+	if ((PROP_TYPE(lpMVProp1->ulPropTag) & ~MV_FLAG) != PROP_TYPE(lpProp2->ulPropTag))
+		/* Treat this as equal */
+		return KCERR_INVALID_PARAMETER;
+	if (PropCheck(lpMVProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
+		return KCERR_INVALID_PARAMETER;
+
 	int			nCompareResult = -1; // Default, Don't change this to 0
 	bool		fMatch = false;
 	MVPropProxy pxyMVProp1(lpMVProp1);
 
-	if (lpMVProp1 == NULL || lpProp2 == NULL || lpfMatch == NULL)
-		return KCERR_INVALID_PARAMETER;
-	if ((PROP_TYPE(lpMVProp1->ulPropTag) & ~MV_FLAG) != PROP_TYPE(lpProp2->ulPropTag))
-		// Treat this as equal
-		return KCERR_INVALID_PARAMETER;
-
-	// check soap union types and null pointers
-	if (PropCheck(lpMVProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
-		return KCERR_INVALID_PARAMETER;
-
 	for (unsigned int i = 0; !fMatch && i < pxyMVProp1.size(); ++i) {
-		er = pxyMVProp1.compare(i, lpProp2, locale, &nCompareResult);
+		auto er = pxyMVProp1.compare(i, lpProp2, locale, &nCompareResult);
 		if (er != erSuccess)
 			return er;
 
@@ -756,11 +708,9 @@ size_t PropSize(const struct propVal *lpProp)
 
 ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 {
+	if (lpProp == nullptr)
+		return erSuccess;
 	ECRESULT er = erSuccess;
-
-	if(lpProp == NULL)
-		return er;
-
 	switch(PROP_TYPE(lpProp->ulPropTag)) {
 	case PT_I2:
 	case PT_LONG:
@@ -781,10 +731,10 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 		break;
 	case PT_CLSID:
 	case PT_BINARY:
-		if (lpProp->Value.bin) {
-			s_free(nullptr, lpProp->Value.bin->__ptr);
-			s_free(nullptr, lpProp->Value.bin);
-		}
+		if (lpProp->Value.bin == nullptr)
+			break;
+		s_free(nullptr, lpProp->Value.bin->__ptr);
+		s_free(nullptr, lpProp->Value.bin);
 		break;
 	case PT_MV_I2:
 		s_free(nullptr, lpProp->Value.mvi.__ptr);
@@ -808,21 +758,19 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 		break;
 	case PT_MV_CLSID:
 	case PT_MV_BINARY:
-		if(lpProp->Value.mvbin.__ptr)
-		{
-			for (gsoap_size_t i = 0; i < lpProp->Value.mvbin.__size; ++i)
-				s_free(nullptr, lpProp->Value.mvbin.__ptr[i].__ptr);
-			s_free(nullptr, lpProp->Value.mvbin.__ptr);
-		}
+		if (lpProp->Value.mvbin.__ptr == nullptr)
+			break;
+		for (gsoap_size_t i = 0; i < lpProp->Value.mvbin.__size; ++i)
+			s_free(nullptr, lpProp->Value.mvbin.__ptr[i].__ptr);
+		s_free(nullptr, lpProp->Value.mvbin.__ptr);
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
-		if(lpProp->Value.mvszA.__ptr)
-		{
-			for (gsoap_size_t i = 0; i < lpProp->Value.mvszA.__size; ++i)
-				s_free(nullptr, lpProp->Value.mvszA.__ptr[i]);
-			s_free(nullptr, lpProp->Value.mvszA.__ptr);
-		}
+		if (lpProp->Value.mvszA.__ptr == nullptr)
+			break;
+		for (gsoap_size_t i = 0; i < lpProp->Value.mvszA.__size; ++i)
+			s_free(nullptr, lpProp->Value.mvszA.__ptr[i]);
+		s_free(nullptr, lpProp->Value.mvszA.__ptr);
 		break;
 	case PT_SRESTRICTION:
 		if(lpProp->Value.res)
@@ -905,7 +853,6 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		if(lpRestrict->lpOr && lpRestrict->lpOr->__ptr) {
 			for (gsoap_size_t i = 0; i < lpRestrict->lpOr->__size; ++i) {
 				er = FreeRestrictTable(lpRestrict->lpOr->__ptr[i]);
-
 				if(er != erSuccess)
 					return er;
 			}
@@ -917,7 +864,6 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		if(lpRestrict->lpAnd && lpRestrict->lpAnd->__ptr) {
 			for (gsoap_size_t i = 0; i < lpRestrict->lpAnd->__size; ++i) {
 				er = FreeRestrictTable(lpRestrict->lpAnd->__ptr[i]);
-
 				if(er != erSuccess)
 					return er;
 			}
@@ -925,7 +871,6 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		}
 		s_free(nullptr, lpRestrict->lpAnd);
 		break;
-
 	case RES_NOT:
 		if(lpRestrict->lpNot && lpRestrict->lpNot->lpNot)
 			FreeRestrictTable(lpRestrict->lpNot->lpNot);
@@ -941,23 +886,18 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 			FreePropVal(lpRestrict->lpProp->lpProp, true);
 		s_free(nullptr, lpRestrict->lpProp);
 		break;
-
 	case RES_COMPAREPROPS:
 		s_free(nullptr, lpRestrict->lpCompare);
 		break;
-
 	case RES_BITMASK:
 		s_free(nullptr, lpRestrict->lpBitmask);
 		break;
-
 	case RES_SIZE:
 		s_free(nullptr, lpRestrict->lpSize);
 		break;
-
 	case RES_EXIST:
 		s_free(nullptr, lpRestrict->lpExist);
 		break;
-
 	case RES_COMMENT:
 		if (lpRestrict->lpComment == nullptr)
 			break;
@@ -966,13 +906,11 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		FreePropValArray(&lpRestrict->lpComment->sProps);
 		s_free(nullptr, lpRestrict->lpComment);
 		break;
-
 	case RES_SUBRESTRICTION:
 		if(lpRestrict->lpSub && lpRestrict->lpSub->lpSubObject)
 			FreeRestrictTable(lpRestrict->lpSub->lpSubObject);
 		s_free(nullptr, lpRestrict->lpSub);
 		break;
-
 	default:
 		er = KCERR_INVALID_TYPE;
 		// NOTE: don't exit here, delete lpRestrict
@@ -1027,19 +965,13 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		break;
 	case PT_UNICODE:
 	case PT_STRING8: {
-		size_t len;
-		
 		if (lpSrc->Value.lpszA == NULL)
 			return KCERR_INVALID_TYPE;
-		if (bTruncate)
-			len = u8_cappedbytes(lpSrc->Value.lpszA, TABLE_CAP_STRING);
-		else
-			len = strlen(lpSrc->Value.lpszA);
-		
-		lpDst->Value.lpszA = s_alloc<char>(soap, len+1);
+		size_t len = !bTruncate ? strlen(lpSrc->Value.lpszA) :
+		             u8_cappedbytes(lpSrc->Value.lpszA, TABLE_CAP_STRING);
+		lpDst->Value.lpszA = s_alloc<char>(soap, len + 1);
 		strncpy(lpDst->Value.lpszA, lpSrc->Value.lpszA, len);
-		*(lpDst->Value.lpszA+len) = 0; // null terminate after strncpy
-
+		lpDst->Value.lpszA[len] = '\0'; // null terminate after strncpy
 		break;
 	}
 	case PT_BINARY:
@@ -1105,9 +1037,9 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		lpDst->Value.mvszA.__size = lpSrc->Value.mvszA.__size;
 		lpDst->Value.mvszA.__ptr = s_alloc<char*>(soap, lpSrc->Value.mvszA.__size);
 		for (gsoap_size_t i = 0; i < lpSrc->Value.mvszA.__size; ++i) {
-			lpDst->Value.mvszA.__ptr[i] = s_alloc<char>(soap, strlen(lpSrc->Value.mvszA.__ptr[i])+1);
-			if(lpSrc->Value.mvszA.__ptr[i] == NULL)
-			    strcpy(lpDst->Value.mvszA.__ptr[i], "");
+			lpDst->Value.mvszA.__ptr[i] = s_alloc<char>(soap, strlen(lpSrc->Value.mvszA.__ptr[i]) + 1);
+			if (lpSrc->Value.mvszA.__ptr[i] == NULL)
+				strcpy(lpDst->Value.mvszA.__ptr[i], "");
 			else
 				strcpy(lpDst->Value.mvszA.__ptr[i], lpSrc->Value.mvszA.__ptr[i]);
 		}
@@ -1137,19 +1069,14 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst,
     struct soap *soap, bool bTruncate)
 {
-	ECRESULT er;
-	struct propVal *lpDst;
-
-	lpDst = s_alloc<struct propVal>(soap);
-
-	er = CopyPropVal(lpSrc, lpDst, soap);
+	auto lpDst = s_alloc<struct propVal>(soap);
+	auto er = CopyPropVal(lpSrc, lpDst, soap, bTruncate);
 	if (er != erSuccess) {
 		// there is no sub-alloc when there's an error, so we can remove lpDst
 		if (!soap)
 			s_free(nullptr, lpDst);
 		return er;
 	}
-
 	*lppDst = lpDst;
 	return erSuccess;
 }
@@ -1157,23 +1084,17 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst,
 ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
     struct propValArray **lppDst, struct soap *soap)
 {
-	ECRESULT er;
-	struct propValArray *lpDst = NULL;
-
-	if (lpSrc == NULL || lppDst == NULL)
+	if (lpSrc == nullptr || lppDst == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
-	lpDst = s_alloc<struct propValArray>(soap);
-
+	auto lpDst = s_alloc<struct propValArray>(soap);
 	if(lpSrc->__size > 0) {
-		er = CopyPropValArray(lpSrc, lpDst, soap);
+		auto er = CopyPropValArray(lpSrc, lpDst, soap);
 		if(er != erSuccess)
 			return er;
 	}else {
 		lpDst->__ptr = NULL;
 		lpDst->__size = 0;
 	}
-
 	*lppDst = lpDst;
 	return erSuccess;
 }
@@ -1181,17 +1102,14 @@ ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
 ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
     struct propValArray *lpDst, struct soap *soap)
 {
-	ECRESULT er;
-
-	if (lpSrc == NULL)
+	if (lpSrc == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
 	lpDst->__ptr = s_alloc<struct propVal>(soap, lpSrc->__size);
 	lpDst->__size = lpSrc->__size;
 	memset(lpDst->__ptr, 0, sizeof(propVal)*lpDst->__size);
 
 	for (gsoap_size_t i = 0; i < lpSrc->__size; ++i) {
-		er = CopyPropVal(&lpSrc->__ptr[i], &lpDst->__ptr[i], soap);
+		auto er = CopyPropVal(&lpSrc->__ptr[i], &lpDst->__ptr[i], soap);
 		if(er != erSuccess) {
 			if (!soap) {
 				s_free(nullptr, lpDst->__ptr);
@@ -1207,148 +1125,117 @@ ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
 ECRESULT CopyRestrictTable(struct soap *soap,
     const struct restrictTable *lpSrc, struct restrictTable **lppDst)
 {
-	ECRESULT er;
-	struct restrictTable *lpDst = NULL;
-
-	if (lpSrc == NULL)
+	if (lpSrc == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
-	lpDst = s_alloc<struct restrictTable>(soap);
+	auto lpDst = s_alloc<struct restrictTable>(soap);
 	memset(lpDst, 0, sizeof(restrictTable));
-
 	lpDst->ulType = lpSrc->ulType;
 
 	switch(lpSrc->ulType) {
 	case RES_OR:
 		if (lpSrc->lpOr == NULL)
 			return KCERR_INVALID_TYPE;
-
 		lpDst->lpOr = s_alloc<restrictOr>(soap);
-
 		lpDst->lpOr->__ptr = s_alloc<restrictTable *>(soap, lpSrc->lpOr->__size);
 		lpDst->lpOr->__size = lpSrc->lpOr->__size;
 		memset(lpDst->lpOr->__ptr, 0, sizeof(restrictTable *) * lpSrc->lpOr->__size);
 
 		for (gsoap_size_t i = 0; i < lpSrc->lpOr->__size; ++i) {
-			er = CopyRestrictTable(soap, lpSrc->lpOr->__ptr[i], &lpDst->lpOr->__ptr[i]);
-
+			auto er = CopyRestrictTable(soap, lpSrc->lpOr->__ptr[i], &lpDst->lpOr->__ptr[i]);
 			if(er != erSuccess)
 				return er;
 		}
-
 		break;
 	case RES_AND:
 		if(lpSrc->lpAnd == NULL)
 			return KCERR_INVALID_TYPE;
 		lpDst->lpAnd = s_alloc<restrictAnd>(soap);
-
 		lpDst->lpAnd->__ptr = s_alloc<restrictTable *>(soap, lpSrc->lpAnd->__size);
 		lpDst->lpAnd->__size = lpSrc->lpAnd->__size;
 		memset(lpDst->lpAnd->__ptr, 0, sizeof(restrictTable *) * lpSrc->lpAnd->__size);
 
 		for (gsoap_size_t i = 0; i < lpSrc->lpAnd->__size; ++i) {
-			er = CopyRestrictTable(soap, lpSrc->lpAnd->__ptr[i], &lpDst->lpAnd->__ptr[i]);
-
+			auto er = CopyRestrictTable(soap, lpSrc->lpAnd->__ptr[i], &lpDst->lpAnd->__ptr[i]);
 			if(er != erSuccess)
 				return er;
 		}
 		break;
-
-	case RES_NOT:
+	case RES_NOT: {
 		lpDst->lpNot = s_alloc<restrictNot>(soap);
 		memset(lpDst->lpNot, 0, sizeof(restrictNot));
-
-		er = CopyRestrictTable(soap, lpSrc->lpNot->lpNot, &lpDst->lpNot->lpNot);
-
+		auto er = CopyRestrictTable(soap, lpSrc->lpNot->lpNot, &lpDst->lpNot->lpNot);
 		if(er != erSuccess)
 			return er;
 		break;
+	}
 	case RES_CONTENT:
 		lpDst->lpContent = s_alloc<restrictContent>(soap);
 		memset(lpDst->lpContent, 0, sizeof(restrictContent));
-
 		lpDst->lpContent->ulFuzzyLevel = lpSrc->lpContent->ulFuzzyLevel;
 		lpDst->lpContent->ulPropTag = lpSrc->lpContent->ulPropTag;
 
 		if(lpSrc->lpContent->lpProp) {
-			er = CopyPropVal(lpSrc->lpContent->lpProp, &lpDst->lpContent->lpProp, soap);
+			auto er = CopyPropVal(lpSrc->lpContent->lpProp, &lpDst->lpContent->lpProp, soap);
 			if(er != erSuccess)
 				return er;
 		}
-
 		break;
-	case RES_PROPERTY:
+	case RES_PROPERTY: {
 		lpDst->lpProp = s_alloc<restrictProp>(soap);
 		memset(lpDst->lpProp, 0, sizeof(restrictProp));
-
 		lpDst->lpProp->ulType = lpSrc->lpProp->ulType;
 		lpDst->lpProp->ulPropTag = lpSrc->lpProp->ulPropTag;
-
-		er = CopyPropVal(lpSrc->lpProp->lpProp, &lpDst->lpProp->lpProp, soap);
-
+		auto er = CopyPropVal(lpSrc->lpProp->lpProp, &lpDst->lpProp->lpProp, soap);
 		if(er != erSuccess)
 			return er;
 		break;
-
+	}
 	case RES_COMPAREPROPS:
 		lpDst->lpCompare = s_alloc<restrictCompare>(soap);
 		memset(lpDst->lpCompare, 0 , sizeof(restrictCompare));
-
 		lpDst->lpCompare->ulType = lpSrc->lpCompare->ulType;
 		lpDst->lpCompare->ulPropTag1 = lpSrc->lpCompare->ulPropTag1;
 		lpDst->lpCompare->ulPropTag2 = lpSrc->lpCompare->ulPropTag2;
 		break;
-
 	case RES_BITMASK:
 		lpDst->lpBitmask = s_alloc<restrictBitmask>(soap);
 		memset(lpDst->lpBitmask, 0, sizeof(restrictBitmask));
-
 		lpDst->lpBitmask->ulMask = lpSrc->lpBitmask->ulMask;
 		lpDst->lpBitmask->ulPropTag = lpSrc->lpBitmask->ulPropTag;
 		lpDst->lpBitmask->ulType = lpSrc->lpBitmask->ulType;
 		break;
-
 	case RES_SIZE:
 		lpDst->lpSize = s_alloc<restrictSize>(soap);
 		memset(lpDst->lpSize, 0, sizeof(restrictSize));
-
 		lpDst->lpSize->ulPropTag = lpSrc->lpSize->ulPropTag;
 		lpDst->lpSize->ulType = lpSrc->lpSize->ulType;
 		lpDst->lpSize->cb = lpSrc->lpSize->cb;
 		break;
-
 	case RES_EXIST:
 		lpDst->lpExist = s_alloc<restrictExist>(soap);
 		memset(lpDst->lpExist, 0, sizeof(restrictExist));
-
 		lpDst->lpExist->ulPropTag = lpSrc->lpExist->ulPropTag;
 		break;
-
-	case RES_COMMENT:
+	case RES_COMMENT: {
 		lpDst->lpComment = s_alloc<restrictComment>(soap);
 		memset(lpDst->lpComment, 0, sizeof(restrictComment));
-
-		er = CopyPropValArray(&lpSrc->lpComment->sProps, &lpDst->lpComment->sProps, soap);
+		auto er = CopyPropValArray(&lpSrc->lpComment->sProps, &lpDst->lpComment->sProps, soap);
 		if (er != erSuccess)
 			return er;
 		er = CopyRestrictTable(soap, lpSrc->lpComment->lpResTable, &lpDst->lpComment->lpResTable);
 		if(er != erSuccess)
 			return er;
-
 		break;
-
-	case RES_SUBRESTRICTION:
+	}
+	case RES_SUBRESTRICTION: {
 	    lpDst->lpSub = s_alloc<restrictSub>(soap);
 	    memset(lpDst->lpSub, 0, sizeof(restrictSub));
-
 	    lpDst->lpSub->ulSubObject = lpSrc->lpSub->ulSubObject;
-
-		er = CopyRestrictTable(soap, lpSrc->lpSub->lpSubObject, &lpDst->lpSub->lpSubObject);
-
+		auto er = CopyRestrictTable(soap, lpSrc->lpSub->lpSubObject, &lpDst->lpSub->lpSubObject);
 		if(er != erSuccess)
 			return er;
-
-        break;
+	        break;
+	}
 	default:
 		return KCERR_INVALID_TYPE;
 	}
@@ -1371,12 +1258,9 @@ ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase)
 
 ECRESULT CopyEntryId(struct soap *soap, entryId* lpSrc, entryId** lppDst)
 {
-	entryId* lpDst = NULL;
-
-	if (lpSrc == NULL)
+	if (lpSrc == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
-	lpDst = s_alloc<entryId>(soap);
+	auto lpDst = s_alloc<entryId>(soap);
 	lpDst->__size = lpSrc->__size;
 
 	if(lpSrc->__size > 0) {
@@ -1392,12 +1276,9 @@ ECRESULT CopyEntryId(struct soap *soap, entryId* lpSrc, entryId** lppDst)
 
 ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryList **lppDst)
 {
-	struct entryList *lpDst = NULL;
-
-	if (lpSrc == NULL)
+	if (lpSrc == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
-	lpDst = s_alloc<entryList>(soap);
+	auto lpDst = s_alloc<entryList>(soap);
 	lpDst->__size = lpSrc->__size;
 	if(lpSrc->__size > 0)
 		lpDst->__ptr = s_alloc<entryId>(soap, lpSrc->__size);
@@ -1432,9 +1313,7 @@ ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 		return erSuccess;
 
 	if(lpNotification->obj != NULL){
-
 		FreePropTagArray(lpNotification->obj->pPropTagArray);
-
 		FreeEntryId(lpNotification->obj->pEntryId, true);
 		FreeEntryId(lpNotification->obj->pOldId, true);
 		FreeEntryId(lpNotification->obj->pOldParentId, true);
@@ -1445,12 +1324,10 @@ ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 	if(lpNotification->tab != NULL) {
 		if(lpNotification->tab->pRow != NULL)
 			FreePropValArray(lpNotification->tab->pRow, true);
-
 		if(lpNotification->tab->propIndex.Value.bin != NULL) {
 			s_free(nullptr, lpNotification->tab->propIndex.Value.bin->__ptr);
 			s_free(nullptr, lpNotification->tab->propIndex.Value.bin);
 		}
-
 		if(lpNotification->tab->propPrior.Value.bin != NULL) {
 			s_free(nullptr, lpNotification->tab->propPrior.Value.bin->__ptr);
 			s_free(nullptr, lpNotification->tab->propPrior.Value.bin);
@@ -1464,12 +1341,10 @@ ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 		FreeEntryId(lpNotification->newmail->pParentId, true);
 		s_free(nullptr, lpNotification->newmail);
 	}
-
 	if(lpNotification->ics != NULL) {
 		FreeEntryId(lpNotification->ics->pSyncState, true);
 		s_free(nullptr, lpNotification->ics);
 	}
-
 	if(bFreeBase)
 		s_free(nullptr, lpNotification);
 	return erSuccess;
@@ -1488,47 +1363,32 @@ ECRESULT CopyNotificationStruct(struct soap *soap,
 	rNotifyTo.ulConnection	= lpNotification->ulConnection;
 
 	if(lpNotification->tab != NULL) {
-
 		rNotifyTo.tab =	s_alloc<notificationTable>(soap);
-
 		memset(rNotifyTo.tab, 0, sizeof(notificationTable));
-
 		rNotifyTo.tab->hResult = lpNotification->tab->hResult;
 		rNotifyTo.tab->ulTableEvent = lpNotification->tab->ulTableEvent;
-
 		CopyPropVal(&lpNotification->tab->propIndex, &rNotifyTo.tab->propIndex, soap);
 		CopyPropVal(&lpNotification->tab->propPrior, &rNotifyTo.tab->propPrior, soap);
-
 		// Ignore errors
 		CopyPropValArray(lpNotification->tab->pRow, &rNotifyTo.tab->pRow, soap);
-
 		rNotifyTo.tab->ulObjType = lpNotification->tab->ulObjType;
-
 	}else if(lpNotification->obj != NULL) {
-
 		rNotifyTo.obj = s_alloc<notificationObject>(soap);
 		memset(rNotifyTo.obj, 0, sizeof(notificationObject));
-
 		rNotifyTo.obj->ulObjType		= lpNotification->obj->ulObjType;
-
 		// Ignore errors, sometimes nothing to copy
 		CopyEntryId(soap, lpNotification->obj->pEntryId, &rNotifyTo.obj->pEntryId);
 		CopyEntryId(soap, lpNotification->obj->pParentId, &rNotifyTo.obj->pParentId);
 		CopyEntryId(soap, lpNotification->obj->pOldId, &rNotifyTo.obj->pOldId);
 		CopyEntryId(soap, lpNotification->obj->pOldParentId, &rNotifyTo.obj->pOldParentId);
 		CopyPropTagArray(soap, lpNotification->obj->pPropTagArray, &rNotifyTo.obj->pPropTagArray);
-
 	}else if(lpNotification->newmail != NULL){
 		rNotifyTo.newmail = s_alloc<notificationNewMail>(soap);
-
 		memset(rNotifyTo.newmail, 0, sizeof(notificationNewMail));
-
 		// Ignore errors, sometimes nothing to copy
 		CopyEntryId(soap, lpNotification->newmail->pEntryId, &rNotifyTo.newmail->pEntryId);
 		CopyEntryId(soap, lpNotification->newmail->pParentId, &rNotifyTo.newmail->pParentId);
-
 		rNotifyTo.newmail->ulMessageFlags	= lpNotification->newmail->ulMessageFlags;
-
 		if(lpNotification->newmail->lpszMessageClass) {
 			nLen = (int)strlen(lpNotification->newmail->lpszMessageClass)+1;
 			rNotifyTo.newmail->lpszMessageClass = s_alloc<char>(soap, nLen);
@@ -1537,7 +1397,6 @@ ECRESULT CopyNotificationStruct(struct soap *soap,
 	}else if(lpNotification->ics != NULL){
 		rNotifyTo.ics = s_alloc<notificationICS>(soap);
 		memset(rNotifyTo.ics, 0, sizeof(notificationICS));
-
 		// We use CopyEntryId as it just copied binary data
 		CopyEntryId(soap, lpNotification->ics->pSyncState, &rNotifyTo.ics->pSyncState);
 	}
@@ -1562,12 +1421,10 @@ ECRESULT CopyNotificationArrayStruct(notificationArray *lpNotifyArrayFrom, notif
 {
 	if (lpNotifyArrayFrom == NULL)
 		return KCERR_INVALID_PARAMETER;
-
 	if (lpNotifyArrayFrom->__size > 0)
 		lpNotifyArrayTo->__ptr = s_alloc<notification>(nullptr, lpNotifyArrayFrom->__size);
 	else
 		lpNotifyArrayTo->__ptr = NULL;
-
 	lpNotifyArrayTo->__size = lpNotifyArrayFrom->__size;
 	for (gsoap_size_t i = 0; i < lpNotifyArrayFrom->__size; ++i)
 		CopyNotificationStruct(NULL, &lpNotifyArrayFrom->__ptr[i], lpNotifyArrayTo->__ptr[i]);
@@ -1579,7 +1436,7 @@ ECRESULT FreeEntryId(entryId* lpEntryId, bool bFreeBase)
 	if(lpEntryId == NULL)
 		return erSuccess;
 	s_free(nullptr, lpEntryId->__ptr);
-	if(bFreeBase == true)
+	if (bFreeBase)
 		s_free(nullptr, lpEntryId);
 	else
 		lpEntryId->__size = 0;
@@ -1588,20 +1445,16 @@ ECRESULT FreeEntryId(entryId* lpEntryId, bool bFreeBase)
 
 ECRESULT CopyRightsArrayToSoap(struct soap *soap, struct rightsArray *lpRightsArraySrc, struct rightsArray **lppRightsArrayDst)
 {
-	struct rightsArray	*lpRightsArrayDst = NULL;
-
-	if (soap == NULL || lpRightsArraySrc == NULL || lppRightsArrayDst == NULL)
+	if (soap == nullptr || lpRightsArraySrc == nullptr ||
+	    lppRightsArrayDst == nullptr)
 		return KCERR_INVALID_PARAMETER;
-
-	lpRightsArrayDst = s_alloc<struct rightsArray>(soap);
+	auto lpRightsArrayDst = s_alloc<struct rightsArray>(soap);
 	memset(lpRightsArrayDst, 0, sizeof *lpRightsArrayDst);
-
 	lpRightsArrayDst->__size = lpRightsArraySrc->__size;
 	lpRightsArrayDst->__ptr = s_alloc<struct rights>(soap, lpRightsArraySrc->__size);
 
 	for (gsoap_size_t i = 0; i < lpRightsArraySrc->__size; ++i) {
 		lpRightsArrayDst->__ptr[i] = lpRightsArraySrc->__ptr[i];
-
 		lpRightsArrayDst->__ptr[i].sUserId.__ptr = s_alloc<unsigned char>(soap, lpRightsArrayDst->__ptr[i].sUserId.__size);
 		memcpy(lpRightsArrayDst->__ptr[i].sUserId.__ptr, lpRightsArraySrc->__ptr[i].sUserId.__ptr, lpRightsArraySrc->__ptr[i].sUserId.__size);
 	}
@@ -1643,18 +1496,14 @@ ECRESULT MergePropValArray(struct soap *soap,
     const struct propValArray *lpsPropValArray2,
     struct propValArray *lpPropValArrayNew)
 {
-	ECRESULT er;
-	const struct propVal *lpsPropVal;
-
 	lpPropValArrayNew->__ptr = s_alloc<struct propVal>(soap, lpsPropValArray1->__size + lpsPropValArray2->__size);
 	lpPropValArrayNew->__size = 0;
 
 	for (gsoap_size_t i = 0; i < lpsPropValArray1->__size; ++i) {
-		lpsPropVal = SpropValFindPropVal(lpsPropValArray2, lpsPropValArray1->__ptr[i].ulPropTag);
+		auto lpsPropVal = SpropValFindPropVal(lpsPropValArray2, lpsPropValArray1->__ptr[i].ulPropTag);
 		if(lpsPropVal == NULL)
 			lpsPropVal = &lpsPropValArray1->__ptr[i];
-
-		er = CopyPropVal(lpsPropVal, &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
+		auto er = CopyPropVal(lpsPropVal, &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
 		if(er != erSuccess)
 			return er;
 		++lpPropValArrayNew->__size;
@@ -1662,11 +1511,10 @@ ECRESULT MergePropValArray(struct soap *soap,
 
 	//Merge items
 	for (gsoap_size_t i = 0; i < lpsPropValArray2->__size; ++i) {
-		lpsPropVal = SpropValFindPropVal(lpPropValArrayNew, lpsPropValArray2->__ptr[i].ulPropTag);
+		auto lpsPropVal = SpropValFindPropVal(lpPropValArrayNew, lpsPropValArray2->__ptr[i].ulPropTag);
 		if(lpsPropVal != NULL)
 			continue; // Already exist
-
-		er = CopyPropVal(&lpsPropValArray2->__ptr[i], &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
+		auto er = CopyPropVal(&lpsPropValArray2->__ptr[i], &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
 		if(er != erSuccess)
 			return er;
 		++lpPropValArrayNew->__size;
@@ -1677,16 +1525,14 @@ ECRESULT MergePropValArray(struct soap *soap,
 ECRESULT CopySearchCriteria(struct soap *soap,
     const struct searchCriteria *lpSrc, struct searchCriteria **lppDst)
 {
-	ECRESULT er = erSuccess;
-	struct searchCriteria *lpDst = NULL;
-
-	if (lpSrc == NULL)
+	if (lpSrc == nullptr)
 		return KCERR_NOT_FOUND;
 
-	lpDst = s_alloc<searchCriteria>(nullptr);
+	ECRESULT er = erSuccess;
+	auto lpDst = s_alloc<searchCriteria>(nullptr);
 	memset(lpDst, '\0', sizeof(*lpDst));
 	if(lpSrc->lpRestrict) {
-    	er = CopyRestrictTable(soap, lpSrc->lpRestrict, &lpDst->lpRestrict);
+		er = CopyRestrictTable(soap, lpSrc->lpRestrict, &lpDst->lpRestrict);
 		if (er != erSuccess)
 			goto exit;
     } else {
@@ -1694,7 +1540,7 @@ ECRESULT CopySearchCriteria(struct soap *soap,
     }
 
 	if(lpSrc->lpFolders) {
-    	er = CopyEntryList(soap, lpSrc->lpFolders, &lpDst->lpFolders);
+		er = CopyEntryList(soap, lpSrc->lpFolders, &lpDst->lpFolders);
 		if (er != erSuccess)
 			goto exit;
     } else {
@@ -1702,7 +1548,6 @@ ECRESULT CopySearchCriteria(struct soap *soap,
     }
 
 	lpDst->ulFlags = lpSrc->ulFlags;
-
 	*lppDst = lpDst;
 exit:
 	if (er != erSuccess && lpDst != NULL) {
@@ -1715,14 +1560,14 @@ exit:
 
 ECRESULT FreeSearchCriteria(struct searchCriteria *lpSearchCriteria)
 {
-	ECRESULT er = erSuccess;
+	if (lpSearchCriteria == nullptr)
+		return erSuccess;
 	if(lpSearchCriteria->lpRestrict)
 		FreeRestrictTable(lpSearchCriteria->lpRestrict);
-
 	if(lpSearchCriteria->lpFolders)
 		FreeEntryList(lpSearchCriteria->lpFolders);
 	s_free(nullptr, lpSearchCriteria);
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -1734,7 +1579,6 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
     struct propmapPairArray **lppsoapPropmap,
     struct propmapMVPairArray **lppsoapMVPropmap)
 {
-	ECRESULT er = erSuccess;
 	struct propmapPairArray *lpsoapPropmap = NULL;
 	struct propmapMVPairArray *lpsoapMVPropmap = NULL;
 	property_map propmap = details.GetPropMapAnonymous();
@@ -1752,7 +1596,6 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 				lpsoapPropmap->__ptr[lpsoapPropmap->__size++].lpszValue = s_strcpy(soap, strData.c_str());
 				continue;
 			}
-
 			if (PROP_TYPE(iter.first) != PT_STRING8 && PROP_TYPE(iter.first) != PT_UNICODE)
 				continue;
 			lpsoapPropmap->__ptr[lpsoapPropmap->__size].ulPropId = iter.first;
@@ -1796,11 +1639,9 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 
 	if (lppsoapPropmap)
 		*lppsoapPropmap = lpsoapPropmap;
-
 	if (lppsoapMVPropmap)
 		*lppsoapMVPropmap = lpsoapMVPropmap;
-
-	return er;
+	return erSuccess;
 }
 
 static ECRESULT
@@ -1834,7 +1675,6 @@ CopyAnonymousDetailsFromSoap(struct propmapPairArray *lpsoapPropmap,
 
 ECRESULT CopyUserDetailsToSoap(unsigned int ulId, entryId *lpUserEid, const objectdetails_t &details, bool bCopyBinary, struct soap *soap, struct user *lpUser)
 {
-	ECRESULT er = erSuccess;
 	const objectclass_t objClass = details.GetClass();
 
 	// assert(OBJECTCLASS_TYPE(objClass) == OBJECTTYPE_MAILUSER);
@@ -1851,60 +1691,42 @@ ECRESULT CopyUserDetailsToSoap(unsigned int ulId, entryId *lpUserEid, const obje
 	lpUser->ulCapacity = details.GetPropInt(OB_PROP_I_RESOURCE_CAPACITY);
 	lpUser->lpsPropmap = NULL;
 	lpUser->lpsMVPropmap = NULL;
-
 	CopyAnonymousDetailsToSoap(soap, details, bCopyBinary, &lpUser->lpsPropmap, &lpUser->lpsMVPropmap);
-
 	// Lazy copy
 	lpUser->sUserId.__size = lpUserEid->__size;
 	lpUser->sUserId.__ptr = lpUserEid->__ptr;
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyUserDetailsFromSoap(struct user *lpUser,
     std::string *lpstrExternId, objectdetails_t *details, struct soap *soap)
 {
-	ECRESULT er = erSuccess;
-
 	if (lpUser->lpszUsername)
 		details->SetPropString(OB_PROP_S_LOGIN, lpUser->lpszUsername);
-
 	if (lpUser->lpszMailAddress)
 		details->SetPropString(OB_PROP_S_EMAIL, lpUser->lpszMailAddress);
-
 	if (lpUser->ulIsAdmin != (ULONG)-1)
 		details->SetPropInt(OB_PROP_I_ADMINLEVEL, lpUser->ulIsAdmin);
-
 	if (lpUser->ulObjClass != (ULONG)-1)
 		details->SetClass((objectclass_t)lpUser->ulObjClass);
-
 	if (lpUser->lpszFullName)
 		details->SetPropString(OB_PROP_S_FULLNAME, lpUser->lpszFullName);
-
 	if (lpUser->lpszPassword)
 		details->SetPropString(OB_PROP_S_PASSWORD, lpUser->lpszPassword);
-
 	if (lpstrExternId)
 		details->SetPropObject(OB_PROP_O_EXTERNID, objectid_t(*lpstrExternId, details->GetClass()));
-
 	if (lpUser->lpszServername)
 		details->SetPropString(OB_PROP_S_SERVERNAME, lpUser->lpszServername);
-
 	if (lpUser->ulIsABHidden != (ULONG)-1)
 		details->SetPropBool(OB_PROP_B_AB_HIDDEN, !!lpUser->ulIsABHidden);
-
 	if (lpUser->ulCapacity != (ULONG)-1)
 		details->SetPropInt(OB_PROP_I_RESOURCE_CAPACITY, lpUser->ulCapacity);
-
 	CopyAnonymousDetailsFromSoap(lpUser->lpsPropmap, lpUser->lpsMVPropmap, details);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyGroupDetailsToSoap(unsigned int ulId, entryId *lpGroupEid, const objectdetails_t &details, bool bCopyBinary, struct soap *soap, struct group *lpGroup)
 {
-	ECRESULT er = erSuccess;
-
 	// assert(OBJECTCLASS_TYPE(details.GetClass()) == OBJECTTYPE_DISTLIST);
 	lpGroup->ulGroupId = ulId;
 	lpGroup->lpszGroupname = s_strcpy(soap, details.GetPropString(OB_PROP_S_LOGIN).c_str());
@@ -1913,45 +1735,32 @@ ECRESULT CopyGroupDetailsToSoap(unsigned int ulId, entryId *lpGroupEid, const ob
 	lpGroup->ulIsABHidden = details.GetPropBool(OB_PROP_B_AB_HIDDEN);
 	lpGroup->lpsPropmap = NULL;
 	lpGroup->lpsMVPropmap = NULL;
-
 	CopyAnonymousDetailsToSoap(soap, details, bCopyBinary, &lpGroup->lpsPropmap, &lpGroup->lpsMVPropmap);
-
 	// Lazy copy
 	lpGroup->sGroupId.__size = lpGroupEid->__size;
 	lpGroup->sGroupId.__ptr = lpGroupEid->__ptr;
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyGroupDetailsFromSoap(struct group *lpGroup,
     std::string *lpstrExternId, objectdetails_t *details, struct soap *soap)
 {
-	ECRESULT er = erSuccess;
-
 	if (lpGroup->lpszGroupname)
 		details->SetPropString(OB_PROP_S_LOGIN, lpGroup->lpszGroupname);
-
 	if (lpGroup->lpszFullname)
 		details->SetPropString(OB_PROP_S_FULLNAME, lpGroup->lpszFullname);
-
 	if (lpGroup->lpszFullEmail)
 		details->SetPropString(OB_PROP_S_EMAIL, lpGroup->lpszFullEmail);
-
 	if (lpstrExternId)
 		details->SetPropObject(OB_PROP_O_EXTERNID, objectid_t(*lpstrExternId, details->GetClass()));
-
 	if (lpGroup->ulIsABHidden != (ULONG)-1)
 		details->SetPropBool(OB_PROP_B_AB_HIDDEN, !!lpGroup->ulIsABHidden);
-
 	CopyAnonymousDetailsFromSoap(lpGroup->lpsPropmap, lpGroup->lpsMVPropmap, details);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyCompanyDetailsToSoap(unsigned int ulId, entryId *lpCompanyEid, unsigned int ulAdmin, entryId *lpAdminEid, const objectdetails_t &details, bool bCopyBinary, struct soap *soap, struct company *lpCompany)
 {
-	ECRESULT er = erSuccess;
-
 	// assert(details.GetClass() == CONTAINER_COMPANY);
 	lpCompany->ulCompanyId = ulId;
 	lpCompany->lpszCompanyname = s_strcpy(soap, details.GetPropString(OB_PROP_S_FULLNAME).c_str());
@@ -1960,44 +1769,31 @@ ECRESULT CopyCompanyDetailsToSoap(unsigned int ulId, entryId *lpCompanyEid, unsi
 	lpCompany->ulIsABHidden = details.GetPropBool(OB_PROP_B_AB_HIDDEN);
 	lpCompany->lpsPropmap = NULL;
 	lpCompany->lpsMVPropmap = NULL;
-
 	CopyAnonymousDetailsToSoap(soap, details, bCopyBinary, &lpCompany->lpsPropmap, &lpCompany->lpsMVPropmap);
-	
 	// Lazy copy
 	lpCompany->sCompanyId.__size = lpCompanyEid->__size;
 	lpCompany->sCompanyId.__ptr = lpCompanyEid->__ptr;
-	
-	// Lazy copy
 	lpCompany->sAdministrator.__size = lpAdminEid->__size;
 	lpCompany->sAdministrator.__ptr = lpAdminEid->__ptr;
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyCompanyDetailsFromSoap(struct company *lpCompany,
     std::string *lpstrExternId, unsigned int ulAdmin, objectdetails_t *details,
     struct soap *soap)
 {
-	ECRESULT er = erSuccess;
-
 	if (lpCompany->lpszCompanyname)
 		details->SetPropString(OB_PROP_S_FULLNAME, lpCompany->lpszCompanyname);
-
 	if (lpCompany->lpszServername)
 		details->SetPropString(OB_PROP_S_SERVERNAME, lpCompany->lpszServername);
-
 	if (lpstrExternId)
 		details->SetPropObject(OB_PROP_O_EXTERNID, objectid_t(*lpstrExternId, details->GetClass()));
- 
 	if (ulAdmin)
 		details->SetPropInt(OB_PROP_I_SYSADMIN, ulAdmin);
-
 	if (lpCompany->ulIsABHidden != (ULONG)-1)
 		details->SetPropBool(OB_PROP_B_AB_HIDDEN, !!lpCompany->ulIsABHidden);
-
 	CopyAnonymousDetailsFromSoap(lpCompany->lpsPropmap, lpCompany->lpsMVPropmap, details);
-
-	return er;
+	return erSuccess;
 }
 
 DynamicPropValArray::DynamicPropValArray(struct soap *soap,
@@ -2018,52 +1814,42 @@ DynamicPropValArray::~DynamicPropValArray()
     
 ECRESULT DynamicPropValArray::AddPropVal(struct propVal &propVal)
 {
-	ECRESULT er;
-    
     if(m_ulCapacity == m_ulPropCount) {
         if(m_ulCapacity == 0)
 			++m_ulCapacity;
-        er = Resize(m_ulCapacity * 2);
+		auto er = Resize(m_ulCapacity * 2);
         if(er != erSuccess)
 			return er;
     }
-    
-    er = CopyPropVal(&propVal, &m_lpPropVals[m_ulPropCount], m_soap);
+	auto er = CopyPropVal(&propVal, &m_lpPropVals[m_ulPropCount], m_soap);
     if(er != erSuccess)
 		return er;
-        
 	++m_ulPropCount;
     return erSuccess;
 }
 
-ECRESULT DynamicPropValArray::GetPropValArray(struct propValArray *lpPropValArray)
+ECRESULT DynamicPropValArray::GetPropValArray(struct propValArray *lpPropValArray, bool release)
 {
-    ECRESULT er = erSuccess;
-    
     lpPropValArray->__size = m_ulPropCount;
     lpPropValArray->__ptr = m_lpPropVals; // Transfer ownership to the caller
-    
-    m_lpPropVals = NULL;					// We don't own these anymore
-    m_ulPropCount = 0;
-    m_ulCapacity = 0;
-    
-    return er;
+	if (release) {
+		m_lpPropVals = nullptr;					// We don't own these anymore
+		m_ulPropCount = 0;
+		m_ulCapacity = 0;
+	}
+	return erSuccess;
 }
 
 ECRESULT DynamicPropValArray::Resize(unsigned int ulSize)
 {
-	ECRESULT er;
-    struct propVal *lpNew = NULL;
-    
 	if (ulSize < m_ulCapacity)
 		return KCERR_INVALID_PARAMETER;
-    
-	lpNew = s_alloc_nothrow<struct propVal>(m_soap, ulSize);
+	auto lpNew = s_alloc_nothrow<struct propVal>(m_soap, ulSize);
 	if (lpNew == NULL)
 		return KCERR_NOT_ENOUGH_MEMORY;
     
 	for (unsigned int i = 0; i < m_ulPropCount; ++i) {
-        er = CopyPropVal(&m_lpPropVals[i], &lpNew[i], m_soap);
+		auto er = CopyPropVal(&m_lpPropVals[i], &lpNew[i], m_soap);
         if(er != erSuccess)
 			return er;
 	}
@@ -2073,7 +1859,6 @@ ECRESULT DynamicPropValArray::Resize(unsigned int ulSize)
 			FreePropVal(&m_lpPropVals[i], false);
 		s_free(nullptr, m_lpPropVals);
 	}
-	
     m_lpPropVals = lpNew;
     m_ulCapacity = ulSize;
 	return erSuccess;
@@ -2098,7 +1883,6 @@ ECRESULT DynamicPropTagArray::GetPropTagArray(struct propTagArray *lpsPropTagArr
     
     lpsPropTagArray->__size = m_lstPropTags.size();
     lpsPropTagArray->__ptr = s_alloc<unsigned int>(m_soap, lpsPropTagArray->__size);
-    
 	for (auto tag : m_lstPropTags)
 		lpsPropTagArray->__ptr[n++] = tag;
 	return erSuccess;
@@ -2115,7 +1899,6 @@ size_t PropValArraySize(const struct propValArray *lpSrc)
 {
 	if (lpSrc == NULL)
 		return 0;
-
 	size_t ulSize = sizeof(struct propValArray) * lpSrc->__size;
 	for (gsoap_size_t i = 0; i < lpSrc->__size; ++i)
 		ulSize += PropSize(&lpSrc->__ptr[i]);
@@ -2131,7 +1914,6 @@ size_t PropValArraySize(const struct propValArray *lpSrc)
 size_t RestrictTableSize(const struct restrictTable *lpSrc)
 {
 	size_t ulSize = 0;
-
 	if (lpSrc == NULL)
 		return 0;
 
@@ -2146,53 +1928,39 @@ size_t RestrictTableSize(const struct restrictTable *lpSrc)
 		for (gsoap_size_t i = 0; i < lpSrc->lpAnd->__size; ++i)
 			ulSize += RestrictTableSize(lpSrc->lpAnd->__ptr[i]);
 		break;
-
 	case RES_NOT:
 		ulSize += sizeof(restrictNot);
 		ulSize += RestrictTableSize(lpSrc->lpNot->lpNot);
 		break;
 	case RES_CONTENT:
 		ulSize += sizeof(restrictContent);
-
-		if(lpSrc->lpContent->lpProp) {
+		if (lpSrc->lpContent->lpProp != nullptr)
 			ulSize += PropSize(lpSrc->lpContent->lpProp);
-		}
-
 		break;
 	case RES_PROPERTY:
 		ulSize += sizeof(restrictProp);
 		ulSize += PropSize(lpSrc->lpProp->lpProp);
-
 		break;
-
 	case RES_COMPAREPROPS:
 		ulSize += sizeof(restrictCompare);
 		break;
-
 	case RES_BITMASK:
 		ulSize += sizeof(restrictBitmask);
 		break;
-
 	case RES_SIZE:
 		ulSize += sizeof(restrictSize);
 		break;
-
 	case RES_EXIST:
 		ulSize += sizeof(restrictExist);
 		break;
-
 	case RES_COMMENT:
 		ulSize += sizeof(restrictComment) + sizeof(restrictTable);
-		
 		ulSize += PropValArraySize(&lpSrc->lpComment->sProps);
 		ulSize += RestrictTableSize(lpSrc->lpComment->lpResTable);
-
 		break;
-
 	case RES_SUBRESTRICTION:
 		ulSize += sizeof(restrictSub);
 		ulSize += RestrictTableSize(lpSrc->lpSub->lpSubObject);
-
         break;
 	default:
 		break;
@@ -2241,13 +2009,10 @@ size_t SearchCriteriaSize(const struct searchCriteria *lpSrc)
 		return 0;
 
 	size_t ulSize = sizeof(struct searchCriteria);
-	if(lpSrc->lpRestrict) {
+	if (lpSrc->lpRestrict != nullptr)
 		ulSize += RestrictTableSize(lpSrc->lpRestrict);
-	}
-
-	if(lpSrc->lpFolders) {
+	if (lpSrc->lpFolders != nullptr)
 		ulSize += EntryListSize(lpSrc->lpFolders);
-	}
 	return ulSize;
 }
 
@@ -2261,7 +2026,6 @@ size_t EntryIdSize(const entryId *lpEntryid)
 {
 	if(lpEntryid == NULL)
 		return 0;
-	
 	return sizeof(entryId) + lpEntryid->__size;
 }
 
@@ -2279,28 +2043,22 @@ size_t NotificationStructSize(const notification *lpNotification)
 	size_t ulSize = sizeof(notification);
 	if(lpNotification->tab != NULL) {
 		ulSize += sizeof(notificationTable);
-
 		ulSize += PropSize(&lpNotification->tab->propIndex);
 		ulSize += PropSize(&lpNotification->tab->propPrior);
 		ulSize += PropValArraySize(lpNotification->tab->pRow);
 	}else if(lpNotification->obj != NULL) {
 		ulSize += sizeof(notificationObject);
-
 		ulSize += EntryIdSize(lpNotification->obj->pEntryId);
 		ulSize += EntryIdSize(lpNotification->obj->pParentId);
 		ulSize += EntryIdSize(lpNotification->obj->pOldId);
 		ulSize += EntryIdSize(lpNotification->obj->pOldParentId);
 		ulSize += PropTagArraySize(lpNotification->obj->pPropTagArray);
-
 	}else if(lpNotification->newmail != NULL){
-
 		ulSize += sizeof(notificationNewMail);
 		ulSize += EntryIdSize(lpNotification->newmail->pEntryId);
 		ulSize += EntryIdSize(lpNotification->newmail->pParentId);
-		
-		if(lpNotification->newmail->lpszMessageClass) {
+		if (lpNotification->newmail->lpszMessageClass != nullptr)
 			ulSize += (unsigned int)strlen(lpNotification->newmail->lpszMessageClass)+1;
-		}
 	}else if(lpNotification->ics != NULL){
 		ulSize += sizeof(notificationICS);
 		ulSize += EntryIdSize(lpNotification->ics->pSyncState);
@@ -2318,7 +2076,6 @@ size_t SortOrderArraySize(const struct sortOrderArray *lpsSortOrder)
 {
 	if (lpsSortOrder == NULL)
 		return 0;	
-
 	return sizeof(struct sortOrder) * lpsSortOrder->__size;
 }
 
@@ -2355,8 +2112,12 @@ const char *GetSourceAddr(struct soap *soap)
 {
 	if (soap_info(soap)->bProxy && soap->proxy_from != nullptr)
 		return soap->proxy_from;
-	else
-		return soap->host;
+	return soap->host;
+}
+
+void ec_soap_deleter::operator()(struct soap *s)
+{
+	soap_free(s);
 }
 
 } /* namespace */

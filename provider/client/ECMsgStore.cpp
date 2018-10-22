@@ -1,22 +1,8 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/memory.hpp>
 #include <kopano/scope.hpp>
@@ -27,7 +13,6 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-
 #include <kopano/ECGetText.h>
 #include <kopano/Util.h>
 #include "Mem.h"
@@ -37,34 +22,91 @@
 #include "ECMAPIFolder.h"
 #include "ECMAPIProp.h"
 #include "WSTransport.h"
-
 #include <kopano/ECTags.h>
-
 #include <kopano/ECGuid.h>
-#include <kopano/ECDebug.h>
 #include <kopano/ECABEntryID.h>
-
 #include <kopano/mapiext.h>
-
 #include "freebusytags.h"
 #include <kopano/CommonUtil.h>
 #include "ClientUtil.h"
 #include "pcutil.hpp"
-
 #include "WSUtil.h" // used for UnWrapServerClientStoreEntry
 #include "ECExportAddressbookChanges.h"
 #include "ics.h"
 #include "ECExchangeExportChanges.h"
 #include "ECChangeAdvisor.h"
-
 #include "ProviderUtil.h"
 #include "EntryPoint.h"
-
 #include <kopano/stringutil.h>
 #include "ECExchangeModifyTable.h"
-
 #include <kopano/mapi_ptr.h>
 #include <kopano/charset/convstring.h>
+
+#define N_ARGS(...) N_ARGS_HELPER1((__VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0))
+#define N_ARGS_HELPER1(tuple) N_ARGS_HELPER2 tuple
+#define N_ARGS_HELPER2(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, n, ...) n
+#define ARGLISTSET(...) ARGLISTSET_HELPER1(N_ARGS(__VA_ARGS__), __VA_ARGS__)
+#define ARGLISTSET_HELPER1(n, ...) ARGLISTSET_HELPER2(n, (__VA_ARGS__))
+#define ARGLISTSET_HELPER2(n, tuple) ARGLISTSET_HELPER3(n, tuple)
+#define ARGLISTSET_HELPER3(n, tuple) ARGLISTSET_##n tuple
+#define ARGLISTSET_1(v)
+#define ARGLISTSET_2(t1, a1) t1 a1
+#define ARGLISTSET_4(t1, a1, t2, a2) t1 a1, t2 a2
+#define ARGLIST(...) ARGLIST_HELPER1(N_ARGS(__VA_ARGS__), __VA_ARGS__)
+#define ARGLIST_HELPER1(n, ...) ARGLIST_HELPER2(n, (__VA_ARGS__))
+#define ARGLIST_HELPER2(n, tuple) ARGLIST_HELPER3(n, tuple)
+#define ARGLIST_HELPER3(n, tuple) ARGLIST_ ##n tuple
+#define ARGLIST_1(s1) ARGLISTSET s1
+#define ARGLIST_2(s1, s2) ARGLISTSET s1, ARGLISTSET s2
+#define ARGLIST_3(s1, s2, s3) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3
+#define ARGLIST_4(s1, s2, s3, s4) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4
+#define ARGLIST_5(s1, s2, s3, s4, s5) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5
+#define ARGLIST_6(s1, s2, s3, s4, s5, s6) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6
+#define ARGLIST_7(s1, s2, s3, s4, s5, s6, s7) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6, ARGLISTSET s7
+#define ARGLIST_8(s1, s2, s3, s4, s5, s6, s7, s8) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6, ARGLISTSET s7, ARGLISTSET s8
+#define ARGLIST_9(s1, s2, s3, s4, s5, s6, s7, s8, s9) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6, ARGLISTSET s7, ARGLISTSET s8, ARGLISTSET s9
+#define ARGLIST_10(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6, ARGLISTSET s7, ARGLISTSET s8, ARGLISTSET s9, ARGLISTSET s10
+#define ARGLIST_11(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11) ARGLISTSET s1, ARGLISTSET s2, ARGLISTSET s3, ARGLISTSET s4, ARGLISTSET s5, ARGLISTSET s6, ARGLISTSET s7, ARGLISTSET s8, ARGLISTSET s9, ARGLISTSET s10, ARGLISTSET s11
+#define ARGSSET(...) ARGSSET_HELPER1(N_ARGS(__VA_ARGS__), __VA_ARGS__)
+#define ARGSSET_HELPER1(n, ...) ARGSSET_HELPER2(n, (__VA_ARGS__))
+#define ARGSSET_HELPER2(n, tuple) ARGSSET_HELPER3(n, tuple)
+#define ARGSSET_HELPER3(n, tuple) ARGSSET_##n tuple
+#define ARGSSET_1(v)
+#define ARGSSET_2(t1, a1) a1
+#define ARGSSET_4(t1, a1, t2, a2) a1, a2
+#define ARGS(...) ARGS_HELPER1(N_ARGS(__VA_ARGS__), __VA_ARGS__)
+#define ARGS_HELPER1(n, ...) ARGS_HELPER2(n, (__VA_ARGS__))
+#define ARGS_HELPER2(n, tuple) ARGS_HELPER3(n, tuple)
+#define ARGS_HELPER3(n, tuple) ARGS_##n tuple
+#define ARGS_1(s1) ARGSSET s1
+#define ARGS_2(s1, s2) ARGSSET s1, ARGSSET s2
+#define ARGS_3(s1, s2, s3) ARGSSET s1, ARGSSET s2, ARGSSET s3
+#define ARGS_4(s1, s2, s3, s4) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4
+#define ARGS_5(s1, s2, s3, s4, s5) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5
+#define ARGS_6(s1, s2, s3, s4, s5, s6) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6
+#define ARGS_7(s1, s2, s3, s4, s5, s6, s7) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6, ARGSSET s7
+#define ARGS_8(s1, s2, s3, s4, s5, s6, s7, s8) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6, ARGSSET s7, ARGSSET s8
+#define ARGS_9(s1, s2, s3, s4, s5, s6, s7, s8, s9) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6, ARGSSET s7, ARGSSET s8, ARGSSET s9
+#define ARGS_10(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6, ARGSSET s7, ARGSSET s8, ARGSSET s9, ARGSSET s10
+#define ARGS_11(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11) ARGSSET s1, ARGSSET s2, ARGSSET s3, ARGSSET s4, ARGSSET s5, ARGSSET s6, ARGSSET s7, ARGSSET s8, ARGSSET s9, ARGSSET s10, ARGSSET s11
+#define XCLASS(_iface) x ##_iface
+#define CLASSMETHOD(_class, _method) _class::_method
+#define METHODSTR_HELPER1(_method) METHODSTR_HELPER2(_method)
+#define METHODSTR_HELPER2(_method) #_method
+#define DEF_ULONGMETHOD1(_trace, _class, _iface, _method, ...) \
+ULONG CLASSMETHOD(_class, CLASSMETHOD(XCLASS(_iface), _method))(ARGLIST(__VA_ARGS__)) \
+{ \
+	METHOD_PROLOGUE_(_class, _iface); \
+	return pThis->_method(ARGS(__VA_ARGS__)); \
+}
+
+/* without exception passthrough */
+#define DEF_HRMETHOD1(_trace, _class, _iface, _method, ...) \
+HRESULT CLASSMETHOD(_class, CLASSMETHOD(XCLASS(_iface), _method))(ARGLIST(__VA_ARGS__)) \
+{ \
+	METHOD_PROLOGUE_(_class, _iface); \
+	return pThis->_method(ARGS(__VA_ARGS__)); \
+}
 
 using namespace KC;
 typedef object_ptr<WSTransport> WSTransportPtr;
@@ -76,66 +118,53 @@ typedef object_ptr<WSTransport> WSTransportPtr;
  * ECMsgStore
  **/
 ECMsgStore::ECMsgStore(const char *lpszProfname, IMAPISupport *sup,
-    WSTransport *tp, BOOL fModify, ULONG ulProfileFlags,
+    WSTransport *tp, BOOL modify, ULONG ulProfileFlags,
     BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore) :
-	ECMAPIProp(NULL, MAPI_STORE, fModify, NULL, "IMsgStore"),
+	ECMAPIProp(nullptr, MAPI_STORE, modify, nullptr, "IMsgStore"),
 	lpSupport(sup), lpTransport(tp), lpNamedProp(tp),
 	m_ulProfileFlags(ulProfileFlags), m_fIsSpooler(fIsSpooler),
 	m_fIsDefaultStore(fIsDefaultStore),
 	m_strProfname((lpszProfname != nullptr) ? lpszProfname : "")
 {
 	// Add our property handlers
-	HrAddPropHandlers(PR_ENTRYID,			GetPropHandler,			DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_RECORD_KEY,		GetPropHandler,			DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_SEARCH_KEY,		GetPropHandler,			DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_USER_NAME	,		GetPropHandler,			DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_USER_ENTRYID,		GetPropHandler,			DefaultSetPropComputed, (void *)this);
-
-	HrAddPropHandlers(PR_MAILBOX_OWNER_NAME,	GetPropHandler,		DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_MAILBOX_OWNER_ENTRYID,	GetPropHandler,		DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_USER_NAME,				GetPropHandler,		DefaultSetPropComputed, (void *)this);
-	HrAddPropHandlers(PR_USER_ENTRYID,			GetPropHandler,		DefaultSetPropComputed, (void *)this);
-
-	HrAddPropHandlers(PR_RECEIVE_FOLDER_SETTINGS,	GetPropHandler,		DefaultSetPropIgnore,	(void*) this, FALSE, FALSE);
-
-	HrAddPropHandlers(PR_MESSAGE_SIZE,				GetPropHandler,		DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
-	HrAddPropHandlers(PR_MESSAGE_SIZE_EXTENDED,		GetPropHandler,		DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
-
-	HrAddPropHandlers(PR_QUOTA_WARNING_THRESHOLD,	GetPropHandler,		DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
-	HrAddPropHandlers(PR_QUOTA_SEND_THRESHOLD,		GetPropHandler,		DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
-	HrAddPropHandlers(PR_QUOTA_RECEIVE_THRESHOLD,	GetPropHandler,		DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
-
-	HrAddPropHandlers(PR_STORE_OFFLINE,	GetPropHandler,		DefaultSetPropComputed, (void *)this);
+	HrAddPropHandlers(PR_ENTRYID, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_RECORD_KEY, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_SEARCH_KEY, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_USER_NAME, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_USER_ENTRYID, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_MAILBOX_OWNER_NAME, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_MAILBOX_OWNER_ENTRYID, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_USER_NAME, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_USER_ENTRYID, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_RECEIVE_FOLDER_SETTINGS, GetPropHandler, DefaultSetPropIgnore, this, false, false);
+	HrAddPropHandlers(PR_MESSAGE_SIZE, GetPropHandler, DefaultSetPropComputed, this, false, false);
+	HrAddPropHandlers(PR_MESSAGE_SIZE_EXTENDED, GetPropHandler, DefaultSetPropComputed, this, false, false);
+	HrAddPropHandlers(PR_QUOTA_WARNING_THRESHOLD, GetPropHandler, DefaultSetPropComputed, this, false, false);
+	HrAddPropHandlers(PR_QUOTA_SEND_THRESHOLD, GetPropHandler, DefaultSetPropComputed, this, false, false);
+	HrAddPropHandlers(PR_QUOTA_RECEIVE_THRESHOLD, GetPropHandler, DefaultSetPropComputed, this, false, false);
+	HrAddPropHandlers(PR_STORE_OFFLINE, GetPropHandler, DefaultSetPropComputed, this);
+	HrAddPropHandlers(PR_EC_SERVER_VERSION, GetPropHandler, DefaultSetPropComputed, this);
 
 	// only on admin store? how? .. now checked on server in ECTableManager
-	HrAddPropHandlers(PR_EC_STATSTABLE_SYSTEM,		GetPropHandler,		DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-	HrAddPropHandlers(PR_EC_STATSTABLE_SESSIONS,	GetPropHandler,		DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-	HrAddPropHandlers(PR_EC_STATSTABLE_USERS,		GetPropHandler,		DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-	HrAddPropHandlers(PR_EC_STATSTABLE_COMPANY,     GetPropHandler,     DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-	HrAddPropHandlers(PR_EC_STATSTABLE_SERVERS,     GetPropHandler,     DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-
-	HrAddPropHandlers(PR_TEST_LINE_SPEED,			GetPropHandler,		DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-	HrAddPropHandlers(PR_EMSMDB_SECTION_UID,		GetPropHandler,		DefaultSetPropComputed, (void*) this, FALSE, TRUE);
-
-	HrAddPropHandlers(PR_ACL_DATA,					GetPropHandler,		SetPropHandler,			(void*) this, FALSE, TRUE);
-
-	HrAddPropHandlers(PR_EC_WEBACCESS_SETTINGS, DefaultGetPropGetReal, DefaultSetPropSetReal, (void*) this, TRUE, TRUE);
-	HrAddPropHandlers(PR_EC_RECIPIENT_HISTORY, DefaultGetPropGetReal, DefaultSetPropSetReal, (void*) this, TRUE, TRUE);
-	HrAddPropHandlers(PR_EC_WEBACCESS_SETTINGS_JSON, DefaultGetPropGetReal, DefaultSetPropSetReal, (void*) this, TRUE, TRUE);
-	HrAddPropHandlers(PR_EC_RECIPIENT_HISTORY_JSON, DefaultGetPropGetReal, DefaultSetPropSetReal, (void*) this, TRUE, TRUE);
-	HrAddPropHandlers(PR_EC_WEBAPP_PERSISTENT_SETTINGS_JSON, DefaultGetPropGetReal, DefaultSetPropSetReal, (void*) this, TRUE, TRUE);
+	HrAddPropHandlers(PR_EC_STATSTABLE_SYSTEM, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_EC_STATSTABLE_SESSIONS, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_EC_STATSTABLE_USERS, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_EC_STATSTABLE_COMPANY, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_EC_STATSTABLE_SERVERS, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_TEST_LINE_SPEED, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_EMSMDB_SECTION_UID, GetPropHandler, DefaultSetPropComputed, this, false, true);
+	HrAddPropHandlers(PR_ACL_DATA, GetPropHandler, SetPropHandler, this, false, true);
 
 	// Basically a workaround because we can't pass 'this' in the superclass constructor.
 	SetProvider(this);
-	this->isTransactedObject = FALSE;
-	GetClientVersion(&this->m_ulClientVersion); //Ignore errors
+	isTransactedObject = false;
+	GetClientVersion(&m_ulClientVersion); //Ignore errors
 	assert(lpszProfname != NULL);
 }
 
 ECMsgStore::~ECMsgStore() {
 	if(lpTransport)
 		lpTransport->HrLogOff();
-
 	// remove all advices
 	if(m_lpNotifyClient)
 		m_lpNotifyClient->ReleaseAll();
@@ -151,7 +180,6 @@ static HRESULT GetIMsgStoreObject(BOOL bOffline,
 	PROVIDER_INFO sProviderInfo;
 	object_ptr<IProfSect> lpProfSect;
 	memory_ptr<SPropValue> lpsPropValue;
-	char *lpszProfileName = NULL;
 
 	HRESULT hr = lpMAPISup->OpenProfileSection((LPMAPIUID)&MUID_PROFILE_INSTANCE, 0, &~lpProfSect);
 	if(hr != hrSuccess)
@@ -161,8 +189,7 @@ static HRESULT GetIMsgStoreObject(BOOL bOffline,
 		return hr;
 
 	// Set ProfileName
-	lpszProfileName = lpsPropValue->Value.lpszA;
-
+	auto lpszProfileName = lpsPropValue->Value.lpszA;
 	hr = GetProviders(lpmapProviders, lpMAPISup, lpszProfileName, 0, &sProviderInfo);
 	if (hr != hrSuccess)
 		return hr;
@@ -196,8 +223,8 @@ HRESULT ECMsgStore::QueryInterface(REFIID refiid, void **lppInterface)
 		return hrSuccess;
 	}
 	// is admin store?
-	REGISTER_INTERFACE2(IECMultiStoreTable, &this->m_xMsgStoreProxy);
-	REGISTER_INTERFACE2(IECTestProtocol, &this->m_xMsgStoreProxy);
+	REGISTER_INTERFACE2(IECMultiStoreTable, &m_xMsgStoreProxy);
+	REGISTER_INTERFACE2(IECTestProtocol, &m_xMsgStoreProxy);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -206,26 +233,15 @@ HRESULT ECMsgStore::QueryInterfaceProxy(REFIID refiid, void **lppInterface)
 	if (refiid == IID_IProxyStoreObject) // block recusive proxy calls
 		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
-	REGISTER_INTERFACE2(IMsgStore, &this->m_xMsgStoreProxy);
-	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMsgStoreProxy);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xMsgStoreProxy);
+	REGISTER_INTERFACE2(IMsgStore, &m_xMsgStoreProxy);
+	REGISTER_INTERFACE2(IMAPIProp, &m_xMsgStoreProxy);
+	REGISTER_INTERFACE2(IUnknown, &m_xMsgStoreProxy);
 	return QueryInterface(refiid, lppInterface);
 }
 
 ULONG ECMsgStore::Release()
 {
-	// If a parent has requested a callback when we're going down, do it now.
-	if (m_cRef == 1 && this->lpfnCallback != nullptr)
-		lpfnCallback(this->lpCallbackObject, this);
 	return ECUnknown::Release();
-}
-
-HRESULT ECMsgStore::HrSetReleaseCallback(ECUnknown *lpObject, RELEASECALLBACK lpfnCallback)
-{
-	this->lpCallbackObject = lpObject;
-	this->lpfnCallback = lpfnCallback;
-
-	return hrSuccess;
 }
 
 HRESULT	ECMsgStore::Create(const char *lpszProfname, LPMAPISUP lpSupport,
@@ -244,7 +260,6 @@ HRESULT ECMsgStore::SetProps(ULONG cValues, const SPropValue *lpPropArray,
 	HRESULT hr = ECMAPIProp::SetProps(cValues, lpPropArray, lppProblems);
 	if (hr != hrSuccess)
 		return hr;
-
 	return ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
@@ -254,7 +269,6 @@ HRESULT ECMsgStore::DeleteProps(const SPropTagArray *lpPropTagArray,
 	HRESULT hr = ECMAPIProp::DeleteProps(lpPropTagArray, lppProblems);
 	if (hr != hrSuccess)
 		return hr;
-
 	return ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
@@ -265,13 +279,12 @@ HRESULT ECMsgStore::SaveChanges(ULONG ulFlags)
 
 HRESULT ECMsgStore::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
-	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-	if (lpiid == NULL)
+	if (lpiid == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 	if(ulPropTag == PR_RECEIVE_FOLDER_SETTINGS) {
-		if (*lpiid == IID_IMAPITable && IsPublicStore() == false)
+		if (*lpiid == IID_IMAPITable && !IsPublicStore())
 			// Non supported function for publicfolder
 			hr = GetReceiveFolderTable(0, (LPMAPITABLE*)lppUnk);
 	} else if(ulPropTag == PR_HIERARCHY_SYNCHRONIZER) {
@@ -315,15 +328,13 @@ HRESULT ECMsgStore::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 
 HRESULT ECMsgStore::OpenStatsTable(unsigned int ulTableType, LPMAPITABLE *lppTable)
 {
-	HRESULT hr = hrSuccess;
-	object_ptr<WSTableView> lpTableView;
-	object_ptr<ECMAPITable> lpTable;
-
 	if (lppTable == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	object_ptr<WSTableView> lpTableView;
+	object_ptr<ECMAPITable> lpTable;
 	// notifications? set 1st param: m_lpNotifyClient
-	hr = ECMAPITable::Create("Stats table", NULL, 0, &~lpTable);
+	auto hr = ECMAPITable::Create("Stats table", nullptr, 0, &~lpTable);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -334,7 +345,7 @@ HRESULT ECMsgStore::OpenStatsTable(unsigned int ulTableType, LPMAPITABLE *lppTab
 	hr = lpTable->HrSetTableOps(lpTableView, true);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);	
+	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);
 	if (hr != hrSuccess)
 		return hr;
     AddChild(lpTable);
@@ -360,20 +371,19 @@ HRESULT ECMsgStore::OpenStatsTable(unsigned int ulTableType, LPMAPITABLE *lppTab
 HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, const ENTRYID *lpEntryID,
     ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
 {
-	HRESULT hr = hrSuccess;
-	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
-	ULONG		cbUnWrapStoreID = 0;
-
 	if (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)
 		return MAPI_E_NO_SUPPORT;
 	if (lpAdviseSink == nullptr || lpulConnection == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
-	assert(m_lpNotifyClient != NULL && (lpEntryID != NULL || this->m_lpEntryId != NULL));
-	if(lpEntryID == NULL) {
+	HRESULT hr = hrSuccess;
+	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
+	ULONG		cbUnWrapStoreID = 0;
 
+	assert(m_lpNotifyClient != nullptr && (lpEntryID != nullptr || m_lpEntryId != nullptr));
+	if(lpEntryID == NULL) {
 		// never sent the client store entry
-		hr = UnWrapServerClientStoreEntry(this->m_cbEntryId, this->m_lpEntryId, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+		hr = UnWrapServerClientStoreEntry(m_cbEntryId, m_lpEntryId, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 		if(hr != hrSuccess)
 			return hr;
 		cbEntryID = cbUnWrapStoreID;
@@ -382,7 +392,6 @@ HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, const ENTRYID *lpEntryID,
 
 	if(m_lpNotifyClient->RegisterAdvise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, true, lpAdviseSink, lpulConnection) != S_OK)
 		hr = MAPI_E_NO_SUPPORT;
-
 	if(hr != hrSuccess)
 		return hr;
 	m_setAdviseConnections.emplace(*lpulConnection);
@@ -392,27 +401,26 @@ HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, const ENTRYID *lpEntryID,
 HRESULT ECMsgStore::Advise(ULONG cbEntryID, const ENTRYID *lpEntryID,
     ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink, ULONG *lpulConnection)
 {
-	HRESULT hr = hrSuccess;
-	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
-	ULONG		cbUnWrapStoreID = 0;
-
 	if (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)
 		return MAPI_E_NO_SUPPORT;
 	if (lpAdviseSink == nullptr || lpulConnection == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
-	assert(m_lpNotifyClient != NULL && (lpEntryID != NULL || this->m_lpEntryId != NULL));
-	if(lpEntryID == NULL) {
+	HRESULT hr = hrSuccess;
+	ecmem_ptr<ENTRYID> lpUnWrapStoreID;
+	ULONG		cbUnWrapStoreID = 0;
 
+	assert(m_lpNotifyClient != nullptr && (lpEntryID != nullptr || m_lpEntryId != nullptr));
+	if(lpEntryID == NULL) {
 		// never sent the client store entry
-		hr = UnWrapServerClientStoreEntry(this->m_cbEntryId, this->m_lpEntryId, &cbUnWrapStoreID, &~lpUnWrapStoreID);
+		hr = UnWrapServerClientStoreEntry(m_cbEntryId, m_lpEntryId, &cbUnWrapStoreID, &~lpUnWrapStoreID);
 		if(hr != hrSuccess)
 			return hr;
 		cbEntryID = cbUnWrapStoreID;
 		lpEntryID = lpUnWrapStoreID;
 	} else {
 		// check that the given lpEntryID belongs to the store in m_lpEntryId
-		if (memcmp(&this->GetStoreGuid(), &reinterpret_cast<const EID *>(lpEntryID)->guid, sizeof(GUID)) != 0)
+		if (memcmp(&GetStoreGuid(), &reinterpret_cast<const EID *>(lpEntryID)->guid, sizeof(GUID)) != 0)
 			return MAPI_E_NO_SUPPORT;
 	}
 
@@ -432,42 +440,34 @@ HRESULT ECMsgStore::Unadvise(ULONG ulConnection) {
 
 HRESULT ECMsgStore::Reload(void *lpParam, ECSESSIONID sessionid)
 {
-	HRESULT hr = hrSuccess;
 	auto lpThis = static_cast<ECMsgStore *>(lpParam);
 
 	for (auto conn_id : lpThis->m_setAdviseConnections)
 		lpThis->m_lpNotifyClient->Reregister(conn_id);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStore::TableRowGetProp(void *lpProvider,
     const struct propVal *lpsPropValSrc, SPropValue *lpsPropValDst,
     void **lpBase, ULONG ulType)
 {
-	HRESULT hr = hrSuccess;
 	auto lpMsgStore = static_cast<ECMsgStore *>(lpProvider);
 
-	switch (lpsPropValSrc->ulPropTag) {
-	case PR_ENTRYID:
-	{				
-		ULONG cbWrapped = 0;
-		memory_ptr<ENTRYID> lpWrapped;
-
-		hr = lpMsgStore->GetWrappedServerStoreEntryID(lpsPropValSrc->Value.bin->__size, lpsPropValSrc->Value.bin->__ptr, &cbWrapped, &~lpWrapped);
-		if (hr != hrSuccess)
-			return hr;
-		hr = ECAllocateMore(cbWrapped, lpBase, reinterpret_cast<void **>(&lpsPropValDst->Value.bin.lpb));
-		if (hr != hrSuccess)
-			return hr;
-		memcpy(lpsPropValDst->Value.bin.lpb, lpWrapped, cbWrapped);
-		lpsPropValDst->Value.bin.cb = cbWrapped;
-		lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
-		break;
-	}	
-	default:
+	if (lpsPropValSrc->ulPropTag != PR_ENTRYID)
 		return MAPI_E_NOT_FOUND;
-	}
-	return hr;
+
+	ULONG cbWrapped = 0;
+	memory_ptr<ENTRYID> lpWrapped;
+	auto hr = lpMsgStore->GetWrappedServerStoreEntryID(lpsPropValSrc->Value.bin->__size, lpsPropValSrc->Value.bin->__ptr, &cbWrapped, &~lpWrapped);
+	if (hr != hrSuccess)
+		return hr;
+	hr = ECAllocateMore(cbWrapped, lpBase, reinterpret_cast<void **>(&lpsPropValDst->Value.bin.lpb));
+	if (hr != hrSuccess)
+		return hr;
+	memcpy(lpsPropValDst->Value.bin.lpb, lpWrapped, cbWrapped);
+	lpsPropValDst->Value.bin.cb = cbWrapped;
+	lpsPropValDst->ulPropTag = CHANGE_PROP_TYPE(lpsPropValSrc->ulPropTag, PT_BINARY);
+	return hrSuccess;
 }
 
 /**
@@ -492,10 +492,6 @@ HRESULT ECMsgStore::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
     ULONG cbEntryID2, const ENTRYID *lpEntryID2, ULONG ulFlags,
     ULONG *lpulResult)
 {
-	PEID peid1 = (PEID)lpEntryID1;
-	PEID peid2 = (PEID)lpEntryID2;
-	auto lpStoreId = reinterpret_cast<const EID *>(m_lpEntryId.get());
-
 	if (lpulResult != nullptr)
 		*lpulResult = false;
 	// Apparently BlackBerry CALHelper.exe needs this
@@ -504,6 +500,10 @@ HRESULT ECMsgStore::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
 	if (lpEntryID1 == nullptr || lpEntryID2 == nullptr ||
 	    lpulResult == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
+
+	PEID peid1 = (PEID)lpEntryID1;
+	PEID peid2 = (PEID)lpEntryID2;
+	auto lpStoreId = reinterpret_cast<const EID *>(m_lpEntryId.get());
 
 	// Check if one or both of the entry identifiers contains the store guid.
 	if (cbEntryID1 != cbEntryID2)
@@ -522,7 +522,6 @@ HRESULT ECMsgStore::CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
 		return hrSuccess;
 
 	if(peid1->ulVersion == 0) {
-
 		if(cbEntryID1 != sizeof(EID_V0))
 			return hrSuccess;
 		if( ((EID_V0*)lpEntryID1)->ulId != ((EID_V0*)lpEntryID2)->ulId )
@@ -549,7 +548,9 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
     ULONG *lpulObjType,
     IUnknown **lppUnk)
 {
-	HRESULT				hr = hrSuccess;
+	if (lpulObjType == nullptr || lppUnk == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	memory_ptr<ENTRYID> lpRootEntryID;
 	ULONG				cbRootEntryID = 0;
 	BOOL				fModifyObject = FALSE;
@@ -557,12 +558,8 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 	object_ptr<ECMessage> lpMessage;
 	object_ptr<IECPropStorage> lpPropStorage;
 	object_ptr<WSMAPIFolderOps> lpFolderOps;
-	unsigned int		ulObjType = 0;
+	unsigned int objtype = 0;
 
-	// Check input/output variables
-	if (lpulObjType == nullptr || lppUnk == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
-	
 	if(ulFlags & MAPI_MODIFY) {
 		if (!fModify)
 			return MAPI_E_NO_ACCESS;
@@ -574,29 +571,27 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 		fModifyObject = fModify;
 
 	if (cbEntryID == 0 || lpEntryID == nullptr) {
-		hr = lpTransport->HrGetStore(m_cbEntryId, m_lpEntryId, 0, NULL, &cbRootEntryID, &~lpRootEntryID);
+		auto hr = lpTransport->HrGetStore(m_cbEntryId, m_lpEntryId, 0, nullptr, &cbRootEntryID, &~lpRootEntryID);
 		if(hr != hrSuccess)
 			return hr;
 		lpEntryID = lpRootEntryID;
 		cbEntryID = cbRootEntryID;
-
 	}else {
-
-		hr = HrCompareEntryIdWithStoreGuid(cbEntryID, lpEntryID, &GetStoreGuid());
+		auto hr = HrCompareEntryIdWithStoreGuid(cbEntryID, lpEntryID, &GetStoreGuid());
 		if(hr != hrSuccess)
 			return hr;
 		if(!(ulFlags & MAPI_DEFERRED_ERRORS)) {
-	        hr = lpTransport->HrCheckExistObject(cbEntryID, lpEntryID, (ulFlags&(SHOW_SOFT_DELETES))); 
-		    if(hr != hrSuccess) 
+			hr = lpTransport->HrCheckExistObject(cbEntryID, lpEntryID, (ulFlags & (SHOW_SOFT_DELETES)));
+			if (hr != hrSuccess)
 				return hr;
 		}
 	}
 
-	hr = HrGetObjTypeFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &ulObjType);
+	auto hr = HrGetObjTypeFromEntryId(cbEntryID, reinterpret_cast<const BYTE *>(lpEntryID), &objtype);
 	if(hr != hrSuccess)
 		return hr;
 
-	switch( ulObjType ) {
+	switch (objtype) {
 	case MAPI_FOLDER:
 		hr = lpTransport->HrOpenFolderOps(cbEntryID, lpEntryID, &~lpFolderOps);
 		if(hr != hrSuccess)
@@ -608,11 +603,9 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 		if(hr != hrSuccess)
 			return hr;
 		hr = lpMAPIFolder->HrSetPropStorage(lpPropStorage, !(ulFlags & MAPI_DEFERRED_ERRORS));
-
 		if(hr != hrSuccess)
 			return hr;
 		hr = lpMAPIFolder->SetEntryId(cbEntryID, lpEntryID);
-
 		if(hr != hrSuccess)
 			return hr;
 		AddChild(lpMAPIFolder);
@@ -621,10 +614,8 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 			hr = lpMAPIFolder->QueryInterface(*lpInterface,(void **)lppUnk);
 		else
 			hr = lpMAPIFolder->QueryInterface(IID_IMAPIFolder, (void **)lppUnk);
-
 		if(lpulObjType)
 			*lpulObjType = MAPI_FOLDER;
-
 		break;
 	case MAPI_MESSAGE:
 		hr = msgfac.Create(this, FALSE, fModifyObject, 0, FALSE, nullptr, &~lpMessage);
@@ -637,11 +628,9 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 		if(hr != hrSuccess)
 			return hr;
 		hr = lpMessage->SetEntryId(cbEntryID, lpEntryID);
-
 		if(hr != hrSuccess)
 			return hr;
 		hr = lpMessage->HrSetPropStorage(lpPropStorage, false);
-
 		if(hr != hrSuccess)
 			return hr;
 		AddChild(lpMessage);
@@ -650,10 +639,8 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
 			hr = lpMessage->QueryInterface(*lpInterface,(void **)lppUnk);
 		else
 			hr = lpMessage->QueryInterface(IID_IMessage, (void **)lppUnk);
-
 		if(lpulObjType)
 			*lpulObjType = MAPI_MESSAGE;
-
 		break;
 	default:
 		return MAPI_E_NOT_FOUND;
@@ -667,49 +654,37 @@ HRESULT ECMsgStore::SetReceiveFolder(const TCHAR *lpszMessageClass,
 	// Non supported function for publicfolder
 	if (IsPublicStore() == TRUE)
 		return MAPI_E_NO_SUPPORT;
-
-	return lpTransport->HrSetReceiveFolder(this->m_cbEntryId, this->m_lpEntryId, convstring(lpszMessageClass, ulFlags), cbEntryID, lpEntryID);
+	return lpTransport->HrSetReceiveFolder(m_cbEntryId, m_lpEntryId,
+	       convstring(lpszMessageClass, ulFlags), cbEntryID, lpEntryID);
 }
 
 // If the open store a publicstore
 BOOL ECMsgStore::IsPublicStore() const
 {
-	BOOL fPublicStore = FALSE;
-
-	if(CompareMDBProvider(&this->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
-		fPublicStore = TRUE;
-
-	return fPublicStore;
+	return CompareMDBProvider(&m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID);
 }
 
 // As the store is a delegate store
 BOOL ECMsgStore::IsDelegateStore() const
 {
-	BOOL fDelegateStore = FALSE;
-
-	if(CompareMDBProvider(&this->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID))
-		fDelegateStore = TRUE;
-
-	return fDelegateStore;
+	return CompareMDBProvider(&m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID);
 }
 
 HRESULT ECMsgStore::GetReceiveFolder(const TCHAR *lpszMessageClass,
     ULONG ulFlags, ULONG *lpcbEntryID, ENTRYID **lppEntryID,
     TCHAR **lppszExplicitClass)
 {
-	HRESULT hr;
+	if (IsPublicStore())
+		return MAPI_E_NO_SUPPORT;
+	if (lpcbEntryID == nullptr || lppEntryID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ULONG		cbEntryID = 0;
 	LPENTRYID	lpEntryID = NULL;
 	utf8string	strExplicitClass;
-
-	// Non supported function for publicfolder
-	if (IsPublicStore() == TRUE)
-		return MAPI_E_NO_SUPPORT;
-	// Check input/output variables
-	if (lpcbEntryID == NULL || lppEntryID == NULL) // lppszExplicitClass may NULL
-		return MAPI_E_INVALID_PARAMETER;
-
-	hr = lpTransport->HrGetReceiveFolder(this->m_cbEntryId, this->m_lpEntryId, convstring(lpszMessageClass, ulFlags), &cbEntryID, &lpEntryID, lppszExplicitClass ? &strExplicitClass : NULL);
+	auto hr = lpTransport->HrGetReceiveFolder(m_cbEntryId, m_lpEntryId,
+	          convstring(lpszMessageClass, ulFlags), &cbEntryID,
+	          &lpEntryID, lppszExplicitClass ? &strExplicitClass : nullptr);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -720,7 +695,7 @@ HRESULT ECMsgStore::GetReceiveFolder(const TCHAR *lpszMessageClass,
 		*lpcbEntryID = 0;
 		*lppEntryID = NULL;
 	}
-	
+
 	if (lppszExplicitClass == nullptr)
 		return hrSuccess;
 	if (ulFlags & MAPI_UNICODE) {
@@ -734,7 +709,6 @@ HRESULT ECMsgStore::GetReceiveFolder(const TCHAR *lpszMessageClass,
 	}
 
 	std::string dst = convert_to<std::string>(strExplicitClass);
-
 	hr = MAPIAllocateBuffer(dst.length() + 1, (void **)lppszExplicitClass);
 	if (hr != hrSuccess)
 		return hr;
@@ -744,40 +718,33 @@ HRESULT ECMsgStore::GetReceiveFolder(const TCHAR *lpszMessageClass,
 
 HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
+	if (IsPublicStore())
+		return MAPI_E_NO_SUPPORT;
+	if (lppTable == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	SizedSPropTagArray(NUM_RFT_PROPS, sPropRFTColumns) =
 		{NUM_RFT_PROPS, {PR_ROWID, PR_INSTANCE_KEY, PR_ENTRYID,
 		PR_RECORD_KEY,PR_MESSAGE_CLASS_A}};
-
-	HRESULT			hr = hrSuccess;
 	object_ptr<ECMemTableView> lpView = NULL;
 	object_ptr<ECMemTable> lpMemTable;
 	rowset_ptr lpsRowSet;
-	unsigned int	i;
 	memory_ptr<SPropTagArray> lpPropTagArray;
 
-	// Non supported function for publicfolder
-	if (IsPublicStore())
-		return MAPI_E_NO_SUPPORT;
-
-	// Check input/output variables
-	if (lppTable == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
 	Util::proptag_change_unicode(ulFlags, sPropRFTColumns);
-	hr = ECMemTable::Create(sPropRFTColumns, PR_ROWID, &~lpMemTable); // PR_INSTANCE_KEY
+	auto hr = ECMemTable::Create(sPropRFTColumns, PR_ROWID, &~lpMemTable); // PR_INSTANCE_KEY
 	if(hr != hrSuccess)
 		return hr;
 
 	//Get the receivefolder list from the server
-	hr = lpTransport->HrGetReceiveFolderTable(ulFlags, this->m_cbEntryId, this->m_lpEntryId, &~lpsRowSet);
+	hr = lpTransport->HrGetReceiveFolderTable(ulFlags, m_cbEntryId, m_lpEntryId, &~lpsRowSet);
 	if(hr != hrSuccess)
 		return hr;
-
-	for (i = 0; i < lpsRowSet->cRows; ++i) {
+	for (unsigned int i = 0; i < lpsRowSet->cRows; ++i) {
 		hr = lpMemTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, nullptr, lpsRowSet[i].lpProps, NUM_RFT_PROPS);
 		if(hr != hrSuccess)
 			return hr;
 	}
-
 	hr = lpMemTable->HrGetView(createLocaleFromName(""), ulFlags & MAPI_UNICODE, &~lpView);
 	if(hr != hrSuccess)
 		return hr;
@@ -796,57 +763,49 @@ HRESULT ECMsgStore::AbortSubmit(ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG
 	// Check input/output variables
 	if (lpEntryID == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
 	return lpTransport->HrAbortSubmit(cbEntryID, lpEntryID);
 }
 
 HRESULT ECMsgStore::GetOutgoingQueue(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
-	HRESULT			hr = hrSuccess;
-	object_ptr<ECMAPITable> lpTable;
-	object_ptr<WSTableOutGoingQueue> lpTableOps;
-
-	// Only supported by the MAPI spooler
-	/* if (this->IsSpooler() == false)
+	/* Only supported by the MAPI spooler */
+	/* if (!IsSpooler())
 		return MAPI_E_NO_SUPPORT;
 	*/
-
-	// Check input/output variables
 	if (lppTable == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = ECMAPITable::Create("Outgoing queue", this->m_lpNotifyClient, 0, &~lpTable);
+
+	object_ptr<ECMAPITable> lpTable;
+	object_ptr<WSTableOutGoingQueue> lpTableOps;
+	auto hr = ECMAPITable::Create("Outgoing queue", m_lpNotifyClient, 0, &~lpTable);
 	if(hr != hrSuccess)
 		return hr;
-	hr = this->lpTransport->HrOpenTableOutGoingQueueOps(this->m_cbEntryId, this->m_lpEntryId, this, &~lpTableOps);
+	hr = lpTransport->HrOpenTableOutGoingQueueOps(m_cbEntryId, m_lpEntryId, this, &~lpTableOps);
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpTable->HrSetTableOps(lpTableOps, !(ulFlags & MAPI_DEFERRED_ERRORS));
-
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);
-
 	AddChild(lpTable);
 	return hr;
 }
 
 HRESULT ECMsgStore::SetLockState(LPMESSAGE lpMessage, ULONG ulLockState)
 {
-	HRESULT			hr = hrSuccess;
+	/* Only supported by the MAPI spooler */
+	/* if (!IsSpooler())
+		return MAPI_E_NO_SUPPORT; */
+	if (lpMessage == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ecmem_ptr<SPropValue> lpsPropArray;
-	ULONG			cValue = 0;
-	ULONG			ulSubmitFlag = 0;
+	unsigned int cValue = 0, ulSubmitFlag = 0;
 	object_ptr<ECMessage> ptrECMessage;
 	static constexpr const SizedSPropTagArray(2, sptaMessageProps) =
 		{2, {PR_SUBMIT_FLAGS, PR_ENTRYID}};
 	enum {IDX_SUBMIT_FLAGS, IDX_ENTRYID};
-
-	// Only supported by the MAPI spooler
-	/* if (!this->IsSpooler())
-		return MAPI_E_NO_SUPPORT; */
-	if (lpMessage == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
-	hr = lpMessage->GetProps(sptaMessageProps, 0, &cValue, &~lpsPropArray);
+	auto hr = lpMessage->GetProps(sptaMessageProps, 0, &cValue, &~lpsPropArray);
 	if(HR_FAILED(hr))
 		return hr;
 	if (PROP_TYPE(lpsPropArray[IDX_ENTRYID].ulPropTag) == PT_ERROR)
@@ -878,9 +837,9 @@ HRESULT ECMsgStore::SetLockState(LPMESSAGE lpMessage, ULONG ulLockState)
 	hr = ECAllocateBuffer(sizeof(SPropValue), &~lpsPropArray);
 	if (hr != hrSuccess)
 		return hr;
+
 	lpsPropArray[0].ulPropTag = PR_SUBMIT_FLAGS;
 	lpsPropArray[0].Value.l = ulSubmitFlag;
-
 	hr = lpMessage->SetProps(1, lpsPropArray, NULL);
 	if (hr != hrSuccess)
 		return hr;
@@ -889,21 +848,17 @@ HRESULT ECMsgStore::SetLockState(LPMESSAGE lpMessage, ULONG ulLockState)
 
 HRESULT ECMsgStore::FinishedMsg(ULONG ulFlags, ULONG cbEntryID, const ENTRYID *lpEntryID)
 {
-	HRESULT		hr = hrSuccess;
-	ULONG		ulObjType = 0;
-	object_ptr<IMessage> lpMessage;
-
-	// Only supported by the MAPI spooler
-	/* ifthis->IsSpooler() == false)
+	/* Only supported by the MAPI spooler */
+	/* if (!IsSpooler())
 		return MAPI_E_NO_SUPPORT;
 	*/
-
-	// Check input/output variables
 	if (lpEntryID == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	unsigned int objtype = 0;
+	object_ptr<IMessage> lpMessage;
 	// Delete the message from the local outgoing queue
-	hr = lpTransport->HrFinishedMessage(cbEntryID, lpEntryID, EC_SUBMIT_LOCAL);
+	auto hr = lpTransport->HrFinishedMessage(cbEntryID, lpEntryID, EC_SUBMIT_LOCAL);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -914,10 +869,9 @@ HRESULT ECMsgStore::FinishedMsg(ULONG ulFlags, ULONG cbEntryID, const ENTRYID *l
 	hr = lpTransport->HrSetLockState(cbEntryID, lpEntryID, false);
 	if (hr != hrSuccess)
 		return hr;
-	hr = OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, MAPI_MODIFY,  &ulObjType, &~lpMessage);
+	hr = OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, MAPI_MODIFY, &objtype, &~lpMessage);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Unlock the message
 	hr = SetLockState(lpMessage, MSG_UNLOCKED);
 	if(hr != hrSuccess)
@@ -925,27 +879,21 @@ HRESULT ECMsgStore::FinishedMsg(ULONG ulFlags, ULONG cbEntryID, const ENTRYID *l
 	return lpSupport->DoSentMail(0, lpMessage);
 }
 
-HRESULT ECMsgStore::NotifyNewMail(LPNOTIFICATION lpNotification)
+HRESULT ECMsgStore::NotifyNewMail(const NOTIFICATION *lpNotification)
 {
-	HRESULT hr;
-
 	// Only supported by the MAPI spooler
-	/* if (this->IsSpooler() == false)
+	/* if (!IsSpooler())
 		return MAPI_E_NO_SUPPORT;
 	*/
-
 	// Check input/output variables
 	if (lpNotification == NULL || lpNotification->info.newmail.lpParentID == NULL || lpNotification->info.newmail.lpEntryID == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	hr = HrCompareEntryIdWithStoreGuid(lpNotification->info.newmail.cbEntryID, lpNotification->info.newmail.lpEntryID, &GetStoreGuid());
+	auto hr = HrCompareEntryIdWithStoreGuid(lpNotification->info.newmail.cbEntryID, lpNotification->info.newmail.lpEntryID, &GetStoreGuid());
 	if(hr != hrSuccess)
 		return hr;
-
 	hr = HrCompareEntryIdWithStoreGuid(lpNotification->info.newmail.cbParentID, lpNotification->info.newmail.lpParentID, &GetStoreGuid());
 	if(hr != hrSuccess)
 		return hr;
-
 	return lpTransport->HrNotify(lpNotification);
 }
 
@@ -957,130 +905,142 @@ HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 	auto lpStore = static_cast<ECMsgStore *>(lpParam);
 
 	switch(PROP_ID(ulPropTag)) {
-		case PROP_ID(PR_EMSMDB_SECTION_UID): {
-			hr = lpStore->lpSupport->OpenProfileSection(NULL, 0, &~lpProfSect);
-			if(hr != hrSuccess)
-				return hr;
-			hr = HrGetOneProp(lpProfSect, PR_SERVICE_UID, &~lpProp);
-			if(hr != hrSuccess)
-				return hr;
-			hr = lpStore->lpSupport->OpenProfileSection((LPMAPIUID)lpProp->Value.bin.lpb, 0, &~lpProfSect);
-			if(hr != hrSuccess)
-				return hr;
-			hr = HrGetOneProp(lpProfSect, PR_EMSMDB_SECTION_UID, &~lpProp);
-			if(hr != hrSuccess)
-				return hr;
-			lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
-			lpsPropValue->Value.bin.cb = sizeof(GUID);
-			return KAllocCopy(lpProp->Value.bin.lpb, sizeof(GUID), reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
-			}
-		case PROP_ID(PR_SEARCH_KEY):
-		case PROP_ID(PR_ENTRYID):
-			{
-				ULONG cbWrapped = 0;
-				memory_ptr<ENTRYID> lpWrapped;
+	case PROP_ID(PR_EMSMDB_SECTION_UID): {
+		hr = lpStore->lpSupport->OpenProfileSection(NULL, 0, &~lpProfSect);
+		if (hr != hrSuccess)
+			return hr;
+		hr = HrGetOneProp(lpProfSect, PR_SERVICE_UID, &~lpProp);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpStore->lpSupport->OpenProfileSection((LPMAPIUID)lpProp->Value.bin.lpb, 0, &~lpProfSect);
+		if (hr != hrSuccess)
+			return hr;
+		hr = HrGetOneProp(lpProfSect, PR_EMSMDB_SECTION_UID, &~lpProp);
+		if (hr != hrSuccess)
+			return hr;
+		lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
+		lpsPropValue->Value.bin.cb = sizeof(GUID);
+		return KAllocCopy(lpProp->Value.bin.lpb, sizeof(GUID), reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb), lpBase);
+	}
+	case PROP_ID(PR_SEARCH_KEY):
+	case PROP_ID(PR_ENTRYID): {
+		ULONG cbWrapped = 0;
+		memory_ptr<ENTRYID> lpWrapped;
 
-				lpsPropValue->ulPropTag = ulPropTag;
-				hr = lpStore->GetWrappedStoreEntryID(&cbWrapped, &~lpWrapped);
-				if(hr == hrSuccess) {
-					hr = ECAllocateMore(cbWrapped, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
-					if (hr != hrSuccess)
-						break;
-					memcpy(lpsPropValue->Value.bin.lpb, lpWrapped, cbWrapped);
-					lpsPropValue->Value.bin.cb = cbWrapped;
-				} else {
-					hr = MAPI_E_NOT_FOUND;
-				}
-				break;
-			}
-		case PROP_ID(PR_RECORD_KEY):
-			lpsPropValue->ulPropTag = PR_RECORD_KEY;
-			lpsPropValue->Value.bin.cb = sizeof(MAPIUID);
-			hr = ECAllocateMore(sizeof(MAPIUID), lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
+		lpsPropValue->ulPropTag = ulPropTag;
+		hr = lpStore->GetWrappedStoreEntryID(&cbWrapped, &~lpWrapped);
+		if (hr == hrSuccess) {
+			hr = ECAllocateMore(cbWrapped, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
 			if (hr != hrSuccess)
 				break;
-			memcpy(lpsPropValue->Value.bin.lpb, &lpStore->GetStoreGuid(), sizeof(MAPIUID));
+			memcpy(lpsPropValue->Value.bin.lpb, lpWrapped, cbWrapped);
+			lpsPropValue->Value.bin.cb = cbWrapped;
+		} else {
+			hr = MAPI_E_NOT_FOUND;
+		}
+		break;
+	}
+	case PROP_ID(PR_RECORD_KEY):
+		lpsPropValue->ulPropTag = PR_RECORD_KEY;
+		lpsPropValue->Value.bin.cb = sizeof(MAPIUID);
+		hr = ECAllocateMore(sizeof(MAPIUID), lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.bin.lpb));
+		if (hr != hrSuccess)
 			break;
-
-		case PROP_ID(PR_RECEIVE_FOLDER_SETTINGS):
-			lpsPropValue->ulPropTag = PR_RECEIVE_FOLDER_SETTINGS;
-			lpsPropValue->Value.x = 1;
-			break;
-		case PROP_ID(PR_MESSAGE_SIZE_EXTENDED):	
-			hr = lpStore->HrGetRealProp(PR_MESSAGE_SIZE_EXTENDED, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_QUOTA_WARNING_THRESHOLD):
-			lpsPropValue->ulPropTag = PR_QUOTA_WARNING_THRESHOLD;
-			hr = lpStore->HrGetRealProp(PR_QUOTA_WARNING_THRESHOLD, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_QUOTA_SEND_THRESHOLD):
-			lpsPropValue->ulPropTag = PR_QUOTA_SEND_THRESHOLD;
-			hr = lpStore->HrGetRealProp(PR_QUOTA_SEND_THRESHOLD, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_QUOTA_RECEIVE_THRESHOLD):
-			lpsPropValue->ulPropTag = PR_QUOTA_RECEIVE_THRESHOLD;
-			hr = lpStore->HrGetRealProp(PR_QUOTA_RECEIVE_THRESHOLD, ulFlags, lpBase, lpsPropValue);
-			break;
-
-		case PROP_ID(PR_MAILBOX_OWNER_NAME):
-			if(lpStore->IsPublicStore() == TRUE) {
-				hr = MAPI_E_NOT_FOUND;
-				break;
-			}
-			lpsPropValue->ulPropTag = ulPropTag;
-			hr = lpStore->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_MAILBOX_OWNER_ENTRYID):
-			if(lpStore->IsPublicStore() == TRUE) {
-				hr = MAPI_E_NOT_FOUND;
-				break;
-			}
-			lpsPropValue->ulPropTag = PR_MAILBOX_OWNER_ENTRYID;
-			hr = lpStore->HrGetRealProp(PR_MAILBOX_OWNER_ENTRYID, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_STORE_OFFLINE):
-			// Delegate stores are always online, so ignore this property
-			if(lpStore->IsDelegateStore() == TRUE) {
-				hr = MAPI_E_NOT_FOUND;
-				break;
-			}
-			lpsPropValue->ulPropTag = PR_STORE_OFFLINE;
-			lpsPropValue->Value.b = false;
-			break;
-		case PROP_ID(PR_USER_NAME):
-			lpsPropValue->ulPropTag = PR_USER_NAME;
-			hr = lpStore->HrGetRealProp(PR_USER_NAME, ulFlags, lpBase, lpsPropValue);
-			break;
-		case PROP_ID(PR_USER_ENTRYID):
-			lpsPropValue->ulPropTag = PR_USER_ENTRYID;
-			hr = lpStore->HrGetRealProp(PR_USER_ENTRYID, ulFlags, lpBase, lpsPropValue);
-			break;
-
-		case PROP_ID(PR_EC_STATSTABLE_SYSTEM):
-		case PROP_ID(PR_EC_STATSTABLE_SESSIONS):
-		case PROP_ID(PR_EC_STATSTABLE_USERS):
-		case PROP_ID(PR_EC_STATSTABLE_COMPANY):
-			lpsPropValue->ulPropTag = ulPropTag;
-			lpsPropValue->Value.x = 1;
-			break;
-		case PROP_ID(PR_TEST_LINE_SPEED):
-			lpsPropValue->ulPropTag = ulPropTag;
-			lpsPropValue->Value.bin.lpb = NULL;
-			lpsPropValue->Value.bin.cb = 0;
-			break;
-		case PROP_ID(PR_ACL_DATA):
-			hr = lpStore->GetSerializedACLData(lpBase, lpsPropValue);
-			if (hr == hrSuccess)
-				lpsPropValue->ulPropTag = PR_ACL_DATA;
-			else {
-				lpsPropValue->ulPropTag = CHANGE_PROP_TYPE(PR_ACL_DATA, PT_ERROR);
-				lpsPropValue->Value.err = hr;
-			}
-			break;
-
-		default:
+		memcpy(lpsPropValue->Value.bin.lpb, &lpStore->GetStoreGuid(), sizeof(MAPIUID));
+		break;
+	case PROP_ID(PR_RECEIVE_FOLDER_SETTINGS):
+		lpsPropValue->ulPropTag = PR_RECEIVE_FOLDER_SETTINGS;
+		lpsPropValue->Value.x = 1;
+		break;
+	case PROP_ID(PR_MESSAGE_SIZE_EXTENDED):
+		hr = lpStore->HrGetRealProp(PR_MESSAGE_SIZE_EXTENDED, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_QUOTA_WARNING_THRESHOLD):
+		lpsPropValue->ulPropTag = PR_QUOTA_WARNING_THRESHOLD;
+		hr = lpStore->HrGetRealProp(PR_QUOTA_WARNING_THRESHOLD, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_QUOTA_SEND_THRESHOLD):
+		lpsPropValue->ulPropTag = PR_QUOTA_SEND_THRESHOLD;
+		hr = lpStore->HrGetRealProp(PR_QUOTA_SEND_THRESHOLD, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_QUOTA_RECEIVE_THRESHOLD):
+		lpsPropValue->ulPropTag = PR_QUOTA_RECEIVE_THRESHOLD;
+		hr = lpStore->HrGetRealProp(PR_QUOTA_RECEIVE_THRESHOLD, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_MAILBOX_OWNER_NAME):
+		if (lpStore->IsPublicStore() == TRUE) {
 			hr = MAPI_E_NOT_FOUND;
 			break;
+		}
+		lpsPropValue->ulPropTag = ulPropTag;
+		hr = lpStore->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_MAILBOX_OWNER_ENTRYID):
+		if (lpStore->IsPublicStore() == TRUE) {
+			hr = MAPI_E_NOT_FOUND;
+			break;
+		}
+		lpsPropValue->ulPropTag = PR_MAILBOX_OWNER_ENTRYID;
+		hr = lpStore->HrGetRealProp(PR_MAILBOX_OWNER_ENTRYID, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_STORE_OFFLINE):
+		// Delegate stores are always online, so ignore this property
+		if (lpStore->IsDelegateStore() == TRUE) {
+			hr = MAPI_E_NOT_FOUND;
+			break;
+		}
+		lpsPropValue->ulPropTag = PR_STORE_OFFLINE;
+		lpsPropValue->Value.b = false;
+		break;
+	case PROP_ID(PR_USER_NAME):
+		lpsPropValue->ulPropTag = PR_USER_NAME;
+		hr = lpStore->HrGetRealProp(PR_USER_NAME, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_USER_ENTRYID):
+		lpsPropValue->ulPropTag = PR_USER_ENTRYID;
+		hr = lpStore->HrGetRealProp(PR_USER_ENTRYID, ulFlags, lpBase, lpsPropValue);
+		break;
+	case PROP_ID(PR_EC_STATSTABLE_SYSTEM):
+	case PROP_ID(PR_EC_STATSTABLE_SESSIONS):
+	case PROP_ID(PR_EC_STATSTABLE_USERS):
+	case PROP_ID(PR_EC_STATSTABLE_COMPANY):
+		lpsPropValue->ulPropTag = ulPropTag;
+		lpsPropValue->Value.x = 1;
+		break;
+	case PROP_ID(PR_TEST_LINE_SPEED):
+		lpsPropValue->ulPropTag = ulPropTag;
+		lpsPropValue->Value.bin.lpb = NULL;
+		lpsPropValue->Value.bin.cb = 0;
+		break;
+	case PROP_ID(PR_ACL_DATA):
+		hr = lpStore->GetSerializedACLData(lpBase, lpsPropValue);
+		if (hr == hrSuccess)
+			lpsPropValue->ulPropTag = PR_ACL_DATA;
+		else {
+			lpsPropValue->ulPropTag = CHANGE_PROP_TYPE(PR_ACL_DATA, PT_ERROR);
+			lpsPropValue->Value.err = hr;
+		}
+		break;
+	case PROP_ID(PR_EC_SERVER_VERSION): {
+		lpsPropValue->ulPropTag = ulPropTag;
+		auto &ver = lpStore->lpTransport->m_server_version;
+		if (PROP_TYPE(ulPropTag) == PT_STRING8) {
+			hr = ECAllocateMore(ver.size() + 1, lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.lpszA));
+			if (hr != hrSuccess)
+				return hr;
+			strcpy(lpsPropValue->Value.lpszA, ver.c_str());
+			break;
+		}
+		const auto tmp = convert_to<std::wstring>(ver);
+		hr = ECAllocateMore((tmp.size() + 1) * sizeof(wchar_t), lpBase, reinterpret_cast<void **>(&lpsPropValue->Value.lpszW));
+		if (hr != hrSuccess)
+			return hr;
+		wcscpy(lpsPropValue->Value.lpszW, tmp.c_str());
+		break;
+	}
+	default:
+		hr = MAPI_E_NOT_FOUND;
+		break;
 	}
 	return hr;
 }
@@ -1088,19 +1048,9 @@ HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 HRESULT	ECMsgStore::SetPropHandler(ULONG ulPropTag, void *lpProvider,
     const SPropValue *lpsPropValue, void *lpParam)
 {
-	HRESULT hr = hrSuccess;
-	auto lpStore = static_cast<ECMsgStore *>(lpParam);
-
-	switch(ulPropTag) {
-	case PR_ACL_DATA:
-		hr = lpStore->SetSerializedACLData(lpsPropValue);
-		break;
-	default:
-		hr = MAPI_E_NOT_FOUND;
-		break;
-	}
-
-	return hr;
+	if (ulPropTag == PR_ACL_DATA)
+		return static_cast<ECMsgStore *>(lpParam)->SetSerializedACLData(lpsPropValue);
+	return MAPI_E_NOT_FOUND;
 }
 
 HRESULT ECMsgStore::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId)
@@ -1109,15 +1059,12 @@ HRESULT ECMsgStore::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId)
 	HRESULT hr = ECGenericProp::SetEntryId(cbEntryId, lpEntryId);
 	if(hr != hrSuccess)
 		return hr;
-
-	if(! (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)) {
-		// Create Notifyclient
-		hr = ECNotifyClient::Create(MAPI_STORE, this, m_ulProfileFlags, lpSupport, &~m_lpNotifyClient);
-		assert(m_lpNotifyClient != NULL);
-		if(hr != hrSuccess)
-			return hr;
-	}
-	return hrSuccess;
+	if (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)
+		return hrSuccess;
+	// Create Notifyclient
+	hr = ECNotifyClient::Create(MAPI_STORE, this, m_ulProfileFlags, lpSupport, &~m_lpNotifyClient);
+	assert(m_lpNotifyClient != NULL);
+	return hr;
 }
 
 const GUID& ECMsgStore::GetStoreGuid()
@@ -1128,21 +1075,20 @@ const GUID& ECMsgStore::GetStoreGuid()
 HRESULT ECMsgStore::GetWrappedStoreEntryID(ULONG* lpcbWrapped, LPENTRYID* lppWrapped)
 {
 	//hr = WrapStoreEntryID(0, WCLIENT_DLL_NAME, CbEID(peid), (LPENTRYID)peid, &cbWrapped, &lpWrapped);
-	return lpSupport->WrapStoreEntryID(this->m_cbEntryId, this->m_lpEntryId, lpcbWrapped, lppWrapped);
+	return lpSupport->WrapStoreEntryID(m_cbEntryId, m_lpEntryId, lpcbWrapped, lppWrapped);
 }
 
 // This is a function special for the spooler to get the right store entryid
 // This is a problem of the master outgoing queue
 HRESULT ECMsgStore::GetWrappedServerStoreEntryID(ULONG cbEntryId, LPBYTE lpEntryId, ULONG* lpcbWrapped, LPENTRYID* lppWrapped)
 {
-	HRESULT		hr = hrSuccess;
 	ULONG		cbStoreID = 0;
 	ecmem_ptr<ENTRYID> lpStoreID;
 	entryId		sEntryId;
 	sEntryId.__ptr = lpEntryId;
 	sEntryId.__size = cbEntryId;
 
-	hr = WrapServerClientStoreEntry(lpTransport->GetServerName(), &sEntryId, &cbStoreID, &~lpStoreID);
+	auto hr = WrapServerClientStoreEntry(lpTransport->GetServerName(), &sEntryId, &cbStoreID, &~lpStoreID);
 	if(hr != hrSuccess)
 		return hr;
 	return lpSupport->WrapStoreEntryID(cbStoreID, lpStoreID, lpcbWrapped, lppWrapped);
@@ -1175,7 +1121,6 @@ HRESULT ECMsgStore::CreateStoreEntryID(const TCHAR *lpszMsgStoreDN,
     const TCHAR *lpszMailboxDN, ULONG ulFlags, ULONG *lpcbEntryID,
     ENTRYID **lppEntryID)
 {
-	HRESULT		hr = hrSuccess;
 	ULONG		cbStoreEntryID = 0;
 	memory_ptr<ENTRYID> lpStoreEntryID;
 	object_ptr<WSTransport> lpTmpTransport;
@@ -1185,8 +1130,7 @@ HRESULT ECMsgStore::CreateStoreEntryID(const TCHAR *lpszMsgStoreDN,
 	if (tstrMsgStoreDN.null_or_empty()) {
 		// No messagestore DN provided. Just try the current server and let it redirect us if neeeded.
 		std::string strRedirServer;
-
-		hr = lpTransport->HrResolveUserStore(tstrMailboxDN, ulFlags, NULL, &cbStoreEntryID, &~lpStoreEntryID, &strRedirServer);
+		auto hr = lpTransport->HrResolveUserStore(tstrMailboxDN, ulFlags, nullptr, &cbStoreEntryID, &~lpStoreEntryID, &strRedirServer);
 		if (hr == MAPI_E_UNABLE_TO_COMPLETE) {
 			hr = lpTransport->CreateAndLogonAlternate(strRedirServer.c_str(), &~lpTmpTransport);
 			if (hr != hrSuccess)
@@ -1203,13 +1147,13 @@ HRESULT ECMsgStore::CreateStoreEntryID(const TCHAR *lpszMsgStoreDN,
 		memory_ptr<char> ptrServerPath;
 		bool bIsPeer;
 
-		hr = MsgStoreDnToPseudoUrl(tstrMsgStoreDN, &strPseudoUrl);
+		auto hr = MsgStoreDnToPseudoUrl(tstrMsgStoreDN, &strPseudoUrl);
 		if (hr == MAPI_E_NO_SUPPORT && (ulFlags & OPENSTORE_OVERRIDE_HOME_MDB) == 0)
 			// Try again old style since the MsgStoreDn contained Unknown as the server name.
 			return CreateStoreEntryID(nullptr, lpszMailboxDN, ulFlags, lpcbEntryID, lppEntryID);
 		else if (hr != hrSuccess)
 			return hr;
-		
+
 		// MsgStoreDN successfully converted
 		hr = lpTransport->HrResolvePseudoUrl(strPseudoUrl.c_str(), &~ptrServerPath, &bIsPeer);
 		if (hr == MAPI_E_NOT_FOUND && (ulFlags & OPENSTORE_OVERRIDE_HOME_MDB) == 0)
@@ -1217,7 +1161,7 @@ HRESULT ECMsgStore::CreateStoreEntryID(const TCHAR *lpszMsgStoreDN,
 			return CreateStoreEntryID(nullptr, lpszMailboxDN, ulFlags, lpcbEntryID, lppEntryID);
 		else if (hr != hrSuccess)
 			return hr;
-		
+
 		// Pseudo URL successfully resolved
 		if (bIsPeer) {
 			hr = lpTransport->HrResolveUserStore(tstrMailboxDN, OPENSTORE_OVERRIDE_HOME_MDB, NULL, &cbStoreEntryID, &~lpStoreEntryID);
@@ -1239,10 +1183,13 @@ HRESULT ECMsgStore::CreateStoreEntryID(const TCHAR *lpszMsgStoreDN,
 
 HRESULT ECMsgStore::EntryIDFromSourceKey(ULONG cFolderKeySize, BYTE *lpFolderSourceKey,	ULONG cMessageKeySize, BYTE *lpMessageSourceKey, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	return lpTransport->HrEntryIDFromSourceKey(this->m_cbEntryId, this->m_lpEntryId, cFolderKeySize, lpFolderSourceKey, cMessageKeySize, lpMessageSourceKey, lpcbEntryID, lppEntryID);
+	return lpTransport->HrEntryIDFromSourceKey(m_cbEntryId, m_lpEntryId,
+	       cFolderKeySize, lpFolderSourceKey, cMessageKeySize,
+	       lpMessageSourceKey, lpcbEntryID, lppEntryID);
 }
 
-HRESULT ECMsgStore::GetRights(ULONG cbUserEntryID, LPENTRYID lpUserEntryID, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpulRights)
+HRESULT ECMsgStore::GetRights(ULONG cbUserEntryID, const ENTRYID *lpUserEntryID,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG *lpulRights)
 {
 	return MAPI_E_NOT_FOUND;
 }
@@ -1251,18 +1198,18 @@ HRESULT ECMsgStore::GetRights(ULONG cbUserEntryID, LPENTRYID lpUserEntryID, ULON
  * Get information about all of the mailboxes on a server.
  *
  * @param[in] lpszServerName	Points to a string that contains the name of the server
- * @param[out] lppTable			Points to a IMAPITable interface containing the information about all of 
+ * @param[out] lppTable			Points to a IMAPITable interface containing the information about all of
  *								the mailboxes on the server specified in lpszServerName
- * param[in] ulFlags			Specifies whether the server name is Unicode or not. The server name is 
+ * param[in] ulFlags			Specifies whether the server name is Unicode or not. The server name is
  *								default in ASCII format. With flags MAPI_UNICODE the server name is in Unicode format.
  * @return	Mapi error codes
  *
- * @remark	If named properties are used in the column set of the lppTable ensure you have the right named property id. 
+ * @remark	If named properties are used in the column set of the lppTable ensure you have the right named property id.
  *			The id can be different on each server.
  */
-HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable, ULONG ulFlags)
+HRESULT ECMsgStore::GetMailboxTable(const TCHAR *lpszServerName,
+    IMAPITable **lppTable, ULONG ulFlags)
 {
-	HRESULT			hr = hrSuccess;
 	object_ptr<ECMAPITable> lpTable;
 	object_ptr<WSTableView> lpTableOps;
 	object_ptr<WSTransport> lpTmpTransport;
@@ -1274,14 +1221,12 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
 	memory_ptr<char> ptrServerPath;
 	std::string		strPseudoUrl;
 	convstring		tstrServerName(lpszServerName, ulFlags);
-
 	const utf8string strUserName = convert_to<utf8string>("SYSTEM");
-	
+
 	if (!tstrServerName.null_or_empty()) {
-	
-		strPseudoUrl = "pseudo://"; 
+		strPseudoUrl = "pseudo://";
 		strPseudoUrl += tstrServerName;
-		hr = lpTransport->HrResolvePseudoUrl(strPseudoUrl.c_str(), &~ptrServerPath, &bIsPeer);
+		auto hr = lpTransport->HrResolvePseudoUrl(strPseudoUrl.c_str(), &~ptrServerPath, &bIsPeer);
 		if (hr != hrSuccess)
 			return hr;
 		if (!bIsPeer) {
@@ -1301,13 +1246,13 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
 	}
 
 	if (bIsPeer) {
-		hr = this->QueryInterface(IID_ECMsgStore, &~lpMsgStore);
+		auto hr = QueryInterface(IID_ECMsgStore, &~lpMsgStore);
 		if (hr != hrSuccess)
 			return hr;
 	}
 
 	assert(lpMsgStore != NULL);
-	hr = ECMAPITable::Create("Mailbox table", lpMsgStore->GetMsgStore()->m_lpNotifyClient, 0, &~lpTable);
+	auto hr = ECMAPITable::Create("Mailbox table", lpMsgStore->GetMsgStore()->m_lpNotifyClient, 0, &~lpTable);
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpMsgStore->lpTransport->HrOpenMailBoxTableOps(ulFlags & MAPI_UNICODE, lpMsgStore->GetMsgStore(), &~lpTableOps);
@@ -1327,9 +1272,9 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
  * Get information about all of the public mailboxes on a server. (not implement)
  *
  * @param[in] lpszServerName	Points to a string that contains the name of the server
- * @param[out] lppTable			Points to a IMAPITable interface containing the information about all of 
+ * @param[out] lppTable			Points to a IMAPITable interface containing the information about all of
  *								the mailboxes on the server specified in lpszServerName
- * param[in] ulFlags			Specifies whether the server name is Unicode or not. The server name is 
+ * param[in] ulFlags			Specifies whether the server name is Unicode or not. The server name is
  *								default in ASCII format. With flags MAPI_UNICODE the server name is in Unicode format.
  *								Flag MDB_IPM		The public folders are interpersonal message (IPM) folders.
 								Flag MDB_NON_IPM	The public folders are non-IPM folders.
@@ -1339,7 +1284,8 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
  *
  * @todo Implement this function like GetMailboxTable
  */
-HRESULT ECMsgStore::GetPublicFolderTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable, ULONG ulFlags)
+HRESULT ECMsgStore::GetPublicFolderTable(const TCHAR *server,
+    IMAPITable **, ULONG flags)
 {
 	return MAPI_E_NOT_FOUND;
 }
@@ -1351,21 +1297,17 @@ static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
     LPMAPIFOLDER lpInboxFolder, LPMAPIFOLDER lpCalendarFolder)
 {
 	// Global
-	HRESULT				hr = hrSuccess;
 	ecmem_ptr<SPropValue> lpPropValue, lpFBPropValue;
-	ULONG				cValues = 0;
-	ULONG				cCurValues = 0;
 	object_ptr<IMAPIFolder> lpFBFolder;
 	object_ptr<IMessage> lpFBMessage;
 
-	// Freebusy mv propery
+	// Freebusy mv property
 	// This property will be fill in on another place
-	hr = ECAllocateBuffer(sizeof(SPropValue), &~lpFBPropValue);
+	auto hr = ECAllocateBuffer(sizeof(SPropValue), &~lpFBPropValue);
 	if(hr != hrSuccess)
 		return hr;
 
 	memset(lpFBPropValue, 0, sizeof(SPropValue));
-
 	lpFBPropValue->ulPropTag = PR_FREEBUSY_ENTRYIDS;
 	lpFBPropValue->Value.MVbin.cValues = 4;
 	hr = ECAllocateMore(sizeof(SBinary)*lpFBPropValue->Value.MVbin.cValues, lpFBPropValue, (void**)&lpFBPropValue->Value.MVbin.lpbin);
@@ -1398,27 +1340,21 @@ static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
 	hr = lpFBFolder->CreateMessage(&IID_IMessage, 0, &~lpFBMessage);
 	if(hr != hrSuccess)
 		return hr;
-	cValues = 6;
-	cCurValues = 0;
+	unsigned int cValues = 6, cCurValues = 0;
 	hr = ECAllocateBuffer(sizeof(SPropValue) * cValues, &~lpPropValue);
 	if(hr != hrSuccess)
 		return hr;
 
 	lpPropValue[cCurValues].ulPropTag = PR_MESSAGE_CLASS_A;
 	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("IPM.Microsoft.ScheduleData.FreeBusy");
-
 	lpPropValue[cCurValues].ulPropTag = PR_SUBJECT_A;
 	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("LocalFreebusy");
-
 	lpPropValue[cCurValues].ulPropTag = PR_FREEBUSY_NUM_MONTHS;
 	lpPropValue[cCurValues++].Value.ul = ECFREEBUSY_DEFAULT_PUBLISH_MONTHS;
-
 	lpPropValue[cCurValues].ulPropTag = PR_DECLINE_RECURRING_MEETING_REQUESTS;
 	lpPropValue[cCurValues++].Value.b = false;
-
 	lpPropValue[cCurValues].ulPropTag = PR_DECLINE_CONFLICTING_MEETING_REQUESTS;
 	lpPropValue[cCurValues++].Value.b = false;
-
 	lpPropValue[cCurValues].ulPropTag = PR_PROCESS_MEETING_REQUESTS;
 	lpPropValue[cCurValues++].Value.b = false;
 
@@ -1428,7 +1364,6 @@ static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
 	hr = lpFBMessage->SaveChanges(KEEP_OPEN_READONLY);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Get entryid of localfreebusy
 	hr = HrGetOneProp(lpFBMessage, PR_ENTRYID, &~lpPropValue);
 	if(hr != hrSuccess)
@@ -1453,10 +1388,8 @@ static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
 
 	lpPropValue[cCurValues].ulPropTag = PR_MESSAGE_CLASS_A;
 	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("IPM.Microsoft.ScheduleData.FreeBusy");
-
 	lpPropValue[cCurValues].ulPropTag = PR_SUBJECT_A;
 	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("LocalFreebusy");
-
 	lpPropValue[cCurValues].ulPropTag = PR_FREEBUSY_NUM_MONTHS;
 	lpPropValue[cCurValues++].Value.ul = ECFREEBUSY_DEFAULT_PUBLISH_MONTHS;
 
@@ -1471,7 +1404,6 @@ static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
 	hr = HrGetOneProp(lpFBMessage, PR_ENTRYID, &~lpPropValue);
 	if(hr != hrSuccess)
 		return hr;
-
 	//Fill in position 0 of the FBProperty, with associated localfreebusy message entryid
 	hr = ECAllocateMore(lpPropValue->Value.bin.cb, lpFBPropValue, (void**)&lpFBPropValue->Value.MVbin.lpbin[0].lpb);
 	if(hr != hrSuccess)
@@ -1512,12 +1444,11 @@ HRESULT ECMsgStore::AddRenAdditionalFolder(IMAPIFolder *lpFolder, ULONG ulType, 
 	SPropValue sPropValue;
 	std::string strBuffer;
 	ULONG ulBlockType = RSF_ELID_ENTRYID;
-	
+
 	if (HrGetOneProp(lpFolder, PR_IPM_OL2007_ENTRYIDS, &~lpRenEntryIDs) == hrSuccess)
 		strBuffer.assign((char *)lpRenEntryIDs->Value.bin.lpb, lpRenEntryIDs->Value.bin.cb);
-		
 	// Remove trailing \0\0\0\0 if it's there
-	if(strBuffer.size() >= 4 && strBuffer.compare(strBuffer.size()-4, 4, "\0\0\0\0", 4) == 0) 
+	if (strBuffer.size() >= 4 && strBuffer.compare(strBuffer.size() - 4, 4, "\0\0\0\0", 4) == 0)
 		strBuffer.resize(strBuffer.size()-4);
 
 	uint16_t tmp2 = cpu_to_le16(ulType);
@@ -1530,7 +1461,7 @@ HRESULT ECMsgStore::AddRenAdditionalFolder(IMAPIFolder *lpFolder, ULONG ulType, 
 	strBuffer.append(1, (lpEntryID->cb>>8)&0xFF);
 	strBuffer.append((char*)lpEntryID->lpb, lpEntryID->cb);
 	strBuffer.append("\x00\x00\x00\x00", 4);
-	
+
 	sPropValue.ulPropTag = PR_IPM_OL2007_ENTRYIDS;
 	sPropValue.Value.bin.cb = strBuffer.size();
 	sPropValue.Value.bin.lpb = (LPBYTE)strBuffer.data();
@@ -1554,7 +1485,7 @@ HRESULT ECMsgStore::AddRenAdditionalFolder(IMAPIFolder *lpFolder, ULONG ulType, 
  * @param lpszContainerType Container type for the folder
  * @param fHidden TRUE if the folder must be marked hidden with PR_ATTR_HIDDEN
  * @return result
- */ 
+ */
 HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
     IMAPIFolder *lpInboxFolder, IMAPIFolder *lpSubTreeFolder, ULONG ulType,
     const TCHAR *lpszFolderName, const TCHAR *lpszComment,
@@ -1563,14 +1494,14 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
 	object_ptr<IMAPIFolder> lpMAPIFolder;
 	memory_ptr<SPropValue> lpPropValueEID;
 	SPropValue sPropValue;
-	
+
 	HRESULT hr = lpSubTreeFolder->CreateFolder(FOLDER_GENERIC,
 	     const_cast<LPTSTR>(lpszFolderName),
 	     const_cast<LPTSTR>(lpszComment), &IID_IMAPIFolder,
 	     OPEN_IF_EXISTS | fMapiUnicode, &~lpMAPIFolder);
 	if(hr != hrSuccess)
 		return hr;
-	
+
 	// Get entryid of the folder
 	hr = HrGetOneProp(lpMAPIFolder, PR_ENTRYID, &~lpPropValueEID);
 	if(hr != hrSuccess)
@@ -1582,16 +1513,14 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
 	hr = HrSetOneProp(lpMAPIFolder, &sPropValue);
 	if(hr != hrSuccess)
 		return hr;
-		
+
 	if(fHidden) {
 		sPropValue.ulPropTag = PR_ATTR_HIDDEN;
 		sPropValue.Value.b = true;
-		
 		hr = HrSetOneProp(lpMAPIFolder, &sPropValue);
 		if(hr != hrSuccess)
 			return hr;
 	}
-		
 
 	hr = AddRenAdditionalFolder(lpRootFolder, ulType, &lpPropValueEID->Value.bin);
 	if (hr != hrSuccess)
@@ -1599,35 +1528,282 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
 	return AddRenAdditionalFolder(lpInboxFolder, ulType, &lpPropValueEID->Value.bin);
 }
 
+HRESULT ECMsgStore::create_store_public(ECMsgStore *store,
+    IMAPIFolder *root, IMAPIFolder *st, const ENTRYID *user, size_t usize)
+{
+	object_ptr<IMAPIFolder> nst, fld, fld2, fld3;
+	auto ret = CreateSpecialFolder(root, store, KC_T("NON_IPM_SUBTREE"),
+	           KC_T(""), PR_NON_IPM_SUBTREE_ENTRYID, 0, nullptr, &~nst);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(root, store, KC_T("FINDER_ROOT"), KC_T(""),
+	      PR_FINDER_ENTRYID, 0, nullptr, &~fld3);
+	if (ret != hrSuccess)
+		return ret;
+
+	ECPERMISSION perm;
+	object_ptr<IECSecurity> sec;
+	perm.ulRights    = ecRightsFolderVisible | ecRightsReadAny | ecRightsCreateSubfolder | ecRightsEditOwned | ecRightsDeleteOwned;
+	perm.ulState     = RIGHT_NEW | RIGHT_AUTOUPDATE_DENIED;
+	perm.ulType      = ACCESS_TYPE_GRANT;
+	perm.sUserId.cb  = g_cbEveryoneEid;
+	perm.sUserId.lpb = g_lpEveryoneEid;
+	ret = fld3->QueryInterface(IID_IECSecurity, &~sec);
+	if (ret != hrSuccess)
+		return ret;
+	ret = sec->SetPermissionRules(1, &perm);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(nst, store, KC_T("SCHEDULE+ FREE BUSY"),
+	      KC_T(""), PR_SPLUS_FREE_BUSY_ENTRYID, 0, nullptr, &~fld);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Set ACLs on the folder */
+	perm.ulRights    = ecRightsReadAny | ecRightsFolderVisible;
+	perm.ulState     = RIGHT_NEW | RIGHT_AUTOUPDATE_DENIED;
+	perm.ulType      = ACCESS_TYPE_GRANT;
+	perm.sUserId.cb  = usize;
+	perm.sUserId.lpb = reinterpret_cast<unsigned char *>(const_cast<ENTRYID *>(user));
+	ret = fld->QueryInterface(IID_IECSecurity, &~sec);
+	if (ret != hrSuccess)
+		return ret;
+	ret = sec->SetPermissionRules(1, &perm);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(fld, store, KC_T("Zarafa 1"), KC_T(""),
+	      PR_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID, 0, nullptr, &~fld2);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Set ACLs on the folder */
+	perm.ulRights    = ecRightsAll; /* ecRightsReadAny | ecRightsCreate | ecRightsEditOwned | ecRightsDeleteOwned | ecRightsCreateSubfolder | ecRightsFolderVisible; */
+	perm.ulState     = RIGHT_NEW | RIGHT_AUTOUPDATE_DENIED;
+	perm.ulType      = ACCESS_TYPE_GRANT;
+	perm.sUserId.cb  = usize;
+	perm.sUserId.lpb = reinterpret_cast<unsigned char *>(const_cast<ENTRYID *>(user));
+	ret = fld2->QueryInterface(IID_IECSecurity, &~sec);
+	if (ret != hrSuccess)
+		return ret;
+	ret = sec->SetPermissionRules(1, &perm);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Set ACLs on the IPM subtree folder */
+	perm.ulRights    = ecRightsReadAny | ecRightsCreate | ecRightsEditOwned | ecRightsDeleteOwned | ecRightsCreateSubfolder | ecRightsFolderVisible;
+	perm.ulState     = RIGHT_NEW | RIGHT_AUTOUPDATE_DENIED;
+	perm.ulType      = ACCESS_TYPE_GRANT;
+	perm.sUserId.cb  = usize;
+	perm.sUserId.lpb = reinterpret_cast<unsigned char *>(const_cast<ENTRYID *>(user));
+	ret = st->QueryInterface(IID_IECSecurity, &~sec);
+	if (ret != hrSuccess)
+		return ret;
+	ret = sec->SetPermissionRules(1, &perm);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* indicate validity of the entry identifiers of the folders in a message store */
+	/* Public folder have default the mask */
+	memory_ptr<SPropValue> pv;
+	ret = ECAllocateBuffer(sizeof(SPropValue) * 2, &~pv);
+	if (ret != hrSuccess)
+		return ret;
+	pv[0].ulPropTag   = PR_VALID_FOLDER_MASK;
+	pv[0].Value.ul    = FOLDER_FINDER_VALID | FOLDER_IPM_SUBTREE_VALID | FOLDER_IPM_INBOX_VALID | FOLDER_IPM_OUTBOX_VALID | FOLDER_IPM_WASTEBASKET_VALID | FOLDER_IPM_SENTMAIL_VALID | FOLDER_VIEWS_VALID | FOLDER_COMMON_VIEWS_VALID;
+	pv[1].ulPropTag   = PR_DISPLAY_NAME_W;
+	pv[1].Value.lpszW = const_cast<wchar_t *>(L"Public folder"); /* FIXME: set the right public folder name here? */
+	return store->SetProps(2, pv, nullptr);
+}
+
+HRESULT ECMsgStore::create_store_private(ECMsgStore *store,
+    ECMAPIFolder *ecroot, IMAPIFolder *root, IMAPIFolder *st)
+{
+	object_ptr<IMAPIFolder> fld, fld3, inbox, cal;
+
+	/* folder holds views that are standard for the message store */
+	auto ret = CreateSpecialFolder(root, store, KC_T("IPM_COMMON_VIEWS"),
+	           KC_T(""), PR_COMMON_VIEWS_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Personal: folder holds views that are defined by a particular user */
+	ret = CreateSpecialFolder(root, store, KC_T("IPM_VIEWS"), KC_T(""),
+	      PR_VIEWS_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(root, store, KC_T("FINDER_ROOT"), KC_T(""),
+	      PR_FINDER_ENTRYID, 0, nullptr, &~fld3);
+	if (ret != hrSuccess)
+		return ret;
+
+	object_ptr<IECSecurity> sec;
+	ECPERMISSION perm;
+	perm.ulRights    = ecRightsFolderVisible | ecRightsReadAny | ecRightsCreateSubfolder | ecRightsEditOwned | ecRightsDeleteOwned;
+	perm.ulState     = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
+	perm.ulType      = ACCESS_TYPE_GRANT;
+	perm.sUserId.cb  = g_cbEveryoneEid;
+	perm.sUserId.lpb = g_lpEveryoneEid;
+	ret = fld3->QueryInterface(IID_IECSecurity, &~sec);
+	if (ret != hrSuccess)
+		return ret;
+	ret = sec->SetPermissionRules(1, &perm);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Shortcuts for the favorites */
+	ret = CreateSpecialFolder(root, store, KC_TX("Shortcut"), KC_T(""),
+	      PR_IPM_FAVORITES_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(root, store, KC_TX("Schedule"), KC_T(""),
+	      PR_SCHEDULE_FOLDER_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(st, nullptr, KC_TX("Inbox"), KC_T(""),
+	      0, 0, nullptr, &~inbox);
+	if (ret != hrSuccess)
+		return ret;
+
+	memory_ptr<SPropValue> pv;
+	ret = HrGetOneProp(inbox, PR_ENTRYID, &~pv);
+	if (ret != hrSuccess)
+		return ret;
+	ret = store->SetReceiveFolder(nullptr, 0, pv->Value.bin.cb, reinterpret_cast<ENTRYID *>(pv->Value.bin.lpb));
+	if (ret != hrSuccess)
+		return ret;
+	ret = store->SetReceiveFolder(reinterpret_cast<const TCHAR *>("IPM"), 0,
+	      pv->Value.bin.cb, reinterpret_cast<ENTRYID *>(pv->Value.bin.lpb));
+	if (ret != hrSuccess)
+		return ret;
+	ret = store->SetReceiveFolder(reinterpret_cast<const TCHAR *>("REPORT.IPM"),
+	      0, pv->Value.bin.cb, reinterpret_cast<ENTRYID *>(pv->Value.bin.lpb));
+	if (ret != hrSuccess)
+		return ret;
+	object_ptr<ECMAPIFolder> ecinbox;
+	ret = inbox->QueryInterface(IID_ECMAPIFolder, &~ecinbox);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, store, KC_TX("Outbox"), KC_T(""),
+	      PR_IPM_OUTBOX_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(st, store, KC_TX("Deleted Items"), KC_T(""),
+	      PR_IPM_WASTEBASKET_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateSpecialFolder(st, store, KC_TX("Sent Items"), KC_T(""),
+	      PR_IPM_SENTMAIL_ENTRYID, 0, nullptr, nullptr);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Contacts"), KC_T(""),
+	      PR_IPM_CONTACT_ENTRYID, 0, KC_T("IPF.Contact"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_IPM_CONTACT_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Calendar"), KC_T(""),
+	      PR_IPM_APPOINTMENT_ENTRYID, 0, KC_T("IPF.Appointment"), &~cal);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(cal, ecroot, PR_IPM_APPOINTMENT_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Drafts"), KC_T(""),
+	      PR_IPM_DRAFTS_ENTRYID, 0, KC_T("IPF.Note"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_IPM_DRAFTS_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Journal"), KC_T(""),
+	      PR_IPM_JOURNAL_ENTRYID, 0, KC_T("IPF.Journal"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_IPM_JOURNAL_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Notes"), KC_T(""),
+	      PR_IPM_NOTE_ENTRYID, 0, KC_T("IPF.StickyNote"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_IPM_NOTE_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Tasks"), KC_T(""),
+	      PR_IPM_TASK_ENTRYID, 0, KC_T("IPF.Task"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_IPM_TASK_ENTRYID, 0);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Create Junk mail (position 5(4 in array) in the mvprop PR_ADDITIONAL_REN_ENTRYIDS) */
+	ret = CreateSpecialFolder(st, ecinbox, KC_TX("Junk E-mail"), KC_T(""),
+	      PR_ADDITIONAL_REN_ENTRYIDS, 4, KC_T("IPF.Note"), &~fld);
+	if (ret != hrSuccess)
+		return ret;
+	ret = SetSpecialEntryIdOnFolder(fld, ecroot, PR_ADDITIONAL_REN_ENTRYIDS, 4);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreatePrivateFreeBusyData(root, inbox, cal);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* Create Outlook 2007/2010 additional folders */
+	ret = CreateAdditionalFolder(root, inbox, st, RSF_PID_RSS_SUBSCRIPTION,
+	      KC_TX("RSS Feeds"), KC_TX("RSS Feed comment"), KC_T("IPF.Note.OutlookHomepage"), false);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateAdditionalFolder(root, inbox, st, RSF_PID_CONV_ACTIONS,
+	      KC_TX("Conversation Action Settings"), KC_T(""), KC_T("IPF.Configuration"), true);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateAdditionalFolder(root, inbox, st, RSF_PID_COMBINED_ACTIONS,
+	      KC_TX("Quick Step Settings"), KC_T(""), KC_T("IPF.Configuration"), true);
+	if (ret != hrSuccess)
+		return ret;
+	ret = CreateAdditionalFolder(root, inbox, st, RSF_PID_SUGGESTED_CONTACTS,
+	      KC_TX("Suggested Contacts"), KC_T(""), KC_T("IPF.Contact"), false);
+	if (ret != hrSuccess)
+		return ret;
+
+	/* indicate validity of the entry identifiers of the folders in a message store */
+	ret = ECAllocateBuffer(sizeof(SPropValue), &~pv);
+	if (ret != hrSuccess)
+		return ret;
+	pv[0].ulPropTag = PR_VALID_FOLDER_MASK;
+	pv[0].Value.ul = FOLDER_VIEWS_VALID | FOLDER_COMMON_VIEWS_VALID |
+	                 FOLDER_FINDER_VALID | FOLDER_IPM_INBOX_VALID |
+	                 FOLDER_IPM_OUTBOX_VALID | FOLDER_IPM_SENTMAIL_VALID |
+	                 FOLDER_IPM_SUBTREE_VALID | FOLDER_IPM_WASTEBASKET_VALID;
+	return store->SetProps(1, pv, nullptr);
+}
+
 HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId,
     const ENTRYID *lpUserId, ULONG *lpcbStoreId, ENTRYID **lppStoreId,
     ULONG *lpcbRootId, ENTRYID **lppRootId)
 {
-	HRESULT				hr				= hrSuccess;
 	object_ptr<WSTransport> lpTempTransport;
 	object_ptr<ECMsgStore> lpecMsgStore;
 	object_ptr<ECMAPIFolder> lpMapiFolderRoot;
 	/* Root container, IPM_SUBTREE and NON_IPM_SUBTREE */
-	object_ptr<IMAPIFolder> lpFolderRoot, lpFolderRootST, lpFolderRootNST;
-	object_ptr<IMAPIFolder> lpMAPIFolder, lpMAPIFolder2, lpMAPIFolder3;
-	object_ptr<IECPropStorage> lpStorage;
-	object_ptr<ECMAPIFolder> lpECMapiFolderInbox;
-	object_ptr<IMAPIFolder> lpInboxFolder, lpCalendarFolder;
-	ecmem_ptr<SPropValue> lpPropValue;
-	ULONG				cValues = 0;
-	ULONG				ulObjType = 0;
-	object_ptr<IECSecurity> lpECSecurity;
-	ECPERMISSION		sPermission;
+	object_ptr<IMAPIFolder> lpFolderRoot, lpFolderRootST;
+	object_ptr<IECPropStorage> storage;
+	unsigned int objtype = 0, cbStoreId = 0, cbRootId = 0;
 	ecmem_ptr<ECUSER> lpECUser;
 	ecmem_ptr<ECCOMPANY> lpECCompany;
 	ecmem_ptr<ECGROUP> lpECGroup;
+	ENTRYID *lpStoreId = nullptr, *lpRootId = nullptr;
 
-	ULONG				cbStoreId = 0;
-	LPENTRYID			lpStoreId = NULL;
-	ULONG				cbRootId = 0;
-	LPENTRYID			lpRootId = NULL;
-
-	hr = CreateEmptyStore(ulStoreType, cbUserId, lpUserId, 0, &cbStoreId, &lpStoreId, &cbRootId, &lpRootId);
+	auto hr = CreateEmptyStore(ulStoreType, cbUserId, lpUserId, 0, &cbStoreId, &lpStoreId, &cbRootId, &lpRootId);
 	if (hr != hrSuccess)
 		return hr;
 	/*
@@ -1662,20 +1838,18 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId,
 		return hr;
 
 	// Get a propstorage for the message store
-	hr = lpTransport->HrOpenPropStorage(0, NULL, cbStoreId, lpStoreId, 0, &~lpStorage);
+	hr = lpTransport->HrOpenPropStorage(0, nullptr, cbStoreId, lpStoreId, 0, &~storage);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Set up the message store to use this storage
-	hr = lpecMsgStore->HrSetPropStorage(lpStorage, TRUE);
+	hr = lpecMsgStore->HrSetPropStorage(storage, true);
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpecMsgStore->SetEntryId(cbStoreId, lpStoreId);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Open rootfolder
-	hr = lpecMsgStore->OpenEntry(cbRootId, lpRootId, &IID_ECMAPIFolder, MAPI_MODIFY , &ulObjType, &~lpMapiFolderRoot);
+	hr = lpecMsgStore->OpenEntry(cbRootId, lpRootId, &IID_ECMAPIFolder, MAPI_MODIFY, &objtype, &~lpMapiFolderRoot);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -1694,263 +1868,12 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId,
 	if(hr != hrSuccess)
 		return hr;
 
-	if(ulStoreType == ECSTORE_TYPE_PUBLIC) { // Public folder action
-		// Create Folder NON_IPM_SUBTREE into the rootfolder
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("NON_IPM_SUBTREE"), KC_T(""), PR_NON_IPM_SUBTREE_ENTRYID, 0, NULL, &~lpFolderRootNST);
-		if (hr != hrSuccess)
-			return hr;
-
-		// Create Folder FINDER_ROOT into the rootfolder
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("FINDER_ROOT"), KC_T(""), PR_FINDER_ENTRYID, 0, NULL, &~lpMAPIFolder3);
-		if (hr != hrSuccess)
-			return hr;
-
-		sPermission.ulRights = ecRightsFolderVisible|ecRightsReadAny|ecRightsCreateSubfolder|ecRightsEditOwned|ecRightsDeleteOwned;
-		sPermission.ulState = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
-		sPermission.ulType = ACCESS_TYPE_GRANT;
-		sPermission.sUserId.cb = g_cbEveryoneEid;
-		sPermission.sUserId.lpb = g_lpEveryoneEid;
-		hr = lpMAPIFolder3->QueryInterface(IID_IECSecurity, &~lpECSecurity);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpECSecurity->SetPermissionRules(1, &sPermission);
-		if (hr != hrSuccess)
-			return hr;
-
-		//Free busy time folder
-		hr = CreateSpecialFolder(lpFolderRootNST, lpecMsgStore, KC_T("SCHEDULE+ FREE BUSY"), KC_T(""), PR_SPLUS_FREE_BUSY_ENTRYID, 0, NULL, &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-
-		/* Set ACLs on the folder */
-		sPermission.ulRights = ecRightsReadAny|ecRightsFolderVisible;
-		sPermission.ulState = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
-		sPermission.ulType = ACCESS_TYPE_GRANT;
-		sPermission.sUserId.cb = cbUserId;
-		sPermission.sUserId.lpb = (unsigned char*)lpUserId;
-		hr = lpMAPIFolder->QueryInterface(IID_IECSecurity, &~lpECSecurity);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpECSecurity->SetPermissionRules(1, &sPermission);
-		if(hr != hrSuccess)
-			return hr;
-		hr = CreateSpecialFolder(lpMAPIFolder, lpecMsgStore, KC_T("Zarafa 1"), KC_T(""), PR_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID, 0, NULL, &~lpMAPIFolder2);
-		if(hr != hrSuccess)
-			return hr;
-
-		/* Set ACLs on the folder */
-		sPermission.ulRights = ecRightsAll;//ecRightsReadAny| ecRightsCreate | ecRightsEditOwned| ecRightsDeleteOwned | ecRightsCreateSubfolder | ecRightsFolderVisible;
-		sPermission.ulState = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
-		sPermission.ulType = ACCESS_TYPE_GRANT;
-		sPermission.sUserId.cb = cbUserId;
-		sPermission.sUserId.lpb = (unsigned char*)lpUserId;
-		hr = lpMAPIFolder2->QueryInterface(IID_IECSecurity, &~lpECSecurity);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpECSecurity->SetPermissionRules(1, &sPermission);
-		if(hr != hrSuccess)
-			return hr;
-
-		/* Set ACLs on the IPM subtree folder */
-		sPermission.ulRights = ecRightsReadAny| ecRightsCreate | ecRightsEditOwned| ecRightsDeleteOwned | ecRightsCreateSubfolder | ecRightsFolderVisible;
-		sPermission.ulState = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
-		sPermission.ulType = ACCESS_TYPE_GRANT;
-		sPermission.sUserId.cb = cbUserId;
-		sPermission.sUserId.lpb = (unsigned char*)lpUserId;
-		hr = lpFolderRootST->QueryInterface(IID_IECSecurity, &~lpECSecurity);
-		if (hr != hrSuccess)
-			return hr;
-		hr = lpECSecurity->SetPermissionRules(1, &sPermission);
-		if (hr != hrSuccess)
-			return hr;
-
-		// indicate, validity of the entry identifiers of the folders in a message store
-		// Public folder have default the mask
-		cValues = 2;
-		hr = ECAllocateBuffer(sizeof(SPropValue) * cValues, &~lpPropValue);
-		if (hr != hrSuccess)
-			return hr;
-		lpPropValue->ulPropTag = PR_VALID_FOLDER_MASK;
-		lpPropValue->Value.ul = FOLDER_FINDER_VALID | FOLDER_IPM_SUBTREE_VALID | FOLDER_IPM_INBOX_VALID | FOLDER_IPM_OUTBOX_VALID | FOLDER_IPM_WASTEBASKET_VALID | FOLDER_IPM_SENTMAIL_VALID | FOLDER_VIEWS_VALID | FOLDER_COMMON_VIEWS_VALID;
-
-		// Set store displayname
-		lpPropValue[1].ulPropTag = PR_DISPLAY_NAME_W;
-		lpPropValue[1].Value.lpszW = const_cast<wchar_t *>(L"Public folder"); //FIXME: set the right public folder name here?
-
-		// Set the property into the store
-		hr = lpecMsgStore->SetProps(cValues, lpPropValue, NULL);
-		if(hr != hrSuccess)
-			return hr;
-	}else if(ulStoreType == ECSTORE_TYPE_PRIVATE) { //Private folder
-
-		// Create Folder COMMON_VIEWS into the rootfolder
-		// folder holds views that are standard for the message store
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("IPM_COMMON_VIEWS"), KC_T(""), PR_COMMON_VIEWS_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Folder VIEWS into the rootfolder
-		// Personal: folder holds views that are defined by a particular user
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("IPM_VIEWS"), KC_T(""), PR_VIEWS_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Folder FINDER_ROOT into the rootfolder
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("FINDER_ROOT"), KC_T(""), PR_FINDER_ENTRYID, 0, NULL, &~lpMAPIFolder3);
-		if(hr != hrSuccess)
-			return hr;
-
-		sPermission.ulRights = ecRightsFolderVisible|ecRightsReadAny|ecRightsCreateSubfolder|ecRightsEditOwned|ecRightsDeleteOwned;
-		sPermission.ulState = RIGHT_NEW|RIGHT_AUTOUPDATE_DENIED;
-		sPermission.ulType = ACCESS_TYPE_GRANT;
-		sPermission.sUserId.cb = g_cbEveryoneEid;
-		sPermission.sUserId.lpb = g_lpEveryoneEid;
-		hr = lpMAPIFolder3->QueryInterface(IID_IECSecurity, &~lpECSecurity);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpECSecurity->SetPermissionRules(1, &sPermission);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Shortcuts
-		// Shortcuts for the favorites
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, _("Shortcut"), KC_T(""), PR_IPM_FAVORITES_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Schedule folder
-		hr = CreateSpecialFolder(lpFolderRoot, lpecMsgStore, KC_T("Schedule"), KC_T(""), PR_SCHEDULE_FOLDER_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create folders into IPM_SUBTREE
-		// Folders like: Inbox, outbox, tasks, agenda, notes, trashcan, send items, contacts,concepts
-
-		// Create Inbox
-		hr = CreateSpecialFolder(lpFolderRootST, NULL, _("Inbox"), KC_T(""), 0, 0, NULL, &~lpInboxFolder);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Get entryid of the folder
-		hr = HrGetOneProp(lpInboxFolder, PR_ENTRYID, &~lpPropValue);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpecMsgStore->SetReceiveFolder(NULL, 0, lpPropValue->Value.bin.cb, (LPENTRYID)lpPropValue->Value.bin.lpb);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpecMsgStore->SetReceiveFolder(LPCTSTR("IPM"), 0, lpPropValue->Value.bin.cb, (LPENTRYID)lpPropValue->Value.bin.lpb);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpecMsgStore->SetReceiveFolder(LPCTSTR("REPORT.IPM"), 0, lpPropValue->Value.bin.cb, (LPENTRYID)lpPropValue->Value.bin.lpb);
-		if(hr != hrSuccess)
-			return hr;
-		hr = lpInboxFolder->QueryInterface(IID_ECMAPIFolder, &~lpECMapiFolderInbox);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Outbox
-		hr = CreateSpecialFolder(lpFolderRootST, lpecMsgStore, _("Outbox"), KC_T(""), PR_IPM_OUTBOX_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Trashcan
-		hr = CreateSpecialFolder(lpFolderRootST, lpecMsgStore, _("Deleted Items"), KC_T(""), PR_IPM_WASTEBASKET_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Sent Items
-		hr = CreateSpecialFolder(lpFolderRootST, lpecMsgStore, _("Sent Items"), KC_T(""), PR_IPM_SENTMAIL_ENTRYID, 0, NULL, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Contacts
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Contacts"), KC_T(""), PR_IPM_CONTACT_ENTRYID, 0, KC_T("IPF.Contact"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_IPM_CONTACT_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create calendar
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Calendar"), KC_T(""), PR_IPM_APPOINTMENT_ENTRYID, 0, KC_T("IPF.Appointment"), &~lpCalendarFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpCalendarFolder, lpMapiFolderRoot, PR_IPM_APPOINTMENT_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Drafts
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Drafts"), KC_T(""), PR_IPM_DRAFTS_ENTRYID, 0, KC_T("IPF.Note"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_IPM_DRAFTS_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create journal
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Journal"), KC_T(""), PR_IPM_JOURNAL_ENTRYID, 0, KC_T("IPF.Journal"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_IPM_JOURNAL_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Notes
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Notes"), KC_T(""), PR_IPM_NOTE_ENTRYID, 0, KC_T("IPF.StickyNote"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_IPM_NOTE_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Tasks
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Tasks"), KC_T(""), PR_IPM_TASK_ENTRYID, 0, KC_T("IPF.Task"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_IPM_TASK_ENTRYID, 0);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Junk mail (position 5(4 in array) in the mvprop PR_ADDITIONAL_REN_ENTRYIDS)
-		hr = CreateSpecialFolder(lpFolderRootST, lpECMapiFolderInbox, _("Junk E-mail"), KC_T(""), PR_ADDITIONAL_REN_ENTRYIDS, 4, KC_T("IPF.Note"), &~lpMAPIFolder);
-		if(hr != hrSuccess)
-			return hr;
-		hr = SetSpecialEntryIdOnFolder(lpMAPIFolder, lpMapiFolderRoot, PR_ADDITIONAL_REN_ENTRYIDS, 4);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Freebusy folder data
-		hr = CreatePrivateFreeBusyData(lpFolderRoot, lpInboxFolder, lpCalendarFolder);
-		if(hr != hrSuccess)
-			return hr;
-
-		// Create Outlook 2007/2010 Additional folders
-		hr = CreateAdditionalFolder(lpFolderRoot, lpInboxFolder, lpFolderRootST, RSF_PID_RSS_SUBSCRIPTION, _("RSS Feeds"), _("RSS Feed comment"), KC_T("IPF.Note.OutlookHomepage"), false);
-		if(hr != hrSuccess)
-			return hr;
-		hr = CreateAdditionalFolder(lpFolderRoot, lpInboxFolder, lpFolderRootST, RSF_PID_CONV_ACTIONS, _("Conversation Action Settings"), KC_T(""), KC_T("IPF.Configuration"), true);
-		if(hr != hrSuccess)
-			return hr;
-		hr = CreateAdditionalFolder(lpFolderRoot, lpInboxFolder, lpFolderRootST, RSF_PID_COMBINED_ACTIONS, _("Quick Step Settings"), KC_T(""), KC_T("IPF.Configuration"), true);
-		if(hr != hrSuccess)
-			return hr;
-		hr = CreateAdditionalFolder(lpFolderRoot, lpInboxFolder, lpFolderRootST, RSF_PID_SUGGESTED_CONTACTS, _("Suggested Contacts"), KC_T(""), KC_T("IPF.Contact"), false);
-		if(hr != hrSuccess)
-			return hr;
-
-		// indicate, validity of the entry identifiers of the folders in a message store
-		cValues = 1;
-		hr = ECAllocateBuffer(sizeof(SPropValue) * cValues, &~lpPropValue);
-		if (hr != hrSuccess)
-			return hr;
-		lpPropValue[0].ulPropTag = PR_VALID_FOLDER_MASK;
-		lpPropValue[0].Value.ul = FOLDER_VIEWS_VALID | FOLDER_COMMON_VIEWS_VALID|FOLDER_FINDER_VALID | FOLDER_IPM_INBOX_VALID | FOLDER_IPM_OUTBOX_VALID | FOLDER_IPM_SENTMAIL_VALID | FOLDER_IPM_SUBTREE_VALID | FOLDER_IPM_WASTEBASKET_VALID;
-
-		// Set the property into the store
-		hr = lpecMsgStore->SetProps(cValues, lpPropValue, NULL);
-		if(hr != hrSuccess)
-			return hr;
-	}
+	if (ulStoreType == ECSTORE_TYPE_PUBLIC)
+		hr = create_store_public(lpecMsgStore, lpFolderRoot, lpFolderRootST, lpUserId, cbUserId);
+	else if (ulStoreType == ECSTORE_TYPE_PRIVATE)
+		hr = create_store_private(lpecMsgStore, lpMapiFolderRoot, lpFolderRoot, lpFolderRootST);
+	if (hr != hrSuccess)
+		return hr;
 
 	*lpcbStoreId = cbStoreId;
 	*lppStoreId = lpStoreId;
@@ -1988,19 +1911,9 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
     const ENTRYID *lpUserId, ULONG ulFlags, ULONG *lpcbStoreId,
     ENTRYID **lppStoreId, ULONG *lpcbRootId, ENTRYID **lppRootId)
 {
-	HRESULT hr = hrSuccess;
-	ULONG cbStoreId = 0;
-	LPENTRYID lpStoreId = NULL;
-	ULONG cbRootId = 0;
-	LPENTRYID lpRootId = NULL;
-	GUID guidStore;
-
-	// Check requested store type
 	if (!ECSTORE_TYPE_ISVALID(ulStoreType) ||
-		(ulFlags != 0 && ulFlags != EC_OVERRIDE_HOMESERVER))
+	    (ulFlags != 0 && ulFlags != EC_OVERRIDE_HOMESERVER))
 		return MAPI_E_INVALID_PARAMETER;
-
-	// Check passed store and root entry ids.
 	if (lpcbStoreId == nullptr || lppStoreId == nullptr ||
 	    lpcbRootId == nullptr || lppRootId == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
@@ -2012,6 +1925,11 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
 		return MAPI_E_INVALID_PARAMETER;
 	if (*lppRootId != nullptr && *lppStoreId == nullptr) /* Root id set, but storeid unset */
 		return MAPI_E_INVALID_PARAMETER;
+
+	unsigned int cbStoreId = 0, cbRootId = 0;
+	ENTRYID *lpStoreId = nullptr, *lpRootId = nullptr;
+	GUID guidStore;
+
 	if ((*lpcbStoreId == 0 || *lpcbRootId == 0) && CoCreateGuid(&guidStore) != S_OK)
 		return MAPI_E_CALL_FAILED;
 
@@ -2024,14 +1942,14 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
 
 	if (*lpcbStoreId == 0) {
 		// Create store entryid
-		hr = HrCreateEntryId(guidStore, MAPI_STORE, &cbStoreId, &lpStoreId);
+		auto hr = HrCreateEntryId(guidStore, MAPI_STORE, &cbStoreId, &lpStoreId);
 		if (hr != hrSuccess)
 			return hr;
 	} else {
 		ULONG cbTmp = 0;
 		LPENTRYID lpTmp = NULL;
 
-		hr = UnWrapStoreEntryID(*lpcbStoreId, *lppStoreId, &cbTmp, &lpTmp);
+		auto hr = UnWrapStoreEntryID(*lpcbStoreId, *lppStoreId, &cbTmp, &lpTmp);
 		if (hr == MAPI_E_INVALID_ENTRYID) {	// Could just be a non-wrapped entryid
 			cbTmp = *lpcbStoreId;
 			lpTmp = *lppStoreId;
@@ -2046,7 +1964,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
 
 	if (*lpcbRootId == 0) {
 		// create root entryid
-		hr = HrCreateEntryId(guidStore, MAPI_FOLDER, &cbRootId, &lpRootId);
+		auto hr = HrCreateEntryId(guidStore, MAPI_FOLDER, &cbRootId, &lpRootId);
 		if (hr != hrSuccess)
 			return hr;
 	} else {
@@ -2055,7 +1973,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
 	}
 
 	// Create the messagestore
-	hr = lpTransport->HrCreateStore(ulStoreType, cbUserId, lpUserId, cbStoreId, lpStoreId, cbRootId, lpRootId, ulFlags);
+	auto hr = lpTransport->HrCreateStore(ulStoreType, cbUserId, lpUserId, cbStoreId, lpStoreId, cbRootId, lpRootId, ulFlags);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -2064,14 +1982,13 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId,
 		*lppStoreId = lpStoreId;
 		lpStoreId = NULL;
 	}
-		
+
 	if (*lpcbRootId == 0) {
 		*lpcbRootId = cbRootId;
 		*lppRootId = lpRootId;
 		lpRootId = NULL;
 	}
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStore::HookStore(ULONG ulStoreType, ULONG cbUserId,
@@ -2161,22 +2078,20 @@ HRESULT ECMsgStore::CreateSpecialFolder(IMAPIFolder *folder_parent_in,
     unsigned int ulMVPos, const TCHAR *lpszContainerClass,
     LPMAPIFOLDER *lppMAPIFolder)
 {
-	HRESULT 		hr = hrSuccess;
-	object_ptr<IMAPIFolder> lpMAPIFolder;
-	ecmem_ptr<SPropValue> lpPropValue;
-
 	if (folder_parent_in == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	object_ptr<IMAPIFolder> lpMAPIFolder;
+	ecmem_ptr<SPropValue> lpPropValue;
 	/* Add a reference to the folders */
 	object_ptr<IMAPIFolder> lpFolderParent(folder_parent_in);
 	object_ptr<ECMAPIProp> lpFolderPropSet(folder_propset_in);
 
 	// Create the folder
-	hr = lpFolderParent->CreateFolder(FOLDER_GENERIC,
-	     const_cast<LPTSTR>(lpszFolderName),
-	     const_cast<LPTSTR>(lpszFolderComment), &IID_IMAPIFolder,
-	     OPEN_IF_EXISTS | fMapiUnicode, &~lpMAPIFolder);
+	auto hr = lpFolderParent->CreateFolder(FOLDER_GENERIC,
+	          const_cast<TCHAR *>(lpszFolderName),
+	          const_cast<TCHAR *>(lpszFolderComment), &IID_IMAPIFolder,
+	          OPEN_IF_EXISTS | fMapiUnicode, &~lpMAPIFolder);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -2226,7 +2141,7 @@ HRESULT ECMsgStore::GetUser(ULONG cbUserId, const ENTRYID *lpUserId,
 	return lpTransport->HrGetUser(cbUserId, lpUserId, ulFlags, lppECUser);
 }
 
-HRESULT ECMsgStore::DeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT ECMsgStore::DeleteUser(ULONG cbUserId, const ENTRYID *lpUserId)
 {
 	return lpTransport->HrDeleteUser(cbUserId, lpUserId);
 }
@@ -2236,29 +2151,25 @@ HRESULT ECMsgStore::ResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *
 	return lpTransport->HrResolveUserName(lpszUserName, ulFlags, lpcbUserId, lppUserId);
 }
 
-HRESULT ECMsgStore::GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::GetSendAsList(ULONG cbUserId, const ENTRYID *lpUserId,
     ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders)
 {
 	return lpTransport->HrGetSendAsList(cbUserId, lpUserId, ulFlags, lpcSenders, lppSenders);
 }
 
-HRESULT ECMsgStore::AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
+HRESULT ECMsgStore::AddSendAsUser(ULONG cbUserId, const ENTRYID *lpUserId,
+    ULONG cbSenderId, const ENTRYID *lpSenderId)
 {
 	return lpTransport->HrAddSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
 }
 
-HRESULT ECMsgStore::DelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
+HRESULT ECMsgStore::DelSendAsUser(ULONG cbUserId, const ENTRYID *lpUserId,
+    ULONG cbSenderId, const ENTRYID *lpSenderId)
 {
 	return lpTransport->HrDelSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
 }
 
-HRESULT ECMsgStore::GetUserClientUpdateStatus(ULONG cbUserId,
-    LPENTRYID lpUserId, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS)
-{
-	return lpTransport->HrGetUserClientUpdateStatus(cbUserId, lpUserId, ulFlags, lppECUCUS);
-}
-
-HRESULT ECMsgStore::RemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT ECMsgStore::RemoveAllObjects(ULONG cbUserId, const ENTRYID *lpUserId)
 {
 	return lpTransport->HrRemoveAllObjects(cbUserId, lpUserId);
 }
@@ -2285,29 +2196,32 @@ HRESULT ECMsgStore::GetGroup(ULONG cbGroupId, const ENTRYID *lpGroupId,
 	return lpTransport->HrGetGroup(cbGroupId, lpGroupId, ulFlags, lppECGroup);
 }
 
-HRESULT ECMsgStore::DeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
+HRESULT ECMsgStore::DeleteGroup(ULONG cbGroupId, const ENTRYID *lpGroupId)
 {
 	return lpTransport->HrDeleteGroup(cbGroupId, lpGroupId);
 }
 
 //Group and user functions
-HRESULT ECMsgStore::DeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT ECMsgStore::DeleteGroupUser(ULONG cbGroupId, const ENTRYID *lpGroupId,
+    ULONG cbUserId, const ENTRYID *lpUserId)
 {
 	return lpTransport->HrDeleteGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
 }
 
-HRESULT ECMsgStore::AddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
+HRESULT ECMsgStore::AddGroupUser(ULONG cbGroupId, const ENTRYID *lpGroupId,
+    ULONG cbUserId, const ENTRYID *lpUserId)
 {
 	return lpTransport->HrAddGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
 }
 
-HRESULT ECMsgStore::GetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
-    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
+HRESULT ECMsgStore::GetUserListOfGroup(ULONG cbGroupId,
+    const ENTRYID *lpGroupId, ULONG ulFlags, ULONG *lpcUsers,
+    ECUSER **lppsUsers)
 {
 	return lpTransport->HrGetUserListOfGroup(cbGroupId, lpGroupId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::GetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::GetGroupListOfUser(ULONG cbUserId, const ENTRYID *lpUserId,
     ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
 	return lpTransport->HrGetGroupListOfUser(cbUserId, lpUserId, ulFlags, lpcGroups, lppsGroups);
@@ -2319,7 +2233,8 @@ HRESULT ECMsgStore::CreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
 	return lpTransport->HrCreateCompany(lpECCompany, ulFlags, lpcbCompanyId, lppCompanyId);
 }
 
-HRESULT ECMsgStore::DeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::DeleteCompany(ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrDeleteCompany(cbCompanyId, lpCompanyId);
 }
@@ -2340,72 +2255,84 @@ HRESULT ECMsgStore::ResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, U
 	return lpTransport->HrResolveCompanyName(lpszCompanyName, ulFlags, lpcbCompanyId, lppCompanyId);
 }
 
-HRESULT ECMsgStore::AddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::AddCompanyToRemoteViewList(ULONG cbSetCompanyId,
+    const ENTRYID *lpSetCompanyId, ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrAddCompanyToRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::DelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::DelCompanyFromRemoteViewList(ULONG cbSetCompanyId,
+    const ENTRYID *lpSetCompanyId, ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrDelCompanyFromRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
-    ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies)
+HRESULT ECMsgStore::GetRemoteViewList(ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
 	return lpTransport->HrGetRemoteViewList(cbCompanyId, lpCompanyId, ulFlags, lpcCompanies, lppsCompanies);
 }
 
-HRESULT ECMsgStore::AddUserToRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::AddUserToRemoteAdminList(ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrAddUserToRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::DelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::DelUserFromRemoteAdminList(ULONG cbUserId,
+    const ENTRYID *lpUserId, ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrDelUserFromRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
 }
 
 HRESULT ECMsgStore::GetRemoteAdminList(ULONG cbCompanyId,
-    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
+    const ENTRYID *lpCompanyId, ULONG ulFlags, ULONG *lpcUsers,
+    ECUSER **lppsUsers)
 {
 	return lpTransport->HrGetRemoteAdminList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::SyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId)
+HRESULT ECMsgStore::SyncUsers(ULONG cbCompanyId, const ENTRYID *lpCompanyId)
 {
 	return lpTransport->HrSyncUsers(cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::GetQuota(ULONG cbUserId, const ENTRYID *lpUserId,
     bool bGetUserDefault, ECQUOTA **lppsQuota)
 {
 	return lpTransport->GetQuota(cbUserId, lpUserId, bGetUserDefault, lppsQuota);
 }
 
-HRESULT ECMsgStore::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::SetQuota(ULONG cbUserId, const ENTRYID *lpUserId,
     ECQUOTA *lpsQuota)
 {
 	return lpTransport->SetQuota(cbUserId, lpUserId, lpsQuota);
 }
 
-HRESULT ECMsgStore::AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
+HRESULT ECMsgStore::AddQuotaRecipient(ULONG cbCompanyId,
+    const ENTRYID *lpCompanyId, ULONG cbRecipientId,
+    const ENTRYID *lpRecipientId, ULONG ulType)
 {
 	return lpTransport->AddQuotaRecipient(cbCompanyId, lpCompanyId, cbRecipientId, lpRecipientId, ulType);
 }
 
-HRESULT ECMsgStore::DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCmopanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
+HRESULT ECMsgStore::DeleteQuotaRecipient(ULONG cbCompanyId,
+    const ENTRYID *lpCmopanyId, ULONG cbRecipientId,
+    const ENTRYID *lpRecipientId, ULONG ulType)
 {
 	return lpTransport->DeleteQuotaRecipient(cbCompanyId, lpCmopanyId, cbRecipientId, lpRecipientId, ulType);
 }
 
-HRESULT ECMsgStore::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::GetQuotaRecipients(ULONG cbUserId, const ENTRYID *lpUserId,
     ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	return lpTransport->GetQuotaRecipients(cbUserId, lpUserId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
+HRESULT ECMsgStore::GetQuotaStatus(ULONG cbUserId, const ENTRYID *lpUserId,
     ECQUOTASTATUS **lppsQuotaStatus)
 {
 	return lpTransport->GetQuotaStatus(cbUserId, lpUserId, lppsQuotaStatus);
@@ -2434,15 +2361,13 @@ HRESULT ECMsgStore::GetServerDetails(ECSVRNAMELIST *lpServerNameList,
 
 HRESULT ECMsgStore::OpenUserStoresTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
-	HRESULT hr = hrSuccess;
-	object_ptr<WSTableView> lpTableView;
-	object_ptr<ECMAPITable> lpTable;
-
 	if (lppTable == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	object_ptr<WSTableView> lpTableView;
+	object_ptr<ECMAPITable> lpTable;
 	// notifications? set 1st param: m_lpNotifyClient
-	hr = ECMAPITable::Create("Userstores table", NULL, 0, &~lpTable);
+	auto hr = ECMAPITable::Create("Userstores table", nullptr, 0, &~lpTable);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -2453,7 +2378,7 @@ HRESULT ECMsgStore::OpenUserStoresTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	hr = lpTable->HrSetTableOps(lpTableView, true);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);	
+	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);
 	if (hr != hrSuccess)
 		return hr;
 	AddChild(lpTable);
@@ -2468,24 +2393,23 @@ HRESULT ECMsgStore::ResolvePseudoUrl(const char *lpszPseudoUrl,
 
 HRESULT ECMsgStore::GetArchiveStoreEntryID(LPCTSTR lpszUserName, LPCTSTR lpszServerName, ULONG ulFlags, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
 {
-	HRESULT hr;
+	if (lpszUserName == nullptr || lpcbStoreID == nullptr ||
+	    lppStoreID == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
 	ULONG cbStoreID;
 	EntryIdPtr ptrStoreID;
 
-	if (lpszUserName == NULL || lpcbStoreID == NULL || lppStoreID == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-
 	if (lpszServerName != NULL) {
 		WSTransportPtr ptrTransport;
-
-		hr = GetTransportToNamedServer(lpTransport, lpszServerName, ulFlags, &~ptrTransport);
+		auto hr = GetTransportToNamedServer(lpTransport, lpszServerName, ulFlags, &~ptrTransport);
 		if (hr != hrSuccess)
 			return hr;
 		hr = ptrTransport->HrResolveTypedStore(convstring(lpszUserName, ulFlags), ECSTORE_TYPE_ARCHIVE, &cbStoreID, &~ptrStoreID);
 		if (hr != hrSuccess)
 			return hr;
 	} else {
-		hr = lpTransport->HrResolveTypedStore(convstring(lpszUserName, ulFlags), ECSTORE_TYPE_ARCHIVE, &cbStoreID, &~ptrStoreID);
+		auto hr = lpTransport->HrResolveTypedStore(convstring(lpszUserName, ulFlags), ECSTORE_TYPE_ARCHIVE, &cbStoreID, &~ptrStoreID);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -2493,7 +2417,8 @@ HRESULT ECMsgStore::GetArchiveStoreEntryID(LPCTSTR lpszUserName, LPCTSTR lpszSer
 	return lpSupport->WrapStoreEntryID(cbStoreID, ptrStoreID, lpcbStoreID, lppStoreID);
 }
 
-HRESULT ECMsgStore::ResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
+HRESULT ECMsgStore::ResetFolderCount(ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ULONG *lpulUpdates)
 {
 	return lpTransport->HrResetFolderCount(cbEntryId, lpEntryId, lpulUpdates);
 }
@@ -2504,10 +2429,10 @@ HRESULT ECMsgStore::GetMasterOutgoingTable(ULONG ulFlags, IMAPITable ** lppOutgo
 	object_ptr<ECMAPITable> lpTable;
 	object_ptr<WSTableOutGoingQueue> lpTableOps;
 
-	HRESULT hr = ECMAPITable::Create("Master outgoing queue", this->m_lpNotifyClient, 0, &~lpTable);
+	auto hr = ECMAPITable::Create("Master outgoing queue", m_lpNotifyClient, 0, &~lpTable);
 	if(hr != hrSuccess)
 		return hr;
-	hr = this->lpTransport->HrOpenTableOutGoingQueueOps(0, NULL, this, &~lpTableOps);
+	hr = lpTransport->HrOpenTableOutGoingQueueOps(0, nullptr, this, &~lpTableOps);
 	if(hr != hrSuccess)
 		return hr;
 	hr = lpTable->HrSetTableOps(lpTableOps, !(ulFlags & MAPI_DEFERRED_ERRORS));
@@ -2526,18 +2451,17 @@ HRESULT ECMsgStore::DeleteFromMasterOutgoingTable(ULONG cbEntryId,
 	// Check input/output variables
 	if (lpEntryId == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	return this->lpTransport->HrFinishedMessage(cbEntryId, lpEntryId, EC_SUBMIT_MASTER | ulFlags);
+	return lpTransport->HrFinishedMessage(cbEntryId, lpEntryId, EC_SUBMIT_MASTER | ulFlags);
 }
 
 // ProxyStoreObject
-HRESULT ECMsgStore::UnwrapNoRef(LPVOID *ppvObject) 
+HRESULT ECMsgStore::UnwrapNoRef(LPVOID *ppvObject)
 {
 	if (ppvObject == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
 	// Because the function UnwrapNoRef return a non referenced object, QueryInterface isn't needed.
-	*ppvObject = static_cast<IMsgStore *>(&this->m_xMsgStoreProxy);
+	*ppvObject = static_cast<IMsgStore *>(&m_xMsgStoreProxy);
 	return hrSuccess;
 }
 
@@ -2548,15 +2472,13 @@ HRESULT ECMsgStore::UnwrapNoRef(LPVOID *ppvObject)
 HRESULT ECMsgStore::OpenMultiStoreTable(const ENTRYLIST *lpMsgList,
     ULONG ulFlags, IMAPITable **lppTable)
 {
-	HRESULT		hr = hrSuccess;
-	object_ptr<ECMAPITable> lpTable;
-	object_ptr<WSTableView> lpTableOps;
-
 	if (lpMsgList == nullptr || lppTable == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
+	object_ptr<ECMAPITable> lpTable;
+	object_ptr<WSTableView> lpTableOps;
 	// no notifications on this table
-	hr = ECMAPITable::Create("Multistore table", NULL, ulFlags, &~lpTable);
+	auto hr = ECMAPITable::Create("Multistore table", nullptr, ulFlags, &~lpTable);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -2656,9 +2578,6 @@ HRESULT ECMsgStore::ExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag,
     const std::vector<ICSCHANGE> &sChanges, ULONG ulStart, ULONG ulCount,
     const SPropTagArray *lpsProps, WSMessageStreamExporter **lppsStreamExporter)
 {
-	WSMessageStreamExporterPtr ptrStreamExporter;
-	WSTransportPtr ptrTransport;
-
 	if (ulStart > sChanges.size())
 		return MAPI_E_INVALID_PARAMETER;
 	if (ulStart + ulCount > sChanges.size())
@@ -2666,6 +2585,8 @@ HRESULT ECMsgStore::ExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag,
 	if (ulCount == 0)
 		return MAPI_E_UNABLE_TO_COMPLETE;
 
+	WSMessageStreamExporterPtr ptrStreamExporter;
+	WSTransportPtr ptrTransport;
 	// Need to clone the transport since we want to be able to use our own transport for other things
 	// while the streaming is going on; you should be able to intermix Synchronize() calls on the exporter
 	// with other MAPI calls which would normally be impossible since the stream is kept open between
@@ -2702,7 +2623,7 @@ DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, AbortSubmit, (ULONG, eid_si
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, GetOutgoingQueue, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, SetLockState, (LPMESSAGE, lpMessage), (ULONG, ulLockState))
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, FinishedMsg, (ULONG, flags), (ULONG, eid_size), (const ENTRYID *, eid))
-DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, NotifyNewMail, (LPNOTIFICATION, lpNotification))
+DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, NotifyNewMail, (const NOTIFICATION *, lpNotification))
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, SaveChanges, (ULONG, ulFlags))
 DEF_HRMETHOD1(TRACE_MAPI, ECMsgStore, MsgStoreProxy, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
@@ -2728,7 +2649,7 @@ ECMSLogon::ECMSLogon(ECMsgStore *lpStore) :
 {
 	// Note we cannot AddRef() the store. This is because the reference order is:
 	// ECMsgStore -> IMAPISupport -> ECMSLogon
-	// Therefore AddRef()'ing the store from here would create a circular reference 
+	// Therefore AddRef()'ing the store from here would create a circular reference
 }
 
 HRESULT ECMSLogon::Create(ECMsgStore *lpStore, ECMSLogon **lppECMSLogon)

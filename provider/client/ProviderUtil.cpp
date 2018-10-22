@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include <kopano/ECGetText.h>
@@ -22,60 +9,49 @@
 #include <mapi.h>
 #include <mapiutil.h>
 #include <mapispi.h>
-
 #include "ClientUtil.h"
 #include "Mem.h"
 #include <kopano/stringutil.h>
-
 #include <kopano/ECGuid.h>
-
-#include "ECABProvider.h"
+#include "ECABContainer.h"
 #include "ECMSProvider.h"
 #include "ECMsgStore.h"
-#include "ECArchiveAwareMsgStore.h"
+#include "ECArchiveAwareMessage.h"
 #include "ECMsgStorePublic.h"
 #include <kopano/charset/convstring.h>
 #include "EntryPoint.h"
 #include "ProviderUtil.h"
-
 #include <kopano/charset/convert.h>
 
 using namespace KC;
 
-HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
+HRESULT CompareStoreIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1,
+    ULONG cbEntryID2, const ENTRYID *lpEntryID2, ULONG ulFlags,
+    ULONG *lpulResult)
 {
+	if (lpEntryID1 == nullptr || lpEntryID2 == nullptr || lpulResult == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (cbEntryID1 < sizeof(GUID) + 4 + 4 || cbEntryID2 < sizeof(GUID) + 4 + 4)
+		return MAPI_E_INVALID_ENTRYID;
+
 	HRESULT hr = hrSuccess;
 	BOOL fTheSame = FALSE;
-	PEID peid1 = (PEID)lpEntryID1;
-	PEID peid2 = (PEID)lpEntryID2;
-
-	if(lpEntryID1 == NULL || lpEntryID2 == NULL || lpulResult == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (cbEntryID1 < (sizeof(GUID) + 4 + 4) || cbEntryID2 < (sizeof(GUID) + 4 + 4)) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}
+	auto peid1 = reinterpret_cast<const EID *>(lpEntryID1);
+	auto peid2 = reinterpret_cast<const EID *>(lpEntryID2);
 
 	if(memcmp(&peid1->guid, &peid2->guid, sizeof(GUID)) != 0)
 		goto exit;
-
 	if(peid1->ulVersion != peid2->ulVersion)
 		goto exit;
-
 	if(peid1->usType != peid2->usType)
 		goto exit;
 
 	if(peid1->ulVersion == 0) {
-
 		if(cbEntryID1 < sizeof(EID_V0))
 			goto exit;
-
-		if( ((EID_V0*)lpEntryID1)->ulId != ((EID_V0*)lpEntryID2)->ulId )
+		if (reinterpret_cast<const EID_V0 *>(lpEntryID1)->ulId !=
+		    reinterpret_cast<const EID_V0 *>(lpEntryID2)->ulId)
 			goto exit;
-
 	}else {
 		if(cbEntryID1 < CbNewEID(""))
 			goto exit;
@@ -85,11 +61,9 @@ HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2
 	}
 
 	fTheSame = TRUE;
-
 exit:
 	if(lpulResult)
 		*lpulResult = fTheSame;
-
 	return hr;
 }
 
@@ -100,42 +74,36 @@ HRESULT SetProviderMode(IMAPISupport *lpMAPISup, ECMapProvider* lpmapProvider, L
 
 HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, const char *lpszProfileName, ULONG ulFlags, PROVIDER_INFO* lpsProviderInfo)
 {
-	HRESULT hr = hrSuccess;
-	ECMapProvider::const_iterator iterProvider;
-	PROVIDER_INFO sProviderInfo;
-	object_ptr<ECMSProvider> lpECMSProvider;
-	object_ptr<ECABProvider> lpECABProvider;
-	sGlobalProfileProps	sProfileProps;
-
 	if (lpmapProvider == nullptr || lpMAPISup == nullptr ||
 	    lpszProfileName == nullptr || lpsProviderInfo == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
 
-	iterProvider = lpmapProvider->find(lpszProfileName);
+	PROVIDER_INFO sProviderInfo;
+	object_ptr<ECMSProvider> lpECMSProvider;
+	object_ptr<ECABProvider> lpECABProvider;
+	sGlobalProfileProps	sProfileProps;
+	auto iterProvider = lpmapProvider->find(lpszProfileName);
 	if (iterProvider != lpmapProvider->cend()) {
 		*lpsProviderInfo = iterProvider->second;
 		return hrSuccess;
 	}
-		
+
 	// Get the username and password from the profile settings
-	hr = ClientUtil::GetGlobalProfileProperties(lpMAPISup, &sProfileProps);
+	auto hr = ClientUtil::GetGlobalProfileProperties(lpMAPISup, &sProfileProps);
 	if(hr != hrSuccess)
 		return hr;
 
 	// Init providers
-
 	// Message store online
 	hr = ECMSProvider::Create(ulFlags, &~lpECMSProvider);
 	if(hr != hrSuccess)
 		return hr;
-
 	// Addressbook online
 	hr = ECABProvider::Create(&~lpECABProvider);
 	if(hr != hrSuccess)
 		return hr;
 
 	// Fill in the Provider info struct
-	
 	//Init only the firsttime the flags
 	sProviderInfo.ulProfileFlags = sProfileProps.ulProfileFlags;
 	sProviderInfo.ulConnectType = CT_ONLINE;
@@ -158,17 +126,15 @@ HRESULT GetProviders(ECMapProvider* lpmapProvider, IMAPISupport *lpMAPISup, cons
 //  all the msgstore objects, we also release the support object.
 //
 HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
-    ULONG cbEntryID, ENTRYID *lpEntryID, ULONG ulMsgFlags, ULONG ulProfileFlags,
-    WSTransport *lpTransport, const MAPIUID *lpguidMDBProvider, BOOL bSpooler,
-    BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG ulMsgFlags,
+    ULONG ulProfileFlags, WSTransport *lpTransport,
+    const MAPIUID *lpguidMDBProvider, BOOL bSpooler, BOOL fIsDefaultStore,
+    BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
 {
 	HRESULT	hr = hrSuccess;
-	
-	BOOL fModify = FALSE;
 	object_ptr<ECMsgStore> lpMsgStore;
 	object_ptr<IECPropStorage> lpStorage;
-
-	fModify = ulMsgFlags & MDB_WRITE || ulMsgFlags & MAPI_BEST_ACCESS; // FIXME check access at server
+	BOOL fModify = ulMsgFlags & MDB_WRITE || ulMsgFlags & MAPI_BEST_ACCESS; // FIXME check access at server
 
 	if (CompareMDBProvider(lpguidMDBProvider, &KOPANO_STORE_PUBLIC_GUID) == TRUE)
 		hr = ECMsgStorePublic::Create(lpszProfname, lpMAPISup, lpTransport, fModify, ulProfileFlags, bSpooler, bOfflineStore, &~lpMsgStore);
@@ -176,7 +142,6 @@ HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
 		hr = ECMsgStore::Create(lpszProfname, lpMAPISup, lpTransport, fModify, ulProfileFlags, bSpooler, FALSE, bOfflineStore, &~lpMsgStore);
 	else
 		hr = ECArchiveAwareMsgStore::Create(lpszProfname, lpMAPISup, lpTransport, fModify, ulProfileFlags, bSpooler, fIsDefaultStore, bOfflineStore, &~lpMsgStore);
-
 	if (hr != hrSuccess)
 		return hr;
 
@@ -186,12 +151,10 @@ HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
 	hr = lpTransport->HrOpenPropStorage(0, nullptr, cbEntryID, lpEntryID, 0, &~lpStorage);
 	if (hr != hrSuccess)
 		return hr;
-
 	// Set up the message store to use this storage
 	hr = lpMsgStore->HrSetPropStorage(lpStorage, FALSE);
 	if (hr != hrSuccess)
 		return hr;
-
 	// Setup callback for session change
 	hr = lpTransport->AddSessionReloadCallback(lpMsgStore, ECMsgStore::Reload, NULL);
 	if (hr != hrSuccess)
@@ -205,24 +168,21 @@ HRESULT CreateMsgStoreObject(const char *lpszProfname, IMAPISupport *lpMAPISup,
 
 HRESULT GetTransportToNamedServer(WSTransport *lpTransport, LPCTSTR lpszServerName, ULONG ulFlags, WSTransport **lppTransport)
 {
-	HRESULT hr;
-	utf8string strServerName;
-	utf8string strPseudoUrl = utf8string::from_string("pseudo://");
-	char *lpszServerPath = NULL;
-	bool bIsPeer = false;
-	WSTransport *lpNewTransport = NULL;
-
 	if (lpszServerName == NULL || lpTransport == NULL || lppTransport == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	if ((ulFlags & ~MAPI_UNICODE) != 0)
 		return MAPI_E_UNKNOWN_FLAGS;
 
-	strServerName = convstring(lpszServerName, ulFlags);
+	utf8string strPseudoUrl = utf8string::from_string("pseudo://");
+	char *lpszServerPath = NULL;
+	bool bIsPeer = false;
+	WSTransport *lpNewTransport = NULL;
+	utf8string strServerName = convstring(lpszServerName, ulFlags);
 	strPseudoUrl.append(strServerName);
-	hr = lpTransport->HrResolvePseudoUrl(strPseudoUrl.c_str(), &lpszServerPath, &bIsPeer);
+
+	auto hr = lpTransport->HrResolvePseudoUrl(strPseudoUrl.c_str(), &lpszServerPath, &bIsPeer);
 	if (hr != hrSuccess)
 		return hr;
-
 	if (bIsPeer) {
 		lpNewTransport = lpTransport;
 		lpNewTransport->AddRef();

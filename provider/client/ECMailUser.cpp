@@ -1,17 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <new>
 #include <kopano/platform.h>
@@ -23,13 +12,12 @@
 #include "ECMAPITable.h"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
-#include <kopano/ECDebug.h>
 
-ECDistList::ECDistList(ECABLogon *lpProvider, BOOL fModify) :
-	ECABContainer(lpProvider, MAPI_DISTLIST, fModify, "IDistList")
+ECDistList::ECDistList(ECABLogon *prov, BOOL modify) :
+	ECABContainer(prov, MAPI_DISTLIST, modify, "IDistList")
 {
 	// since we have no OpenProperty / abLoadProp, remove the 8k prop limit
-	this->m_ulMaxPropSize = 0;
+	m_ulMaxPropSize = 0;
 }
 
 HRESULT ECDistList::QueryInterface(REFIID refiid, void **lppInterface)
@@ -48,7 +36,7 @@ HRESULT ECDistList::QueryInterface(REFIID refiid, void **lppInterface)
 HRESULT ECDistList::Create(ECABLogon *lpProvider, BOOL fModify,
     ECDistList **lppDistList)
 {
-	return alloc_wrap<ECDistList>(lpProvider, fModify).put(lppDistList);
+	return KC::alloc_wrap<ECDistList>(lpProvider, fModify).put(lppDistList);
 }
 
 HRESULT ECDistList::TableRowGetProp(void *provider, const struct propVal *src,
@@ -71,32 +59,35 @@ HRESULT ECDistList::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
     LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
     ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IDistList, static_cast<IDistList *>(this), ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+	return GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IDistList,
+	       static_cast<IDistList *>(this), ciidExclude, rgiidExclude,
+	       lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj,
+	       ulFlags, lppProblems);
 }
 
 HRESULT ECDistList::CopyProps(const SPropTagArray *lpIncludeProps,
     ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
     void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IDistList,
+	return GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IDistList,
 	       static_cast<IDistList *>(this), lpIncludeProps, ulUIParam,
 	       lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-ECMailUser::ECMailUser(ECABLogon *lpProvider, BOOL fModify) :
-    ECABProp(lpProvider, MAPI_MAILUSER, fModify, "IMailUser")
+ECMailUser::ECMailUser(ECABLogon *prov, BOOL modify) :
+	ECABProp(prov, MAPI_MAILUSER, modify, "IMailUser")
 {
 	// since we have no OpenProperty / abLoadProp, remove the 8k prop limit
-	this->m_ulMaxPropSize = 0;
+	m_ulMaxPropSize = 0;
 }
 
 HRESULT ECMailUser::Create(ECABLogon *lpProvider, BOOL fModify,
     ECMailUser **lppMailUser)
 {
-	return alloc_wrap<ECMailUser>(lpProvider, fModify).put(lppMailUser);
+	return KC::alloc_wrap<ECMailUser>(lpProvider, fModify).put(lppMailUser);
 }
 
-HRESULT	ECMailUser::QueryInterface(REFIID refiid, void **lppInterface) 
+HRESULT ECMailUser::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECMailUser, this);
 	REGISTER_INTERFACE2(ECABProp, this);
@@ -117,7 +108,6 @@ HRESULT ECMailUser::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 {
 	if (lpiid == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
 	if (ulFlags & MAPI_CREATE)
 		// Don't support creating any sub-objects
 		return MAPI_E_NO_ACCESS;
@@ -129,12 +119,17 @@ HRESULT ECMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
     LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
     ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, static_cast<IMailUser *>(this), ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+	return GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser,
+	       static_cast<IMailUser *>(this), ciidExclude, rgiidExclude,
+	       lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj,
+	       ulFlags, lppProblems);
 }
 
 HRESULT ECMailUser::CopyProps(const SPropTagArray *lpIncludeProps,
     ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
     void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, static_cast<IMailUser *>(this), lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
+	return GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser,
+	       static_cast<IMailUser *>(this), lpIncludeProps, ulUIParam,
+	       lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }

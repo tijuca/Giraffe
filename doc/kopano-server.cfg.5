@@ -70,16 +70,8 @@ Example: !include common.cfg
 .PP
 A space-separated list of address:port specifiers for where the server should
 listen for unencrypted connections. IPv6 addresses need to be enclosed in
-brackets (as in \fB[2a01:db1::]:236\fP), and the asterisk is the multi-protocol
-address wildcard.
-.SS server_bind
-.PP
-This historic directive specifies a single IPv4/IPv6 address to bind to. Its
-use is discouraged in favor of \fBserver_listen\fP and \fBserver_listen_tls\fP.
-.SS server_tcp_enabled, server_tcp_port
-These historic directive specify the single port to bind to for unencrypted
-connections. Their use is discouraged in favor of \fBserver_listen\fP. The
-address is mandated by \fBserver_bind\fP.
+brackets (as in \fB[2001:db8::1]:236\fP), and the asterisk is the
+multi-protocol address wildcard.
 .SS server_pipe_enabled
 .PP
 Enable Unix pipe connections. Should not be disabled.
@@ -214,15 +206,19 @@ Default:
 The method which should be used for logging. Valid values are:
 .TP
 \fBsyslog\fP
-Use the Linux system log. All messages will be written to the mail facility. See also
-\fBsyslog.conf\fR(5).
+Use the syslog service. Messages will be sent using the "mail" facility tag. See also
+\fBjournald.conf\fP(5) or \fBsyslog.conf\fP(5).
 .TP
-\fIfile\fR
+\fBfile\fR
 Log to a file. The filename will be specified in
 \fBlog_file\fR.
+.TP
+\fBauto\fP
+Autoselect mode: If \fBlog_file\fP is set, that will be used.
+Else, syslog will be used if it looks like it is available.
+Else, stderr.
 .PP
-Default:
-\fIfile\fR
+Default: \fIauto\fP
 .SS log_file
 .PP
 When logging to a file, specify the filename in this parameter. Use
@@ -350,16 +346,21 @@ MyISAM, Aria, etc.
 Default: \fIInnoDB\fP
 .SS mysql_group_concat_max_len
 .PP
-The group_concat_max_len used to set for MySQL. If you have large distribution lists (more than 150 members), it is useful to set this value higher. On the other hand, some MySQL versions are known to break with a value higher than 21844.
+GROUP_CONCAT() is used to combine multiple rows into one string, used in Kopano
+in conjunction with distribution lists. Some versions of MySQL have a very low
+limit, and this option can be used to raise it. For example, MariaDB 10.0
+has a default limit of 1024, MariaDB 10.2 has a default of 1048576.
 .PP
-Default:
-\fI21844\fR
+Versions prior to KC 8.7 would always set this value; since 8.7, this option
+can only be used to raise it.
+.PP
+Default: \fI21844\fP
 .SS attachment_storage
 .PP
 The location where attachments are stored. This can be in the MySQL database, or as separate files. The drawback of \*(Aqdatabase\*(Aq is that the large data of attachment will push useful data from the MySQL cache. The drawback of separate files is that a mysqldump is not enough for a full disaster recovery.
 .PP
-Possible values: \fBdatabase\fP, \fBfiles\fP, and, if built with libs3/AWS
-support, \fBs3\fP.
+Possible values: \fBdatabase\fP, \fBfiles\fP, \fBfiles_v2\fP (experimental),
+and, if built with libs3/AWS support, \fBs3\fP.
 .PP
 Default:
 \fIfiles\fR
@@ -382,6 +383,12 @@ to disable compression completely. The maximum compression level is
 .PP
 Default:
 \fI6\fR
+.SS attachment_files_fsync
+.PP
+When storing new attachments, this directive controls whether fsync(2) is
+to be called after the data has been placed into the file.
+.PP
+Default: \fIyes\fP
 .SH "EXPLANATION OF THE SSL SETTINGS PARAMETERS"
 .SS server_listen_tls
 .PP
@@ -390,10 +397,6 @@ listen for TLS connections, similar to the \fBserver_listen\fP directive. The
 default value is empty, which means no ports will be listened on for TLS. When
 this option is used, you must set the SSL key options correctly, otherwise the
 server not start.
-.SS server_ssl_enabled, server_ssl_port
-These historic directive specify the single port to bind to for SSL
-connections. Their use is discouraged in favor of \fBserver_listen_tls\fP. The
-address is mandated by \fBserver_bind\fP.
 .SS server_ssl_key_file
 .PP
 The file containing the private key and certificate. Please read the SSL section in the
@@ -441,32 +444,36 @@ Default:
 \fI/etc/kopano/sslkeys\fR
 .SS server_ssl_protocols
 .PP
-Disabled or enabled protocol names. Supported protocol names are
-\fISSLv3\fR
-and
-\fITLSv1\fR. If Kopano was linked against OpenSSL 1.0.1 or later there is additional support for the new protocols
-\fITLSv1.1\fR
-and
-\fITLSv1.2\fR. To exclude both SSLv3 and TLSv1, set
-\fBserver_ssl_protocols\fR
-to
-\fI!SSLv3 !TLSv1\fR.
+A space-separated list of disabled or enabled protocol names. Supported
+protocol names depend on the system's SSL library; depending on version, one or
+more of the following are available: \fBTLSv1.3\fP, \fBTLSv1.2\fP,
+\fBTLSv1.1\fP, \fBSSLv3\fP, \fBSSLv2\fP. To disable a protocol, prefix the name
+with an exclamation mark.
 .PP
-Default: SSLv2 being disabled
+Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
 .SS server_ssl_ciphers
 .PP
-SSL ciphers to use, set to
-\fIALL\fR
-for backward compatibility.
+A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
+names depend on the system's SSL library, and are generally plentiful. To
+disable a cipher or cipher group, prefix the name with a minus or exclamation
+mark. Details and meaning of the syntax are described in ciphers(1).
 .PP
 Default:
-\fIALL:!LOW:!SSLv2:!EXP:!aNULL\fR
+\fIDEFAULT:!LOW:!SSLv2:!SSLv3:!TLSv1.0:!TLSv1.1:!EXPORT:!DH:!PSK:!kRSA:!aDSS:!aNULL:+AES\fP
 .SS server_ssl_prefer_server_ciphers
 .PP
-Prefer the server\*(Aqs order of SSL ciphers over client\*(Aqs.
+In SSLv3 and newer, the server side gets to make the ultimate cipher pick out
+of the set that both ends support. In doing so, it can either use the client
+preference list, or, if this directive is set to "yes", its own list (as
+determined by \fBssl_cipher\fP).
+.PP
+Default: \fIyes\fP
+.SS server_ssl_curves
+.PP
+ECDH curves to use for SSL
 .PP
 Default:
-\fIno\fR
+\fIX25519:P-521:P-384:P-256\fP
 .SH "EXPLANATION OF THE THREADING PARAMETERS"
 .SS threads
 .PP
@@ -514,7 +521,7 @@ Default:
 .SS enable_sso
 .PP
 When you configured your system for single sign\-on, you can enable this by setting the value to
-\fIyes\fR. The server can autodetect between NTLM and Kerberos. For NTLM authentication you will need the ntlm_auth program from Samba. Please see the server installation manual on howto enable your system for single sign\-on.
+\fIyes\fR. The server can autodetect between NTLM, Kerberos and OpenID Connect. For NTLM authentication you will need the ntlm_auth program from Samba. Please see the server installation manual on howto enable your system for single sign\-on.
 .PP
 Default:
 \fIno\fR
@@ -723,42 +730,42 @@ contains the new username. The script should at least call
 to correctly create the store for the new user.
 .PP
 Default:
-\fI/etc/kopano/userscripts/createuser\fR
+\fI/usr/lib/kopano/userscripts/createuser\fR
 .SS deleteuser_script
 .PP
 \fIKOPANO_STOREID\fR
 contains the old id of the store of the removed user.
 .PP
 Default:
-\fI/etc/kopano/userscripts/deleteuser\fR
+\fI/usr/lib/kopano/userscripts/deleteuser\fR
 .SS creategroup_script
 .PP
 \fIKOPANO_GROUP\fR
 contains the new groupname. No action is currently needed by the script.
 .PP
 Default:
-\fI/etc/kopano/userscripts/creategroup\fR
+\fI/usr/lib/kopano/userscripts/creategroup\fR
 .SS deletegroup_script
 .PP
 \fIKOPANO_GROUPID\fR
 contains the old id of the group. No action is currently needed by the script.
 .PP
 Default:
-\fI/etc/kopano/userscripts/deletegroup\fR
+\fI/usr/lib/kopano/userscripts/deletegroup\fR
 .SS createcompany_script
 .PP
 \fIKOPANO_COMPANY\fR
 contains the new companyname. No action is currently needed by the script.
 .PP
 Default:
-\fI/etc/kopano/userscripts/createcompany\fR
+\fI/usr/lib/kopano/userscripts/createcompany\fR
 .SS deletecompany_script
 .PP
 \fIKOPANO_COMPANYID\fR
 contains the old id of the company. No action is currently needed by the script.
 .PP
 Default:
-\fI/etc/kopano/userscripts/deletecompany\fR
+\fI/usr/lib/kopano/userscripts/deletecompany\fR
 .SS user_safe_mode
 .PP
 If enabled, the storage server will only log when create, delete and move actions are done on an user object. This might be useful when you are testing changes to your plugin configuration.
@@ -789,6 +796,33 @@ The secret access key of your S3 account.
 .SS attachment_s3_bucketname
 .PP
 The bucket name in which the files will be stored.
+.SH "EXPLANATION OF OPENID CONNECT PARAMETERS"
+.SS kcoidc_issuer_identifier
+.PP
+The OpenID Connect Issuer Identifier.
+.PP
+When set, the server attempts OIDC discovery using the configured issuer identifier on startup. An Issuer Identifier is a case sensitive URL using the https scheme that contains scheme, host, and optionally, port number and path components. This no Issuer Identifier is set, OIDC support is disabled.
+.PP
+No default set.
+.PP
+Example:
+\fIhttps://your-kopano-konnect.local\fR
+.SS kcoidc_insecure_skip_verify
+.PP
+Skip OpenID Connect client security.
+.PP
+When set to yes, TLS certificate validation is skipped for all requests related to OpenID Connect. This is insecure and should not be used in production setups.
+.PP
+Default:
+\fIno\fR
+.SS kcoidc_initialize_timeout
+.PP
+Timeout in seconds when to give up OpenID Connect discovery.
+.PP
+When the OIDC initialize timeout is reached, server continues startup without OIDC and all OIDC validation will fail until the discovery completes. When set to 0, the server startup does not wait for OIDC discovery at all.
+.PP
+Default:
+\fI60\fR
 .SH "EXPLANATION OF MISCELLEANIOUS PARAMETERS"
 .SS enable_hosted_kopano
 .PP
@@ -942,6 +976,28 @@ Enable/disable reminders for shared stores.
 .PP
 Default:
 \fIyes\fR
+.SS statsclient_url
+.PP
+A HTTP URL or filesystem-local socket specification for a kopano-statsd
+compatible web service that ingests service statistics such as memory usage or
+mail processing counters.
+.PP
+Example: \fIhttps://my.local.org/collector.php\fP
+.PP
+Default: \fIunix:/var/run/kopano/statsd.sock\fP
+.SS statsclient_interval
+.PP
+The time interval at which the statsd service is to be contacted, in seconds.
+When "statsclient_url" points to a kopano-statsd instance, the value should be
+\fI60\fP (for now), because its rrdtool archives are set to expect data at this
+rate.
+.PP
+Default: \fI0\fP (submission service is deactivated)
+.SS statsclient_ssl_verify
+.PP
+This setting can be used to control SSL certificate validation.
+.PP
+Default: \fIyes\fP
 .SH "RELOADING"
 .PP
 The following options are reloadable by sending the kopano\-server process a HUP signal or reload the process by the initscript

@@ -1,22 +1,9 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
+#include <exception>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -147,13 +134,11 @@ HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray)
 	auto hr = MAPIAllocateBuffer(ulSize * sizeof(LPMAPINAMEID), &~lppArray);
 	if (hr != hrSuccess)
 		return hr;
-
 	hr = MAPIAllocateMore(ulSize * sizeof(MAPINAMEID), lppArray, (void**)&lpBuffer);
 	if (hr != hrSuccess)
 		return hr;
 	for (ULONG i = 0; i < ulSize; ++i)
 		lppArray[i] = &lpBuffer[i];
-
 	*lpppNameArray = lppArray.release();
 	return hrSuccess;
 }
@@ -170,7 +155,6 @@ HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount, const ULONG *lpTag,
 	lpPropertyTagArray->cValues = ulCount;
 	for (ULONG i = 0; i < ulCount; ++i)
 		lpPropertyTagArray->aulPropTag[i] = lpTag[i];
-
 	hr = lpMessage->GetProps(lpPropertyTagArray, 0, &ulPropertyCount, lppPropertyArray);
 	if (FAILED(hr))
 		cout << "Failed to obtain all properties." << endl;
@@ -181,7 +165,6 @@ HRESULT ReadNamedProperties(LPMESSAGE lpMessage, ULONG ulCount, LPMAPINAMEID *lp
 			    LPSPropTagArray *lppPropertyTagArray, LPSPropValue *lppPropertyArray)
 {
 	ULONG ulReadCount = 0;
-
 	auto hr = lpMessage->GetIDsFromNames(ulCount, lppTag, 0, lppPropertyTagArray);
 	if(hr != hrSuccess) {
 		cout << "Failed to obtain IDs from names." << endl;
@@ -192,7 +175,6 @@ HRESULT ReadNamedProperties(LPMESSAGE lpMessage, ULONG ulCount, LPMAPINAMEID *lp
 		 */
 		return MAPI_E_CALL_FAILED;
 	}
-
 	hr = lpMessage->GetProps(*lppPropertyTagArray, 0, &ulReadCount, lppPropertyArray);
 	if (FAILED(hr))
 		cout << "Failed to obtain all properties." << endl;
@@ -226,7 +208,6 @@ static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
 		else if (lpPropertyArray[i].ulPropTag == PR_FOLDER_TYPE)
 			*lpFolderType = lpPropertyArray[i].Value.ul;
 	}
-
 	/*
 	 * As long as we found what we were looking for, we should be satisfied.
 	 */
@@ -240,10 +221,8 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
     IMAPIFolder *lpRootFolder, const SRow *lpRow, const CHECKMAP &checkmap)
 {
 	object_ptr<IMAPIFolder> lpFolder;
-	ULONG ulObjectType = 0;
-	string strName;
-	string strClass;
-	ULONG ulFolderType = 0;
+	unsigned int ulObjectType = 0, ulFolderType = 0;
+	std::string strName, strClass;
 
 	auto lpItemProperty = lpRow->cfind(PR_ENTRYID);
 	if (!lpItemProperty) {
@@ -276,7 +255,6 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
 		cout << "\"" << strName << "\" (" << strClass << ")" << endl;
 		return hrSuccess;
 	}
-
 	if (ulFolderType != FOLDER_GENERIC) {
 		cout << "Ignoring search folder: ";
 		cout << "\"" << strName << "\" (" << strClass << ")" << endl;
@@ -304,15 +282,13 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 	LPMDB lpReadStore = NULL;
 	object_ptr<IMAPIFolder> lpRootFolder;
 	object_ptr<IMAPITable> lpHierarchyTable;
-	ULONG ulObjectType;
-	ULONG ulCount;
+	unsigned int ulObjectType, ulCount;
 	object_ptr<IExchangeManageStore> lpIEMS;
     // user
-    ULONG			cbUserStoreEntryID = 0;
 	memory_ptr<ENTRYID> lpUserStoreEntryID, lpEntryIDSrc;
 	std::set<std::string> setFolderIgnore;
 	memory_ptr<SPropValue> lpAddRenProp;
-	ULONG cbEntryIDSrc = 0;
+	unsigned int cbUserStoreEntryID = 0, cbEntryIDSrc = 0;
 
 	auto hr = mapiinit.Initialize();
 	if (hr != hrSuccess) {
@@ -327,7 +303,7 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 		cout << "Wrong username or password." << endl;
 		return hr;
 	}
-	
+
 	if (bPublic) {
 		hr = HrOpenECPublicStore(lpSession, &~lpStore);
 		if (hr != hrSuccess) {
@@ -348,7 +324,6 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
             cout << "Cannot open ExchangeManageStore object" << endl;
 		return hr;
         }
-
 		hr = lpIEMS->CreateStoreEntryID(reinterpret_cast<const TCHAR *>(L""),
 		     reinterpret_cast<const TCHAR *>(convert_to<std::wstring>(strAltUser).c_str()),
 		     MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID,
@@ -362,7 +337,6 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
             cout << "Cannot open user store of user" << endl;
 		return hr;
         }
-        
         lpReadStore = lpAltStore;
 	} else {
 	    lpReadStore = lpStore;
@@ -373,11 +347,9 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 		cout << "Failed to open root folder." << endl;
 		return hr;
 	}
-
 	if (HrGetOneProp(lpRootFolder, PR_IPM_OL2007_ENTRYIDS /*PR_ADDITIONAL_REN_ENTRYIDS_EX*/, &~lpAddRenProp) == hrSuccess &&
 	    Util::ExtractSuggestedContactsEntryID(lpAddRenProp, &cbEntryIDSrc, &~lpEntryIDSrc) == hrSuccess)
 		setFolderIgnore.emplace(reinterpret_cast<const char *>(lpEntryIDSrc.get()), cbEntryIDSrc);
-
 	hr = lpRootFolder->GetHierarchyTable(CONVENIENT_DEPTH, &~lpHierarchyTable);
 	if (hr != hrSuccess) {
 		cout << "Failed to open hierarchy." << endl;
@@ -406,24 +378,19 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 			return hr;
 		if (lpRows->cRows == 0)
 			break;
-
 		for (ULONG i = 0; i < lpRows->cRows; ++i)
 			RunFolderValidation(setFolderIgnore, lpRootFolder, &lpRows[i], checkmap);
 	}
 	return hrSuccess;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv) try
 {
 	CHECKMAP checkmap;
-	char* strUser = NULL;
+	char *strUser = nullptr, *strAltUser = nullptr;
 	const char *strPass = "";
-	char* strAltUser = NULL;
 	int c;
-	bool bAll = false;
-	bool bPrompt = false;
-	bool bPublic = false;
-	bool acceptDisclaimer = false;
+	bool bAll = false, bPrompt = false, bPublic = false, acceptDisclaimer = false;
 
 	setlocale(LC_MESSAGES, "");
 	if (!forceUTF8Locale(true))
@@ -522,7 +489,6 @@ int main(int argc, char *argv[])
 		print_help(argv[0]);
 		return 1;
 	}
-	
 	if (bPrompt) {
 		strPass = get_password("Enter password:");
 		if(!strPass) {
@@ -530,7 +496,6 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
-
 	if (checkmap.empty()) {
 		if (!bAll)
 			cout << "Filter arguments missing, defaulting to --all" << endl;
@@ -546,13 +511,12 @@ int main(int argc, char *argv[])
 	/*
 	 * Cleanup
 	 */
-	if (hr == hrSuccess) {
-		cout << endl << "Statistics:" << endl;
-		for (auto i = checkmap.begin(); i != checkmap.end(); ++i) {
-			i->second->PrintStatistics(i->first);
-		}
-		return 0;
-	} else {
+	if (hr != hrSuccess)
 		return 1;
-	}
+	cout << endl << "Statistics:" << endl;
+	for (const auto &i : checkmap)
+		i.second->PrintStatistics(i.first);
+	return 0;
+} catch (...) {
+	std::terminate();
 }

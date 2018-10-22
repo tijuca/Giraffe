@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // based on vmime/messaging/smtp/SMTPTransport.hpp, but with additions
@@ -44,7 +32,6 @@
 #ifndef MAPI_NET_SMTP_SMTPTRANSPORT_HPP_INCLUDED
 #define MAPI_NET_SMTP_SMTPTRANSPORT_HPP_INCLUDED
 
-#include <kopano/zcdefs.h>
 #include <vmime/config.hpp>
 #include <vmime/net/transport.hpp>
 #include <vmime/net/socket.hpp>
@@ -63,8 +50,7 @@ class SMTPResponse;
 
 /** SMTP transport service.
   */
-
-class MAPISMTPTransport _kc_final : public transport {
+class MAPISMTPTransport final : public transport {
 public:
 
 	MAPISMTPTransport(vmime::shared_ptr<session> sess, vmime::shared_ptr<security::authenticator> auth, const bool secured = false);

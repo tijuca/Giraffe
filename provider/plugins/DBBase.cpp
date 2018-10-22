@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <algorithm>
 #include <list>
@@ -23,6 +10,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include "DBBase.h"
 #include <kopano/ECDefs.h>
 #include <kopano/EMSAbTag.h>
@@ -43,9 +31,9 @@ DBPlugin::DBPlugin(std::mutex &pluginlock, ECPluginSharedData *shareddata) :
 //    // Do not delete m_lpDatabase as it is freed when the thread exits
 //}
 
-void DBPlugin::InitPlugin() {
-
-	if(GetDatabaseObject(&m_lpDatabase) != erSuccess)
+void DBPlugin::InitPlugin(std::shared_ptr<ECStatsCollector> sc)
+{
+	if (GetDatabaseObject(std::move(sc), &m_lpDatabase) != erSuccess)
 	    throw runtime_error(string("db_init: cannot get handle to database"));
 }
 
@@ -86,7 +74,6 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 {
 	std::map<objectid_t, objectdetails_t> mapdetails;
 	std::map<objectclass_t, std::string> objectstrings;
-	string strSubQuery;
 	DB_RESULT lpResult;
 	DB_ROW lpDBRow = NULL;
 	objectdetails_t details;
@@ -104,20 +91,15 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 	}
 
 	/* Create subquery which combines all externids with the matching objectclass */
-	for (auto iterStrings = objectstrings.cbegin();
-	     iterStrings != objectstrings.cend(); ++iterStrings) {
-		if (iterStrings != objectstrings.cbegin())
-			strSubQuery += " OR ";
-		strSubQuery += "(o.externid IN (" + iterStrings->second + ") "
-				"AND " + OBJECTCLASS_COMPARE_SQL("objectclass", iterStrings->first) + ")";
-	}
-
+	auto strSubQuery = kc_join(objectstrings, " OR ", [](const auto &p) {
+		return "(o.externid IN (" + p.second + ") "
+			"AND " + OBJECTCLASS_COMPARE_SQL("objectclass", p.first) + ")"; });
 	auto strQuery =
 		"SELECT o.externid, o.objectclass, op.propname, op.value "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"LEFT JOIN "+(string)DB_OBJECTPROPERTY_TABLE+" AS op "
 		"ON op.objectid=o.id "
-		"WHERE (" + strSubQuery + ") "
+		"WHERE (" + std::move(strSubQuery) + ") "
 		"ORDER BY o.externid, o.objectclass";
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)
@@ -282,7 +264,7 @@ struct props {
 
 void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &details, const std::list<std::string> *lpDeleteProps)
 {
-	std::string strDeleteQuery, strData;
+	std::string strData;
 	bool bFirstOne = true, bFirstDel = true;
 	const struct props sUserValidProps[] = {
 		{ OB_PROP_S_LOGIN, OP_LOGINNAME, },
@@ -316,25 +298,14 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 
 	if (lpDeleteProps) {
 		// delete properties
-		strDeleteQuery =
+		auto strDeleteQuery =
 			"DELETE FROM " + (string)DB_OBJECTPROPERTY_TABLE + " "
 			"WHERE objectid = (" + strSubQuery + ") " +
-			" AND propname IN (";
-
-		bFirstOne = true;
-
-		for (const auto &prop : *lpDeleteProps) {
-			if (!bFirstOne)
-				strDeleteQuery += ",";
-			strDeleteQuery += prop;
-			bFirstOne = false;
-		}
-
-		strDeleteQuery += ")";
+			" AND propname IN (" +
+			kc_join(*lpDeleteProps, ",") + ")";
 		auto er = m_lpDatabase->DoDelete(strDeleteQuery);
 		if(er != erSuccess)
 			throw runtime_error(string("db_query: ") + strerror(er));
-
 	}
 
 	auto strQuery = "REPLACE INTO " + std::string(DB_OBJECTPROPERTY_TABLE) + "(objectid, propname, value) VALUES ";
@@ -399,7 +370,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 			strData = ap.second;
 		strQuery +=
 			"((" + strSubQuery + "),"
-			"'" + m_lpDatabase->Escape(stringify(ap.first, true)) + "',"
+			"'" + m_lpDatabase->Escape(stringify_hex(ap.first)) + "',"
 			"'" +  m_lpDatabase->Escape(strData) + "')";
 		bFirstOne = false;
 	}
@@ -414,7 +385,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 	/* Normal properties have been inserted, check for additional MV properties */
 	bFirstOne = true;
 	strQuery = "REPLACE INTO " + (string)DB_OBJECTMVPROPERTY_TABLE + "(objectid, propname, orderid, value) VALUES ";
-	strDeleteQuery =
+	auto strDeleteQuery =
 		"DELETE FROM " + (string)DB_OBJECTMVPROPERTY_TABLE + " "
 		"WHERE objectid = (" + strSubQuery + ") " +
 		" AND propname IN (";
@@ -424,7 +395,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 		unsigned int ulOrderId = 0;
 		if (!bFirstDel)
 			strDeleteQuery += ",";
-		strDeleteQuery += "'" + m_lpDatabase->Escape(stringify(mva.first, true)) + "'";
+		strDeleteQuery += "'" + m_lpDatabase->Escape(stringify_hex(mva.first)) + "'";
 		bFirstDel = false;
 
 		if (mva.second.empty())
@@ -441,7 +412,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 				strData = prop;
 			strQuery +=
 				"((" + strSubQuery + "),"
-				"'" + m_lpDatabase->Escape(stringify(mva.first, true)) + "',"
+				"'" + m_lpDatabase->Escape(stringify_hex(mva.first)) + "',"
 				"" + stringify(ulOrderId) + ","
 				"'" +  m_lpDatabase->Escape(strData) + "')";
 			++ulOrderId;

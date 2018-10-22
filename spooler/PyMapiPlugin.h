@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef _PYMAPIPLUGIN_H
@@ -45,23 +33,26 @@ class pym_plugin_intf {
 	virtual HRESULT RequestCallExecution(const char *func, IMAPISession *, IAddrBook *, IMsgStore *, IMAPIFolder *, IMessage *, ULONG *do_callexe, ULONG *result) { return hrSuccess; }
 };
 
-struct pym_factory_priv;
-
-class PyMapiPluginFactory _kc_final {
+class PyMapiPluginFactory final {
 public:
-	PyMapiPluginFactory(void);
+	PyMapiPluginFactory() = default;
 	~PyMapiPluginFactory();
-	HRESULT create_plugin(KC::ECConfig *, KC::ECLogger *, const char *mgr_class, pym_plugin_intf **);
+	HRESULT create_plugin(KC::ECConfig *, const char *mgr_class, pym_plugin_intf **);
 
 private:
-	struct pym_factory_priv *m_priv;
-	bool m_bEnablePlugin = false;
-	std::string m_strPluginPath;
-	KC::object_ptr<KC::ECLogger> m_lpLogger;
+	void *m_handle = nullptr;
+	void (*m_exit)(void) = nullptr;
 
 	// Inhibit (accidental) copying
 	PyMapiPluginFactory(const PyMapiPluginFactory &) = delete;
 	PyMapiPluginFactory &operator=(const PyMapiPluginFactory &) = delete;
 };
+
+extern "C" {
+
+extern _kc_export HRESULT plugin_manager_init(KC::ECConfig *, const char *, pym_plugin_intf **);
+extern _kc_export void plugin_manager_exit();
+
+}
 
 #endif

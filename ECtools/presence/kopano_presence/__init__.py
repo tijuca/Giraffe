@@ -1,4 +1,7 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-only
+from .version import __version__
+
 from copy import deepcopy
 import hashlib
 import hmac
@@ -18,7 +21,7 @@ from flask import Flask, request, abort
 CONFIG = {
     'data_path': Config.string(default='/var/lib/kopano/presence/'),
     'data_save_interval': Config.integer(default=5),
-    'plugins': Config.string(multiple=True, default="spreed"),
+    'plugins': Config.string(multiple=True, default=['spreed']),
     'run_as_user': Config.string(default="kopano"),
     'run_as_group': Config.string(default="kopano"),
     'server_bind': Config.string(default="127.0.0.1"),

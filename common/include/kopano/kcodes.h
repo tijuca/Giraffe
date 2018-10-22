@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef KC_KCODES_HPP
 #define KC_KCODES_HPP 1
 
@@ -90,8 +77,7 @@ typedef unsigned int ECRESULT;
 #define KOPANO_OBJTYPE_MESSAGE			5
 
 // Sessions
-typedef uint64_t ECSESSIONID;
-typedef uint64_t ECSESSIONGROUPID;
+typedef uint64_t ECSESSIONID, ECSESSIONGROUPID;
 
 #define EC_NOTIFICATION_CHECK_FREQUENTY		(1000*2)
 #define EC_NOTIFICATION_CLOSE_TIMEOUT		(1000)
@@ -127,6 +113,8 @@ typedef uint64_t ECSESSIONGROUPID;
 #define ATTACH_PATHDEPTH_LEVEL1 10
 #define ATTACH_PATHDEPTH_LEVEL2 20
 
+#define ec_perror(s, r)     ec_log_ercode((r), EC_LOGLEVEL_ERROR, s ": %s (%x)", nullptr)
+
 enum CONNECTION_TYPE {
 	CONNECTION_TYPE_TCP,
 	CONNECTION_TYPE_SSL,
@@ -136,6 +124,7 @@ enum CONNECTION_TYPE {
 
 //Functions
 extern _kc_export HRESULT kcerr_to_mapierr(ECRESULT, HRESULT hrDefault = 0x80070005 /* MAPI_E_NO_ACCESS */);
+extern _kc_export ECRESULT ec_log_ercode(ECRESULT, unsigned int level, const char *fmt, const char *func);
 
 } /* namespace */
 

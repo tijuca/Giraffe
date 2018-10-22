@@ -1,29 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <algorithm>
 #include <new>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include <kopano/ECLogger.h>
 #include <mapidefs.h>
-
 #include "ECNotifyClient.h"
 #include "ECNotifyMaster.h"
 #include "ECSessionGroupManager.h"
@@ -33,7 +17,9 @@
 #include <sys/signal.h>
 #include <sys/types.h>
 
-#define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember)) 
+#define CALL_MEMBER_FN(object,ptrToMember) ((object).*(ptrToMember))
+
+using namespace KC;
 
 inline ECNotifySink::ECNotifySink(ECNotifyClient *lpClient, NOTIFYCALLBACK fnCallback)
 	: m_lpClient(lpClient)
@@ -66,7 +52,7 @@ ECNotifyMaster::~ECNotifyMaster(void)
 
 HRESULT ECNotifyMaster::Create(SessionGroupData *lpData, ECNotifyMaster **lppMaster)
 {
-	return alloc_wrap<ECNotifyMaster>(lpData).put(lppMaster);
+	return KC::alloc_wrap<ECNotifyMaster>(lpData).put(lppMaster);
 }
 
 HRESULT ECNotifyMaster::ConnectToSession()
@@ -109,7 +95,7 @@ HRESULT ECNotifyMaster::ReleaseSession(ECNotifyClient* lpClient)
 	/* Remove all connections attached to client */
 	auto iter = m_mapConnections.cbegin();
 	while (true) {
-		iter = find_if(iter, m_mapConnections.cend(), [lpClient](const NOTIFYCONNECTIONCLIENTMAP::value_type &entry) { return entry.second.IsClient(lpClient); });
+		iter = std::find_if(iter, m_mapConnections.cend(), [=](const auto &e) { return e.second.IsClient(lpClient); });
 		if (iter == m_mapConnections.cend())
 			break;
 		iter = m_mapConnections.erase(iter);
@@ -151,17 +137,25 @@ HRESULT ECNotifyMaster::StartNotifyWatch()
 
 	/* Make thread joinable which we need during shutdown */
 	pthread_attr_t m_hAttrib;
-	pthread_attr_init(&m_hAttrib);
-	pthread_attr_setdetachstate(&m_hAttrib, PTHREAD_CREATE_JOINABLE);
+	if (pthread_attr_init(&m_hAttrib) != 0)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	if (pthread_attr_setdetachstate(&m_hAttrib, PTHREAD_CREATE_JOINABLE) != 0) {
+		pthread_attr_destroy(&m_hAttrib);
+		return MAPI_E_INVALID_PARAMETER;
+	}
 	/* 1Mb of stack space per thread */
-	if (pthread_attr_setstacksize(&m_hAttrib, 1024 * 1024))
+	if (pthread_attr_setstacksize(&m_hAttrib, 1024 * 1024)) {
+		pthread_attr_destroy(&m_hAttrib);
 		return MAPI_E_CALL_FAILED;
-	if (pthread_create(&m_hThread, &m_hAttrib, NotifyWatch, static_cast<void *>(this)))
+	}
+	auto ret = pthread_create(&m_hThread, &m_hAttrib, NotifyWatch, static_cast<void *>(this));
+	if (ret != 0) {
+		pthread_attr_destroy(&m_hAttrib);
+		ec_log_err("Could not create ECNotifyMaster watch thread: %s", strerror(ret));
 		return MAPI_E_CALL_FAILED;
-
+	}
 	pthread_attr_destroy(&m_hAttrib);
 	set_thread_name(m_hThread, "NotifyThread");
-
 	m_bThreadRunning = TRUE;
 	return hrSuccess;
 }
@@ -180,7 +174,7 @@ HRESULT ECNotifyMaster::StopNotifyWatch()
 	m_bThreadExit = TRUE;
 
 	if (m_lpTransport) {
-		/* Get another transport so we can tell the server to end the session. We 
+		/* Get another transport so we can tell the server to end the session. We
 		 * can't use our own m_lpTransport since it is probably in a blocking getNextNotify()
 		 * call. Seems like a bit of a shame to open a new connection, but there's no
 		 * other option */
@@ -189,16 +183,15 @@ HRESULT ECNotifyMaster::StopNotifyWatch()
 			biglock.unlock();
 			return hr;
 		}
-    
-		lpTransport->HrLogOff();
 
+		lpTransport->HrLogOff();
 		/* Cancel any pending IO if the network transport is down, causing the logoff to fail */
 		m_lpTransport->HrCancelIO();
 	}
+
 	biglock.unlock();
 	if (pthread_join(m_hThread, NULL) != 0)
 		ec_log_debug("ECNotifyMaster::StopNotifyWatch: Invalid thread join");
-
 	m_bThreadRunning = FALSE;
 	return hrSuccess;
 }
@@ -208,8 +201,6 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 	kcsrv_blocksigs();
 	auto pNotifyMaster = static_cast<ECNotifyMaster *>(pTmpNotifyMaster);
 	assert(pNotifyMaster != NULL);
-
-	HRESULT							hr = hrSuccess;
 	NOTIFYCONNECTIONMAP				mapNotifications;
 	notifyResponse					notifications;
 	bool							bReconnect = false;
@@ -235,8 +226,7 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 		 * Request notification (Blocking Call)
 		 */
 		notificationArray *pNotifyArray = NULL;
-
-		hr = pNotifyMaster->m_lpTransport->HrGetNotify(&pNotifyArray);
+		auto hr = pNotifyMaster->m_lpTransport->HrGetNotify(&pNotifyArray);
 		if (static_cast<unsigned int>(hr) == KCWARN_CALL_KEEPALIVE) {
 			if (bReconnect)
 				bReconnect = false;
@@ -282,7 +272,6 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 
 		if (bReconnect)
 			bReconnect = false;
-
 		/* This is when the connection is interupted */
 		if (pNotifyArray == NULL)
 			continue;
@@ -327,4 +316,3 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 	}
 	return NULL;
 }
-

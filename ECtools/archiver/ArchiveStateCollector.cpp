@@ -1,21 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <kopano/zcdefs.h>
 #include <new>
 #include <utility>
 #include <kopano/memory.hpp>
@@ -23,6 +9,7 @@
 #include <kopano/userutil.h>
 #include "ArchiveStateCollector.h"
 #include <kopano/CommonUtil.h>
+#include <kopano/MAPIErrors.h>
 #include "ArchiverSession.h"
 #include "ArchiveStateUpdater.h"
 #include "ECIterators.h"
@@ -31,105 +18,100 @@
 
 namespace KC {
 
-namespace details {
+/**
+ * Subclass of DataCollector that is used to get the current state
+ * through the MailboxTable.
+ */
+class MailboxDataCollector final : public DataCollector {
+public:
+	MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, std::shared_ptr<ECLogger>);
+	HRESULT GetRequiredPropTags(IMAPIProp *, SPropTagArray **) const override;
+	HRESULT CollectData(IMAPITable *store_table) override;
 
-	/**
-	 * Subclass of DataCollector that is used to get the current state
-	 * through the MailboxTable.
-	 */
-	class MailboxDataCollector _kc_final : public DataCollector {
-	public:
-		MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger);
-		HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _kc_override;
-		HRESULT CollectData(LPMAPITABLE lpStoreTable) _kc_override;
+private:
+	ArchiveStateCollector::ArchiveInfoMap &m_mapArchiveInfo;
+	std::shared_ptr<ECLogger> m_lpLogger;
+};
 
-	private:
-		ArchiveStateCollector::ArchiveInfoMap &m_mapArchiveInfo;
-		object_ptr<ECLogger> m_lpLogger;
-	};
+MailboxDataCollector::MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo,
+     std::shared_ptr<ECLogger> lpLogger) :
+	m_mapArchiveInfo(mapArchiveInfo), m_lpLogger(std::move(lpLogger))
+{
+}
 
-	MailboxDataCollector::MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger): m_mapArchiveInfo(mapArchiveInfo), m_lpLogger(lpLogger)
-	{
-	}
+HRESULT MailboxDataCollector::GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const
+{
+	SPropTagArrayPtr ptrPropTagArray;
 
-	HRESULT MailboxDataCollector::GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const
-	{
-		HRESULT hr = hrSuccess;
-		SPropTagArrayPtr ptrPropTagArray;
+	PROPMAP_START(2)
+		PROPMAP_NAMED_ID(STORE_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "store-entryids")
+		PROPMAP_NAMED_ID(ITEM_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "item-entryids")
+	PROPMAP_INIT(lpProp);
 
-		PROPMAP_START(2)
-			PROPMAP_NAMED_ID(STORE_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "store-entryids")
-			PROPMAP_NAMED_ID(ITEM_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "item-entryids")
-		PROPMAP_INIT(lpProp);
+	auto hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), &~ptrPropTagArray);
+	if (hr != hrSuccess)
+		return hr;
+	ptrPropTagArray->cValues = 4;
+	ptrPropTagArray->aulPropTag[0] = PR_ENTRYID;
+	ptrPropTagArray->aulPropTag[1] = PR_MAILBOX_OWNER_ENTRYID;
+	ptrPropTagArray->aulPropTag[2] = PROP_STORE_ENTRYIDS;
+	ptrPropTagArray->aulPropTag[3] = PROP_ITEM_ENTRYIDS;
 
-		hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), &~ptrPropTagArray);
+	*lppPropTagArray = ptrPropTagArray.release();
+	return hr;
+}
+
+HRESULT MailboxDataCollector::CollectData(LPMAPITABLE lpStoreTable)
+{
+	enum {IDX_ENTRYID, IDX_MAILBOX_OWNER_ENTRYID, IDX_STORE_ENTRYIDS, IDX_ITEM_ENTRYIDS, IDX_MAX};
+
+	while (true) {
+		SRowSetPtr ptrRows;
+		auto hr = lpStoreTable->QueryRows(50, 0, &~ptrRows);
 		if (hr != hrSuccess)
 			return hr;
+		if (ptrRows.size() == 0)
+			break;
 
-		ptrPropTagArray->cValues = 4;
-		ptrPropTagArray->aulPropTag[0] = PR_ENTRYID;
-		ptrPropTagArray->aulPropTag[1] = PR_MAILBOX_OWNER_ENTRYID;
-		ptrPropTagArray->aulPropTag[2] = PROP_STORE_ENTRYIDS;
-		ptrPropTagArray->aulPropTag[3] = PROP_ITEM_ENTRYIDS;
+		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
+			const auto &prop = ptrRows[i].lpProps;
+			bool bComplete = true;
+			abentryid_t userId;
 
-		*lppPropTagArray = ptrPropTagArray.release();
-		return hr;
-	}
-
-	HRESULT MailboxDataCollector::CollectData(LPMAPITABLE lpStoreTable)
-	{
-		enum {IDX_ENTRYID, IDX_MAILBOX_OWNER_ENTRYID, IDX_STORE_ENTRYIDS, IDX_ITEM_ENTRYIDS, IDX_MAX};
-
-		while (true) {
-			SRowSetPtr ptrRows;
-			auto hr = lpStoreTable->QueryRows(50, 0, &~ptrRows);
-			if (hr != hrSuccess)
-				return hr;
-
-			if (ptrRows.size() == 0)
-				break;
-
-			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-				bool bComplete = true;
-				abentryid_t userId;
-
-				for (unsigned j = 0; bComplete && j < IDX_MAX; ++j) {
-					if (PROP_TYPE(ptrRows[i].lpProps[j].ulPropTag) == PT_ERROR) {
-						m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Got incomplete row, row %u, column %u contains error 0x%08x", i, j, ptrRows[i].lpProps[j].Value.err);
-						bComplete = false;
-					}
-				}
-						
-				if (!bComplete)
-					continue;
-
-				if (ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues != ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.cValues) {
-					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Mismatch in archive prop count, %u vs. %u", ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues, ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.cValues);
-					continue;
-				}
-				userId = ptrRows[i].lpProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin;
-				auto res = m_mapArchiveInfo.emplace(userId, ArchiveStateCollector::ArchiveInfo());
-				if (res.second == true)
-					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user id %s", userId.tostring().c_str());
-				else
-					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Updating row for user '" TSTRING_PRINTF "'", res.first->second.userName.c_str());
-
-				// Assign entryid
-				res.first->second.storeId = ptrRows[i].lpProps[IDX_ENTRYID].Value.bin;
-
-				// Assign archives
-				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive(s)", ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues);
-				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.cValues; ++j) {
-					SObjectEntry objEntry;
-					objEntry.sStoreEntryId = ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.lpbin[j];
-					objEntry.sItemEntryId = ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.lpbin[j];
-					res.first->second.lstArchives.emplace_back(std::move(objEntry));
+			for (unsigned j = 0; bComplete && j < IDX_MAX; ++j) {
+				if (PROP_TYPE(prop[j].ulPropTag) == PT_ERROR) {
+					m_lpLogger->logf(EC_LOGLEVEL_WARNING, "Got incomplete row, row %u, column %u contains error \"%s\" (%x)",
+						i, j, GetMAPIErrorMessage(prop[j].Value.err), prop[j].Value.err);
+					bComplete = false;
 				}
 			}
-		}
-		return hrSuccess;
-	}
+			if (!bComplete)
+				continue;
+			if (prop[IDX_STORE_ENTRYIDS].Value.MVbin.cValues != prop[IDX_ITEM_ENTRYIDS].Value.MVbin.cValues) {
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Mismatch in archive prop count, %u vs. %u", prop[IDX_STORE_ENTRYIDS].Value.MVbin.cValues, prop[IDX_ITEM_ENTRYIDS].Value.MVbin.cValues);
+				continue;
+			}
+			userId = prop[IDX_MAILBOX_OWNER_ENTRYID].Value.bin;
+			auto res = m_mapArchiveInfo.emplace(userId, ArchiveStateCollector::ArchiveInfo());
+			if (res.second)
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Inserting row for user id \"%s\"", userId.tostring().c_str());
+			else
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Updating row for user \"" TSTRING_PRINTF "\"", res.first->second.userName.c_str());
 
+			// Assign entryid
+			res.first->second.storeId = prop[IDX_ENTRYID].Value.bin;
+
+			// Assign archives
+			m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Adding %u archive(s)", prop[IDX_STORE_ENTRYIDS].Value.MVbin.cValues);
+			for (ULONG j = 0; j < prop[IDX_STORE_ENTRYIDS].Value.MVbin.cValues; ++j) {
+				SObjectEntry objEntry;
+				objEntry.sStoreEntryId = prop[IDX_STORE_ENTRYIDS].Value.MVbin.lpbin[j];
+				objEntry.sItemEntryId = prop[IDX_ITEM_ENTRYIDS].Value.MVbin.lpbin[j];
+				res.first->second.lstArchives.emplace_back(std::move(objEntry));
+			}
+		}
+	}
+	return hrSuccess;
 }
 
 /**
@@ -138,10 +120,11 @@ namespace details {
  * @param[in]	lpLogger		The logger.
  * @param[out]	lpptrCollector	The new ArchiveStateCollector instance.
  */
-HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger, ArchiveStateCollectorPtr *lpptrCollector)
+HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession,
+    std::shared_ptr<ECLogger> lpLogger, ArchiveStateCollectorPtr *lpptrCollector)
 {
 	ArchiveStateCollectorPtr ptrCollector(
-		new(std::nothrow) ArchiveStateCollector(ptrSession, lpLogger));
+		new(std::nothrow) ArchiveStateCollector(ptrSession, std::move(lpLogger)));
 	if (ptrCollector == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	*lpptrCollector = std::move(ptrCollector);
@@ -152,9 +135,9 @@ HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession, ECLo
  * @param[in]	ArchiverSessionPtr		The archive session
  * @param[in]	lpLogger		The logger.
  */
-ArchiveStateCollector::ArchiveStateCollector(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger)
-: m_ptrSession(ptrSession)
-, m_lpLogger(new ECArchiverLogger(lpLogger), false)
+ArchiveStateCollector::ArchiveStateCollector(const ArchiverSessionPtr &ptrSession,
+    std::shared_ptr<ECLogger> lpLogger) :
+	m_ptrSession(ptrSession), m_lpLogger(new ECArchiverLogger(std::move(lpLogger)))
 { }
 
 /**
@@ -164,7 +147,7 @@ ArchiveStateCollector::ArchiveStateCollector(const ArchiverSessionPtr &ptrSessio
  */
 HRESULT ArchiveStateCollector::GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lpptrUpdater)
 {
-	details::MailboxDataCollector mdc(m_mapArchiveInfo, m_lpLogger);
+	MailboxDataCollector mdc(m_mapArchiveInfo, m_lpLogger);
 	auto hr = PopulateUserList();
 	if (hr != hrSuccess)
 		return hr;
@@ -173,7 +156,8 @@ HRESULT ArchiveStateCollector::GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lp
 	     m_ptrSession->GetSSLPath(), m_ptrSession->GetSSLPass(),
 	     false, &mdc);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Failed to get mailbox data. hr=0x%08x", hr);
+		m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Failed to get mailbox data: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
 
@@ -209,7 +193,8 @@ HRESULT ArchiveStateCollector::PopulateUserList()
 		}
 	} catch (const KMAPIError &e) {
 		hr = e.code();
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate addressbook containers. (hr=0x%08x)", hr);
+		m_lpLogger->logf(EC_LOGLEVEL_FATAL, "Failed to iterate addressbook containers: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
 	return hrSuccess;
@@ -224,8 +209,7 @@ HRESULT ArchiveStateCollector::PopulateUserList()
  */
 HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 {
-	SPropValue sPropObjType;
-	SPropValue sPropDispType;
+	SPropValue sPropObjType, sPropDispType;
 	MAPITablePtr ptrTable;
 	SRowSetPtr ptrRows;
 	static constexpr const SizedSPropTagArray(4, sptaUserProps) =
@@ -239,6 +223,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 	sPropDispType.ulPropTag = PR_DISPLAY_TYPE;
 	sPropDispType.Value.ul = DT_MAILUSER;;
 
+	m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Scanning IABContainer for users with archives");
 	auto hr = lpContainer->GetContentsTable(0, &~ptrTable);
 	if (hr != hrSuccess)
 		return hr;
@@ -265,33 +250,33 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 			break;
 
 		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-			if (ptrRows[i].lpProps[IDX_ENTRYID].ulPropTag != PR_ENTRYID) {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get entryid from address list. hr=0x%08x", ptrRows[i].lpProps[IDX_ACCOUNT].Value.err);
+			const auto &prop = ptrRows[i].lpProps;
+			if (prop[IDX_ENTRYID].ulPropTag != PR_ENTRYID) {
+				auto err = prop[IDX_ACCOUNT].Value.err;
+				m_lpLogger->perr("Unable to get entryid from address list", err);
 				continue;
 			}
-
-			if (ptrRows[i].lpProps[IDX_ACCOUNT].ulPropTag != PR_ACCOUNT) {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get username from address list. hr=0x%08x", ptrRows[i].lpProps[IDX_ACCOUNT].Value.err);
+			if (prop[IDX_ACCOUNT].ulPropTag != PR_ACCOUNT) {
+				auto err = prop[IDX_ACCOUNT].Value.err;
+				m_lpLogger->perr("Unable to get username from address list", err);
 				continue;
 			}
-
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user '" TSTRING_PRINTF "'", ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
-			auto iterator = m_mapArchiveInfo.emplace(abentryid_t(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin), ArchiveInfo()).first;
-			iterator->second.userName.assign(ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
-
-			if (ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].ulPropTag == PR_EC_ARCHIVE_SERVERS) {
-				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive server(s)", ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues);
-				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues; ++j)
-					iterator->second.lstServers.emplace_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.LPPSZ[j]);
+			m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Inserting row for user \"" TSTRING_PRINTF "\"", prop[IDX_ACCOUNT].Value.LPSZ);
+			auto iterator = m_mapArchiveInfo.emplace(abentryid_t(prop[IDX_ENTRYID].Value.bin), ArchiveInfo()).first;
+			iterator->second.userName.assign(prop[IDX_ACCOUNT].Value.LPSZ);
+			if (prop[IDX_EC_ARCHIVE_SERVERS].ulPropTag == PR_EC_ARCHIVE_SERVERS) {
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Adding %u archive server(s)", prop[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues);
+				for (ULONG j = 0; j < prop[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.cValues; ++j)
+					iterator->second.lstServers.emplace_back(prop[IDX_EC_ARCHIVE_SERVERS].Value.MVSZ.LPPSZ[j]);
 			}
-
-			if (ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].ulPropTag == PR_EC_ARCHIVE_COUPLINGS) {
-				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding %u archive coupling(s)", ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues);
-				for (ULONG j = 0; j < ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues; ++j)
-					iterator->second.lstCouplings.emplace_back(ptrRows[i].lpProps[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.LPPSZ[j]);
+			if (prop[IDX_EC_ARCHIVE_COUPLINGS].ulPropTag == PR_EC_ARCHIVE_COUPLINGS) {
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Adding %u archive coupling(s)", prop[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues);
+				for (ULONG j = 0; j < prop[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.cValues; ++j)
+					iterator->second.lstCouplings.emplace_back(prop[IDX_EC_ARCHIVE_COUPLINGS].Value.MVSZ.LPPSZ[j]);
 			}
 		}
 	}
+	m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "IABContainer scan yielded %zu users", m_mapArchiveInfo.size());
 	return hrSuccess;
 }
 

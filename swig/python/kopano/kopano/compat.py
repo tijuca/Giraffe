@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -10,16 +11,11 @@ try:
 except ImportError:
     import pickle
 
+# Not unused, imported from server
 try:
     from functools import lru_cache
-except ImportError:
+except ImportError: # pragma: no cover
     from .lru_cache import lru_cache
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    # We only need it for Python 2
-    pass
 
 import base64
 import codecs
@@ -78,8 +74,11 @@ if sys.hexversion >= 0x03000000:
     def encode(s):
         return s.encode()
 
+    def fake_ord(b):
+        return b
+
 # Python 2
-else:
+else: # pragma: no cover
     def is_str(s):
         return isinstance(s, (str, unicode))
 
@@ -113,7 +112,7 @@ else:
         return isinstance(i, (int, long))
 
     def is_file(f):
-        return isinstance(f, file) or isinstance(f, StringIO)
+        return isinstance(f, file) or isinstance(f, (io.BytesIO, io.StringIO))
 
     def encode(s):
         # sys.stdout can be StringIO (nosetests)
@@ -127,6 +126,9 @@ else:
 
     def fake_unicode(u):
         return unicode(u)
+
+    def fake_ord(b):
+        return ord(b)
 
 def set_bin_encoding(encoding):
     """Override encoding to use for binary identifiers (hex or base64)."""

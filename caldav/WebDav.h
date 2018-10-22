@@ -1,38 +1,20 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef _WEBDAV_H_
 #define _WEBDAV_H_
 
 #include <libxml/tree.h>
 #include <libxml/xmlwriter.h>
 #include <libxml/parser.h>
-
 #include <mapi.h>
 #include <map>
-
 #include "ProtocolBase.h"
 #include "Http.h"
 
 struct WEBDAVPROPNAME {
-	std::string strNS;
-	std::string strPropname;
-	std::string strPropAttribName;
-	std::string strPropAttribValue;
+	std::string strNS, strPropname, strPropAttribName, strPropAttribValue;
 };
 
 struct WEBDAVVALUE {
@@ -95,15 +77,12 @@ struct WEBDAVRPTMGET {
 };
 
 struct WEBDAVFBUSERINFO {
-	std::string strUser;
-	std::string strIcal;
+	std::string strUser, strIcal;
 };
 
 struct WEBDAVFBINFO {
-	time_t tStart;
-	time_t tEnd;
-	std::string strOrganiser;
-	std::string strUID;
+	time_t tStart, tEnd;
+	std::string strOrganiser, strUID;
 	std::list<WEBDAVFBUSERINFO> lstFbUserInfo;
 };
 
@@ -112,7 +91,7 @@ struct WEBDAVFBINFO {
 
 class WebDav : public ProtocolBase {
 public:
-	WebDav(Http *, IMAPISession *, const std::string &srv_tz, const std::string &charset);
+	WebDav(Http &, IMAPISession *, const std::string &srv_tz, const std::string &charset);
 	virtual ~WebDav();
 
 protected:
@@ -139,13 +118,11 @@ private:
 	std::map <std::string,std::string> m_mapNs;
 
 	HRESULT HrParseXml();
-
 	/* more processing xml, but not as direct entrypoint */
 	HRESULT HrHandleRptMulGet();
 	HRESULT HrPropertySearch();
 	HRESULT HrPropertySearchSet();
 	HRESULT HrHandleRptCalQry();
-
 	HRESULT RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *strXml);
 	HRESULT GetNs(std::string *szPrefx, std::string *strNs);
 	void RegisterNs(const std::string &strNs, std::string *strPrefix);
@@ -155,12 +132,11 @@ private:
 	HRESULT HrWriteResponseProps(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, std::list<WEBDAVPROPERTY> *lstProps);
 	HRESULT HrWriteSPropStat(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, const WEBDAVPROPSTAT &sPropStat);
 	HRESULT HrWriteItems(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, WEBDAVPROPERTY *lpsWebProprty);
-
 	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName,xmlNode *lpXmlNode);
+
 protected:
 	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName, const std::string &strPropName, const std::string &strNs);
 	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName, const std::string &strPropName, const std::string &strPropAttribName, const std::string &strPropAttribValue, const std::string &strNs);
-
 };
 
 #endif

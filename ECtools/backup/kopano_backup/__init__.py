@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-only
 from .version import __version__
 
 import binascii
@@ -20,7 +21,7 @@ except ImportError:
     import _pickle as pickle
 if sys.hexversion >= 0x03000000:
     import bsddb3 as bsddb
-else:
+else: # pragma: no cover
     import bsddb
 
 from MAPI import (
@@ -104,7 +105,14 @@ if sys.hexversion >= 0x03000000:
 
     def pickle_loads(s):
         return pickle.loads(s, encoding='bytes')
-else:
+
+    def _unbase64(s):
+        return codecs.decode(codecs.encode(s, 'ascii'), 'base64')
+
+    def _base64(s):
+        return codecs.decode(codecs.encode(s, 'base64').strip(), 'ascii')
+
+else: # pragma: no cover
     def _decode(s):
         return s.decode(getattr(sys.stdin, 'encoding', 'utf8') or 'utf8')
 
@@ -116,6 +124,12 @@ else:
 
     def pickle_loads(s):
         return pickle.loads(s)
+
+    def _unbase64(s):
+        return s.decode('base64')
+
+    def _base64(s):
+        return s.encode('base64').strip()
 
 def _hex(s):
     return codecs.encode(s, 'hex').upper()
@@ -130,7 +144,7 @@ def fatal(s):
 def dbopen(path):
     if sys.hexversion >= 0x03000000:
         return bsddb.hashopen(path, 'c')
-    else:
+    else: # pragma: no cover
         return bsddb.hashopen(_encode(path), 'c')
 
 def _copy_folder_meta(from_dir, to_dir, keep_db=False):
@@ -895,7 +909,7 @@ def dump_rules(folder, user, server, stats, log):
                 for movecopy in actions.findall('.//moveCopy'):
                     try:
                         s = movecopy.findall('store')[0]
-                        store = server.mapisession.OpenMsgStore(0, s.text.decode('base64'), None, 0)
+                        store = server.mapisession.OpenMsgStore(0, _unbase64(s.text), None, 0)
                         guid = _hex(HrGetOneProp(store, PR_STORE_RECORD_KEY).Value)
                         store = server.store(guid) # XXX guid doesn't work for multiserver?
                         if store.public:
@@ -903,7 +917,7 @@ def dump_rules(folder, user, server, stats, log):
                         else:
                             s.text = store.user.name if store != user.store else ''
                         f = movecopy.findall('folder')[0]
-                        path = store.folder(entryid=_hex(f.text.decode('base64'))).path
+                        path = store.folder(entryid=_hex(_unbase64(f.text))).path
                         f.text = path
                     except (MAPIErrorNotFound, kopano.NotFoundError, binascii.Error):
                         log.warning("cannot serialize rule for unknown store/folder")
@@ -925,9 +939,9 @@ def load_rules(folder, user, server, data, stats, log):
                             store = server.public_store
                         else:
                             store = server.user(s.text).store if s.text else user.store
-                        s.text = _unhex(store.entryid).encode('base64').strip()
+                        s.text = _base64(_unhex(store.entryid))
                         f = movecopy.findall('folder')[0]
-                        f.text = _unhex(store.folder(f.text).entryid).encode('base64').strip()
+                        f.text = _base64(_unhex(store.folder(f.text).entryid))
                     except kopano.NotFoundError:
                         log.warning("skipping rule for unknown store/folder")
             etxml = ElementTree.tostring(etxml)
@@ -1006,4 +1020,4 @@ def main():
         Service('backup', options=options, config=CONFIG, args=args).start()
 
 if __name__ == '__main__':
-    main()
+    main() # pragma: no cover

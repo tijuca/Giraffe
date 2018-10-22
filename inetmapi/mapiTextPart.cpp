@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // based on htmlTextPart, but with additions
@@ -40,7 +28,6 @@
 // a combined work based on this library.  Thus, the terms and conditions of
 // the GNU General Public License cover the whole combination.
 //
-
 #include <memory>
 #include "mapiTextPart.h"
 #include <vmime/exception.hpp>
@@ -120,9 +107,7 @@ void mapiTextPart::generateIn(vmime::shared_ptr<bodyPart> /* message */,
 			auto objPart = vmime::make_shared<bodyPart>();
 			relPart->getBody()->appendPart(objPart);
 
-			std::string id = obj->getId();
-			std::string name = obj->getName();
-
+			std::string id = obj->getId(), name = obj->getName();
 			if (id.substr(0, 4) == "CID:")
 				id = id.substr(4);
 
@@ -209,26 +194,20 @@ void mapiTextPart::addEmbeddedObject(const bodyPart& part, const string& id)
 
 void mapiTextPart::parse(vmime::shared_ptr<const vmime::bodyPart> message,
     vmime::shared_ptr<const vmime::bodyPart> parent,
-    vmime::shared_ptr<const vmime::bodyPart> textPart)
+    vmime::shared_ptr<const vmime::bodyPart> text_part)
 {
 	// Search for possible embedded objects in the _whole_ message.
-	std::vector<vmime::shared_ptr<const vmime::bodyPart> > cidParts;
-	std::vector<vmime::shared_ptr<const vmime::bodyPart> > locParts;
-
+	std::vector<vmime::shared_ptr<const vmime::bodyPart>> cidParts, locParts;
 	findEmbeddedParts(*message, cidParts, locParts);
 
 	// Extract HTML text
 	std::ostringstream oss;
 	utility::outputStreamAdapter adapter(oss);
-
-	textPart->getBody()->getContents()->extract(adapter);
-
+	text_part->getBody()->getContents()->extract(adapter);
 	const string data = oss.str();
-
-	m_text = textPart->getBody()->getContents()->clone();
-
-	if (textPart->getHeader()->hasField(fields::CONTENT_TYPE)) {
-		auto ctf = vmime::dynamicCast<vmime::contentTypeField>(textPart->getHeader()->findField(fields::CONTENT_TYPE));
+	m_text = text_part->getBody()->getContents()->clone();
+	if (text_part->getHeader()->hasField(fields::CONTENT_TYPE)) {
+		auto ctf = vmime::dynamicCast<vmime::contentTypeField>(text_part->getHeader()->findField(fields::CONTENT_TYPE));
 		m_charset = ctf->getCharset();
 	}
 
@@ -257,11 +236,12 @@ void mapiTextPart::parse(vmime::shared_ptr<const vmime::bodyPart> message,
 	}
 
 	// Extract plain text, if any.
-	if (!findPlainTextPart(*message, *parent, *textPart))
+	if (!findPlainTextPart(*message, *parent, *text_part))
 		m_plainText = vmime::make_shared<vmime::emptyContentHandler>();
 }
 
-bool mapiTextPart::findPlainTextPart(const bodyPart& part, const bodyPart& parent, const bodyPart& textPart)
+bool mapiTextPart::findPlainTextPart(const bodyPart &part,
+    const bodyPart &parent, const bodyPart &text_part)
 {
 	// We search for the nearest "multipart/alternative" part.
 	if (part.getHeader()->hasField(fields::CONTENT_TYPE)) {
@@ -276,7 +256,7 @@ bool mapiTextPart::findPlainTextPart(const bodyPart& part, const bodyPart& paren
 			for (size_t i = 0; i < part.getBody()->getPartCount(); ++i) {
 				auto p = part.getBody()->getPartAt(i);
 				if (p.get() == &parent ||     // if "text/html" is in "multipart/related"
-				    p.get() == &textPart)     // if not...
+				    p.get() == &text_part) /* if not... */
 					foundPart = p;
 			}
 
@@ -289,8 +269,8 @@ bool mapiTextPart::findPlainTextPart(const bodyPart& part, const bodyPart& paren
 					auto p = part.getBody()->getPartAt(i);
 					if (!p->getHeader()->hasField(fields::CONTENT_TYPE))
 						continue;
-					auto ctf = p->getHeader()->findField(fields::CONTENT_TYPE);
-					auto type = *vmime::dynamicCast<const vmime::mediaType>(ctf->getValue());
+					ctf = p->getHeader()->findField(fields::CONTENT_TYPE);
+					type = *vmime::dynamicCast<const vmime::mediaType>(ctf->getValue());
 					if (type.getType() == mediaTypes::TEXT &&
 					    type.getSubType() == mediaTypes::TEXT_PLAIN)
 					{
@@ -310,8 +290,7 @@ bool mapiTextPart::findPlainTextPart(const bodyPart& part, const bodyPart& paren
 	bool found = false;
 
 	for (size_t i = 0; !found && i < part.getBody()->getPartCount(); ++i)
-		found = findPlainTextPart(*part.getBody()->getPartAt(i), parent, textPart);
-
+		found = findPlainTextPart(*part.getBody()->getPartAt(i), parent, text_part);
 	return found;
 }
 

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECCHANNEL_H
@@ -38,7 +26,7 @@ namespace KC {
 // ECChannel is the communication channel with the other side. Initially, it is
 // a simple way to read/write full lines of data. The reason why we specify
 // a special 'HrWriteLine' instead of 'HrWrite' is that SSL encryption prefers
-// writing all the data at once, instead of via multiple write() calls. Also, 
+// writing all the data at once, instead of via multiple write() calls. Also,
 // this ensures that the ECChannel class is responsible for reading, writing
 // and culling newline characters.
 
@@ -47,15 +35,14 @@ public:
 	_kc_hidden ECChannel(int sockfd);
 	~ECChannel();
 	HRESULT HrEnableTLS(void);
-	_kc_hidden HRESULT HrGets(char *buf, ULONG bufsize, ULONG *have_read);
-	HRESULT HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer = 65536);
+	_kc_hidden HRESULT HrGets(char *buf, size_t bufsize, size_t *have_read);
+	HRESULT HrReadLine(std::string &buf, size_t maxbuf = 65536);
 	HRESULT HrWriteString(const std::string & strBuffer);
-	HRESULT HrWriteLine(const char *szBuffer, int len = 0);
+	HRESULT HrWriteLine(const char *buf, size_t len = 0);
 	HRESULT HrWriteLine(const std::string & strBuffer);
-	_kc_hidden HRESULT HrReadBytes(char *buf, ULONG count);
-	HRESULT HrReadBytes(std::string * strBuffer, ULONG ulByteCount);
-	HRESULT HrReadAndDiscardBytes(ULONG ulByteCount);
-
+	_kc_hidden HRESULT HrReadBytes(char *buf, size_t len);
+	HRESULT HrReadBytes(std::string *buf, size_t len);
+	HRESULT HrReadAndDiscardBytes(size_t);
 	HRESULT HrSelect(int seconds);
 	_kc_hidden void SetIPAddress(const struct sockaddr *, size_t);
 	_kc_hidden const char *peer_addr(void) const { return peer_atxt; }
@@ -77,15 +64,23 @@ private:
 	_kc_hidden char *SSL_gets(char *buf, int *len);
 };
 
+class _kc_export ec_bindaddr_less {
+	public:
+	bool operator()(const std::string &, const std::string &) const;
+};
+
 /* helpers to open socket */
-extern _kc_export HRESULT HrListen(const char *bind, uint16_t port, int *fd);
+extern _kc_export int ec_listen_localsock(const char *path, int *fd, int mode = -1);
+extern _kc_export int ec_listen_inet(const char *bind, uint16_t port, int *fd);
+extern _kc_export int ec_listen_generic(const char *bind, int *fd, int mode = -1);
 /* accept data on connection */
 extern _kc_export HRESULT HrAccept(int fd, ECChannel **ch);
-
 extern _kc_export int zcp_bindtodevice(int fd, const char *iface);
 extern int zcp_peeraddr_is_local(const struct sockaddr *, socklen_t);
 extern _kc_export int zcp_peerfd_is_local(int);
-extern _kc_export std::set<std::pair<std::string, uint16_t>> kc_parse_bindaddrs(const char *, uint16_t);
+extern _kc_export std::pair<std::string, uint16_t> ec_parse_bindaddr(const char *);
+extern _kc_export void ec_reexec_prepare_sockets();
+extern _kc_export int ec_fdtable_socket(const char *, struct sockaddr_storage *, socklen_t *);
 
 } /* namespace KC */
 

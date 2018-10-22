@@ -1,51 +1,18 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <mapidefs.h>
 #include <mapitags.h>
-
 #include <algorithm>
-#include <kopano/lockhelper.hpp>
-
+#include <mutex>
 #include "ECSession.h"
 #include "ECSessionGroup.h"
 #include "ECSessionManager.h"
 #include "SOAPUtils.h"
 
 namespace KC {
-
-class FindChangeAdvise {
-public:
-	FindChangeAdvise(ECSESSIONID ulSession, unsigned int ulConnection)
-		: m_ulSession(ulSession)
-		, m_ulConnection(ulConnection)
-	{ }
-
-	bool operator()(const CHANGESUBSCRIBEMAP::value_type &rhs) const
-	{
-		return rhs.second.ulSession == m_ulSession && rhs.second.ulConnection == m_ulConnection;
-	}
-
-private:
-	ECSESSIONID		m_ulSession;
-	unsigned int	m_ulConnection;
-};
 
 ECSessionGroup::ECSessionGroup(ECSESSIONGROUPID sessionGroupId,
     ECSessionManager *lpSessionManager) :
@@ -60,14 +27,14 @@ ECSessionGroup::~ECSessionGroup()
 		m_lpSessionManager->UnsubscribeObjectEvents(p.second, m_sessionGroupId);
 }
 
-void ECSessionGroup::Lock()
+void ECSessionGroup::lock()
 {
 	/* Increase our refcount by one */
 	scoped_lock lock(m_hThreadReleasedMutex);
 	++m_ulRefCount;
 }
 
-void ECSessionGroup::Unlock()
+void ECSessionGroup::unlock()
 {
 	// Decrease our refcount by one, signal ThreadReleased if RefCount == 0
 	scoped_lock lock(m_hThreadReleasedMutex);
@@ -134,14 +101,13 @@ ECRESULT ECSessionGroup::AddAdvise(ECSESSIONID ulSessionId, unsigned int ulConne
 		scoped_lock lock(m_hNotificationLock);
 		m_mapSubscribe.emplace(ulConnection, sSubscribeItem);
 	}
-	
+
 	if(ulEventMask & (fnevNewMail | fnevObjectModified | fnevObjectCreated | fnevObjectCopied | fnevObjectDeleted | fnevObjectMoved)) {
 		// Object and new mail notifications should be subscribed at the session manager
 		unsigned int ulStore = 0;
 
 		m_lpSessionManager->GetCacheManager()->GetStore(ulKey, &ulStore, NULL);
-		m_lpSessionManager->SubscribeObjectEvents(ulStore, this->m_sessionGroupId);
-		
+		m_lpSessionManager->SubscribeObjectEvents(ulStore, m_sessionGroupId);
 		scoped_lock lock(m_mutexSubscribedStores);
 		m_mapSubscribedStores.emplace(ulKey, ulStore);
 	}
@@ -155,9 +121,7 @@ ECRESULT ECSessionGroup::AddChangeAdvise(ECSESSIONID ulSessionId, unsigned int u
 
 	if (lpSyncState == NULL)
 		return KCERR_INVALID_PARAMETER;
-
 	sSubscribeItem.sSyncState = *lpSyncState;
-
 	scoped_lock lock(m_hNotificationLock);
 	m_mapChangeSubscribe.emplace(lpSyncState->ulSyncId, sSubscribeItem);
 	return erSuccess;
@@ -170,26 +134,28 @@ ECRESULT ECSessionGroup::DelAdvise(ECSESSIONID ulSessionId, unsigned int ulConne
 	if (iterSubscription == m_mapSubscribe.cend()) {
 		// Apparently the connection was used for change notifications.
 		auto iterItem = find_if(m_mapChangeSubscribe.cbegin(),
-			m_mapChangeSubscribe.cend(),
-			FindChangeAdvise(ulSessionId, ulConnection));
+			m_mapChangeSubscribe.cend(), [&](const auto &r) {
+				return r.second.ulSession == ulSessionId &&
+				       r.second.ulConnection == ulConnection;
+			});
 		if (iterItem != m_mapChangeSubscribe.cend())
 			m_mapChangeSubscribe.erase(iterItem);
-	} else {
-		if(iterSubscription->second.ulEventMask & (fnevObjectModified | fnevObjectCreated | fnevObjectCopied | fnevObjectDeleted | fnevObjectMoved)) {
-			// Object notification - remove our subscription to the store
-			scoped_lock lock(m_mutexSubscribedStores);
-			// Find the store that the key was subscribed for
-			auto iterSubscribed = m_mapSubscribedStores.find(iterSubscription->second.ulKey);
-			if (iterSubscribed != m_mapSubscribedStores.cend()) {
-				// Unsubscribe the store
-				m_lpSessionManager->UnsubscribeObjectEvents(iterSubscribed->second, this->m_sessionGroupId);
-				// Remove from our list
-				m_mapSubscribedStores.erase(iterSubscribed);
-			} else
-				assert(false); // Unsubscribe for something that was not subscribed
-		}
-		m_mapSubscribe.erase(iterSubscription);
+		return hrSuccess;
 	}
+	if (iterSubscription->second.ulEventMask & (fnevObjectModified | fnevObjectCreated | fnevObjectCopied | fnevObjectDeleted | fnevObjectMoved)) {
+		// Object notification - remove our subscription to the store
+		scoped_lock slock(m_mutexSubscribedStores);
+		// Find the store that the key was subscribed for
+		auto iterSubscribed = m_mapSubscribedStores.find(iterSubscription->second.ulKey);
+		if (iterSubscribed != m_mapSubscribedStores.cend()) {
+			// Unsubscribe the store
+			m_lpSessionManager->UnsubscribeObjectEvents(iterSubscribed->second, m_sessionGroupId);
+			// Remove from our list
+			m_mapSubscribedStores.erase(iterSubscribed);
+		} else
+			assert(false); // Unsubscribe for something that was not subscribed
+	}
+	m_mapSubscribe.erase(iterSubscription);
 	return hrSuccess;
 }
 
@@ -197,17 +163,65 @@ ECRESULT ECSessionGroup::AddNotification(notification *notifyItem, unsigned int 
 {
 	ulock_normal l_note(m_hNotificationLock);
 	ECNotification notify(*notifyItem);
+	unsigned int ulParent = 0, ulOldParent = 0;
+	bool check_parent = false, check_old_parent = false;
+	ECRESULT hr = erSuccess;
+
+	if (notifyItem->obj != nullptr) {
+		if (notifyItem->obj->pParentId) {
+			hr = m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(notifyItem->obj->pParentId, &ulParent);
+			if (hr != hrSuccess)
+				ulParent = 0; // to be sure
+		}
+		if (notifyItem->obj->pOldParentId) {
+			hr = m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(notifyItem->obj->pOldParentId, &ulOldParent);
+			if (hr != hrSuccess)
+				ulOldParent = 0; // to be sure
+		}
+	}
 
 	for (const auto &i : m_mapSubscribe) {
-		if ((ulSessionId != 0 && ulSessionId != i.second.ulSession) ||
-		    (ulKey != i.second.ulKey && i.second.ulKey != ulStore) ||
-			!(notifyItem->ulEventType & i.second.ulEventMask))
+		auto eventmask = i.second.ulEventMask;
+
+		// session mismatch (?)
+		if (ulSessionId != 0 && ulSessionId != i.second.ulSession)
+			continue;
+
+		// not subscribed to respective (parent) folder or store
+		check_parent = ulParent && (eventmask & fnevObjTypeMessage) &&
+				(notifyItem->obj != nullptr) &&
+				notifyItem->obj->ulObjType == MAPI_MESSAGE;
+		check_old_parent = ulOldParent && (eventmask & fnevObjTypeMessage) &&
+				(notifyItem->obj != nullptr) &&
+				notifyItem->obj->ulObjType == MAPI_MESSAGE;
+
+		if (i.second.ulKey != ulKey &&
+		    i.second.ulKey != ulStore &&
+		    (!check_parent || i.second.ulKey != ulParent) &&
+		    (!check_old_parent || i.second.ulKey != ulOldParent))
+			continue;
+
+		// not subscribed to specified event type(s)
+		if (!(notifyItem->ulEventType & eventmask))
+			continue;
+
+		// not subscribed to specified object type(s)
+		if ((notifyItem->obj != nullptr) && (eventmask & (fnevObjTypeMessage | fnevObjTypeFolder))) {
+			unsigned int objtype = 0;
+			if (notifyItem->obj->ulObjType == MAPI_MESSAGE)
+				objtype = fnevObjTypeMessage;
+			else if (notifyItem->obj->ulObjType == MAPI_FOLDER)
+				objtype = fnevObjTypeFolder;
+			if (!(objtype & eventmask))
 				continue;
+		}
+
+		// send notification
 		notify.SetConnection(i.second.ulConnection);
 		m_listNotification.emplace_back(notify);
 	}
 	l_note.unlock();
-	
+
 	// Since we now have a notification ready to send, tell the session manager that we have something to send. Since
 	// a notification can be read from any session in the session group, we have to notify all of the sessions
 	scoped_rlock l_ses(m_hSessionMapLock);
@@ -219,24 +233,24 @@ ECRESULT ECSessionGroup::AddNotification(notification *notifyItem, unsigned int 
 ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned int ulType, unsigned int ulObjType, unsigned int ulTableId,
 											  sObjectTableKey* lpsChildRow, sObjectTableKey* lpsPrevRow, struct propValArray *lpRow)
 {
-	Lock();
+	std::lock_guard<ECSessionGroup> holder(*this);
 	auto lpNotify = s_alloc<notification>(nullptr);
 	memset(lpNotify, 0, sizeof(notification));
 	lpNotify->tab = s_alloc<notificationTable>(nullptr);
 	memset(lpNotify->tab, 0, sizeof(notificationTable));
-	
+
 	lpNotify->ulEventType			= fnevTableModified;
 	lpNotify->tab->ulTableEvent		= ulType;
 
 	if(lpsChildRow && (lpsChildRow->ulObjId > 0 || lpsChildRow->ulOrderId > 0)) {
-		lpNotify->tab->propIndex.ulPropTag = PR_INSTANCE_KEY;
-		lpNotify->tab->propIndex.__union = SOAP_UNION_propValData_bin;
-		lpNotify->tab->propIndex.Value.bin = s_alloc<xsd__base64Binary>(nullptr);
-		lpNotify->tab->propIndex.Value.bin->__ptr = s_alloc<unsigned char>(nullptr, sizeof(ULONG) * 2);
-		lpNotify->tab->propIndex.Value.bin->__size = sizeof(ULONG)*2;
-
-		memcpy(lpNotify->tab->propIndex.Value.bin->__ptr, &lpsChildRow->ulObjId, sizeof(ULONG));
-		memcpy(lpNotify->tab->propIndex.Value.bin->__ptr+sizeof(ULONG), &lpsChildRow->ulOrderId, sizeof(ULONG));
+		auto &p = lpNotify->tab->propIndex;
+		p.ulPropTag = PR_INSTANCE_KEY;
+		p.__union = SOAP_UNION_propValData_bin;
+		p.Value.bin = s_alloc<xsd__base64Binary>(nullptr);
+		p.Value.bin->__ptr = s_alloc<unsigned char>(nullptr, sizeof(ULONG) * 2);
+		p.Value.bin->__size = sizeof(ULONG) * 2;
+		memcpy(p.Value.bin->__ptr, &lpsChildRow->ulObjId, sizeof(ULONG));
+		memcpy(p.Value.bin->__ptr + sizeof(ULONG), &lpsChildRow->ulOrderId, sizeof(ULONG));
 	}else {
 		lpNotify->tab->propIndex.ulPropTag = PR_NULL;
 		lpNotify->tab->propIndex.__union = SOAP_UNION_propValData_ul;
@@ -244,22 +258,20 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 
 	if(lpsPrevRow && (lpsPrevRow->ulObjId > 0 || lpsPrevRow->ulOrderId > 0))
 	{
-		lpNotify->tab->propPrior.ulPropTag = PR_INSTANCE_KEY;
-		lpNotify->tab->propPrior.__union = SOAP_UNION_propValData_bin;
-		lpNotify->tab->propPrior.Value.bin = s_alloc<xsd__base64Binary>(nullptr);
-		lpNotify->tab->propPrior.Value.bin->__ptr = s_alloc<unsigned char>(nullptr, sizeof(ULONG) * 2);
-		lpNotify->tab->propPrior.Value.bin->__size = sizeof(ULONG)*2;
-
-		memcpy(lpNotify->tab->propPrior.Value.bin->__ptr, &lpsPrevRow->ulObjId, sizeof(ULONG));
-		memcpy(lpNotify->tab->propPrior.Value.bin->__ptr+sizeof(ULONG), &lpsPrevRow->ulOrderId, sizeof(ULONG));
-
+		auto &p = lpNotify->tab->propPrior;
+		p.ulPropTag = PR_INSTANCE_KEY;
+		p.__union = SOAP_UNION_propValData_bin;
+		p.Value.bin = s_alloc<xsd__base64Binary>(nullptr);
+		p.Value.bin->__ptr = s_alloc<unsigned char>(nullptr, sizeof(ULONG) * 2);
+		p.Value.bin->__size = sizeof(ULONG) * 2;
+		memcpy(p.Value.bin->__ptr, &lpsPrevRow->ulObjId, sizeof(ULONG));
+		memcpy(p.Value.bin->__ptr + sizeof(ULONG), &lpsPrevRow->ulOrderId, sizeof(ULONG));
 	}else {
 		lpNotify->tab->propPrior.__union = SOAP_UNION_propValData_ul;
 		lpNotify->tab->propPrior.ulPropTag = PR_NULL;
 	}
-	
-	lpNotify->tab->ulObjType = ulObjType;
 
+	lpNotify->tab->ulObjType = ulObjType;
 	if(lpRow) {
 		lpNotify->tab->pRow = s_alloc<propValArray>(nullptr);
 		lpNotify->tab->pRow->__ptr = lpRow->__ptr;
@@ -267,7 +279,6 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 	}
 
 	AddNotification(lpNotify, ulTableId, 0, ulSessionId);
-
 	//Free by lpRow
 	if(lpNotify->tab->pRow){
 		lpNotify->tab->pRow->__ptr = NULL;
@@ -276,8 +287,6 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 
 	//Free struct
 	FreeNotificationStruct(lpNotify);
-
-	Unlock();
 	return erSuccess;
 }
 
@@ -297,7 +306,7 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 	notifyItem.ics->pSyncState->__ptr = (unsigned char*)&syncState;
 	notifyItem.ics->ulChangeType = ulChangeType;
 
-	Lock();
+	std::lock_guard<ECSessionGroup> holder(*this);
 	ulock_normal l_note(m_hNotificationLock);
 	// Iterate through all sync ids
 	for (auto sync_id : syncIds) {
@@ -307,11 +316,10 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 		     iterItem != iterRange.second; ++iterItem) {
 			// update sync state
 			syncState.ulSyncId = sync_id;
-			
 			// create ECNotification
 			ECNotification notify(notifyItem);
 			notify.SetConnection(iterItem->second.ulConnection);
-			m_listNotification.emplace_back(notify);
+			m_listNotification.emplace_back(std::move(notify));
 			mapInserted[iterItem->second.ulSession]++;
 		}
 	}
@@ -323,7 +331,6 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 	for (const auto &p : m_mapSessions)
 		m_lpSessionManager->NotifyNotificationReady(p.second.lpSession->GetSessionId());
 	l_ses.unlock();
-	Unlock();
 	return erSuccess;
 }
 
@@ -342,12 +349,12 @@ ECRESULT ECSessionGroup::AddChangeNotification(ECSESSIONID ulSessionId, unsigned
 	notifyItem.ics->pSyncState->__size = sizeof(syncState);
 	notifyItem.ics->pSyncState->__ptr = (unsigned char*)&syncState;
 
-	Lock();
+	std::lock_guard<ECSessionGroup> holder(*this);
 	ulock_normal l_note(m_hNotificationLock);
 	// create ECNotification
 	ECNotification notify(notifyItem);
 	notify.SetConnection(ulConnection);
-	m_listNotification.emplace_back(notify);
+	m_listNotification.emplace_back(std::move(notify));
 	l_note.unlock();
 
 	// Since we now have a notification ready to send, tell the session manager that we have something to send. Since
@@ -356,31 +363,27 @@ ECRESULT ECSessionGroup::AddChangeNotification(ECSESSIONID ulSessionId, unsigned
 	for (const auto &p : m_mapSessions)
 		m_lpSessionManager->NotifyNotificationReady(p.second.lpSession->GetSessionId());
 	l_ses.unlock();
-	Unlock();
 	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::GetNotifyItems(struct soap *soap, ECSESSIONID ulSessionId, struct notifyResponse *notifications)
 {
 	ECRESULT		er = erSuccess;
+	std::lock_guard<ECSessionGroup> holder(*this);
 
 	/* Start waiting for notifications */
-	Lock();
-
 	/*
 	 * Store the session which requested the notifications.
 	 * We need this in case the session is removed and the
 	 * session must release all calls into ECSessionGroup.
 	 */
 	m_getNotifySession = ulSessionId;
-
 	/*
 	 * Update Session times for all sessions attached to this group.
 	 * This prevents any of the sessions to timeout while it was waiting
 	 * for notifications for the group.
 	 */
 	UpdateSessionTime();
-
 	memset(notifications, 0,  sizeof(notifyResponse));
 	ulock_normal l_note(m_hNotificationLock);
 
@@ -403,9 +406,6 @@ ECRESULT ECSessionGroup::GetNotifyItems(struct soap *soap, ECSESSIONID ulSession
 
 	/* Reset GetNotifySession */
 	m_getNotifySession = 0;
-
-	Unlock();
-
 	return er;
 }
 
@@ -430,12 +430,9 @@ size_t ECSessionGroup::GetObjectSize(void)
 	ulSize += MEMORY_USAGE_MAP(m_mapSubscribe.size(), SUBSCRIBEMAP);
 	ulSize += MEMORY_USAGE_MAP(m_mapChangeSubscribe.size(), CHANGESUBSCRIBEMAP);
 
-	size_t ulItems = 0;
-	for (const auto &n : m_listNotification) {
-		++ulItems;
+	for (const auto &n : m_listNotification)
 		ulSize += n.GetObjectSize();
-	}
-	ulSize += MEMORY_USAGE_LIST(ulItems, ECNOTIFICATIONLIST);
+	ulSize += MEMORY_USAGE_LIST(m_listNotification.size(), ECNOTIFICATIONLIST);
 	l_note.unlock();
 
 	ulSize += sizeof(*this);

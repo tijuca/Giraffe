@@ -1,17 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* mapix.h – Defines flags and interfaces that MAPI implements for clients */
@@ -23,15 +12,11 @@
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <string>
-
-/* Include common MAPI header files if they haven't been already. */
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiguid.h>
 #include <mapitags.h>
 
-
-/* Forward interface declarations */
 class IProfAdmin;
 class IMsgServiceAdmin;
 class IMAPISession;
@@ -64,8 +49,7 @@ typedef IMAPISession* LPMAPISESSION;
 /* Structure passed to MAPIInitialize(), and its ulFlags values */
 
 struct MAPIINIT_0 {
-    ULONG           ulVersion;
-    ULONG           ulFlags;
+	ULONG ulVersion, ulFlags;
 };
 typedef struct MAPIINIT_0 *LPMAPIINIT_0;
 typedef MAPIINIT_0 MAPIINIT;

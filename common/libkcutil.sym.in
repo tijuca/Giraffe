@@ -1,7 +1,6 @@
 KERNEL32_1 {
 global:
 	GetSystemTimeAsFileTime;
-	GetTempPath;
 	GlobalAlloc;
 	Sleep;
 	lstrcmpW;
@@ -17,6 +16,16 @@ global:
 };
 KC_@PACKAGE_ABI@ {
 global:
+	GUID_NULL;
+	IID_*;
+	KOPANO_*_GUID;
+	MSEMS_*_GUID;
+	MUID*;
+	PS_[A-Z]*;
+	PSETID_*;
+	WAB_GUID;
+	muidStoreWrap;
+	pbGlobalProfileSectionGuid;
 	extern "C++" {
 		KC::*;
 		typeinfo*;

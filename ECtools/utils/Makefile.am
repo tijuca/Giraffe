@@ -1,8 +1,9 @@
 # -*- Makefile -*-
 
-dist_sbin_SCRIPTS = kopano-autorespond.py kopano-mr-accept.py kopano-mr-process.py 
+dist_sbin_SCRIPTS = kopano-autorespond.py kopano-mr-accept kopano-mr-process
 
 EXTRA_DIST = setup.py \
+	setup.cfg \
 	kopano_utils/__init__.py \
 	kopano_utils/autorespond.py \
 	kopano_utils/mr_accept.py \
@@ -11,7 +12,7 @@ EXTRA_DIST = setup.py \
 install-exec-local:
 	rm -Rf staging
 	${MKDIR_P} staging
-	cp -a ${srcdir}/setup.py ${srcdir}/kopano_utils staging/
+	cp -a ${srcdir}/setup.py ${srcdir}/setup.cfg ${srcdir}/kopano_utils staging/
 	cp -a kopano_utils/version.py staging/kopano_utils/
 	cd staging/ && ${PYTHON} setup.py \
 		build --build-base="${abs_builddir}/build" \
@@ -21,4 +22,4 @@ install-exec-local:
 
 uninstall-local:
 	rm -Rf ${DESTDIR}${pythondir}/kopano_utils \
-		${DESTDIR}${pythondir}/kopano_utils-0*.egg-info
+		${DESTDIR}${pythondir}/kopano_utils-*.egg-info

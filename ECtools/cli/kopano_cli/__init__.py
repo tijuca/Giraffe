@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-or-later
+from __future__ import print_function
 from .version import __version__
 
 import getpass
@@ -12,7 +14,7 @@ import kopano
 from kopano.parser import _true, _int, _name, _guid, _bool, _list_name, _date, _path
 
 def parser_opt_args():
-    parser = kopano.parser('skpcuGCfVUP')
+    parser = kopano.parser('skpcuGCfVUPS')
     parser.add_option('--debug', help='Debug mode', **_true())
     parser.add_option('--lang', help='Create folders in this language')
     parser.add_option('--create', help='Create object', **_true())
@@ -59,6 +61,7 @@ def parser_opt_args():
     group.add_option('--mr-accept', help='Auto-accept meeting requests', **_bool())
     group.add_option('--mr-accept-conflicts', help='Auto-accept conflicting meeting requests', **_bool())
     group.add_option('--mr-accept-recurring', help='Auto-accept recurring meeting requests', **_bool())
+    group.add_option('--mr-process', help='Auto-process meeting requests', **_bool())
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Send-as and delegations", "")
@@ -118,11 +121,11 @@ UPDATE_MATRIX = {
     ('name',): ('companies', 'groups', 'users'),
     ('email', 'add_sendas', 'remove_sendas'): ('users', 'groups'),
     ('fullname', 'password', 'password_prompt', 'admin_level', 'active', 'reset_folder_count'): ('users',),
-    ('mr_accept', 'mr_accept_conflicts', 'mr_accept_recurring', 'hook_archive', 'unhook_archive'): ('users',),
+    ('mr_accept', 'mr_accept_conflicts', 'mr_accept_recurring', 'hook_archive', 'unhook_archive', 'mr_process'): ('users',),
     ('ooo', 'ooo_clear', 'ooo_subject', 'ooo_message', 'ooo_from', 'ooo_until'): ('users',),
     ('add_feature', 'remove_feature', 'add_delegation', 'remove_delegation'): ('users',),
     ('send_only_to_delegates',): ('users',),
-    ('add_permission', 'remove_permission'): ('global', 'companies', 'users'),
+    ('add_permission', 'remove_permission'): ('global', 'companies', 'users', 'stores'),
     ('add_user', 'remove_user'): ('groups',),
     ('quota_override', 'quota_hard', 'quota_soft', 'quota_warn'): ('global', 'companies', 'users'),
     ('create_store', 'unhook_store', 'hook_store'): ('global', 'companies', 'users'),
@@ -134,12 +137,12 @@ UPDATE_MATRIX = {
 if sys.hexversion >= 0x03000000:
     def _encode(s):
         return s
-else:
+else: # pragma: no cover
     def _encode(s):
         return s.encode(sys.stdout.encoding or 'utf8')
 
 def orig_option(o):
-    OBJ_OPT = {'users': '--user', 'groups': '--group', 'companies': '--company'}
+    OBJ_OPT = {'users': '--user', 'groups': '--group', 'companies': '--company', 'stores': '--store'}
     return OBJ_OPT.get(o) or '--'+o.replace('_', '-')
 
 def yesno(x):
@@ -157,9 +160,9 @@ def name_flags(s):
 def list_users(intro, users):
     users = list(users)
     print(intro + ' (%d):' % len(users))
-    fmt = '{:>16}{:>20}{:>20}{:>40}'
+    fmt = '{0:>16} {1:>20} {2:>20} {3:>40}'
     print(fmt.format('User', 'Full Name', 'Homeserver', 'Store'))
-    print(96*'-')
+    print(99*'-')
     for user in sorted(users, key=lambda u: u.name):
         print(fmt.format(_encode(user.name), _encode(user.fullname), _encode(user.home_server), user.store.guid if user.store else ''))
     print
@@ -167,7 +170,7 @@ def list_users(intro, users):
 def list_groups(intro, groups):
     groups = list(groups)
     print(intro + ' (%d):' % len(groups))
-    fmt = '\t{:>16}'
+    fmt = '\t{0:>16}'
     print(fmt.format('Groupname'))
     print('\t'+16*'-')
     for group in sorted(groups, key=lambda g: g.name):
@@ -177,17 +180,17 @@ def list_groups(intro, groups):
 def list_companies(intro, companies):
     companies = list(companies)
     print(intro + ' (%d):' % len(companies))
-    fmt = '\t{:>32}{:>32}'
+    fmt = '\t{0:>32} {1:>32}'
     print(fmt.format('Companyname', 'System Administrator'))
-    print('\t'+64*'-')
+    print('\t'+65*'-')
     for company in sorted(companies, key=lambda c: c.name):
         print(fmt.format(_encode(company.name), _encode(company.admin.name) if company.admin else ''))
 
 def list_orphans(server):
     print('Stores without users:')
-    fmt = '\t{:>32}{:>20}{:>16}{:>16}{:>16}'
+    fmt = '\t{0:>32} {1:>20} {2:>16} {3:>16} {4:>16}'
     print(fmt.format('Store guid', 'Username', 'Last login', 'Store size', 'Store type'))
-    print('\t'+100*'-')
+    print('\t'+104*'-')
     for store in server.stores():
         if store.orphan:
             username = store.user.name if store.user else ''
@@ -212,9 +215,9 @@ def user_counts(server): # XXX allowed/available
     if sys.hexversion >= 0x03000000: # XXX shouldn't be necessary
         stats = dict([(s.decode('ascii'), stats[s].decode('ascii')) for s in stats])
     print('User counts:')
-    fmt = '\t{:>12}{:>10}'
+    fmt = '\t{0:>12} {1:>10}'
     print(fmt.format('', 'Used'))
-    print('\t'+42*'-')
+    print('\t'+43*'-')
     print(fmt.format('Active', stats['usercnt_active']))
     print(fmt.format('Non-active', stats['usercnt_nonactive']))
     print(fmt.format('NA Users', stats['usercnt_na_user']))
@@ -222,8 +225,14 @@ def user_counts(server): # XXX allowed/available
     print(fmt.format('NA Equipment', stats['usercnt_equipment']))
     print(fmt.format('Total', int(stats['usercnt_active'])+int(stats['usercnt_nonactive'])))
 
+def quota_str(limit): # TODO in pyko?
+    if not limit:
+        return 'unlimited'
+    else:
+        return '%d MB' % (float(limit) / 2**20)
+
 def user_details(user):
-    fmt = '{:<30}{:<}'
+    fmt = '{0:<30} {1:<}'
     print(fmt.format('Name:', _encode(user.name)))
     print(fmt.format('Full name:', _encode(user.fullname)))
     print(fmt.format('Email address:', user.email))
@@ -250,6 +259,8 @@ def user_details(user):
             print(fmt.format('    Accept conflicting:', yesno(user.autoaccept.conflicts)))
             print(fmt.format('    Accept recurring:', yesno(user.autoaccept.recurring)))
 
+        print(fmt.format('Auto-process meeting request:', yesno(user.autoprocess.enabled)))
+
         ooo = 'disabled'
         if user.outofoffice.enabled:
             ooo = user.outofoffice.period_desc + (' (currently %s)' % ('active' if user.outofoffice.active else 'inactive'))
@@ -257,15 +268,15 @@ def user_details(user):
 
     print('Current user store quota settings:')
     print(fmt.format('    Quota overrides:', yesno(not user.quota.use_default)))
-    print(fmt.format('    Warning level:', str(user.quota.warning_limit or 'unlimited')))
-    print(fmt.format('    Soft level:', str(user.quota.soft_limit or 'unlimited')))
-    print(fmt.format('    Hard level:', str(user.quota.hard_limit or 'unlimited')))
+    print(fmt.format('    Warning level:', quota_str(user.quota.warning_limit)))
+    print(fmt.format('    Soft level:', quota_str(user.quota.soft_limit)))
+    print(fmt.format('    Hard level:', quota_str(user.quota.hard_limit)))
 
     list_groups('Groups', user.groups())
     list_permissions(user.store)
 
 def group_details(group):
-    fmt = '{:<16}{:<}'
+    fmt = '{0:<16} {1:<}'
     print(fmt.format('Name:', _encode(group.name)))
     print(fmt.format('Email address:', group.email))
     print(fmt.format('Address Book:', ('hidden' if group.hidden else 'visible')))
@@ -273,7 +284,7 @@ def group_details(group):
     list_users('Users', group.users())
 
 def company_details(company, server):
-    fmt = '{:<30}{:<}'
+    fmt = '{0:<30} {1:<}'
     print(fmt.format('Name:', _encode(company.name)))
     if company.admin:
         print(fmt.format('Sysadmin:', _encode(company.admin.name)))
@@ -284,10 +295,16 @@ def company_details(company, server):
     if server.multitenant:
         print(fmt.format('Remote-admin list:', ', '.join(_encode(u.name) for u in company.admins())))
         print(fmt.format('Remote-view list:', ', '.join(_encode(c.name) for c in company.views())))
-        user = company.users().next()
+        user = next(company.users())
         print(fmt.format('Userquota-recipient list:', ', '.join(_encode(u.name) for u in user.quota.recipients() if u.name != 'SYSTEM')))
         print(fmt.format('Companyquota-recipient list:', ', '.join(_encode(u.name) for u in company.quota.recipients() if u.name != 'SYSTEM')))
     list_permissions(company.public_store)
+
+def store_details(store, server):
+    fmt = '{0:<30} {1:<}'
+    print(fmt.format('GUID:', store.guid))
+    print(fmt.format('Size:', '%.2f MB' % (store.size / 2**20)))
+    list_permissions(store)
 
 def shared_options(obj, options, server):
     if options.name:
@@ -304,11 +321,11 @@ def quota_options(user, options):
     if options.quota_override is not None:
         user.quota.use_default = not options.quota_override
     if options.quota_warn is not None:
-        user.quota.warning_limit = options.quota_warn
+        user.quota.warning_limit = options.quota_warn * (2**20) # TODO make pyko accept '2 GB' etc?
     if options.quota_soft is not None:
-        user.quota.soft_limit = options.quota_soft
+        user.quota.soft_limit = options.quota_soft * (2**20)
     if options.quota_hard is not None:
-        user.quota.hard_limit = options.quota_hard
+        user.quota.hard_limit = options.quota_hard * (2**20)
 
 def delegation_options(user, options, server):
     for delegation in options.add_delegation:
@@ -357,8 +374,6 @@ def user_options(name, options, server):
 
     shared_options(user, options, server)
 
-    if options.create_store:
-        user.create_store()
     if options.unhook_store:
         user.unhook()
     if options.hook_store:
@@ -367,6 +382,8 @@ def user_options(name, options, server):
         user.unhook_archive()
     if options.hook_archive:
         user.hook_archive(server.store(options.hook_archive))
+    if options.create_store:
+        user.create_store()
 
     if options.reset_folder_count:
         for folder in [user.root] + list(user.folders()):
@@ -378,6 +395,9 @@ def user_options(name, options, server):
         user.autoaccept.conflicts = options.mr_accept_conflicts
     if options.mr_accept_recurring is not None:
         user.autoaccept.recurring = options.mr_accept_recurring
+
+    if options.mr_process is not None:
+        user.autoprocess.enabled = options.mr_process
 
     for feature in options.add_feature:
         user.add_feature(feature)
@@ -440,12 +460,12 @@ def group_options(name, options, server):
         server.delete(group)
 
 def company_update_options(company, options, server):
-    if options.create_store:
-        company.create_public_store()
     if options.unhook_store:
         company.unhook_public_store()
     if options.hook_store:
         company.hook_public_store(server.store(options.hook_store))
+    if options.create_store:
+        company.create_public_store()
 
     shared_options(company, options, server)
 
@@ -470,8 +490,6 @@ def company_update_options(company, options, server):
     for user in options.remove_companyquota_recipient:
         company.quota.remove_recipient(server.user(user), company=True)
 
-    permission_options(company.public_store, options, server)
-
     for user in company.users(): # there are only server-wide settings
         quota_options(user, options)
 
@@ -494,6 +512,14 @@ def company_options(name, options, server):
 
     if options.delete:
         server.delete(company)
+
+def store_options(name, options, server):
+    store = server.store(name)
+
+    if options.details:
+        store_details(store, server)
+
+    permission_options(store, options, server)
 
 def global_options(options, server):
     if options.lang:
@@ -519,16 +545,14 @@ def global_options(options, server):
     if options.user_count:
         user_counts(server)
 
-    if not (options.companies or options.groups or options.users):
-        companies = list(server.companies(parse=False))
-        for i, company in enumerate(companies):
-            company_overview_options(company, options, server)
-            if i < len(companies)-1:
-                print
-        company_update_options(server.company('Default'), options, server)
+    if (not server.multitenant and \
+        not (options.companies or options.groups or options.users or options.stores)):
+        company = server.company('Default')
+        company_overview_options(company, options, server)
+        company_update_options(company, options, server)
 
-def check_options(options, server):
-    objtypes = [name for name in ('companies', 'groups', 'users') if getattr(options, name)]
+def check_options(parser, options, server):
+    objtypes = [name for name in ('companies', 'groups', 'users', 'stores') if getattr(options, name)]
     if len(objtypes) > 1:
         raise Exception('cannot combine options: %s' % ', '.join(orig_option(o) for o in objtypes))
 
@@ -538,6 +562,9 @@ def check_options(options, server):
 
     options.details = False
     updates = [name for name in sum(UPDATE_MATRIX, ()) if getattr(options, name) not in (None, [])]
+
+    if not (actions or updates or objtypes):
+        raise Exception('no object or action specified')
     if not (actions or updates):
         options.details = True
 
@@ -562,7 +589,7 @@ def main():
             raise Exception("extra argument '%s' specified" % args[0])
 
         server = kopano.Server(options)
-        check_options(options, server)
+        check_options(parser, options, server)
 
         global_options(options, server)
         for c in options.companies:
@@ -571,13 +598,15 @@ def main():
             group_options(g, options, server)
         for u in options.users:
             user_options(u, options, server)
+        for s in options.stores:
+            store_options(s, options, server)
 
     except Exception as e:
         if 'options' in locals() and options.debug:
-            print(traceback.format_exc())
+            print(traceback.format_exc(), file=sys.stderr)
         else:
-            print(_encode(str(e)))
+            print(_encode(str(e)), file=sys.stderr)
         sys.exit(1)
 
 if __name__ == '__main__':
-    main()
+    main() # pragma: no cover

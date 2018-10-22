@@ -1,22 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <mutex>
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
+#include <kopano/ECLogger.h>
 #include "SSLUtil.h"
 #include <pthread.h>
 #include <openssl/bn.h>
@@ -29,7 +17,11 @@ namespace KC {
 
 static std::recursive_mutex *ssl_locks;
 
-#if OPENSSL_VERSION_NUMBER < 0x1010000fL
+#if defined(LIBRESSL_VERSION_NUMBER) || (defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x1010000fL)
+#	define OLD_API 1
+#endif
+
+#ifdef OLD_API
 static void ssl_lock(int mode, int n, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
@@ -65,7 +57,7 @@ void ssl_threading_cleanup() {
 /**
  * Free most of the SSL library allocated memory.
  *
- * This will remove most of the memmory used by 
+ * This will remove most of the memmory used by
  * the ssl library. Don't use this function in libraries
  * because it will unload the whole SSL data.
  *
@@ -73,24 +65,21 @@ void ssl_threading_cleanup() {
  */
 void SSL_library_cleanup()
 {
-	#ifndef OPENSSL_NO_ENGINE
-		ENGINE_cleanup();
-	#endif
-
+#ifndef OPENSSL_NO_ENGINE
+	ENGINE_cleanup();
+#endif
 	ERR_free_strings();
-	#if OPENSSL_VERSION_NUMBER < 0x10100000L
-		ERR_remove_state(0);
-	#endif
+#ifdef OLD_API
+	ERR_remove_state(0);
+#endif
 	EVP_cleanup();
 	CRYPTO_cleanup_all_ex_data();
-
 	CONF_modules_unload(0);
 }
 
 void ssl_random_init()
 {
 	rand_init();
-
 	while (RAND_status() == 0) {
 		char buffer[16];
 		rand_get(buffer, sizeof buffer);
@@ -100,11 +89,15 @@ void ssl_random_init()
 
 void ssl_random(bool b64bit, uint64_t *id)
 {
-	#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-		RAND_bytes(reinterpret_cast<unsigned char *>(id), sizeof(*id));
-	#else
-		RAND_pseudo_bytes(reinterpret_cast<unsigned char *>(id), sizeof(*id));
-	#endif
+#ifdef OLD_API
+	int ret = RAND_pseudo_bytes(reinterpret_cast<unsigned char *>(id), sizeof(*id));
+#else
+	int ret = RAND_bytes(reinterpret_cast<unsigned char *>(id), sizeof(*id));
+#endif
+	if (ret < 0) {
+		ec_log_crit("RAND_bytes < 0: %s\n", ERR_reason_error_string(ERR_get_error()));
+		abort();
+	}
 	if (!b64bit)
 		*id &= 0xFFFFFFFF;
 }

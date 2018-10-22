@@ -1,4 +1,8 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: AGPL-3.0-or-later
+from .version import __version__
+
+import codecs
 import csv
 import time
 import sys
@@ -13,7 +17,7 @@ from . import pst
 if sys.hexversion >= 0x03000000:
     def _encode(s):
         return s
-else:
+else: # pragma: no cover
     def _encode(s):
         return s.encode(sys.stdout.encoding or 'utf8')
 
@@ -21,17 +25,17 @@ PSETID_Archive = DEFINE_GUID(0x72e98ebc, 0x57d2, 0x4ab5, 0xb0, 0xaa, 0xd5, 0x0a,
 
 def recip_prop(propid, value):
     # PST not generated with full unicode?
-    if isinstance(value, unicode):
-        return SPropValue(PROP_TAG(PT_UNICODE, propid), value)
-    else:
+    if isinstance(value, bytes):
         return SPropValue(PROP_TAG(PT_STRING8, propid), value)
+    else:
+        return SPropValue(PROP_TAG(PT_UNICODE, propid), value)
 
 def rev_cp1252(value):
     # PST not generated with full unicode flag?
-    if isinstance(value, unicode):
-        return value
-    else:
+    if isinstance(value, bytes):
         return value.decode('cp1252')
+    else:
+        return value
 
 class Service(kopano.Service):
     def import_props(self, parent, mapiobj, embedded=False):
@@ -108,7 +112,7 @@ class Service(kopano.Service):
                 value = user.name if user else r.EmailAddress
                 props.append(recip_prop(PROP_ID(PR_EMAIL_ADDRESS), value))
             if user:
-                props.append(SPropValue(PR_ENTRYID, user.userid.decode('hex')))
+                props.append(SPropValue(PR_ENTRYID, codecs.decode(user.userid.encode('ascii'), 'hex')))
             recipients.append(props)
         mapiobj.ModifyRecipients(0, recipients)
 
@@ -205,4 +209,4 @@ def main():
         Service('migration-pst', options=options, args=args).start()
 
 if __name__ == '__main__':
-    main()
+    main() # pragma: no cover

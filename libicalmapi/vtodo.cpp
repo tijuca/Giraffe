@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <memory>
 #include "vtodo.h"
@@ -165,8 +152,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *lpicEventRoot, icalcomponent *lpicEvent, bool bIsAllday, icalitem *lpIcalItem)
 {
 	SPropValue sPropVal;
-	time_t timeDTStart = 0;
-	time_t timeDue = 0;
+	time_t timeDTStart = 0, timeDue = 0;
 
 	auto lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
 	if (lpicProp) {
@@ -190,6 +176,9 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME);
 		sPropVal.Value.ft  = UnixTimeToFileTime(timeDTStart);
 		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
+	} else {
+		lpIcalItem->lstDelPropTags.emplace_back(CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_STARTDATE], PT_SYSTIME));
+		lpIcalItem->lstDelPropTags.emplace_back(CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME));
 	}
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DUE_PROPERTY);
@@ -214,14 +203,19 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME);
 		sPropVal.Value.ft  = UnixTimeToFileTime(timeDue);
 		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
+	} else {
+		lpIcalItem->lstDelPropTags.emplace_back(CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_DUEDATE], PT_SYSTIME));
+		lpIcalItem->lstDelPropTags.emplace_back(CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME));
 	}
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_COMPLETED_PROPERTY);
 	if (lpicProp) {
-		
+		auto timecomplete = icaltime_as_timet(icalproperty_get_due(lpicProp));
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETED_DATE], PT_SYSTIME);
-		sPropVal.Value.ft  = UnixTimeToFileTime(timeDue);
+		sPropVal.Value.ft  = UnixTimeToFileTime(timecomplete);
 		lpIcalItem->lstMsgProps.emplace_back(sPropVal);
+	} else {
+		lpIcalItem->lstDelPropTags.emplace_back(CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETED_DATE], PT_SYSTIME));
 	}
 	return hrSuccess;
 }

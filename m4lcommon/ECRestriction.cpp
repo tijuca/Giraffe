@@ -1,26 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <utility>
 #include <kopano/ECRestriction.h>
 #include <kopano/Util.h>
 #include <kopano/mapi_ptr.h>
-
 #include <mapicode.h>
 #include <mapix.h>
 
@@ -83,12 +69,11 @@ HRESULT ECRestriction::FindRowIn(LPMAPITABLE lpTable, BOOKMARK BkOrigin, ULONG u
 HRESULT ECRestriction::CopyProp(SPropValue *lpPropSrc, void *lpBase,
     ULONG ulFlags, SPropValue **lppPropDst)
 {
-	HRESULT hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropDst;
 
 	if (lpPropSrc == nullptr || lppPropDst == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = MAPIAllocateMore(sizeof(*lpPropDst), lpBase, &~lpPropDst);
+	auto hr = MAPIAllocateMore(sizeof(*lpPropDst), lpBase, &~lpPropDst);
 	if (hr != hrSuccess)
 		return hr;
 	if (ulFlags & Shallow)
@@ -417,18 +402,14 @@ ECRawRestriction::ECRawRestriction(RawResPtr ptrRestriction)
 { }
 
 HRESULT ECRawRestriction::GetMAPIRestriction(LPVOID lpBase, LPSRestriction lpRestriction, ULONG ulFlags) const {
-	HRESULT hr = hrSuccess;
-
 	if (lpBase == NULL || lpRestriction == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	if (!m_ptrRestriction)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	if (ulFlags & (ECRestriction::Cheap | ECRestriction::Shallow))
-		*lpRestriction = *m_ptrRestriction;
-
-	else
-		hr = Util::HrCopySRestriction(lpRestriction, m_ptrRestriction.get(), lpBase);
-	return hr;
+	if (!(ulFlags & (ECRestriction::Cheap | ECRestriction::Shallow)))
+		return Util::HrCopySRestriction(lpRestriction, m_ptrRestriction.get(), lpBase);
+	*lpRestriction = *m_ptrRestriction;
+	return hrSuccess;
 }
 
 ECRestriction *ECRawRestriction::Clone(void) const &

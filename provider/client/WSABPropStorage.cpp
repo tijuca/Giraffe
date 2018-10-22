@@ -1,17 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <new>
 #include <stdexcept>
@@ -26,34 +15,31 @@
 
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL   \
-	if (er == KCERR_END_OF_SESSION && this->m_lpTransport->HrReLogon() == hrSuccess) \
+	if (er == KCERR_END_OF_SESSION && m_lpTransport->HrReLogon() == hrSuccess) \
 		goto retry; \
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
     if(hr != hrSuccess) \
         goto exit;
-                    
 
 /*
  * This is a PropStorage object for use with the WebServices storage platform
  */
+using namespace KC;
 
-WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId,
-    KCmdProxy *cmd, std::recursive_mutex &data_lock, ECSESSIONID sid,
-    WSTransport *lpTransport) :
-	ECUnknown("WSABPropStorage"), lpCmd(cmd), lpDataLock(data_lock),
-	ecSessionId(sid), m_lpTransport(lpTransport)
+WSABPropStorage::WSABPropStorage(ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ECSESSIONID sid, WSTransport *lpTransport) :
+	ECUnknown("WSABPropStorage"), ecSessionId(sid),
+	m_lpTransport(lpTransport)
 {
 	auto ret = CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 	if (ret != hrSuccess)
 		throw std::runtime_error("CopyMAPIEntryIdToSOAPEntryId");
     lpTransport->AddSessionReloadCallback(this, Reload, &m_ulSessionReloadCallback);
-	    
 }
 
 WSABPropStorage::~WSABPropStorage()
 {
     m_lpTransport->RemoveSessionReloadCallback(m_ulSessionReloadCallback);
-    
 	FreeEntryId(&m_sEntryId, false);
 }
 
@@ -64,12 +50,12 @@ HRESULT WSABPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId,
-    KCmdProxy *lpCmd, std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
-    WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
+HRESULT WSABPropStorage::Create(ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ECSESSIONID ecSessionId, WSTransport *lpTransport,
+    WSABPropStorage **lppPropStorage)
 {
-	return alloc_wrap<WSABPropStorage>(cbEntryId, lpEntryId, lpCmd,
-	       lpDataLock, ecSessionId, lpTransport).put(lppPropStorage);
+	return alloc_wrap<WSABPropStorage>(cbEntryId, lpEntryId, ecSessionId,
+	       lpTransport).put(lppPropStorage);
 }
 
 HRESULT WSABPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue)
@@ -91,23 +77,21 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	ecmem_ptr<SPropValue> lpProp;
 	struct readPropsResponse sResponse;
 	convert_context	converter;
-
-	LockSoap();
+	soap_lock_guard spg(*m_lpTransport);
 
 	START_SOAP_CALL
 	{
     	// Read the properties from the server
-		if (lpCmd->readABProps(ecSessionId, m_sEntryId, &sResponse) != SOAP_OK)
+		if (m_lpTransport->m_lpCmd->readABProps(ecSessionId, m_sEntryId, &sResponse) != SOAP_OK)
     		er = KCERR_NETWORK_ERROR;
     	else
     		er = sResponse.er;
     }
     END_SOAP_CALL
-    
+
 	// Convert the property tags to a MAPIOBJECT
 	//(type,objectid)
 	mo = new MAPIOBJECT;
-
 	/*
 	 * This is only done to have a base for AllocateMore, otherwise a local
 	 * automatic variable would have sufficed.
@@ -132,30 +116,11 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	}
 
 	*lppsMapiObject = mo;
-
 exit:
-	UnLockSoap();
-
-	if (hr != hrSuccess && mo)
+	spg.unlock();
+	if (hr != hrSuccess)
 		delete mo;
 	return hr;
-}
-
-HRESULT WSABPropStorage::LockSoap()
-{
-	lpDataLock.lock();
-	return erSuccess;
-}
-
-HRESULT WSABPropStorage::UnLockSoap()
-{
-	// Clean up data create with soap_malloc
-	if(lpCmd->soap) {
-		soap_destroy(lpCmd->soap);
-		soap_end(lpCmd->soap);
-	}
-	lpDataLock.unlock();
-	return erSuccess;
 }
 
 // Called when the session ID has changed
@@ -164,23 +129,22 @@ HRESULT WSABPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
 	return hrSuccess;
 }
 
-WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, KCmdProxy *lpCmd,
-    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) :
-	WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId,
-	    lpEntryId, lpTransport, "WSABTableView")
+WSABTableView::WSABTableView(ULONG type, ULONG flags, ECSESSIONID sid,
+    ULONG cbEntryId, const ENTRYID *lpEntryId, ECABLogon *lpABLogon,
+    WSTransport *lpTransport) :
+	WSTableView(type, flags, sid, cbEntryId, lpEntryId, lpTransport,
+	    "WSABTableView")
 {
 	m_lpProvider = lpABLogon;
 	m_ulTableType = TABLETYPE_AB;
 }
 
-HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmdProxy *lpCmd,
-    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
-    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport,
-    WSTableView **lppTableView)
+HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags,
+    ECSESSIONID ecSessionId, ULONG cbEntryId, const ENTRYID *lpEntryId,
+    ECABLogon *lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
 {
-	return alloc_wrap<WSABTableView>(ulType, ulFlags, lpCmd, lpDataLock,
-	       ecSessionId, cbEntryId, lpEntryId, lpABLogon, lpTransport)
+	return alloc_wrap<WSABTableView>(ulType, ulFlags, ecSessionId,
+	       cbEntryId, lpEntryId, lpABLogon, lpTransport)
 	       .as(IID_ECTableView, lppTableView);
 }
 

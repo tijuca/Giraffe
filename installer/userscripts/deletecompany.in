@@ -9,11 +9,12 @@
 # beware that this string can contain any characters, so take heed to
 # correct quoting.
 
-if [ -f @sysconfdir@/sysconfig/kopano ]; then
-  . @sysconfdir@/sysconfig/kopano
-elif [ -f @sysconfdir@/default/kopano ]; then
-  . @sysconfdir@/default/kopano
+KOPANO_COMPANY_SCRIPTS=/ignore/
+PATH=/bin:/usr/local/bin:/usr/bin
+export PATH
+if [ -z "${KOPANO_COMPANY}" -a -z "${KOPANO_COMPANYID}" ] ; then
+    exec >&2
+    echo "KOPANO_COMPANY and KOPANO_COMPANYID is not set."
+    exit 1
 fi
-PKGLIBEXECDIR=@PKGLIBEXECDIR@
-KOPANO_COMPANY_SCRIPTS=@USERSCRIPTDIR@/deletecompany.d
-. @USERSCRIPTDIR@/companies_common.sh
+exec "@pkglibexecdir@/kscriptrun" @uscriptlibdir@/deletecompany.d @uscriptconfdir@/deletecompany.d

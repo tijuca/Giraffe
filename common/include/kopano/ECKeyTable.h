@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef TABLE_H
 #define TABLE_H
 
@@ -22,7 +9,7 @@
  * How this works
  *
  * Basically, we only have to keep a table in-memory of the object IDs of the objects
- * in a table, so when data is requested, we can give a list of all the object IDs 
+ * in a table, so when data is requested, we can give a list of all the object IDs
  * and the actual data can be retrieved from the database.
  *
  * The table class handles this, by having a table of rows, with per-row a TableRow
@@ -54,12 +41,10 @@
  */
 #include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
-
 #include <list>
 #include <map>
 #include <mutex>
 #include <vector>
-
 #define BOOKMARK_LIMIT		100
 
 namespace KC {
@@ -67,19 +52,25 @@ namespace KC {
 struct sObjectTableKey {
     sObjectTableKey(unsigned int obj_id, unsigned int order_id) : ulObjId(obj_id), ulOrderId(order_id) {}
 	sObjectTableKey(void) = default;
-	unsigned int ulObjId = 0;
-	unsigned int ulOrderId = 0;
+	unsigned int ulObjId = 0, ulOrderId = 0;
 
-	bool operator()(const sObjectTableKey &o) const noexcept
+	bool operator==(const sObjectTableKey &o) const noexcept
+	{
+		return ulObjId == o.ulObjId && ulOrderId == o.ulOrderId;
+	}
+
+	bool operator!=(const sObjectTableKey &o) const noexcept { return !operator==(o); }
+
+	bool operator<(const sObjectTableKey &o) const noexcept
 	{
 		return ulObjId < o.ulObjId || (ulObjId == o.ulObjId && ulOrderId < o.ulOrderId);
 	}
-};
 
-extern bool operator!=(const sObjectTableKey &, const sObjectTableKey &) noexcept;
-extern _kc_export bool operator==(const sObjectTableKey &, const sObjectTableKey &) noexcept;
-extern _kc_export bool operator<(const sObjectTableKey &, const sObjectTableKey &) noexcept;
-extern bool operator>(const sObjectTableKey &, const sObjectTableKey &) noexcept;
+	bool operator>(const sObjectTableKey &o) const noexcept
+	{
+		return ulObjId > o.ulObjId || (ulObjId == o.ulObjId && ulOrderId > o.ulOrderId);
+	}
+};
 
 typedef std::map<sObjectTableKey, unsigned int> ECObjectTableMap;
 typedef std::list<sObjectTableKey> ECObjectTableList;
@@ -121,7 +112,7 @@ public:
 	ECTableRow(const sObjectTableKey &, std::vector<ECSortCol> &&, bool hidden);
 	ECTableRow(sObjectTableKey &&, std::vector<ECSortCol> &&, bool hidden);
 	ECTableRow(const ECTableRow &other);
-	_kc_hidden unsigned int GetObjectSize(void) const;
+	_kc_hidden size_t GetObjectSize() const;
 	_kc_hidden static bool rowcompare(const ECTableRow *, const ECTableRow *);
 	_kc_hidden static bool rowcompare(const ECSortColView &, const ECSortColView &, bool ignore_order = false);
 	_kc_hidden static bool rowcompareprefix(size_t prefix, const std::vector<ECSortCol> &, const std::vector<ECSortCol> &);
@@ -157,38 +148,35 @@ public:
 	// FIXME this is rather ugly, the names must differ from those in mapi.h, as they clash !
 	enum UpdateType {
 		TABLE_CHANGE=1, TABLE_ERR, TABLE_ROW_ADD,
-					TABLE_ROW_DELETE, TABLE_ROW_MODIFY,TABLE_SORT, 
+					TABLE_ROW_DELETE, TABLE_ROW_MODIFY,TABLE_SORT,
 					TABLE_RESTRICT, TABLE_SETCOL, TABLE_DO_RELOAD,
 	};
 
 	enum { EC_SEEK_SET=0, EC_SEEK_CUR, EC_SEEK_END };
-	
+
 	ECKeyTable();
 	~ECKeyTable();
 	ECRESULT UpdateRow(UpdateType ulType, const sObjectTableKey *lpsRowItem, std::vector<ECSortCol> &&, sObjectTableKey *lpsPrevRow, bool fHidden = false, UpdateType *lpulAction = nullptr);
+	ECRESULT UpdateRow_Delete(const sObjectTableKey *row, std::vector<ECSortCol> &&, sObjectTableKey *prev_row, bool hidden = false, UpdateType *action = nullptr);
+	ECRESULT UpdateRow_Modify(const sObjectTableKey *row, std::vector<ECSortCol> &&, sObjectTableKey *prev_row, bool hidden = false, UpdateType *action = nullptr);
 	ECRESULT	GetPreviousRow(const sObjectTableKey *lpsRowItem, sObjectTableKey *lpsPrevItem);
 	ECRESULT	SeekRow(unsigned int ulBookmark, int lSeekTo, int *lplRowsSought);
 	ECRESULT	SeekId(const sObjectTableKey *lpsRowItem);
 	ECRESULT	GetRowCount(unsigned int *ulRowCount, unsigned int *ulCurrentRow);
 	ECRESULT	QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList, bool bDirBackward, unsigned int ulFlags, bool bShowHidden = false);
 	ECRESULT	Clear();
-
 	_kc_hidden ECRESULT GetBookmark(unsigned int p1, int *p2);
 	ECRESULT	CreateBookmark(unsigned int* lpulbkPosition);
 	ECRESULT	FreeBookmark(unsigned int ulbkPosition);
-
 	ECRESULT	GetRowsBySortPrefix(sObjectTableKey *lpsRowItem, ECObjectTableList *lpRowList);
 	ECRESULT	HideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lpHiddenList);
 	ECRESULT	UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lpUnhiddenList);
-
 	// Returns the first row where the sort columns are not less than the specified sortkey
 	ECRESULT LowerBound(const std::vector<ECSortCol> &);
 	ECRESULT Find(const std::vector<ECSortCol> &, sObjectTableKey *);
 	ECRESULT UpdatePartialSortKey(sObjectTableKey *lpsRowItem, size_t ulColumn, const ECSortCol &, sObjectTableKey *lpsPrevRow, bool *lpfHidden, ECKeyTable::UpdateType *lpulAction);
 	ECRESULT 	GetRow(sObjectTableKey *lpsRowItem, ECTableRow **lpRow);
-	
-
-	unsigned int GetObjectSize();
+	size_t GetObjectSize();
 
 private:
 	_kc_hidden ECRESULT UpdateCounts(ECTableRow *);

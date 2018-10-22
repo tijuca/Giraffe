@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 %module(directors="1") MAPICore
 
 %{
@@ -258,6 +259,7 @@ swig_type_info *TypeFromIID(REFIID iid)
   if (iid == IID_ECMsgStoreOnline || iid == IID_ECMsgStoreOffline) return SWIGTYPE_p_IMsgStore;
   TYPECASE(IExchangeExportChanges)
   TYPECASE(IECExportChanges)
+  TYPECASE(IECExportAddressbookChanges)
   TYPECASE(IExchangeImportContentsChanges)
   TYPECASE(IExchangeImportHierarchyChanges)
   TYPECASE(IExchangeManageStore)
@@ -272,6 +274,7 @@ swig_type_info *TypeFromIID(REFIID iid)
   TYPECASE(IProxyStoreObject)
   TYPECASE(IECImportContentsChanges)
   TYPECASE(IECImportHierarchyChanges)
+  TYPECASE(IECImportAddressbookChanges)
   return NULL;
 }
 
@@ -291,6 +294,7 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IMsgStore)
   IIDCASE(IExchangeExportChanges)
   IIDCASE(IECExportChanges)
+  IIDCASE(IECExportAddressbookChanges)
   IIDCASE(IExchangeImportContentsChanges)
   IIDCASE(IExchangeImportHierarchyChanges)
   IIDCASE(IExchangeManageStore)
@@ -304,13 +308,12 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IProxyStoreObject)
   IIDCASE(IECImportContentsChanges)
   IIDCASE(IECImportHierarchyChanges)
+  IIDCASE(IECImportAddressbookChanges)
   return &IID_IUnknown;
 }
 %}
 
 #if SWIGPYTHON
-%include "ECLogger.i"
-
 // Directors for IStream
 
 %{
@@ -334,5 +337,4 @@ public:
 	}
 };
 
-%include "kopanosync.i"
 #endif

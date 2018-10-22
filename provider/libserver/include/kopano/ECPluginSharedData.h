@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECPLUGINSHAREDDATA_H
@@ -20,6 +8,7 @@
 
 #include <kopano/zcdefs.h>
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <kopano/ECConfig.h>
 
@@ -34,7 +23,7 @@ class ECStatsCollector;
  * Each instance of the UserPlugin share the contents
  * of ECPluginSharedData.
  */
-class _kc_export ECPluginSharedData _kc_final {
+class _kc_export ECPluginSharedData final {
 private:
 	/**
 	 * Singleton instance of ECPluginSharedData
@@ -71,7 +60,7 @@ private:
 	 * 					Plugins are allowed to throw an exception when bDistributed is true
 	 *					while the plugin doesn't support multi-server.
 	 */
-	_kc_hidden ECPluginSharedData(ECConfig *parent, ECStatsCollector *, bool hosted, bool distributed);
+	_kc_hidden ECPluginSharedData(std::shared_ptr<ECConfig> parent, std::shared_ptr<ECStatsCollector>, bool hosted, bool distributed);
 	_kc_hidden virtual ~ECPluginSharedData(void);
 
 public:
@@ -93,7 +82,7 @@ public:
 	 * 					Plugins are allowed to throw an exception when bDistributed is true
 	 *					while the plugin doesn't support multi-server.
 	 */
-	_kc_hidden static void GetSingleton(ECPluginSharedData **singleton, ECConfig *parent, ECStatsCollector *, bool hosted, bool distributed);
+	_kc_hidden static void GetSingleton(ECPluginSharedData **out, std::shared_ptr<ECConfig> parent, std::shared_ptr<ECStatsCollector>, bool hosted, bool distributed);
 
 	/**
 	 * Increase reference count
@@ -121,7 +110,7 @@ public:
 	 *
 	 * @return the ECStatsCollector pointer
 	 */
-	_kc_hidden virtual ECStatsCollector *GetStatsCollector(void) const { return m_lpStatsCollector; }
+	_kc_hidden virtual std::shared_ptr<ECStatsCollector> GetStatsCollector() const { return m_lpStatsCollector; }
 
 	/**
 	 * Check for multi-company support
@@ -132,7 +121,7 @@ public:
 
 	/**
 	 * Check for multi-server support
-	 * 
+	 *
 	 * @return True if multi-server support is enabled.
 	 */
 	_kc_hidden virtual bool IsDistributed(void) const { return m_bDistributed; }
@@ -154,12 +143,12 @@ private:
 	/**
 	 * Server configuration file
 	 */
-	ECConfig *m_lpParentConfig;
+	std::shared_ptr<ECConfig> m_lpParentConfig;
 
 	/**
 	 * Statistics collector
 	 */
-	ECStatsCollector *m_lpStatsCollector;
+	std::shared_ptr<ECStatsCollector> m_lpStatsCollector;
 
 	/**
 	 * True if multi-company support is enabled.

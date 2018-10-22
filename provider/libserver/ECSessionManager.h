@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // ECSessionManager.h: interface for the ECSessionManager class.
@@ -27,10 +15,12 @@
 #include <condition_variable>
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <pthread.h>
-#include <kopano/lockhelper.hpp>
+#include <kopano/platform.h>
+#include <kopano/timeutil.hpp>
 #include "ECAttachmentStorage.h"
 #include "ECUserManagement.h"
 #include "ECSearchFolders.h"
@@ -41,11 +31,13 @@
 #include "ECSessionGroup.h"
 #include "ECNotificationManager.h"
 #include "ECLockManager.h"
+#include "StatsClient.h"
 
 struct soap;
 
 namespace KC {
 
+class ECConfig;
 class ECLogger;
 class ECTPropsPurge;
 
@@ -57,10 +49,7 @@ typedef std::multimap<unsigned int, ECSESSIONGROUPID> OBJECTSUBSCRIPTIONSMULTIMA
 
 struct TABLESUBSCRIPTION {
      TABLE_ENTRY::TABLE_TYPE ulType;
-     unsigned int ulRootObjectId;
-     unsigned int ulObjectType;
-     unsigned int ulObjectFlags;
-     
+	unsigned int ulRootObjectId, ulObjectType, ulObjectFlags;
 	bool operator==(const TABLESUBSCRIPTION &b) const noexcept { return memcmp(this, &b, sizeof(*this)) == 0; }
 	bool operator<(const TABLESUBSCRIPTION &b) const noexcept { return memcmp(this, &b, sizeof(*this)) < 0; }
 };
@@ -69,11 +58,8 @@ typedef std::multimap<TABLESUBSCRIPTION, ECSESSIONID> TABLESUBSCRIPTIONMULTIMAP;
 
 struct sSessionManagerStats {
 	struct {
-		ULONG ulItems;
-		ULONG ulLocked;
-		ULONG ulOpenTables;
-		ULONGLONG ullSize;
-		ULONGLONG ulTableSize;
+		ULONG ulItems, ulLocked, ulOpenTables;
+		ULONGLONG ullSize, ulTableSize;
 	}session;
 
 	struct {
@@ -81,21 +67,80 @@ struct sSessionManagerStats {
 		ULONGLONG ullSize;
 	} group;
 
-	ULONG ulPersistentByConnection;
-	ULONG ulPersistentByConnectionSize;
-	ULONG ulPersistentBySession;
-	ULONG ulPersistentBySessionSize;
-	ULONG ulTableSubscriptions;
-	ULONG ulObjectSubscriptions;
-	ULONG ulTableSubscriptionSize;
-	ULONG ulObjectSubscriptionSize;
+	ULONG ulPersistentByConnection, ulPersistentByConnectionSize;
+	ULONG ulPersistentBySession, ulPersistentBySessionSize;
+	ULONG ulTableSubscriptions, ulTableSubscriptionSize;
+	ULONG ulObjectSubscriptions, ulObjectSubscriptionSize;
+};
+
+class usercount_t final {
+	public:
+	enum ucIndex {
+		ucActiveUser = 0,
+		ucNonActiveUser,
+		ucRoom,
+		ucEquipment,
+		ucContact,
+		ucNonActiveTotal, /* Must be right before ucMAX */
+		ucMAX = ucNonActiveTotal, /* Must be very last */
+	};
+
+	usercount_t() = default;
+
+	usercount_t(unsigned int a, unsigned int n, unsigned int r, unsigned int e, unsigned int c) :
+		m_valid(true)
+	{
+		m_counts[ucActiveUser] = a;
+		m_counts[ucNonActiveUser] = n;
+		m_counts[ucRoom] = r;
+		m_counts[ucEquipment] = e;
+		m_counts[ucContact] = c;
+	}
+
+	void assign(unsigned int a, unsigned int n, unsigned int r, unsigned int e, unsigned int c)
+	{
+		*this = usercount_t(a, n, r, e, c);
+	}
+
+	bool is_valid() const { return m_valid; }
+
+	void set(ucIndex index, unsigned int value)
+	{
+		if (index == ucNonActiveTotal)
+			return;
+		assert(index >= 0 && index < ucMAX);
+		m_counts[index] = value;
+		m_valid = true;
+	}
+
+	unsigned int operator[](ucIndex index) const
+	{
+		if (index == ucNonActiveTotal)
+			/* Contacts do not count for non-active stores. */
+			return m_counts[ucNonActiveUser] + m_counts[ucRoom] + m_counts[ucEquipment];
+		assert(index >= 0 && index < ucMAX);
+		return m_counts[index];
+	}
+
+	private:
+	bool m_valid = false;
+	unsigned int m_counts[ucMAX]{};
+};
+
+class _kc_export server_stats final : public ECStatsCollector {
+	public:
+	_kc_hidden server_stats(std::shared_ptr<ECConfig>);
+	void fill_odm() override;
+
+	private:
+	_kc_hidden void update_tcmalloc_stats();
 };
 
 class SOURCEKEY;
 
-class _kc_export ECSessionManager _kc_final {
+class _kc_export ECSessionManager final {
 public:
-	_kc_hidden ECSessionManager(ECConfig *, ECLogger *audit, bool hosted, bool distributed);
+	_kc_hidden ECSessionManager(std::shared_ptr<ECConfig>, std::shared_ptr<ECLogger> audit, std::shared_ptr<server_stats>, bool hosted, bool distributed);
 	_kc_hidden virtual ~ECSessionManager(void);
 	_kc_hidden virtual ECRESULT CreateAuthSession(struct soap *, unsigned int caps, ECSESSIONID *, ECAuthSession **, bool register_ses, bool lock_ses);
 	// Creates a session based on passed credentials
@@ -113,7 +158,7 @@ public:
 	_kc_hidden virtual ECRESULT RemoveSessionPersistentConnection(unsigned int conn_id);
 	_kc_hidden virtual ECRESULT GetSessionGroup(ECSESSIONGROUPID, ECSession *, ECSessionGroup **);
 	_kc_hidden virtual ECRESULT DeleteIfOrphaned(ECSessionGroup *);
-	_kc_hidden ECRESULT RemoveAllSessions(void);
+	_kc_export ECRESULT RemoveAllSessions();
 	_kc_hidden ECRESULT CancelAllSessions(ECSESSIONID except = 0);
 	_kc_hidden ECRESULT ForEachSession(void (*cb)(ECSession *, void *), void *obj);
 	_kc_hidden ECRESULT LoadSettings(void);
@@ -127,17 +172,16 @@ public:
 	_kc_hidden ECRESULT NotificationDeleted(unsigned int obj_type, unsigned int obj_id, unsigned int store_id, entryId *eid, unsigned int folder_id, unsigned int flags);
 	_kc_hidden ECRESULT NotificationSearchComplete(unsigned int obj_id, unsigned int store_id);
 	_kc_hidden ECRESULT NotificationChange(const std::set<unsigned int> &sync_ids, unsigned int change_id, unsigned int change_type);
-	_kc_hidden ECRESULT ValidateSession(struct soap *, ECSESSIONID, ECAuthSession **, bool lock_ses = false);
-	_kc_hidden ECRESULT ValidateSession(struct soap *, ECSESSIONID, ECSession **, bool lock_ses = false);
+	_kc_hidden ECRESULT ValidateSession(struct soap *, ECSESSIONID, ECAuthSession **);
+	_kc_hidden ECRESULT ValidateSession(struct soap *, ECSESSIONID, ECSession **);
 	_kc_hidden ECRESULT AddSessionClocks(ECSESSIONID, double user, double system, double real);
 	ECRESULT RemoveBusyState(ECSESSIONID ecSessionID, pthread_t thread);
 	_kc_hidden static void *SessionCleaner(void *tmp_ses_mgr);
 	_kc_hidden ECRESULT AddNotification(notification *item, unsigned int key, unsigned int store_id = 0, unsigned int folder_id = 0, unsigned int flags = 0);
 	_kc_hidden ECRESULT DeferNotificationProcessing(ECSESSIONID, struct soap *);
 	_kc_hidden ECRESULT NotifyNotificationReady(ECSESSIONID);
-	_kc_hidden void GetStats(void (*cb)(const std::string &, const std::string &, const std::string &, void *), void *obj);
-	_kc_hidden void GetStats(sSessionManagerStats &);
-	_kc_hidden ECRESULT DumpStats(void);
+	_kc_hidden void update_extra_stats();
+	_kc_hidden sSessionManagerStats get_stats();
 	_kc_hidden bool IsHostedSupported() const { return m_bHostedKopano; }
 	_kc_hidden bool IsDistributedSupported() const { return m_bDistributedKopano; }
 	_kc_hidden ECRESULT GetServerGUID(GUID *);
@@ -153,7 +197,7 @@ public:
 	// are published to the 'AddNotification()' function for the session's sessiongroup.
 	_kc_hidden ECRESULT SubscribeObjectEvents(unsigned int store_id, ECSESSIONGROUPID);
 	_kc_hidden ECRESULT UnsubscribeObjectEvents(unsigned int store_id, ECSESSIONGROUPID);
-	
+
 	enum SEQUENCE { SEQ_IMAP };
 	_kc_hidden ECRESULT GetNewSequence(SEQUENCE, unsigned long long *seq_id);
 	_kc_hidden ECRESULT CreateDatabaseConnection(void);
@@ -163,44 +207,42 @@ public:
 	_kc_hidden ECLocale GetSortLocale(ULONG store_id);
 	_kc_hidden ECCacheManager *GetCacheManager() const { return m_lpECCacheManager.get(); }
 	_kc_hidden ECSearchFolders *GetSearchFolders() const { return m_lpSearchFolders.get(); }
-	_kc_hidden ECConfig *GetConfig() const { return m_lpConfig; }
-	_kc_hidden ECLogger *GetAudit() const { return m_lpAudit; }
+	_kc_hidden std::shared_ptr<ECConfig> GetConfig() const { return m_lpConfig; }
+	_kc_hidden std::shared_ptr<ECLogger> GetAudit() const { return m_lpAudit; }
 	_kc_hidden ECPluginFactory *GetPluginFactory() const { return m_lpPluginFactory.get(); }
 	_kc_hidden ECLockManager *GetLockManager() const { return m_ptrLockManager.get(); }
 	_kc_hidden ECAttachmentConfig *get_atxconfig() const { return m_atxconfig.get(); }
+	_kc_hidden ECRESULT get_user_count(usercount_t *);
+	_kc_hidden ECRESULT get_user_count_cached(usercount_t *);
+
+	std::shared_ptr<server_stats> m_stats;
 
 protected:
 	_kc_hidden BTSession *GetSession(ECSESSIONID, bool lock_ses = false);
-	_kc_hidden ECRESULT ValidateBTSession(struct soap *, ECSESSIONID, BTSession **, bool lock_ses = false);
+	_kc_hidden ECRESULT ValidateBTSession(struct soap *, ECSESSIONID, BTSession **);
 	_kc_hidden BOOL IsSessionPersistent(ECSESSIONID );
 	_kc_hidden ECRESULT UpdateSubscribedTables(ECKeyTable::UpdateType, TABLESUBSCRIPTION, std::list<unsigned int> &child_id);
 	_kc_hidden ECRESULT SaveSourceKeyAutoIncrement(unsigned long long new_src_key_autoincr);
 
 	EC_SESSIONGROUPMAP m_mapSessionGroups; ///< map of all the session groups
 	SESSIONMAP			m_mapSessions;			///< map of all the sessions
-
 	KC::shared_mutex m_hCacheRWLock; ///< locking of the sessionMap
 	KC::shared_mutex m_hGroupLock; ///< locking of session group map and lonely list
 	std::mutex m_hExitMutex; /* Mutex needed for the release signal */
 	std::condition_variable m_hExitSignal; /* Signal that should be sent to the sessionncleaner when to exit */
 	pthread_t			m_hSessionCleanerThread;///< Thread that is used for the sessioncleaner
-	bool				m_bTerminateThread;
-	ECConfig*			m_lpConfig;
-	bool bExit = false;
-	bool				m_bHostedKopano;
-	bool				m_bDistributedKopano;
+	std::shared_ptr<ECConfig> m_lpConfig;
+	bool bExit = false, m_bTerminateThread, m_thread_active = false;
+	bool m_bHostedKopano, m_bDistributedKopano;
 	unsigned long long m_ullSourceKeyAutoIncrement = 0;
 	unsigned int m_ulSourceKeyQueue = 0;
 	std::mutex m_hSourceKeyAutoIncrementMutex;
-
 	std::mutex m_mutexPersistent;
 	PERSISTENTBYSESSION m_mapPersistentBySession; ///< map of all persistent sessions mapped to their connection id
 	PERSISTENTBYCONNECTION m_mapPersistentByConnection; ///< map of all persistent connections mapped to their sessions
-
 	std::mutex m_mutexTableSubscriptions;
 	unsigned int		m_ulTableSubscriptionId;
 	TABLESUBSCRIPTIONMULTIMAP m_mapTableSubscriptions;	///< Maps a table subscription to the subscriber
-
 	std::mutex m_mutexObjectSubscriptions;
 	OBJECTSUBSCRIPTIONSMULTIMAP	m_mapObjectSubscriptions;	///< Maps an object notification subscription (store id) to the subscriber
 
@@ -209,20 +251,26 @@ protected:
 	unsigned long long m_ulSeqIMAP = 0;
 	unsigned int m_ulSeqIMAPQueue = 0;
 
-	object_ptr<ECLogger> m_lpAudit;
-	std::unique_ptr<GUID> m_lpServerGuid;
+	bool m_sguid_set = false;
+	GUID m_server_guid{};
+	std::shared_ptr<ECLogger> m_lpAudit;
 	std::unique_ptr<ECPluginFactory> m_lpPluginFactory;
-	std::unique_ptr<ECSearchFolders> m_lpSearchFolders;
 	std::unique_ptr<ECDatabaseFactory> m_lpDatabaseFactory;
+	std::unique_ptr<ECSearchFolders> m_lpSearchFolders;
 	std::unique_ptr<ECCacheManager> m_lpECCacheManager;
 	std::unique_ptr<ECTPropsPurge> m_lpTPropsPurge;
 	ECLockManagerPtr m_ptrLockManager;
 	std::unique_ptr<ECNotificationManager> m_lpNotificationManager;
 	std::unique_ptr<ECDatabase> m_lpDatabase;
 	std::unique_ptr<ECAttachmentConfig> m_atxconfig;
+
+	std::recursive_mutex m_usercount_mtx;
+	KC::time_point m_usercount_ts;
+	usercount_t m_usercount;
 };
 
-extern _kc_export ECSessionManager *g_lpSessionManager;
+extern _kc_export void (*kopano_get_server_stats)(unsigned int *qlen, KC::time_duration *qage, unsigned int *nthr, unsigned int *nidlethr);
+extern _kc_export std::unique_ptr<ECSessionManager> g_lpSessionManager;
 
 } /* namespace */
 

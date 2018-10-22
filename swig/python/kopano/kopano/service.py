@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -26,7 +27,7 @@ if sys.hexversion >= 0x03000000:
     try:
         import daemon # picks system version
         import daemon.pidfile as pidlockfile
-    except ImportError:
+    except ImportError: # pragma: no cover
         from . import daemon # fallback to bundled version
         from .daemon import pidlockfile
 
@@ -35,8 +36,7 @@ if sys.hexversion >= 0x03000000:
     from . import server as _server
     from . import errors as _errors
     from . import parser as _parser
-    from . import log as _log
-else:
+else: # pragma: no cover
     try:
         import daemon # picks bundled version
         import daemon.pidlockfile as pidlockfile
@@ -48,7 +48,6 @@ else:
     import server as _server
     import errors as _errors
     import parser as _parser
-    import log as _log
 
 def _daemon_helper(func, service, log):
     try:
@@ -162,7 +161,7 @@ Encapsulates everything to create a simple service, such as:
         self._server = None
 
     def main(self):
-        raise _errors.Error('Service.main not implemented')
+        raise _errors.Error('Service.main not implemented') # pragma: no cover
 
     @property
     def server(self):
@@ -207,7 +206,7 @@ class Worker(Process):
         return self._server
 
     def main(self):
-        raise _errors.Error('Worker.main not implemented')
+        raise _errors.Error('Worker.main not implemented') # pragma: no cover
 
     def run(self):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -216,11 +215,12 @@ class Worker(Process):
         with _log.log_exc(self.log):
             self.main()
 
-class _ZSocket: # XXX megh, double wrapper
+class _ZSocket:
     def __init__(self, addr, ssl_key, ssl_cert):
         self.ssl_key = ssl_key
         self.ssl_cert = ssl_cert
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.s.bind(addr)
         self.s.listen(socket.SOMAXCONN)
 
@@ -230,11 +230,12 @@ class _ZSocket: # XXX megh, double wrapper
         return connstream, fromaddr
 
 
-def server_socket(addr, ssl_key=None, ssl_cert=None, log=None): # XXX https, merge code with client_socket
+def server_socket(addr, ssl_key=None, ssl_cert=None, log=None):
     if addr.startswith('file://'):
         addr2 = addr.replace('file://', '')
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        os.system('rm -f %s' % addr2)
+        if os.path.exists(addr2):
+            os.remove(addr2)
         s.bind(addr2)
         s.listen(socket.SOMAXCONN)
     elif addr.startswith('https://'):
@@ -245,6 +246,7 @@ def server_socket(addr, ssl_key=None, ssl_cert=None, log=None): # XXX https, mer
         addr2 = addr.replace('http://', '').split(':')
         addr2 = (addr2[0], int(addr2[1]))
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(addr2)
         s.listen(socket.SOMAXCONN)
     if log:

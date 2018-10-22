@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // ECSessionGroup.h: interface for the ECSessionGroup class.
@@ -29,7 +17,6 @@
 #include <map>
 #include <mutex>
 #include <set>
-
 #include <kopano/ECKeyTable.h>
 #include "ECNotification.h"
 #include <kopano/kcodes.h>
@@ -44,7 +31,7 @@ class ECSessionGroup;
 class ECSessionManager;
 
 struct sessionInfo {
-	sessionInfo(ECSession *lpSession) : lpSession(lpSession) {}
+	sessionInfo(ECSession *s) : lpSession(s) {}
 	ECSession	 *lpSession;
 };
 
@@ -68,7 +55,7 @@ struct changeSubscribeItem {
 };
 typedef std::multimap<unsigned int, changeSubscribeItem> CHANGESUBSCRIBEMAP;	// SyncId -> changeSubscribeItem
 
-class ECSessionGroup _kc_final {
+class ECSessionGroup final {
 public:
 	ECSessionGroup(ECSESSIONGROUPID sessionGroupId, ECSessionManager *lpSessionManager);
 	virtual ~ECSessionGroup();
@@ -76,14 +63,14 @@ public:
 	/*
 	 * Thread safety handlers
 	 */
-	virtual void Lock();
-	virtual void Unlock();
-	virtual bool IsLocked(void) const _kc_final { return m_ulRefCount > 0; }
+	virtual void lock();
+	virtual void unlock();
+	virtual bool IsLocked() const final { return m_ulRefCount > 0; }
 
 	/*
 	 * Returns the SessionGroupId
 	 */
-	virtual ECSESSIONGROUPID GetSessionGroupId(void) const _kc_final { return m_sessionGroupId; }
+	virtual ECSESSIONGROUPID GetSessionGroupId() const final { return m_sessionGroupId; }
 
 	/*
 	 * Add/Remove Session from group
@@ -152,14 +139,14 @@ private:
 	 * session has exited
 	 */
 	bool m_bExit = false;
-	
+
 	/* Reference to the session manager needed to notify changes in our queue */
 	ECSessionManager *	m_lpSessionManager;
-	
+
 	/* Multimap of subscriptions that we have (key -> store id) */
 	SUBSCRIBESTOREMULTIMAP	m_mapSubscribedStores;
 	std::mutex m_mutexSubscribedStores;
-	
+
 private:
 	// Make ECSessionGroup non-copyable
 	ECSessionGroup(const ECSessionGroup &) = delete;

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <new>
 #include <kopano/platform.h>
@@ -22,29 +10,22 @@
 #include "ECExchangeExportChanges.h"
 #include "WSMessageStreamExporter.h"
 #include "WSSerializedMessage.h"
-
 #include <set>
-
 #include <kopano/Util.h>
 #include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include <mapiguid.h>
 #include <kopano/mapiext.h>
-
 #include <mapiutil.h>
 #include "ics.h"
-#include <kopano/ECDebug.h>
-
 #include "Mem.h"
 #include "ECMessage.h"
 #include <kopano/stringutil.h>
-#include "ECSyncLog.h"
 #include "ECSyncUtil.h"
 #include "ECSyncSettings.h"
 #include "EntryPoint.h"
 #include <kopano/CommonUtil.h>
-// We use ntohl/htonl for network-order conversion
-#include <arpa/inet.h>
+#include <arpa/inet.h> /* ntohl */
 #include <kopano/charset/convert.h>
 
 using namespace KC;
@@ -55,16 +36,9 @@ ECExchangeExportChanges::ECExchangeExportChanges(ECMsgStore *lpStore,
 	m_strDisplay(szDisplay != nullptr ? szDisplay : L"<Unknown>"),
 	/* In server-side sync, only use a batch size of 1. */
 	m_ulBatchSize(sk.empty() ? 1 : 256), m_iidMessage(IID_IMessage),
-	m_lpStore(lpStore)
+	m_lpLogger(new ECLogger_Null), m_lpStore(lpStore)
 {
-	ECSyncLog::GetLogger(&~m_lpLogger);
 	memset(&m_tmsStart, 0, sizeof(m_tmsStart));
-}
-
-HRESULT ECExchangeExportChanges::SetLogger(ECLogger *lpLogger)
-{
-	m_lpLogger.reset(lpLogger);
-	return hrSuccess;
 }
 
 HRESULT ECExchangeExportChanges::Create(ECMsgStore *lpStore, REFIID iid, const std::string& sourcekey, const wchar_t *szDisplay, unsigned int ulSyncType, LPEXCHANGEEXPORTCHANGES* lppExchangeExportChanges){
@@ -108,7 +82,6 @@ HRESULT ECExchangeExportChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LP
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
 			return hr;
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str());
-
 	} else {
 		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg.get());
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
@@ -131,12 +104,8 @@ HRESULT ECExchangeExportChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LP
 
 HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKNOWN lpCollector, LPSRestriction lpRestriction, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize){
 	HRESULT hr;
-
-	ULONG		ulSyncId = 0;
-	ULONG		ulChangeId = 0;
-	ULONG		ulStep = 0;
+	unsigned int ulSyncId = 0, ulChangeId = 0, ulStep = 0;
 	BOOL		bCanStream = FALSE;
-
 	bool		bForceImplicitStateUpdate = false;
 	auto lpSyncSettings = &ECSyncSettings::instance;
 	typedef std::map<SBinary, ChangeListIter, Util::SBinaryLess>	ChangeMap;
@@ -147,16 +116,13 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 	std::string	sourcekey;
 
 	if(m_bConfiged){
-		ZLOG_DEBUG(m_lpLogger, "Config() called twice");
+		zlog("Config() called twice");
 		return MAPI_E_UNCONFIGURED;
 	}
-
 	if(lpRestriction) {
 		hr = Util::HrCopySRestriction(&~m_lpRestrict, lpRestriction);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Invalid restriction");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Invalid restriction", hr);
 	} else {
 		m_lpRestrict.reset();
 	}
@@ -165,7 +131,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 
 	if(! (ulFlags & SYNC_CATCHUP)) {
 		if(lpCollector == NULL) {
-			ZLOG_DEBUG(m_lpLogger, "No importer to export to");
+			zlog("No importer to export to");
 			return MAPI_E_INVALID_PARAMETER;
 		}
 
@@ -175,16 +141,16 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 			if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
 				m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 				if (bCanStream == TRUE) {
-					ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
+					zlog("Exporter supports enhanced ICS, checking importer...");
 					hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, &~m_lpImportStreamedContents);
 					if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED) {
 						assert(m_lpImportStreamedContents == NULL);
 						hr = hrSuccess;
-						ZLOG_DEBUG(m_lpLogger, "Importer doesn't support enhanced ICS");
+						zlog("Importer does not support enhanced ICS");
 					} else
-						ZLOG_DEBUG(m_lpLogger, "Importer supports enhanced ICS");
+						zlog("Importer supports enhanced ICS");
 				} else
-					ZLOG_DEBUG(m_lpLogger, "Exporter doesn't support enhanced ICS");
+					zlog("Exporter does not support enhanced ICS");
 			}
 		}else if(m_ulSyncType == ICS_SYNC_HIERARCHY){
 			hr = lpCollector->QueryInterface(IID_IExchangeImportHierarchyChanges, &~m_lpImportHierarchy);
@@ -197,32 +163,23 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 
 	if (lpStream == NULL){
 		LARGE_INTEGER lint = {{ 0, 0 }};
-		ULONG tmp[2] = { 0, 0 };
-		ULONG ulSize = 0;
+		unsigned int tmp[2] = {0, 0}, ulSize = 0;
 
-		ZLOG_DEBUG(m_lpLogger, "Creating new exporter stream");
+		zlog("Creating new exporter stream");
 		hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, sizeof(tmp)), true, &~m_lpStream);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to create new exporter stream");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Unable to create new exporter stream", hr);
 		m_lpStream->Seek(lint, STREAM_SEEK_SET, NULL);
 		m_lpStream->Write(tmp, sizeof(tmp), &ulSize);
 	} else {
 		hr = lpStream->QueryInterface(IID_IStream, &~m_lpStream);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Passed state stream does not support IStream interface");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Passed state stream does not support IStream interface", hr);
 	}
 
 	hr = HrDecodeSyncStateStream(m_lpStream, &ulSyncId, &ulChangeId, &m_setProcessedChanges);
-	if(hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "Unable to decode sync state stream, hr=0x%08x", hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return zlog("Unable to decode sync state stream", hr);
 	ZLOG_DEBUG(m_lpLogger, "Decoded state stream: syncid=%u, changeid=%u, processed changes=%lu", ulSyncId, ulChangeId, (long unsigned int)m_setProcessedChanges.size());
 
 	if(ulSyncId == 0) {
@@ -231,7 +188,6 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 		// Ignore any trailing garbage in the stream
 		if (m_sourcekey.size() < 24 && (m_sourcekey[m_sourcekey.size()-1] & 0x80)) {
 			// If we're getting a truncated sourcekey, untruncate it now so we can pass it to GetChanges()
-
 			sourcekey = m_sourcekey;
 			sourcekey[m_sourcekey.size()-1] &= ~0x80;
 			sourcekey.append(1, '\x00');
@@ -242,28 +198,19 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 
 		// Register our sync with the server, get a sync ID
 		hr = m_lpStore->lpTransport->HrSetSyncStatus(sourcekey, ulSyncId, ulChangeId, m_ulSyncType, 0, &ulSyncId);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to update sync status on server, hr=0x%08x", hr);
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Unable to update sync status on server", hr);
 		ZLOG_DEBUG(m_lpLogger, "New sync id for folder '%ls': %u", m_strDisplay.c_str(), ulSyncId);
-
 		bForceImplicitStateUpdate = true;
 	}
 
 	MAPIFreeBuffer(m_lpChanges);
 	hr = m_lpStore->lpTransport->HrGetChanges(sourcekey, ulSyncId, ulChangeId, m_ulSyncType, ulFlags, m_lpRestrict, &m_ulMaxChangeId, &m_ulChanges, &~m_lpChanges);
-	if(hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "Unable to get changes from server, hr=0x%08x", hr);
-		return hr;
-	}
-
+	if (hr != hrSuccess)
+		return zlog("Unable to get changes from server", hr);
 	m_ulSyncId = ulSyncId;
 	m_ulChangeId = ulChangeId;
-
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "folder: %ls changes: %u syncid: %u changeid: %u", m_strDisplay.c_str(), m_ulChanges, m_ulSyncId, m_ulChangeId);
-
+	m_lpLogger->logf(EC_LOGLEVEL_INFO, "folder=\"%ls\" changes=%u syncid=%u changeid=%u", m_strDisplay.c_str(), m_ulChanges, m_ulSyncId, m_ulChangeId);
 	/**
 	 * Filter the changes.
 	 * How this works:
@@ -300,98 +247,92 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 			default:
 				break;
 			}
-		} else {
-			switch (ICS_ACTION(m_lpChanges[ulStep].ulChangeType)) {
-			case ICS_NEW:
-				// This shouldn't happen since apparently we have another change for the same object.
-				// However, if an object gets moved to another folder and back, we'll get a delete followed by an add. If that happens
-				// we skip the delete and morph the current add to a change.
-				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
-					auto iterNewChange = lstChange.emplace(lstChange.end(), *iterLastChange->second);
-					iterNewChange->ulChangeType = (iterNewChange->ulChangeType & ~ICS_ACTION_MASK) | ICS_CHANGE;
-					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
-						m_lstSoftDelete.erase(iterLastChange->second);
-					else
-						m_lstHardDelete.erase(iterLastChange->second);
-					iterLastChange->second = iterNewChange;
+			continue;
+		}
 
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for a previously deleted object. I converted it to a change. sourcekey=%s",
-						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				} else
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for an object we've seen before. prev_change=%04x, sourcekey=%s",
-						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				break;
-
-			case ICS_CHANGE:
-				// Any change is allowed as the previous change except a change.
-				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE on an object for which we just saw an ICS_CHANGE. sourcekey=%s",
-						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				// A previous delete is allowed for the same reason as in ICS_NEW.
-				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
-					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
-						m_lstSoftDelete.erase(iterLastChange->second);
-					else
-						m_lstHardDelete.erase(iterLastChange->second);
-					iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE change for a previously deleted object. sourcekey=%s",
-						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				} else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG) {
-					m_lstFlag.erase(iterLastChange->second);
-					iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
-					ZLOG_DEBUG(m_lpLogger, "Upgraded a previous ICS_FLAG to ICS_CHANGED. sourcekey=%s",
-						bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				} else
-					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_CHANGE due to a previous change. prev_change=%04x, sourcekey=%s",
-						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				break;
-
-			case ICS_FLAG:
-				// This is only allowed after an ICS_NEW and ICS_CHANGE. It will be ignored in any case.
-				if (ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_NEW && ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_CHANGE)
-					ZLOG_DEBUG(m_lpLogger, "Got an ICS_FLAG with something else than a ICS_NEW or ICS_CHANGE as the previous changes. prev_change=%04x, sourcekey=%s",
-						iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_FLAG due to previous ICS_NEW or ICS_CHANGE. prev_change=%04x, sourcekey=%s",
-					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				break;
-
-			case ICS_SOFT_DELETE:
-			case ICS_HARD_DELETE:
-				// We'll ignore the previous change and replace it with this delete. We won't write it now as
-				// we could get an add for the same object. But because of the reordering (deletes after all adds/changes) we would delete
-				// the new object. Therefore we'll make a change out of a delete - add/change.
-				ZLOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s",
-					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_NEW || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
-					lstChange.erase(iterLastChange->second);
-				else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG)
-					m_lstFlag.erase(iterLastChange->second);
-				else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
+		switch (ICS_ACTION(m_lpChanges[ulStep].ulChangeType)) {
+		case ICS_NEW:
+			// This shouldn't happen since apparently we have another change for the same object.
+			// However, if an object gets moved to another folder and back, we'll get a delete followed by an add. If that happens
+			// we skip the delete and morph the current add to a change.
+			if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
+				auto iterNewChange = lstChange.emplace(lstChange.end(), *iterLastChange->second);
+				iterNewChange->ulChangeType = (iterNewChange->ulChangeType & ~ICS_ACTION_MASK) | ICS_CHANGE;
+				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
 					m_lstSoftDelete.erase(iterLastChange->second);
-				else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE)
-					m_lstHardDelete.erase(iterLastChange->second);
-
-				if (ICS_ACTION(m_lpChanges[ulStep].ulChangeType) == ICS_SOFT_DELETE)
-					iterLastChange->second = m_lstSoftDelete.emplace(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
 				else
-					iterLastChange->second = m_lstHardDelete.emplace(m_lstHardDelete.end(), m_lpChanges[ulStep]);
-				break;
-			default:
-				ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
-					m_lpChanges[ulStep].ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
-				break;
-			}
+					m_lstHardDelete.erase(iterLastChange->second);
+				iterLastChange->second = iterNewChange;
+				ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for a previously deleted object. I converted it to a change. sourcekey=%s",
+					bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			} else
+				ZLOG_DEBUG(m_lpLogger, "Got an ICS_NEW change for an object we've seen before. prev_change=%04x, sourcekey=%s",
+					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			break;
+
+		case ICS_CHANGE:
+			// Any change is allowed as the previous change except a change.
+			if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
+				ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE on an object for which we just saw an ICS_CHANGE. sourcekey=%s",
+					bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			// A previous delete is allowed for the same reason as in ICS_NEW.
+			if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE) {
+				if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
+					m_lstSoftDelete.erase(iterLastChange->second);
+				else
+					m_lstHardDelete.erase(iterLastChange->second);
+				iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
+				ZLOG_DEBUG(m_lpLogger, "Got an ICS_CHANGE change for a previously deleted object. sourcekey=%s",
+					bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			} else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG) {
+				m_lstFlag.erase(iterLastChange->second);
+				iterLastChange->second = lstChange.emplace(lstChange.end(), m_lpChanges[ulStep]);
+				ZLOG_DEBUG(m_lpLogger, "Upgraded a previous ICS_FLAG to ICS_CHANGED. sourcekey=%s",
+					bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			} else
+				ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_CHANGE due to a previous change. prev_change=%04x, sourcekey=%s",
+					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			break;
+
+		case ICS_FLAG:
+			// This is only allowed after an ICS_NEW and ICS_CHANGE. It will be ignored in any case.
+			if (ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_NEW && ICS_ACTION(iterLastChange->second->ulChangeType) != ICS_CHANGE)
+				ZLOG_DEBUG(m_lpLogger, "Got an ICS_FLAG with something else than a ICS_NEW or ICS_CHANGE as the previous changes. prev_change=%04x, sourcekey=%s",
+					iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_FLAG due to previous ICS_NEW or ICS_CHANGE. prev_change=%04x, sourcekey=%s",
+				iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			break;
+
+		case ICS_SOFT_DELETE:
+		case ICS_HARD_DELETE:
+			// We'll ignore the previous change and replace it with this delete. We won't write it now as
+			// we could get an add for the same object. But because of the reordering (deletes after all adds/changes) we would delete
+			// the new object. Therefore we'll make a change out of a delete - add/change.
+			ZLOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s",
+				iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_NEW || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
+				lstChange.erase(iterLastChange->second);
+			else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG)
+				m_lstFlag.erase(iterLastChange->second);
+			else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
+				m_lstSoftDelete.erase(iterLastChange->second);
+			else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE)
+				m_lstHardDelete.erase(iterLastChange->second);
+
+			if (ICS_ACTION(m_lpChanges[ulStep].ulChangeType) == ICS_SOFT_DELETE)
+				iterLastChange->second = m_lstSoftDelete.emplace(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
+			else
+				iterLastChange->second = m_lstHardDelete.emplace(m_lstHardDelete.end(), m_lpChanges[ulStep]);
+			break;
+		default:
+			ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s",
+				m_lpChanges[ulStep].ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey).c_str());
+			break;
 		}
 	}
 
 	m_lstChange.assign(lstChange.begin(), lstChange.end());
-
-	if(ulBufferSize != 0){
-		m_ulBufferSize = ulBufferSize;
-	}else{
-		m_ulBufferSize = 10;
-	}
-
+	m_ulBufferSize = (ulBufferSize != 0) ? ulBufferSize : 10;
 	m_bConfiged = true;
 
 	if (bForceImplicitStateUpdate) {
@@ -407,18 +348,16 @@ HRESULT ECExchangeExportChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgre
 	HRESULT			hr = hrSuccess;
 
 	if(!m_bConfiged){
-		ZLOG_DEBUG(m_lpLogger, "Config() not called before Synchronize()");
+		zlog("Config() not called before Synchronize()");
 		return MAPI_E_UNCONFIGURED;
 	}
-
 	if(m_ulFlags & SYNC_CATCHUP){
-		m_ulChangeId = m_ulMaxChangeId > m_ulChangeId ? m_ulMaxChangeId : m_ulChangeId;
+		m_ulChangeId = std::max(m_ulMaxChangeId, m_ulChangeId);
 		hr = UpdateStream(m_lpStream);
 		if (hr == hrSuccess)
 			*lpulProgress = *lpulSteps = 0;
 		return hr;
 	}
-
 	if (*lpulProgress == 0 && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
 		m_clkStart = times(&m_tmsStart);
 
@@ -426,29 +365,23 @@ HRESULT ECExchangeExportChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgre
 		hr = ExportMessageChanges();
 		if(hr == SYNC_W_PROGRESS)
 			goto progress;
-
 		if(hr != hrSuccess)
 			return hr;
-
 		hr = ExportMessageDeletes();
 		if(hr != hrSuccess)
 			return hr;
-
 		hr = ExportMessageFlags();
 		if(hr != hrSuccess)
 			return hr;
-
 	}else if(m_ulSyncType == ICS_SYNC_HIERARCHY){
 		hr = ExportFolderChanges();
 		if(hr == SYNC_W_PROGRESS)
 			goto progress;
 		if(hr != hrSuccess)
 			return hr;
-
 		hr = ExportFolderDeletes();
 		if(hr != hrSuccess)
 			return hr;
-
 	}else{
 		return MAPI_E_INVALID_PARAMETER;
 	}
@@ -462,10 +395,8 @@ HRESULT ECExchangeExportChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgre
 			hr = m_lpImportContents->UpdateState(NULL);
 		else
 			hr = m_lpImportHierarchy->UpdateState(NULL);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Importer state update failed, hr=0x%08x", hr);
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Importer state update failed", hr);
 	}
 
 progress:
@@ -493,8 +424,7 @@ progress:
 						snprintf(szDuration, sizeof(szDuration), "%u:%02u.%03u min.", (unsigned)(dblDuration / 60), (unsigned)dblDuration % 60, (unsigned)(dblDuration * 1000 + .5) % 1000);
 					else
 						snprintf(szDuration, sizeof(szDuration), "%u.%03u s.", (unsigned)dblDuration % 60, (unsigned)(dblDuration * 1000 + .5) % 1000);
-
-					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "folder changes synchronized in %s", szDuration);
+					m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "folder changes synchronized in %s", szDuration);
 				} else
 					m_lpLogger->Log(EC_LOGLEVEL_INFO, "folder changes synchronized");
 			}
@@ -508,7 +438,7 @@ progress:
 
 HRESULT ECExchangeExportChanges::UpdateState(LPSTREAM lpStream){
 	if(!m_bConfiged){
-		ZLOG_DEBUG(m_lpLogger, "Config() not called before UpdateState()");
+		zlog("Config() not called before UpdateState()");
 		return MAPI_E_UNCONFIGURED;
 	}
 	if (lpStream == NULL)
@@ -520,7 +450,7 @@ HRESULT ECExchangeExportChanges::GetChangeCount(ULONG *lpcChanges) {
 	ULONG cChanges = 0;
 
 	if(!m_bConfiged){
-		ZLOG_DEBUG(m_lpLogger, "Config() not called before GetChangeCount()");
+		zlog("Config() not called before GetChangeCount()");
 		return MAPI_E_UNCONFIGURED;
 	}
 
@@ -528,7 +458,6 @@ HRESULT ECExchangeExportChanges::GetChangeCount(ULONG *lpcChanges) {
 	if(!m_lstHardDelete.empty() || !m_lstSoftDelete.empty() || !m_lstFlag.empty())
 		++cChanges;
 	cChanges += m_lstChange.size();
-
 	*lpcChanges = cChanges;
 	return hrSuccess;
 }
@@ -551,55 +480,49 @@ HRESULT ECExchangeExportChanges::GetChangeCount(ULONG *lpcChanges) {
  */
 HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize)
 {
-	HRESULT hr;
-	auto lpSyncSettings = &ECSyncSettings::instance;
-	BOOL bCanStream = false;
-	BOOL bSupportsPropTag = false;
-	
 	if (ulPropTag != PR_ENTRYID && ulPropTag != PR_SOURCE_KEY)
 		return MAPI_E_INVALID_PARAMETER;
-	
+	if (ulPropTag == PR_ENTRYID && lpParents != nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (ulPropTag == PR_SOURCE_KEY && lpParents == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (lpParents != nullptr && lpParents->cValues != lpEntries->cValues)
+		return MAPI_E_INVALID_PARAMETER;
+
+	auto lpSyncSettings = &ECSyncSettings::instance;
+	BOOL bCanStream = false, bSupportsPropTag = false;
+
 	if(ulPropTag == PR_ENTRYID) {
 		m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_EXPORT_PROPTAG, &bSupportsPropTag);
 		if (!bSupportsPropTag)
 			return MAPI_E_NO_SUPPORT;
 	}
-	
-	if (ulPropTag == PR_ENTRYID && lpParents != NULL)
-		return MAPI_E_INVALID_PARAMETER;
-	if (ulPropTag == PR_SOURCE_KEY && lpParents == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-	if (lpParents != NULL && lpParents->cValues != lpEntries->cValues)
-		return MAPI_E_INVALID_PARAMETER;
-	
 	if(m_bConfiged){
-		ZLOG_DEBUG(m_lpLogger, "Config() called twice");
+		zlog("Config() called twice");
 		return MAPI_E_UNCONFIGURED;
 	}
-	
-	// Only available for message syncing	
+	// Only available for message syncing
 	if (m_ulSyncType != ICS_SYNC_CONTENTS)
 		return MAPI_E_NO_SUPPORT;
 
 	// Select an importer interface
-	hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, &~m_lpImportContents);
+	auto hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, &~m_lpImportContents);
 	if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
 		m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 		if (bCanStream == TRUE) {
-			ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
+			zlog("Exporter supports enhanced ICS, checking importer...");
 			hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, &~m_lpImportStreamedContents);
 			if (hr == MAPI_E_INTERFACE_NOT_SUPPORTED) {
 				assert(m_lpImportStreamedContents == NULL);
 				hr = hrSuccess;
-				ZLOG_DEBUG(m_lpLogger, "Importer doesn't support enhanced ICS");
+				zlog("Importer does not support enhanced ICS");
 			} else
-				ZLOG_DEBUG(m_lpLogger, "Importer supports enhanced ICS");
+				zlog("Importer supports enhanced ICS");
 		} else
-			ZLOG_DEBUG(m_lpLogger, "Exporter doesn't support enhanced ICS");
+			zlog("Exporter does not support enhanced ICS");
 	}
-	
-	m_ulEntryPropTag = ulPropTag;
 
+	m_ulEntryPropTag = ulPropTag;
 	// Fill m_lpChanges with items from lpEntries
 	hr = MAPIAllocateBuffer(sizeof(ICSCHANGE) * lpEntries->cValues, &~m_lpChanges);
 	if(hr != hrSuccess)
@@ -617,13 +540,12 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 			if(hr != hrSuccess)
 				return hr;
 		}
-		
-		m_lpChanges[i].ulChangeType = ICS_MESSAGE_NEW;
 
+		m_lpChanges[i].ulChangeType = ICS_MESSAGE_NEW;
 		// Since all changes are 'change' modifications, duplicate all data in m_lpChanges in m_lstChange
 		m_lstChange.emplace_back(m_lpChanges[i]);
 	}
-	
+
 	m_bConfiged = true;
 	return hrSuccess;
 }
@@ -645,12 +567,7 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 	HRESULT			hr = hrSuccess;
 	memory_ptr<SPropValue> lpPropArray;
 	memory_ptr<SPropTagArray> lpPropTagArray;
-	ULONG			ulObjType;
-	ULONG			ulCount;
-	ULONG			ulFlags;
-	ULONG			ulSteps = 0;
-
-	ULONG			cbEntryID = 0;
+	unsigned int ulObjType, ulCount, ulSteps = 0, cbEntryID = 0;
 	memory_ptr<ENTRYID> lpEntryID;
 	static constexpr const SizedSPropTagArray(5, sptMessageExcludes) =
 		{5, {PR_MESSAGE_SIZE, PR_MESSAGE_RECIPIENTS,
@@ -662,7 +579,7 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 	static constexpr const SizedSPropTagArray(1, sptAttach) = {1, {PR_ATTACH_NUM}};
 
 	while(m_ulStep < m_lstChange.size() && (m_ulBufferSize == 0 || ulSteps < m_ulBufferSize)){
-		ulFlags = 0;
+		unsigned int ulFlags = 0;
 		if ((m_lstChange.at(m_ulStep).ulChangeType & ICS_ACTION_MASK) == ICS_NEW)
 			ulFlags |= SYNC_NEW_MESSAGE;
 
@@ -671,7 +588,6 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 		rowset_ptr lpRows;
 		if(!m_sourcekey.empty()) {
 			// Normal exporter, get the import properties we need by opening the source message
-
 			hr = m_lpStore->EntryIDFromSourceKey(
 				m_lstChange.at(m_ulStep).sParentSourceKey.cb,
 				m_lstChange.at(m_ulStep).sParentSourceKey.lpb,
@@ -682,10 +598,11 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 				hr = hrSuccess;
 				goto next;
 			}
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
-
+			m_lpLogger->logf(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Error while getting entryid from sourcekey %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Error while getting entryid from sourcekey %s: %s (%x)",
+					bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str(),
+					GetMAPIErrorMessage(hr), hr);
 				goto exit;
 			}
 			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpSourceMessage);
@@ -694,21 +611,23 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 				goto next;
 			}
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to open message with entryid %s: %s", bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr));
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Unable to open message with entryid %s: %s (%x)",
+					bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr), hr);
 				goto exit;
 			}
 			/* Check if requested interface exists */
 			void *throwaway;
 			hr = lpSourceMessage->QueryInterface(m_iidMessage, &throwaway);
 			if (hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to open message with entryid %s: %s", bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr));
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Unable to open message with entryid %s: %s (%x)",
+					bin2hex(cbEntryID, lpEntryID.get()).c_str(), GetMAPIErrorMessage(hr), hr);
 				goto exit;
 			}
 			lpSourceMessage->Release(); /* give back one ref taken by QI */
 
 			hr = lpSourceMessage->GetProps(sptImportProps, 0, &ulCount, &~lpPropArray);
 			if(FAILED(hr)) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to get properties from source message");
+				zlog("Unable to get properties from source message", hr);
 				goto exit;
 			}
 			hr = m_lpImportContents->ImportMessageChange(ulCount, lpPropArray, ulFlags, &~lpDestMessage);
@@ -726,12 +645,10 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 		if (hr == SYNC_E_IGNORE) {
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "ignored change");
 			// Mark this change as processed
-
 			hr = hrSuccess;
 			goto next;
 		}else if(hr == SYNC_E_OBJECT_DELETED){
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "ignored change for deleted item");
-
 			// Mark this change as processed
 			hr = hrSuccess;
 			goto next;
@@ -742,8 +659,8 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 			goto next;
 		// TODO handle SYNC_E_OBJECT_DELETED, SYNC_E_CONFLICT, SYNC_E_NO_PARENT, SYNC_E_INCEST, SYNC_E_UNSYNCHRONIZED
 		}else if(hr != hrSuccess){
-			//m_lpLogger->Log(EC_LOGLEVEL_INFO, "change error: %s", stringify(hr, true).c_str());
-			ZLOG_DEBUG(m_lpLogger, "Error during message import");
+			//m_lpLogger->perr("change error", hr);
+			zlog("Error during message import", hr);
 			goto exit;
 		}
 		if (lpDestMessage == NULL)
@@ -759,31 +676,29 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 		hr = lpSourceMessage->CopyTo(0, NULL, sptMessageExcludes, 0,
 		     NULL, &IID_IMessage, lpDestMessage, 0, NULL);
 		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to copy to imported message");
+			zlog("Unable to copy to imported message", hr);
 			goto exit;
 		}
 		hr = lpSourceMessage->GetRecipientTable(0, &~lpTable);
 		if(hr !=  hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to read source message's recipient table");
+			zlog("Unable to read source message's recipient table", hr);
 			goto exit;
 		}
 		hr = lpTable->QueryColumns(TBL_ALL_COLUMNS, &~lpPropTagArray);
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to get column set from source message's recipient table");
+			zlog("Unable to get column set from source message's recipient table", hr);
 			goto exit;
 		}
-
 		hr = lpTable->SetColumns(lpPropTagArray, 0);
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to set column set for source message's recipient table");
+			zlog("Unable to set column set for source message's recipient table", hr);
 			goto exit;
 		}
 		hr = lpTable->QueryRows(0xFFFF, 0, &~lpRows);
 		if(hr !=  hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to read recipients from source message");
+			zlog("Unable to read recipients from source message", hr);
 			goto exit;
 		}
-
 		//FIXME: named property in the recipienttable ?
 		hr = lpDestMessage->ModifyRecipients(0, reinterpret_cast<ADRLIST *>(lpRows.get()));
 		if(hr !=  hrSuccess)
@@ -793,24 +708,25 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 		//delete every attachment
 		hr = lpDestMessage->GetAttachmentTable(0, &~lpTable);
 		if(hr !=  hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to get destination's attachment table");
+			zlog("Unable to get destination's attachment table", hr);
 			goto exit;
 		}
 		hr = lpTable->SetColumns(sptAttach, 0);
 		if(hr !=  hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to set destination's attachment table's column set");
+			zlog("Unable to set destination's attachment table's column set", hr);
 			goto exit;
 		}
 		hr = lpTable->QueryRows(0xFFFF, 0, &~lpRows);
 		if(hr !=  hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to read destination's attachment list");
+			zlog("Unable to read destination's attachment list", hr);
 			goto exit;
 		}
 
 		for (ulCount = 0; ulCount < lpRows->cRows; ++ulCount) {
 			hr = lpDestMessage->DeleteAttach(lpRows[ulCount].lpProps[0].Value.ul, 0, nullptr, 0);
 			if(hr != hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to delete destination's attachment number %d", lpRows[ulCount].lpProps[0].Value.ul);
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Unable to delete destination's attachment number %d: %s (%x)",
+					lpRows[ulCount].lpProps[0].Value.ul, GetMAPIErrorMessage(hr), hr);
 				goto exit;
 			}
 		}
@@ -830,24 +746,24 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 			object_ptr<IAttach> lpSourceAttach, lpDestAttach;
 			hr = lpSourceMessage->OpenAttach(lpRows[ulCount].lpProps[0].Value.ul, &IID_IAttachment, 0, &~lpSourceAttach);
 			if(hr !=  hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to open attachment %d in source message", lpRows[ulCount].lpProps[0].Value.ul);
+				m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "Unable to open attachment %d in source message: %s (%x)",
+					lpRows[ulCount].lpProps[0].Value.ul, GetMAPIErrorMessage(hr), hr);
 				goto exit;
 			}
 			hr = lpDestMessage->CreateAttach(&IID_IAttachment, 0, &ulObjType, &~lpDestAttach);
 			if(hr !=  hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to create attachment");
+				zlog("Unable to create attachment", hr);
 				goto exit;
 			}
 			hr = lpSourceAttach->CopyTo(0, NULL, sptAttach, 0,
 			     NULL, &IID_IAttachment, lpDestAttach, 0, NULL);
 			if(hr !=  hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to copy attachment");
+				zlog("Unable to copy attachment", hr);
 				goto exit;
 			}
-
 			hr = lpDestAttach->SaveChanges(0);
 			if(hr !=  hrSuccess) {
-				ZLOG_DEBUG(m_lpLogger, "SaveChanges() failed for destination attachment");
+				zlog("SaveChanges() failed for destination attachment", hr);
 				goto exit;
 			}
 		}
@@ -855,19 +771,17 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesSlow() {
 
 		hr = lpSourceMessage->GetPropList(0, &~lpPropTagArray);
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to get property list of source message");
+			zlog("Unable to get property list of source message", hr);
 			goto exit;
 		}
-
 		hr = Util::HrDeleteResidualProps(lpDestMessage, lpSourceMessage, lpPropTagArray);
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to remove old properties from destination message");
+			zlog("Unable to remove old properties from destination message", hr);
 			goto exit;
 		}
-
 		hr = lpDestMessage->SaveChanges(0);
 		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "SaveChanges failed for destination message");
+			zlog("SaveChanges failed for destination message", hr);
 			goto exit;
 		}
 
@@ -883,7 +797,7 @@ next:
 		hr = SYNC_W_PROGRESS;
 exit:
 	if(hr != hrSuccess && hr != SYNC_W_PROGRESS)
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "change error: %s", stringify(hr, true).c_str());
+		m_lpLogger->perr("change error", hr);
 	return hr;
 }
 
@@ -891,10 +805,9 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 {
 	HRESULT hr = hrSuccess;
 	object_ptr<WSSerializedMessage> ptrSerializedMessage;
-	ULONG cbProps = 0;
+	unsigned int cbProps = 0, ulFlags = 0;
 	SPropValuePtr ptrProps;
 	const SPropValue *lpPropVal = NULL;
-	ULONG ulFlags = 0;
 	StreamPtr ptrDestStream;
 	static constexpr const SizedSPropTagArray(11, sptImportProps) = { 11, {
 		PR_SOURCE_KEY,
@@ -913,12 +826,11 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 		PR_SOURCE_KEY,
 		PR_PARENT_SOURCE_KEY,
 		PR_STORE_RECORD_KEY,
-		PR_STORE_ENTRYID, 
+		PR_STORE_ENTRYID,
 		PR_EC_HIERARCHYID,
 		PR_EC_PARENT_HIERARCHYID,
 		PR_ENTRYID
 	} };
-
 	const auto lpImportProps = m_sourcekey.empty() ? sptImportPropsServerWide : sptImportProps;
 
 	// No more changes (add/modify).
@@ -936,55 +848,54 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 			hr = hrSuccess;
 			goto exit;
 		} else if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Stream export failed");
+			zlog("ExportFast: Stream export failed", hr);
 			goto exit;
 		}
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Got new batch");
+		zlog("ExportFast: Got new batch");
 	}
 
 	ZLOG_DEBUG(m_lpLogger, "ExportFast: Requesting serialized message, step = %u", m_ulStep);
 	hr = m_ptrStreamExporter->GetSerializedMessage(m_ulStep, &~ptrSerializedMessage);
 	if (hr == SYNC_E_OBJECT_DELETED) {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Source message is deleted");
+		zlog("ExportFast: Source message is deleted");
 		hr = hrSuccess;
 		goto skip;
 	} else if (hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: Unable to get serialized message, hr = 0x%08x", hr);
+		zlog("ExportFast: Unable to get serialized message", hr);
 		goto exit;
 	}
 	hr = ptrSerializedMessage->GetProps(&cbProps, &~ptrProps);
 	if (hr != hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Unable to get required properties from serialized message");
+		zlog("ExportFast: Unable to get required properties from serialized message", hr);
 		goto exit;
 	}
-
 	lpPropVal = PCpropFindProp(ptrProps, cbProps, PR_MESSAGE_FLAGS);
 	if (lpPropVal != NULL && (lpPropVal->Value.ul & MSGFLAG_ASSOCIATED))
 		ulFlags |= SYNC_ASSOCIATED;
 	if ((m_lstChange.at(m_ulStep).ulChangeType & ICS_ACTION_MASK) == ICS_NEW)
 		ulFlags |= SYNC_NEW_MESSAGE;
 
-	ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Importing message change");
+	zlog("ExportFast: Importing message change");
 	hr = m_lpImportStreamedContents->ImportMessageChangeAsAStream(cbProps, ptrProps, ulFlags, &~ptrDestStream);
 	if (hr == hrSuccess) {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Copying data");
+		zlog("ExportFast: Copying data");
 		hr = ptrSerializedMessage->CopyData(ptrDestStream);
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "ExportFast: Failed to copy data, hr = 0x%08x", hr);
+			zlog("ExportFast: Failed to copy data", hr);
 			LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 			goto exit;
 		}
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: %s", "Copied data");
+		zlog("ExportFast: Copied data");
 	} else if (hr == SYNC_E_IGNORE || hr == SYNC_E_OBJECT_DELETED) {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: Change ignored, code = 0x%08x", hr);
+		zlog("ExportFast: Change ignored", hr);
 		hr = ptrSerializedMessage->DiscardData();
 		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "ExportFast: Failed to discard data, hr = 0x%08x", hr);
+			zlog("ExportFast: Failed to discard data", hr);
 			LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 			goto exit;
 		}
 	} else {
-		ZLOG_DEBUG(m_lpLogger, "ExportFast: Import failed, hr = 0x%08x", hr);
+		zlog("ExportFast: Import failed", hr);
 		LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 		goto exit;
 	}
@@ -993,13 +904,10 @@ skip:
 	m_setProcessedChanges.emplace(m_lstChange.at(m_ulStep).ulChangeId, std::string(reinterpret_cast<const char *>(m_lstChange.at(m_ulStep).sSourceKey.lpb), m_lstChange.at(m_ulStep).sSourceKey.cb));
 	if (++m_ulStep < m_lstChange.size())
 		hr = SYNC_W_PROGRESS;
-
 exit:
 	if (FAILED(hr))
 		m_ptrStreamExporter.reset();
-
-	ZLOG_DEBUG(m_lpLogger, "ExportFast: Done, hr = 0x%08x", hr);
-	return hr;
+	return zlog("ExportFast: Done", hr);
 }
 
 HRESULT ECExchangeExportChanges::ExportMessageFlags(){
@@ -1028,10 +936,9 @@ HRESULT ECExchangeExportChanges::ExportMessageFlags(){
 		if (hr == SYNC_E_IGNORE)
 			hr = hrSuccess;
 		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Read state change failed");
+			zlog("Read state change failed", hr);
 			goto exit;
 		}
-
 		// Mark the flag changes as processed
 		for (const auto &change : m_lstFlag)
 			m_setProcessedChanges.emplace(change.ulChangeId, std::string(reinterpret_cast<const char *>(change.sSourceKey.lpb), change.sSourceKey.cb));
@@ -1039,53 +946,39 @@ HRESULT ECExchangeExportChanges::ExportMessageFlags(){
 
 exit:
 	if (hr != hrSuccess)
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to sync message flags, 0x%08X", hr);
+		m_lpLogger->logf(EC_LOGLEVEL_FATAL, "Failed to sync message flags, 0x%08X", hr);
 	return hr;
 }
 
 HRESULT ECExchangeExportChanges::ExportMessageDeletes(){
-	HRESULT			hr = hrSuccess;
 	memory_ptr<ENTRYLIST> lpEntryList;
 
 	if(!m_lstSoftDelete.empty()){
-		hr = ChangesToEntrylist(&m_lstSoftDelete, &~lpEntryList);
+		auto hr = ChangesToEntrylist(&m_lstSoftDelete, &~lpEntryList);
 		if(hr != hrSuccess)
 			return hr;
 		hr = m_lpImportContents->ImportMessageDeletion(SYNC_SOFT_DELETE, lpEntryList);
 		if (hr == SYNC_E_IGNORE)
 			hr = hrSuccess;
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Message deletion import failed");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Message deletion import failed", hr);
 		hr = AddProcessedChanges(m_lstSoftDelete);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to add processed soft deletion changes");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Unable to add processed soft deletion changes", hr);
 	}
 
 	if(!m_lstHardDelete.empty()){
-		hr = ChangesToEntrylist(&m_lstHardDelete, &~lpEntryList);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to create entry list");
-			return hr;
-		}
-
+		auto hr = ChangesToEntrylist(&m_lstHardDelete, &~lpEntryList);
+		if (hr != hrSuccess)
+			return zlog("Unable to create entry list", hr);
 		hr = m_lpImportContents->ImportMessageDeletion(0, lpEntryList);
 		if (hr == SYNC_E_IGNORE)
 			hr = hrSuccess;
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Message hard deletion failed");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Message hard deletion failed", hr);
 		hr = AddProcessedChanges(m_lstHardDelete);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to add processed hard deletion changes");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Unable to add processed hard deletion changes", hr);
 	}
 	return hrSuccess;
 }
@@ -1093,12 +986,7 @@ HRESULT ECExchangeExportChanges::ExportMessageDeletes(){
 HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 	HRESULT			hr = hrSuccess;
 	LPSPropValue	lpPropVal = NULL;
-
-	ULONG			ulObjType = 0;
-	ULONG			ulCount = 0;
-	ULONG			ulSteps = 0;
-
-	ULONG			cbEntryID = 0;
+	unsigned int ulObjType = 0, ulCount = 0, ulSteps = 0, cbEntryID = 0;
 
 	while(m_ulStep < m_lstChange.size() && (m_ulBufferSize == 0 || ulSteps < m_ulBufferSize)){
 		object_ptr<IMAPIFolder> lpFolder;
@@ -1117,17 +1005,15 @@ HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 				hr = hrSuccess;
 				goto next;
 			}
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
+			m_lpLogger->logf(EC_LOGLEVEL_INFO, "change sourcekey: %s", bin2hex(m_lstChange.at(m_ulStep).sSourceKey).c_str());
 			hr = m_lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
 			if(hr != hrSuccess){
 				hr = hrSuccess;
 				goto next;
 			}
 			hr = HrGetAllProps(lpFolder, (m_ulFlags & SYNC_UNICODE ? MAPI_UNICODE : 0), &ulCount, &~lpPropArray);
-			if(FAILED(hr)) {
-				ZLOG_DEBUG(m_lpLogger, "Unable to get source folder properties");
-				return hr;
-			}
+			if (FAILED(hr))
+				return zlog("Unable to get source folder properties", hr);
 
 			//for folders directly under m_lpFolder PR_PARENT_SOURCE_KEY must be NULL
 			//this protects against recursive problems during syncing when the PR_PARENT_SOURCE_KEY
@@ -1162,10 +1048,10 @@ HRESULT ECExchangeExportChanges::ExportFolderChanges(){
 			hr = hrSuccess;
 			goto next;
 		}else if(FAILED(hr)) {
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "change error: %s", stringify(hr, true).c_str());
+			m_lpLogger->perr("change error", hr);
 			return hr;
 		}else if(hr != hrSuccess){
-			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "change warning: %s", stringify(hr, true).c_str());
+			m_lpLogger->pwarn("change warning", hr);
 		}
 next:
 		// Mark this change as processed
@@ -1186,46 +1072,30 @@ HRESULT ECExchangeExportChanges::ExportFolderDeletes(){
 
 	if(!m_lstSoftDelete.empty()){
 		hr = ChangesToEntrylist(&m_lstSoftDelete, &~lpEntryList);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to create folder deletion entry list");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Unable to create folder deletion entry list", hr);
 		hr = m_lpImportHierarchy->ImportFolderDeletion(SYNC_SOFT_DELETE, lpEntryList);
 		if (hr == SYNC_E_IGNORE)
 			hr = hrSuccess;
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to import folder deletions");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Unable to import folder deletions", hr);
 		hr = AddProcessedChanges(m_lstSoftDelete);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to add processed folder soft deletions");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Unable to add processed folder soft deletions", hr);
 	}
 
 	if(!m_lstHardDelete.empty()){
 		hr = ChangesToEntrylist(&m_lstHardDelete, &~lpEntryList);
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to create folder hard delete entry list");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Unable to create folder hard delete entry list", hr);
 		hr = m_lpImportHierarchy->ImportFolderDeletion(0, lpEntryList);
 		if (hr == SYNC_E_IGNORE)
 			hr = hrSuccess;
-		if(hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Hard delete folder import failed");
-			return hr;
-		}
-
+		if (hr != hrSuccess)
+			return zlog("Hard delete folder import failed", hr);
 		hr = AddProcessedChanges(m_lstHardDelete);
-		if (hr != hrSuccess) {
-			ZLOG_DEBUG(m_lpLogger, "Unable to add processed folder hard deletions");
-			return hr;
-		}
+		if (hr != hrSuccess)
+			return zlog("Unable to add processed folder hard deletions", hr);
 	}
 	return hrSuccess;
 }
@@ -1235,35 +1105,27 @@ HRESULT ECExchangeExportChanges::UpdateStream(LPSTREAM lpStream){
 	HRESULT hr = hrSuccess;
 	LARGE_INTEGER liPos = {{0, 0}};
 	ULARGE_INTEGER liZero = {{0, 0}};
-	ULONG ulSize;
-	ULONG ulChangeCount = 0;
-	ULONG ulChangeId = 0;
-	ULONG ulSourceKeySize = 0;
-	
+	unsigned int ulSize, ulChangeCount = 0, ulChangeId = 0, ulSourceKeySize = 0;
+
 	if(lpStream == NULL)
 		goto exit;
-
 	hr = lpStream->SetSize(liZero);
 	if(hr != hrSuccess)
 		goto exit;
-
 	hr = lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
 	if(hr != hrSuccess)
 		goto exit;
-
 	hr = lpStream->Write(&m_ulSyncId, 4, &ulSize);
 	if(hr != hrSuccess)
 		goto exit;
 	if (m_ulSyncId == 0)
 		m_ulChangeId = 0;
-
 	hr = lpStream->Write(&m_ulChangeId, 4, &ulSize);
 	if(hr != hrSuccess)
 		goto exit;
 
 	if(!m_setProcessedChanges.empty()) {
 		ulChangeCount = m_setProcessedChanges.size();
-
 		hr = lpStream->Write(&ulChangeCount, 4, &ulSize);
 		if(hr != hrSuccess)
 			goto exit;
@@ -1285,12 +1147,10 @@ HRESULT ECExchangeExportChanges::UpdateStream(LPSTREAM lpStream){
 
 	// Seek back to the beginning after we've finished
 	lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
-
 exit:
-	if(hr != hrSuccess)
-		ZLOG_DEBUG(m_lpLogger, "Stream operation failed");
-
-	return hr;
+	if (hr != hrSuccess)
+		return zlog("Stream operation failed", hr);
+	return hrSuccess;
 }
 
 //convert (delete) changes to entrylist for message and folder deletion.
@@ -1319,8 +1179,8 @@ HRESULT ECExchangeExportChanges::ChangesToEntrylist(std::list<ICSCHANGE> * lpLst
 	}else{
 		lpEntryList->lpbin = NULL;
 	}
-	lpEntryList->cValues = ulCount;
 
+	lpEntryList->cValues = ulCount;
 	*lppEntryList = lpEntryList.release();
 	return hrSuccess;
 }
@@ -1349,10 +1209,19 @@ void ECExchangeExportChanges::LogMessageProps(int loglevel, ULONG cValues, LPSPr
 	auto lpPropHierarchyId = PCpropFindProp(lpPropArray, cValues, PR_EC_HIERARCHYID);
 	auto lpPropParentId = PCpropFindProp(lpPropArray, cValues, PR_EC_PARENT_HIERARCHYID);
 
-	m_lpLogger->Log(loglevel, "ExportFast:   Message info: id=%u, parentid=%u, msgflags=%x, entryid=%s, sourcekey=%s",
+	m_lpLogger->logf(loglevel, "ExportFast:   Message info: id=%u, parentid=%u, msgflags=%x, entryid=%s, sourcekey=%s",
 		lpPropHierarchyId != NULL ? lpPropHierarchyId->Value.ul : 0,
 		lpPropParentId != NULL ? lpPropParentId->Value.ul : 0,
 		lpPropFlags != NULL ? lpPropFlags->Value.ul : 0,
 		lpPropEntryID != NULL ? bin2hex(lpPropEntryID->Value.bin).c_str() : "<Unknown>",
 		lpPropSK != NULL ? bin2hex(lpPropSK->Value.bin).c_str() : "<Unknown>");
+}
+
+HRESULT ECExchangeExportChanges::zlog(const char *msg, HRESULT code)
+{
+	if (code == hrSuccess)
+		m_lpLogger->log(EC_LOGLEVEL_DEBUG, msg);
+	else
+		m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "%s: %s (%x)", msg, GetMAPIErrorMessage(code), code);
+	return code;
 }

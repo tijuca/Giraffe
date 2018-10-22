@@ -1,17 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -43,9 +32,9 @@ class IExchangeManageStore : public virtual IUnknown {
 public:
 	virtual HRESULT CreateStoreEntryID(const TCHAR *store_dn, const TCHAR *mbox_dn, ULONG flags, ULONG *eid_size, ENTRYID **eid) = 0;
 	virtual HRESULT EntryIDFromSourceKey(ULONG cFolderKeySize, BYTE *lpFolderSourceKey, ULONG cMessageKeySize, BYTE *lpMessageSourceKey, ULONG *lpcbEntryID, LPENTRYID *lppEntryID) = 0;
-	virtual HRESULT GetRights(ULONG cbUserEntryID, LPENTRYID lpUserEntryID, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpulRights) = 0;
-	virtual HRESULT GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable, ULONG ulFlags) = 0;
-	virtual HRESULT GetPublicFolderTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable, ULONG ulFlags) = 0;
+	virtual HRESULT GetRights(ULONG ueid_size, const ENTRYID *user_eid, ULONG eid_size, const ENTRYID *eid, ULONG *rights) = 0;
+	virtual HRESULT GetMailboxTable(const TCHAR *server, IMAPITable **, ULONG flags) = 0;
+	virtual HRESULT GetPublicFolderTable(const TCHAR *server, IMAPITable **, ULONG flags) = 0;
 };
 IID_OF(IExchangeManageStore)
 
@@ -231,7 +220,7 @@ typedef IExchangeManageStore* LPEXCHANGEMANAGESTORE;
 #define PR_PUBLIC_FOLDER_ENTRYID			PROP_TAG(PT_BINARY, 0x663C)
 #define PR_HIERARCHY_CHANGE_NUM				PROP_TAG(PT_LONG, 0x663E)
 
-#define PR_USER_SID							PROP_TAG(PT_BINARY, PROP_ID(ptagSearchState))
+#define PR_USER_SID CHANGE_PROP_TYPE(ptagSearchState, PT_BINARY)
 #define PR_CREATOR_TOKEN					PR_USER_SID
 
 #define PR_HAS_NAMED_PROPERTIES				PROP_TAG(PT_BOOLEAN, 0x664A)
@@ -333,8 +322,8 @@ typedef IExchangeManageStore* LPEXCHANGEMANAGESTORE;
 #define PR_FILE_SIZE_EXTENDED			PROP_TAG(PT_I8, 0x6747)
 #define PR_MSG_EDITOR_FORMAT			PROP_TAG(PT_LONG, 0x5909)
 
-#define PR_CONVERSION_STATE				PROP_TAG(PT_LONG, PROP_ID(ptagAdminNickName))
-#define PR_HTML							PROP_TAG(PT_BINARY, PROP_ID(PR_BODY_HTML))
+#define PR_CONVERSION_STATE CHANGE_PROP_TYPE(ptagAdminNickName, PT_LONG)
+#define PR_HTML CHANGE_PROP_TYPE(PR_BODY_HTML, PT_BINARY)
 #define PR_ACTIVE_USER_ENTRYID			PROP_TAG(PT_BINARY, 0x6652)
 #define PR_CONFLICT_ENTRYID				PROP_TAG(PT_BINARY, 0x3FF0)
 #define PR_MESSAGE_LOCALE_ID			PROP_TAG(PT_LONG, 0x3FF1)
@@ -446,7 +435,7 @@ typedef IExchangeManageStore* LPEXCHANGEMANAGESTORE;
 #define PR_LAST_LOGOFF_TIME				PROP_TAG(PT_SYSTIME, 0x66A3 )
 #define PR_STORAGE_LIMIT_INFORMATION	PROP_TAG(PT_LONG, 0x66A4 )
 
-#define PR_INTERNET_MDNS				PROP_TAG(PT_BOOLEAN, PROP_ID(PR_NEWSGROUP_COMPONENT))
+#define PR_INTERNET_MDNS CHANGE_PROP_TYPE(PR_NEWSGROUP_COMPONENT, PT_BOOLEAN)
 
 #define PR_QUOTA_WARNING_THRESHOLD		PROP_TAG(PT_LONG, 0x6721)
 #define PR_QUOTA_SEND_THRESHOLD			PROP_TAG(PT_LONG, 0x6722)
@@ -481,7 +470,7 @@ typedef IExchangeManageStore* LPEXCHANGEMANAGESTORE;
 #define PR_CODE_PAGE_ID					PROP_TAG(PT_LONG, 0x66C3)
 #define PR_SORT_LOCALE_ID				PROP_TAG(PT_LONG, 0x6705)
 
-#define PR_MESSAGE_SIZE_EXTENDED		PROP_TAG(PT_I8, PROP_ID(PR_MESSAGE_SIZE))
+#define PR_MESSAGE_SIZE_EXTENDED CHANGE_PROP_TYPE(PR_MESSAGE_SIZE, PT_I8)
 
 #define PR_AUTO_ADD_NEW_SUBS			PROP_TAG(PT_BOOLEAN, 0x65E5)
 #define PR_NEW_SUBS_GET_AUTO_ADD		PROP_TAG(PT_BOOLEAN, 0x65E6)

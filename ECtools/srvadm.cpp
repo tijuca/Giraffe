@@ -1,26 +1,15 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005-2016 Zarafa and its licensors
  * Copyright 2018, Kopano and its licensors
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, version 3 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <map>
 #include <memory>
 #include <utility>
 #include <string>
 #include <cstdlib>
-#include <popt.h>
 #include <mapidefs.h>
+#include <libHX/option.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
@@ -29,19 +18,19 @@
 #include <kopano/stringutil.h>
 
 using namespace KC;
-static int opt_purge_deferred, opt_purge_softdelete;
+static int opt_purge_deferred, opt_purge_softdelete = -1;
 static unsigned int opt_cache_bits;
 static const char *opt_config_file, *opt_host, *opt_clear_cache;
 static std::unique_ptr<ECConfig> adm_config;
 
-static constexpr const struct poptOption adm_options[] = {
-	{"clear-cache", 0, POPT_ARG_STRING, &opt_clear_cache, 0, "Clear one or more caches"},
-	{"purge-deferred", 0, POPT_ARG_NONE, &opt_purge_deferred, 0, "Purge all items in the deferred update table"},
-	{"purge-softdelete", 0, POPT_ARG_INT, &opt_purge_softdelete, 0, "Purge softdeleted items older than N days"},
-	{nullptr, 'c', POPT_ARG_STRING, &opt_config_file, 'c', "Specify alternate config file"},
-	{nullptr, 'h', POPT_ARG_STRING, &opt_host, 0, "URI for server"},
-	POPT_AUTOHELP
-	{nullptr},
+static constexpr const struct HXoption adm_options[] = {
+	{"clear-cache", 0, HXTYPE_STRING, &opt_clear_cache, nullptr, nullptr, 0, "Clear one or more caches"},
+	{"purge-deferred", 0, HXTYPE_NONE, &opt_purge_deferred, nullptr, nullptr, 0, "Purge all items in the deferred update table"},
+	{"purge-softdelete", 0, HXTYPE_INT, &opt_purge_softdelete, nullptr, nullptr, 0, "Purge softdeleted items older than N days"},
+	{nullptr, 'c', HXTYPE_STRING, &opt_config_file, nullptr, nullptr, 0, "Specify alternate config file"},
+	{nullptr, 'h', HXTYPE_STRING, &opt_host, nullptr, nullptr, 0, "URI for server"},
+	HXOPT_AUTOHELP,
+	HXOPT_TABLEEND,
 };
 
 static constexpr const configsetting_t adm_config_defaults[] = {
@@ -114,7 +103,7 @@ static HRESULT adm_perform()
 		return adm_clear_cache(srvctx.m_svcadm);
 	if (opt_purge_deferred)
 		return adm_purge_deferred(srvctx.m_svcadm);
-	if (opt_purge_softdelete)
+	if (opt_purge_softdelete >= 0)
 		return adm_purge_softdelete(srvctx.m_svcadm);
 	return MAPI_E_CALL_FAILED;
 }
@@ -153,25 +142,19 @@ static unsigned int adm_parse_cache(const char *arglist)
 	return bits;
 }
 
-static bool adm_parse_options(int &argc, char **&argv)
+static bool adm_parse_options(int &argc, const char **&argv)
 {
 	adm_config.reset(ECConfig::Create(adm_config_defaults));
 	opt_config_file = ECConfig::GetDefaultPath("admin.cfg");
-	auto ctx = poptGetContext(nullptr, argc, const_cast<const char **>(argv), adm_options, 0);
-	int c;
-	while ((c = poptGetNextOpt(ctx)) >= 0) {
-		if (c == 'c') {
-			adm_config->LoadSettings(opt_config_file);
-			if (adm_config->HasErrors()) {
-				fprintf(stderr, "Error reading config file %s\n", opt_config_file);
-				return false;
-			}
-		}
-	}
-	if (c < -1) {
-		fprintf(stderr, "%s\n", poptStrerror(c));
-		poptPrintHelp(ctx, stderr, 0);
+	if (HX_getopt(adm_options, &argc, &argv, HXOPT_USAGEONERR) != HXOPT_ERR_SUCCESS)
 		return false;
+	if (opt_config_file != nullptr) {
+		adm_config->LoadSettings(opt_config_file);
+		if (adm_config->HasErrors()) {
+			fprintf(stderr, "Error reading config file %s\n", opt_config_file);
+			LogConfigErrors(adm_config.get());
+			return false;
+		}
 	}
 	if (opt_clear_cache != nullptr) {
 		opt_cache_bits = adm_parse_cache(opt_clear_cache);
@@ -181,7 +164,7 @@ static bool adm_parse_options(int &argc, char **&argv)
 	return true;
 }
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
 	setlocale(LC_ALL, "");
 	ec_log_get()->SetLoglevel(EC_LOGLEVEL_INFO);

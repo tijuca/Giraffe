@@ -1,24 +1,10 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECGENERICPROP_H
 #define ECGENERICPROP_H
 
-#include <kopano/zcdefs.h>
 #include <memory>
 #include <mutex>
 #include <kopano/ECUnknown.h>
@@ -30,7 +16,6 @@
 #include <map>
 #include <set>
 
-using namespace KC;
 // These are the callback functions called when a software-handled property is requested
 typedef HRESULT (*SetPropCallBack)(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 typedef HRESULT (* GetPropCallBack)(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
@@ -45,7 +30,7 @@ struct PROPCALLBACK {
 
 	bool operator==(const PROPCALLBACK &callback) const noexcept
 	{
-		return callback.ulPropTag == this->ulPropTag;
+		return callback.ulPropTag == ulPropTag;
 	}
 };
 
@@ -55,17 +40,18 @@ typedef std::map<short, ECPropertyEntry>		ECPropertyEntryMap;
 typedef ECPropertyEntryMap::iterator			ECPropertyEntryIterator;
 
 class ECGenericProp :
-    public ECUnknown, public virtual IMAPIProp, public IECSingleInstance {
+    public KC::ECUnknown, public virtual IMAPIProp,
+    public KC::IECSingleInstance {
 protected:
 	ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName = NULL);
 	virtual ~ECGenericProp() = default;
 
 public:
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual HRESULT QueryInterface(const IID &, void **) override;
 
 	HRESULT SetProvider(void* lpProvider);
 	HRESULT SetEntryId(ULONG eid_size, const ENTRYID *eid);
-	static HRESULT		DefaultGetPropGetReal(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);	
+	static HRESULT DefaultGetPropGetReal(ULONG ulPropTag, void *lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
 	static HRESULT DefaultSetPropComputed(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 	static HRESULT DefaultSetPropIgnore(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 	static HRESULT DefaultSetPropSetReal(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
@@ -96,16 +82,16 @@ protected: ///?
 	virtual HRESULT HrRemoveModifications(MAPIOBJECT *lpsMapiObject, ULONG ulPropTag);
 
 	// For IECSingleInstance
-	virtual HRESULT GetSingleInstanceId(ULONG *id_size, ENTRYID **id);
+	virtual HRESULT GetSingleInstanceId(ULONG *id_size, ENTRYID **id) override;
 	virtual HRESULT SetSingleInstanceId(ULONG eid_size, const ENTRYID *eid) override;
 
 public:
 	// From IMAPIProp
-	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT SaveChanges(ULONG ulFlags);
-	virtual HRESULT GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppPropArray);
-	virtual HRESULT GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray);
-	
+	virtual HRESULT GetLastError(HRESULT, ULONG flags, MAPIERROR **) override;
+	virtual HRESULT SaveChanges(ULONG flags) override;
+	virtual HRESULT GetProps(const SPropTagArray *, ULONG flags, ULONG *nprops, SPropValue **) override;
+	virtual HRESULT GetPropList(ULONG flags, SPropTagArray **) override;
+
 	/**
 	 * \brief Opens a property.
 	 *
@@ -117,13 +103,13 @@ public:
 	 *
 	 * \return hrSuccess on success.
 	 */
-	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk);
-	virtual HRESULT SetProps(ULONG cValues, const SPropValue *lpPropArray, LPSPropProblemArray *lppProblems);
-	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
-	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
-	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
+	virtual HRESULT OpenProperty(ULONG tag, const IID *intf, ULONG intf_opts, ULONG flags, IUnknown **) override;
+	virtual HRESULT SetProps(ULONG nprops, const SPropValue *props, SPropProblemArray **) override;
+	virtual HRESULT DeleteProps(const SPropTagArray *, LPSPropProblemArray *) override;
+	virtual HRESULT CopyTo(ULONG nexcl, const IID *excl, const SPropTagArray *exclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **) override;
+	virtual HRESULT CopyProps(const SPropTagArray *inclprop, ULONG ui_param, IMAPIProgress *, const IID *intf, void *dest, ULONG flags, SPropProblemArray **) override;
 	virtual HRESULT GetNamesFromIDs(SPropTagArray **tags, const GUID *propset, ULONG flags, ULONG *nvals, MAPINAMEID ***names) override;
-	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags);
+	virtual HRESULT GetIDsFromNames(ULONG n, MAPINAMEID **, ULONG flags, SPropTagArray **) override;
 
 protected:
 	ECPropertyEntryMap lstProps;
@@ -133,7 +119,6 @@ protected:
 	BOOL fSaved = false; // only 0 if just created, // not saved until we either read or write from/to disk
 	ULONG					ulObjType;
 	ULONG ulObjFlags = 0; // message: MAPI_ASSOCIATED, folder: FOLDER_SEARCH (last?)
-
 	BOOL					fModify;
 	void*					lpProvider;
 	BOOL isTransactedObject = true; // only ECMsgStore and ECMAPIFolder are not transacted
@@ -150,8 +135,6 @@ public:
 	std::unique_ptr<MAPIOBJECT> m_sMapiObject;
 };
 
-
-// Inlines
 inline bool ECGenericProp::IsReadOnly() const {
 	return !fModify;
 }

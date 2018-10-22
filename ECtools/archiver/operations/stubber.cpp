@@ -1,27 +1,19 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
+#include <memory>
+#include <utility>
 #include <kopano/platform.h>
 #include <kopano/ECConfig.h>
+#include <kopano/MAPIErrors.h>
 #include "ECArchiverLogger.h"
 #include "stubber.h"
+#include <kopano/MAPIErrors.h>
 #include <kopano/archiver-common.h>
 #include "helpers/MAPIPropHelper.h"
 #include <kopano/mapiext.h>
+
 using namespace KC::helpers;
 
 namespace KC {
@@ -29,9 +21,9 @@ namespace KC {
 /**
  * Check if the store entryid from a SObjectEntry is wrapped with a server path.
  *
- * This class is used as the predicate argument in find_if. 
+ * This class is used as the predicate argument in find_if.
  */
-class IsNotWrapped _kc_final {
+class IsNotWrapped final {
 	public:
 	/**
 	 * This method is called for each SObjectEntry for which the store entryid needs to be
@@ -56,14 +48,14 @@ namespace operations {
  * @param[in]	ulptStubbed
  *					The proptag of the stubbed property {72e98ebc-57d2-4ab5-b0aad50a7b531cb9}/stubbed
  */
-Stubber::Stubber(ECArchiverLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread)
-: ArchiveOperationBase(lpLogger, ulAge, bProcessUnread, ARCH_NEVER_STUB)
-, m_ulptStubbed(ulptStubbed)
+Stubber::Stubber(std::shared_ptr<ECArchiverLogger> lpLogger, ULONG ulptStubbed,
+    int ulAge, bool bProcessUnread) :
+	ArchiveOperationBase(std::move(lpLogger), ulAge, bProcessUnread, ARCH_NEVER_STUB),
+	m_ulptStubbed(ulptStubbed)
 { }
 
 HRESULT Stubber::ProcessEntry(IMAPIFolder * lpFolder, const SRow &proprow)
 {
-	HRESULT hr;
 	MessagePtr ptrMessage;
 	ULONG ulType = 0;
 
@@ -75,8 +67,8 @@ HRESULT Stubber::ProcessEntry(IMAPIFolder * lpFolder, const SRow &proprow)
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
 	}
-	Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening message (%s)", bin2hex(lpEntryId->Value.bin).c_str());
-	hr = lpFolder->OpenEntry(lpEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEntryId->Value.bin.lpb), &IID_IECMessageRaw, MAPI_BEST_ACCESS, &ulType, &~ptrMessage);
+	Logger()->logf(EC_LOGLEVEL_DEBUG, "Opening message (%s)", bin2hex(lpEntryId->Value.bin).c_str());
+	auto hr = lpFolder->OpenEntry(lpEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEntryId->Value.bin.lpb), &IID_IECMessageRaw, MAPI_BEST_ACCESS, &ulType, &~ptrMessage);
 	if (hr == MAPI_E_NOT_FOUND) {
 		Logger()->Log(EC_LOGLEVEL_WARNING, "Failed to open message. This can happen if the search folder is lagging.");
 		return hrSuccess;
@@ -88,9 +80,11 @@ HRESULT Stubber::ProcessEntry(IMAPIFolder * lpFolder, const SRow &proprow)
 
 HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 {
-	HRESULT hr;
-	SPropValue sProps[3];
-	SPropValue sProp = {0};
+	assert(lpMessage != nullptr);
+	if (lpMessage == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+
+	SPropValue sProps[3], sProp = {0};
 	MAPITablePtr ptrAttTable;
 	SRowSetPtr ptrRowSet;
 	AttachPtr ptrAttach;
@@ -99,11 +93,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	ObjectEntryList lstMsgArchives;
 	static constexpr const SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
 
-	assert(lpMessage != NULL);
-	if (lpMessage == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-
-	hr = VerifyRestriction(lpMessage);
+	auto hr = VerifyRestriction(lpMessage);
 	if (hr == MAPI_E_NOT_FOUND) {
 		// This is not an error
 		Logger()->Log(EC_LOGLEVEL_WARNING, "Ignoring message because it doesn't match the criteria for begin stubbed.");
@@ -134,12 +124,10 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 
 	sProps[0].ulPropTag = m_ulptStubbed;
 	sProps[0].Value.b = 1;
-	
 	sProps[1].ulPropTag = PR_BODY;
 	sProps[1].Value.LPSZ = const_cast<TCHAR *>(KC_T("This message is archived..."));
 	sProps[2].ulPropTag = PR_ICON_INDEX;
 	sProps[2].Value.l = 2;
-
 	hr = lpMessage->SetProps(3, sProps, NULL);
 	if (hr != hrSuccess)
 		return Logger()->perr("Failed to set properties", hr);
@@ -151,16 +139,17 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		return Logger()->perr("Failed to get attachment numbers", hr);
 
 	if (!ptrRowSet.empty()) {
-		Logger()->Log(EC_LOGLEVEL_INFO, "Removing %u attachments", ptrRowSet.size());
+		Logger()->logf(EC_LOGLEVEL_INFO, "Removing %u attachments", ptrRowSet.size());
 		for (ULONG i = 0; i < ptrRowSet.size(); ++i) {
 			hr = lpMessage->DeleteAttach(ptrRowSet[i].lpProps[0].Value.ul, 0, NULL, 0);
 			if (hr != hrSuccess) {
-				Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to delete attachment %u. (hr=%s)", i, stringify(hr, true).c_str());
+				Logger()->logf(EC_LOGLEVEL_FATAL, "Failed to delete attachment %u: %s (%x)",
+					i, GetMAPIErrorMessage(hr), hr);
 				return hr;
 			}
 		}
-		
-		Logger()->Log(EC_LOGLEVEL_INFO, "Adding placeholder attachment");		
+
+		Logger()->Log(EC_LOGLEVEL_INFO, "Adding placeholder attachment");
 		hr = lpMessage->CreateAttach(&iid_of(ptrAttach), 0, &ulAttachNum, &~ptrAttach);
 		if (hr != hrSuccess)
 			return Logger()->perr("Failed to create attachment", hr);
@@ -173,7 +162,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		if (hr != hrSuccess)
 			return Logger()->perr("Failed to save attachment", hr);
 	}
-	
+
 	hr = lpMessage->SaveChanges(0);
 	if (hr != hrSuccess)
 		return Logger()->perr("Failed to save stubbed message", hr);

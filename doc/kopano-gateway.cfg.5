@@ -66,11 +66,6 @@ Include and process
 Example: !include common.cfg
 .RE
 .SH "EXPLANATION OF EACH PARAMETER"
-.SS server_bind
-.PP
-IP address to bind to. Leave empty to bind to all addresses.
-.PP
-Default: (empty)
 .SS server_hostname
 .PP
 Hostname of the server to print to a client in the logon greeting. Leave empty to use DNS to find the hostname.
@@ -82,54 +77,32 @@ Whether to show the hostname in the logon greeting to clients. This config optio
 .PP
 Default:
 \fIno\fR
-.SS pop3_enable
+.SS imap_listen
 .PP
-Enable POP3 service with value yes. All other values disable the service.
+A space-separated list of address:port specifiers for where the server should
+listen for unencrypted and STARTTLS-ed IMAP connections. IPv6 addresses need to
+be enclosed in brackets (as in \fB[2001:db8::1]:236\fP), and the asterisk is
+the multi-protocol address wildcard.
 .PP
-Default:
-\fIyes\fR
-.SS pop3_port
+Default: \fI*:143\fP
+.SS imaps_listen
+A space-separated list of address:port spcifiers for implicit-SSL IMAP
+connections, similar to \fBimap_listen\fP. Normally placed on port 993.
 .PP
-The POP3 service will listen on this port for incoming connections.
+Default: \fI(empty)\fP
+.SS pop3_listen
 .PP
-Default:
-\fI110\fR
-.SS pop3s_enable
+A space-separated list of address:port specifiers for where the server should
+listen for unencrypted and STARTTLS-ed POP3 connections. IPv6 addresses need to
+be enclosed in brackets (as in \fB[2001:db8::1]:236\fP), and the asterisk is
+the multi-protocol address wildcard.
 .PP
-Enable POP3S service with value yes. All other values disable the service.
+Default: \fI*:110\fP
+.SS pop3s_listen
+A space-separated list of address:port spcifiers for implicit-SSL POP3
+connections, similar to \fBpop3_listen\fP. Normally placed on port 995.
 .PP
-Default:
-\fIyes\fR
-.SS pop3s_port
-.PP
-The POP3S service will listen on this port for incoming connections.
-.PP
-Default:
-\fI995\fR
-.SS imap_enable
-.PP
-Enable IMAP service with value yes. All other values disable the service.
-.PP
-Default:
-\fIyes\fR
-.SS imap_port
-.PP
-The IMAP service will listen on this port for incoming connections.
-.PP
-Default:
-\fI143\fR
-.SS imaps_enable
-.PP
-Enable IMAPS service with value yes. All other values disable the service.
-.PP
-Default:
-\fIyes\fR
-.SS imaps_port
-.PP
-The IMAPS service will listen on this port for incoming connections.
-.PP
-Default:
-\fI993\fR
+Default: \fI(empty)\fP
 .SS server_socket
 .PP
 The http address of the storage server.
@@ -271,46 +244,55 @@ The path with the files to verify the clients certificates with.
 Default: value not set.
 .SS ssl_protocols
 .PP
-Disabled or enabled protocol names. Supported protocol names are
-\fISSLv3\fR
-and
-\fITLSv1\fR. If Kopano was linked against OpenSSL 1.0.1 or later there is additional support for the new protocols
-\fITLSv1.1\fR
-and
-\fITLSv1.2\fR. To exclude both SSLv3 and TLSv1, set
-\fBserver_ssl_protocols\fR
-to
-\fI!SSLv3 !TLSv1\fR.
+A space-separated list of disabled or enabled protocol names.
+Supported protocol names depend on the system's SSL library;
+depending on version, one or more of the following are available:
+\fBTLSv1.3\fP, \fBTLSv1.2\fP, \fBTLSv1.1\fP, \fBSSLv3\fP,
+\fBSSLv2\fP. To disable a protocol, prefix the name with an
+exclamation mark.
 .PP
-Default: SSLv2 being disabled
+Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
 .SS ssl_ciphers
 .PP
-SSL ciphers to use, set to
-\fIALL\fR
-for backward compatibility.
+A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
+names depend on the system's SSL library, and are generally plentiful. To
+disable a cipher or cipher group, prefix the name with a minus or exclamation
+mark. Details and meaning of the syntax are described in ciphers(1).
 .PP
 Default:
-\fIALL:!LOW:!SSLv2:!EXP:!aNULL\fR
+\fIDEFAULT:!LOW:!SSLv2:!SSLv3:!TLSv1.0:!TLSv1.1:!EXPORT:!DH:!PSK:!kRSA:!aDSS:!aNULL:+AES\fP
 .SS ssl_prefer_server_ciphers
 .PP
-Prefer the server\*(Aqs order of SSL ciphers over client\*(Aqs.
+In SSLv3 and newer, the server side gets to make the ultimate cipher pick out
+of the set that both ends support. In doing so, it can either use the client
+preference list, or, if this directive is set to "yes", its own list (as
+determined by \fBssl_cipher\fP).
+.PP
+Default: \fIyes\fP
+.SS ssl_curves
+.PP
+ECDH curves to use for SSL
 .PP
 Default:
-\fIno\fR
+\fIX25519:P-521:P-384:P-256\fP
 .SS log_method
 .PP
 The method which should be used for logging. Valid values are:
 .TP
-\fIsyslog\fR
-Use the Linux system log. All messages will be written to the mail facility. See also
-\fBsyslog.conf\fR(5).
+\fBsyslog\fR
+Use the syslog service. Messages will be sent using the "mail" facility tag. See also
+\fBjournald.conf\fP(5) or \fBsyslog.conf\fP(5).
 .TP
-\fIfile\fR
+\fBfile\fP
 Log to a file. The filename will be specified in
 \fBlog_file\fR.
+.TP
+\fBauto\fP
+Autoselect mode: If \fBlog_file\fP is set, that will be used.
+Else, syslog will be used if it looks like it is available.
+Else, stderr.
 .PP
-Default:
-\fIfile\fR
+Default: \fIauto\fP
 .SS log_file
 .PP
 When logging to a file, specify the filename in this parameter. Use

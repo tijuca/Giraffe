@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# kopano-presence Kopano Core Presence Daemon
+# kopano-presence Kopano Groupware Core Presence Daemon
 #
 # chkconfig: 345 86 24
 # processname: /usr/sbin/kopano-presence
 # config: /etc/kopano/presence.cfg
 # pidfile: /var/run/kopano/presence.pid
-
+# SPDX-License-Identifier: AGPL-3.0-only
 ### BEGIN INIT INFO
 # Provides: kopano-presence
 # Required-Start: $local_fs $network $remote_fs $syslog
@@ -26,12 +26,7 @@ PRESENCECONFIG_OPT=""
 [ ! -z $PRESENCECONFIG -a -f $PRESENCECONFIG ] && PRESENCECONFIG_OPT="-c $PRESENCECONFIG"
 
 # Switch to C, like at boot time.
-unset LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
-# Update with user settings.
-LC_CTYPE=en_US.UTF-8
-LC_TIME=en_US.UTF-8
-[ -f /etc/sysconfig/kopano ] && . /etc/sysconfig/kopano
-export LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
+unset LANG LC_CTYPE LC_NUMERIC LC_COLLATE LC_MESSAGES LC_ALL
 
 # Source function library.
 . /etc/rc.d/init.d/functions

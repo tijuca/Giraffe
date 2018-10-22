@@ -9,11 +9,12 @@
 # beware that this string can contain any characters, so take heed to
 # correct quoting.
 
-if [ -f @sysconfdir@/sysconfig/kopano ]; then
-  . @sysconfdir@/sysconfig/kopano
-elif [ -f @sysconfdir@/default/kopano ]; then
-  . @sysconfdir@/default/kopano
+KOPANO_GROUP_SCRIPTS=/ignore/
+PATH=/bin:/usr/local/bin:/usr/bin
+export PATH
+if [ -z "${KOPANO_GROUP}" -a -z "${KOPANO_GROUPID}" ] ; then
+    exec >&2
+    echo "KOPANO_GROUP and KOPANO_GROUPID is not set."
+    exit 1
 fi
-PKGLIBEXECDIR=@PKGLIBEXECDIR@
-KOPANO_GROUP_SCRIPTS=@USERSCRIPTDIR@/deletegroup.d
-. @USERSCRIPTDIR@/groups_common.sh
+exec "@pkglibexecdir@/kscriptrun" @uscriptlibdir@/deletegroup.d @uscriptconfdir@/deletegroup.d

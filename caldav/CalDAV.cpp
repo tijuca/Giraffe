@@ -1,25 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
+#include <atomic>
 #include <kopano/platform.h>
 #include <memory>
 #include <new>
 #include <type_traits>
+#include <utility>
+#include <vector>
 #include <climits>
 #include <cstdlib>
 #include <poll.h>
@@ -33,42 +25,45 @@
 #include "CalDavProto.h"
 #include "ProtocolBase.h"
 #include <csignal>
-
 #include <iostream>
 #include <string>
-
+#include <getopt.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECChannel.h>
 #include <kopano/memory.hpp>
-#include <kopano/my_getopt.h>
 #include <kopano/ecversion.h>
 #include <kopano/CommonUtil.h>
+#include <kopano/stringutil.h>
+#include "charset/localeutil.h"
 #include "SSLUtil.h"
-
-#include "TmpPath.h"
-#include <execinfo.h>
+#include <kopano/fileutil.hpp>
 #include <kopano/UnixUtil.h>
 #include <unicode/uclean.h>
 #include <openssl/ssl.h>
 
 using namespace KC;
+using namespace std::string_literals;
 
 struct HandlerArgs {
     ECChannel *lpChannel;
 	bool bUseSSL;
 };
 
-static bool g_bDaemonize = true;
-static bool g_bQuit, g_bThreads, g_dump_config;
-static ECLogger *g_lpLogger = NULL;
-static ECConfig *g_lpConfig = NULL;
+struct socks {
+	std::vector<struct pollfd> pollfd;
+	std::vector<int> linfd;
+	std::vector<bool> ssl;
+};
+
+static bool g_bDaemonize = true, g_bQuit, g_bThreads, g_dump_config;
+static std::shared_ptr<ECLogger> g_lpLogger;
+static std::shared_ptr<ECConfig> g_lpConfig;
 static pthread_t mainthread;
-static int nChildren = 0;
-
-static HRESULT HrSetupListeners(int *lpulNormalSocket, int *lpulSecureSocket);
-static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket);
+static std::atomic<int> nChildren{0};
+static struct socks g_socks;
+static HRESULT ical_listen(ECConfig *cfg);
+static HRESULT HrProcessConnections();
 static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL, int nCloseFDs, int *pCloseFDs);
-
 static void *HandlerClient(void *lpArg);
 static HRESULT HrHandleRequest(ECChannel *lpChannel);
 
@@ -92,7 +87,6 @@ static void sighup(int)
 			int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
 			g_lpLogger->SetLoglevel(new_ll);
 		}
-
 		g_lpLogger->Reset();
 		ec_log_warn("Log connection was reset");
 	}
@@ -107,7 +101,85 @@ static void sigchld(int)
 
 static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(g_lpLogger, "kopano-ical", PROJECT_VERSION, signr, si, uc);
+	generic_sigsegv_handler(g_lpLogger.get(), "kopano-ical", PROJECT_VERSION, signr, si, uc);
+}
+
+static HRESULT running_service(char **argv)
+{
+	ec_log_always("Starting kopano-ical version " PROJECT_VERSION " (pid %d uid %u)", getpid(), getuid());
+	unix_coredump_enable(g_lpConfig->GetSetting("coredump_enabled"));
+	auto hr = ical_listen(g_lpConfig.get());
+	if (hr != hrSuccess)
+		return hr;
+	if (unix_runas(g_lpConfig.get()))
+		return MAPI_E_CALL_FAILED;
+	ec_reexec_prepare_sockets();
+	auto ret = ec_reexec(argv);
+	if (ret < 0)
+		ec_log_notice("K-1240: Failed to re-exec self: %s. "
+			"Continuing with standard allocator and/or restricted coredumps.",
+			strerror(-ret));
+
+	// setup signals
+	KAlternateStack sigstack;
+	struct sigaction act{};
+	signal(SIGPIPE, SIG_IGN);
+	act.sa_sigaction = sigsegv;
+	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
+	sigemptyset(&act.sa_mask);
+	sigaction(SIGSEGV, &act, nullptr);
+	sigaction(SIGBUS, &act, nullptr);
+	sigaction(SIGABRT, &act, nullptr);
+	act.sa_flags = SA_RESTART;
+	act.sa_handler = sigterm;
+	sigaction(SIGTERM, &act, nullptr);
+	sigaction(SIGINT, &act, nullptr);
+	act.sa_handler = sighup;
+	sigaction(SIGHUP, &act, nullptr);
+	act.sa_handler = sigchld;
+	sigaction(SIGCHLD, &act, nullptr);
+	if (g_bDaemonize && unix_daemonize(g_lpConfig.get()))
+		return MAPI_E_CALL_FAILED;
+	if (!g_bDaemonize)
+		setsid();
+	unix_create_pidfile(argv[0], g_lpConfig.get());
+	if (!g_bThreads)
+		g_lpLogger = StartLoggerProcess(g_lpConfig.get(), std::move(g_lpLogger));
+	else
+		g_lpLogger->SetLogprefix(LP_TID);
+	ec_log_set(g_lpLogger);
+	ssl_threading_setup();
+
+	AutoMAPI mapiinit;
+	hr = mapiinit.Initialize();
+	if (hr != hrSuccess) {
+		kc_perror("Messaging API could not be initialized", hr);
+		return hr;
+	}
+	mainthread = pthread_self();
+	hr = HrProcessConnections();
+	if (hr != hrSuccess)
+		return hr;
+	ec_log_info("CalDAV Gateway will now exit");
+
+	// in forked mode, send all children the exit signal
+	if (!g_bThreads) {
+		signal(SIGTERM, SIG_IGN);
+		kill(0, SIGTERM);
+		int i = 30; /* wait max 30 seconds */
+		while (nChildren && i) {
+			if (i % 5 == 0)
+				ec_log_notice("Waiting for %d processes/threads to exit", nChildren.load());
+			sleep(1);
+			--i;
+		}
+
+		if (nChildren)
+			ec_log_notice("Forced shutdown with %d processes/threads left", nChildren.load());
+		else
+			ec_log_info("CalDAV Gateway shutdown complete");
+	}
+	return hrSuccess;
 }
 
 using std::cout;
@@ -131,45 +203,35 @@ static void PrintVersion(void)
 
 int main(int argc, char **argv) {
 	HRESULT hr = hrSuccess;
-	int ulListenCalDAV = 0;
-	int ulListenCalDAVs = 0;
 	bool bIgnoreUnknownConfigOptions = false;
-    stack_t st = {0};
-	struct sigaction act;
-
 	// Configuration
-	int opt = 0;
 	const char *lpszCfg = ECConfig::GetDefaultPath("ical.cfg");
 	bool exp_config = false;
 	static const configsetting_t lpDefaults[] = {
 		{ "run_as_user", "kopano" },
 		{ "run_as_group", "kopano" },
 		{ "pid_file", "/var/run/kopano/ical.pid" },
-		{ "running_path", "/var/lib/kopano" },
+		{"running_path", "/var/lib/kopano/empty", CONFIGSETTING_OBSOLETE},
 		{ "process_model", "thread" },
-		{ "server_bind", "" },
-		{"ical_port", "8080", CONFIGSETTING_NONEMPTY},
-		{"ical_enable", "yes", CONFIGSETTING_NONEMPTY},
-		{"icals_port", "8443", CONFIGSETTING_NONEMPTY},
-		{"icals_enable", "no", CONFIGSETTING_NONEMPTY},
+		{"coredump_enabled", "systemdefault"},
+		{"socketspec", "", CONFIGSETTING_OBSOLETE},
+		{"ical_listen", "*:8080"},
+		{"icals_listen", ""},
 		{ "enable_ical_get", "yes", CONFIGSETTING_RELOADABLE },
 		{ "server_socket", "http://localhost:236/" },
 		{ "server_timezone","Europe/Amsterdam"},
 		{ "default_charset","utf-8"},
-		{"log_method", "file", CONFIGSETTING_NONEMPTY},
-		{"log_file", "/var/log/kopano/ical.log", CONFIGSETTING_NONEMPTY},
+		{"log_method", "auto", CONFIGSETTING_NONEMPTY},
+		{"log_file", ""},
 		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 		{ "log_timestamp", "1" },
 		{ "log_buffer_size", "0" },
         { "ssl_private_key_file", "/etc/kopano/ical/privkey.pem" },
         { "ssl_certificate_file", "/etc/kopano/ical/cert.pem" },
-#ifdef SSL_TXT_SSLV2
-		{ "ssl_protocols", "!SSLv2" },
-#else
-		{"ssl_protocols", ""},
-#endif
-		{ "ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL" },
-		{ "ssl_prefer_server_ciphers", "no" },
+		{"ssl_protocols", KC_DEFAULT_SSLPROTOLIST},
+		{"ssl_ciphers", KC_DEFAULT_CIPHERLIST},
+		{"ssl_prefer_server_ciphers", "yes"},
+		{"ssl_curves", KC_DEFAULT_ECDH_CURVES},
         { "ssl_verify_client", "no" },
         { "ssl_verify_file", "" },
         { "ssl_verify_path", "" },
@@ -180,7 +242,6 @@ int main(int argc, char **argv) {
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS = UCHAR_MAX + 1,
 		OPT_DUMP_CONFIG,
 	};
-
 	static const struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"config", required_argument, NULL, 'c'},
@@ -191,11 +252,9 @@ int main(int argc, char **argv) {
 		{NULL, 0, NULL, 0}
 	};
 
-	setlocale(LC_CTYPE, "");
-
+	forceUTF8Locale(true);
 	while (1) {
-		opt = my_getopt_long_permissive(argc, argv, "Fhc:V", long_options, NULL);
-
+		int opt = my_getopt_long_permissive(argc, argv, "Fhc:V", long_options, nullptr);
 		if (opt == -1)
 			break;
 
@@ -222,192 +281,94 @@ int main(int argc, char **argv) {
 			goto exit;
 		}
 	}
-	
+
 	// init xml parser
 	xmlInitParser();
-
-	g_lpConfig = ECConfig::Create(lpDefaults);
+	g_lpConfig.reset(ECConfig::Create(lpDefaults));
 	if (!g_lpConfig->LoadSettings(lpszCfg, !exp_config) ||
 	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-		g_lpLogger = new ECLogger_File(1, 0, "-", false);
+		g_lpLogger.reset(new(std::nothrow) ECLogger_File(1, 0, "-", false));
 		if (g_lpLogger == nullptr) {
 			hr = MAPI_E_NOT_ENOUGH_MEMORY;
 			goto exit;
 		}
 		ec_log_set(g_lpLogger);
-		LogConfigErrors(g_lpConfig);
+		LogConfigErrors(g_lpConfig.get());
 		goto exit;
 	}
 	if (g_dump_config)
 		return g_lpConfig->dump_config(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
-
-	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoICal");
+	g_lpLogger.reset(CreateLogger(g_lpConfig.get(), argv[0], "KopanoICal"));
 	if (!g_lpLogger) {
 		fprintf(stderr, "Error loading configuration or parsing commandline arguments.\n");
 		goto exit;
 	}
 	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
-		LogConfigErrors(g_lpConfig);
-	if (!TmpPath::instance.OverridePath(g_lpConfig))
+		LogConfigErrors(g_lpConfig.get());
+	if (!TmpPath::instance.OverridePath(g_lpConfig.get()))
 		ec_log_err("Ignoring invalid path-setting!");
-
-	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0)
+	if (strcmp(g_lpConfig->GetSetting("process_model"), "thread") == 0) {
 		g_bThreads = true;
-
-	// initialize SSL threading
-    ssl_threading_setup();
-
-	hr = HrSetupListeners(&ulListenCalDAV, &ulListenCalDAVs);
-	if (hr != hrSuccess)
-		goto exit;
-
-	// setup signals
-	signal(SIGTERM, sigterm);
-	signal(SIGINT, sigterm);
-	signal(SIGHUP, sighup);
-	signal(SIGCHLD, sigchld);
-	signal(SIGPIPE, SIG_IGN);
-
-    memset(&st, 0, sizeof(st));
-    memset(&act, 0, sizeof(act));
-
-    st.ss_sp = malloc(65536);
-    st.ss_flags = 0;
-    st.ss_size = 65536;
-
-	act.sa_sigaction = sigsegv;
-	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
-	sigemptyset(&act.sa_mask);
-	sigaltstack(&st, NULL);
-	sigaction(SIGSEGV, &act, NULL);
-	sigaction(SIGBUS, &act, NULL);
-	sigaction(SIGABRT, &act, NULL);
-
-	// fork if needed and drop privileges as requested.
-	// this must be done before we do anything with pthreads
-	if (unix_runas(g_lpConfig))
-		goto exit;
-	if (g_bDaemonize && unix_daemonize(g_lpConfig))
-		goto exit;
-	if (!g_bDaemonize)
-		setsid();
-	unix_create_pidfile(argv[0], g_lpConfig);
-	if (g_bThreads == false)
-		g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger);
-	else
 		g_lpLogger->SetLogprefix(LP_TID);
-	ec_log_set(g_lpLogger);
-
-	hr = MAPIInitialize(NULL);
-	if (hr != hrSuccess) {
-		kc_perror("Messaging API could not be initialized", hr);
-		goto exit;
 	}
-	mainthread = pthread_self();
-	ec_log(EC_LOGLEVEL_ALWAYS, "Starting kopano-ical version " PROJECT_VERSION " (pid %d)", getpid());
-	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
-	if (hr != hrSuccess)
-		goto exit2;
 
-	ec_log_info("CalDAV Gateway will now exit");
-
-	// in forked mode, send all children the exit signal
-	if (g_bThreads == false) {
-		int i;
-
-		signal(SIGTERM, SIG_IGN);
-		kill(0, SIGTERM);
-		i = 30;						// wait max 30 seconds
-		while (nChildren && i) {
-			if (i % 5 == 0)
-				ec_log_notice("Waiting for %d processes to exit", nChildren);
-			sleep(1);
-			--i;
-		}
-
-		if (nChildren)
-			ec_log_notice("Forced shutdown with %d processes left", nChildren);
-		else
-			ec_log_info("CalDAV Gateway shutdown complete");
-	}
-exit2:
-	MAPIUninitialize();
+	hr = running_service(argv);
 exit:
-	free(st.ss_sp);
 	ECChannel::HrFreeCtx();
-	delete g_lpConfig;
-	DeleteLogger(g_lpLogger);
-
 	SSL_library_cleanup(); // Remove SSL data for the main application and other related libraries
 	// Cleanup SSL parts
 	ssl_threading_cleanup();
-
 	// Cleanup libxml2 library
 	xmlCleanupParser();
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
-	return hr;
-
+	return hr == hrSuccess ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
+static HRESULT ical_listen(ECConfig *cfg)
 {
-	HRESULT hr;
-	bool bListen;
-	bool bListenSecure;
-	int ulPortICal;
-	int ulPortICalS;
-	int ulNormalSocket = 0;
-	int ulSecureSocket = 0;
+	std::set<std::string, ec_bindaddr_less> ical_sock, icals_sock;
+	ical_sock  = vector_to_set<std::string, ec_bindaddr_less>(tokenize(cfg->GetSetting("ical_listen"), ' ', true));
+	icals_sock = vector_to_set<std::string, ec_bindaddr_less>(tokenize(cfg->GetSetting("icals_listen"), ' ', true));
 
-	// setup sockets
-	bListenSecure = (strcasecmp(g_lpConfig->GetSetting("icals_enable"), "yes") == 0);
-	bListen = (strcasecmp(g_lpConfig->GetSetting("ical_enable"), "yes") == 0);
-
-	if (!bListen && !bListenSecure) {
-		ec_log_crit("No ports to open for listening.");
-		return MAPI_E_INVALID_PARAMETER;
-	}
-
-	ulPortICal = atoi(g_lpConfig->GetSetting("ical_port"));
-	ulPortICalS = atoi(g_lpConfig->GetSetting("icals_port"));
-
-	// start listening on normal port
-	if (bListen) {
-		hr = HrListen(g_lpConfig->GetSetting("server_bind"), ulPortICal, &ulNormalSocket);
+	if (!icals_sock.empty()) {
+		auto hr = ECChannel::HrSetCtx(g_lpConfig.get());
 		if (hr != hrSuccess) {
-			ec_log_crit("Could not listen on port %d. (0x%08X %s)", ulPortICal, hr, GetMAPIErrorMessage(hr));
-			bListen = false;
-		} else {
-			ec_log_info("Listening on port %d.", ulPortICal);
+			kc_perror("Error loading SSL context, ICALS will be disabled", hr);
+			icals_sock.clear();
 		}
 	}
 
-	// start listening on secure port
-	if (bListenSecure) {
-		hr = ECChannel::HrSetCtx(g_lpConfig);
-		if (hr == hrSuccess) {
-			hr = HrListen(g_lpConfig->GetSetting("server_bind"), ulPortICalS, &ulSecureSocket);
-			if (hr != hrSuccess) {
-				ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
-				bListenSecure = false;
-			}
-			ec_log_info("Listening on secure port %d.", ulPortICalS);
-		} else {
-			ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
-			bListenSecure = false;
-		}
+	/* Launch */
+	struct pollfd pfd;
+	memset(&pfd, 0, sizeof(pfd));
+	pfd.events = POLLIN;
+	for (const auto &spec : ical_sock) {
+		auto ret = ec_fdtable_socket(spec.c_str(), nullptr, nullptr);
+		if (ret >= 0)
+			pfd.fd = ret;
+		else
+			ret = ec_listen_generic(spec.c_str(), &pfd.fd);
+		if (ret < 0)
+			return MAPI_E_NETWORK_ERROR;
+		g_socks.pollfd.push_back(pfd);
+		g_socks.linfd.push_back(pfd.fd);
+		g_socks.ssl.push_back(false);
 	}
-
-	if (!bListen && !bListenSecure) {
-		ec_log_crit("No ports have been opened for listening, exiting.");
-		return MAPI_E_INVALID_PARAMETER;
+	for (const auto &spec : icals_sock) {
+		auto ret = ec_fdtable_socket(spec.c_str(), nullptr, nullptr);
+		if (ret >= 0)
+			pfd.fd = ret;
+		else
+			ret = ec_listen_generic(spec.c_str(), &pfd.fd);
+		if (ret < 0)
+			return MAPI_E_NETWORK_ERROR;
+		g_socks.pollfd.push_back(pfd);
+		g_socks.linfd.push_back(pfd.fd);
+		g_socks.ssl.push_back(true);
 	}
-
-	*lpulNormal = ulNormalSocket;
-	*lpulSecure = ulSecureSocket;
 	return hrSuccess;
 }
 
@@ -415,36 +376,21 @@ static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
  * Listen to the passed sockets and calls HrStartHandlerClient for
  * every incoming connection.
  *
- * @param[in]	ulNormalSocket	Listening socket of incoming HTTP connections
- * @param[in]	ulSecureSocket	Listening socket of incoming HTTPS connections
  * @retval MAPI error code
  */
-static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
+static HRESULT HrProcessConnections()
 {
 	HRESULT hr = hrSuccess;
-	struct pollfd pollfd[2];
-	bool bUseSSL;
 	ECChannel *lpChannel = NULL;
-	int nCloseFDs = 0, pCloseFDs[2] = {0}, pfd_normal = -1, pfd_secure = -1;
-
-	if (ulNormalSocket) {
-		pCloseFDs[nCloseFDs] = pollfd[nCloseFDs].fd = ulNormalSocket;
-		pfd_normal = nCloseFDs++;
-	}
-	if (ulSecureSocket) {
-		pCloseFDs[nCloseFDs] = pollfd[nCloseFDs].fd = ulSecureSocket;
-		pfd_secure = nCloseFDs++;
-	}
-	for (size_t i = 0; i < nCloseFDs; ++i)
-		pollfd[i].events = POLLIN | POLLRDHUP;
 
 	// main program loop
 	while (!g_bQuit) {
-		for (size_t i = 0; i < nCloseFDs; ++i)
-			pollfd[i].revents = 0;
+		auto nfds = g_socks.pollfd.size();
+		for (size_t i = 0; i < nfds; ++i)
+			g_socks.pollfd[i].revents = 0;
 
 		// Check whether there are incoming connections.
-		int err = poll(pollfd, nCloseFDs, 10 * 1000);
+		auto err = poll(&g_socks.pollfd[0], nfds, 10 * 1000);
 		if (err < 0) {
 			if (errno != EINTR) {
 				ec_log_crit("An unknown socket error has occurred.");
@@ -461,36 +407,26 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 			break;
 		}
 
-		// Check if a normal connection is waiting.
-		if (pfd_normal >= 0 && pollfd[pfd_normal].revents & (POLLIN | POLLRDHUP)) {
-			ec_log_info("Connection waiting on port %d.", atoi(g_lpConfig->GetSetting("ical_port")));
-			bUseSSL = false;
-			hr = HrAccept(ulNormalSocket, &lpChannel);
-			if (hr != hrSuccess) {
-				ec_log_err("Could not accept incoming connection on port %d. (0x%08X)", atoi(g_lpConfig->GetSetting("ical_port")), hr);
+		for (size_t i = 0; i < nfds; ++i) {
+			if (!(g_socks.pollfd[i].revents & POLLIN))
+				/* OS might set more bits than requested */
 				continue;
-			}
-		// Check if a secure connection is waiting.
-		} else if (pfd_secure >= 0 && pollfd[pfd_secure].revents & (POLLIN | POLLRDHUP)) {
-			ec_log_info("Connection waiting on secure port %d.", atoi(g_lpConfig->GetSetting("icals_port")));
-			bUseSSL = true;
-			hr = HrAccept(ulSecureSocket, &lpChannel);
-			if (hr != hrSuccess) {
-				ec_log_err("Could not accept incoming secure connection on port %d. (0x%08X %s)", atoi(g_lpConfig->GetSetting("ical_port")), hr, GetMAPIErrorMessage(hr));
-				continue;
-			}
-		} else {
-			continue;
-		}
 
-		hr = HrStartHandlerClient(lpChannel, bUseSSL, nCloseFDs, pCloseFDs);
+			hr = HrAccept(g_socks.linfd[i], &lpChannel);
+			if (hr != hrSuccess) {
+				kc_perror("Could not accept incoming connection", hr);
+				continue;
+			}
+
+		hr = HrStartHandlerClient(lpChannel, g_socks.ssl[i], g_socks.linfd.size(), &g_socks.linfd[0]);
 		if (hr != hrSuccess) {
 			delete lpChannel;	// destructor closes sockets
 			kc_perror("Handling client connection failed", hr);
 			continue;
 		}
-		if (g_bThreads == false)
+		if (!g_bThreads)
 			delete lpChannel;	// always cleanup channel in main process
+		}
 	}
 
 	return hr;
@@ -509,49 +445,46 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL,
     int nCloseFDs, int *pCloseFDs)
 {
-	HRESULT hr = hrSuccess;
 	pthread_attr_t pThreadAttr;
 	pthread_t pThread;
-	auto lpHandlerArgs = new HandlerArgs;
-
+	auto lpHandlerArgs = make_unique_nt<HandlerArgs>();
+	if (lpHandlerArgs == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	lpHandlerArgs->lpChannel = lpChannel;
 	lpHandlerArgs->bUseSSL = bUseSSL;
 
-	if (g_bThreads) {
-		pthread_attr_init(&pThreadAttr);
-
-		if (pthread_attr_setdetachstate(&pThreadAttr, PTHREAD_CREATE_DETACHED) != 0)
-			ec_log_warn("Could not set thread attribute to detached.");
-		if (pthread_create(&pThread, &pThreadAttr, HandlerClient, lpHandlerArgs) != 0) {
-			ec_log_err("Could not create thread.");
-			hr = E_FAIL;
-			goto exit;
-		}
-
-		set_thread_name(pThread, std::string("ZCalDAV") + lpChannel->peer_addr());
-	}
-	else {
-		if (unix_fork_function(HandlerClient, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
-			ec_log_err("Could not create process.");
-			hr = E_FAIL;
-			goto exit;
-		}
+	if (!g_bThreads) {
 		++nChildren;
+		if (unix_fork_function(HandlerClient, lpHandlerArgs.get(), nCloseFDs, pCloseFDs) < 0) {
+			ec_log_err("Could not create ZCalDAV process: %s", strerror(errno));
+			--nChildren;
+			return E_FAIL;
+		}
+		return hrSuccess;
 	}
-
-exit:
-	if (hr != hrSuccess)
-		delete lpHandlerArgs;
-
-	return hr;
+	if (pthread_attr_init(&pThreadAttr) != 0)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	if (pthread_attr_setdetachstate(&pThreadAttr, PTHREAD_CREATE_DETACHED) != 0)
+		ec_log_warn("Could not set thread attribute to detached.");
+	++nChildren;
+	auto ret = pthread_create(&pThread, &pThreadAttr, HandlerClient, lpHandlerArgs.get());
+	pthread_attr_destroy(&pThreadAttr);
+	if (ret != 0) {
+		--nChildren;
+		ec_log_err("Could not create ZCalDAV thread: %s", strerror(ret));
+		return E_FAIL;
+	} else {
+		lpHandlerArgs.release();
+	}
+	set_thread_name(pThread, std::string("ZCalDAV") + lpChannel->peer_addr());
+	return hrSuccess;
 }
 
 static void *HandlerClient(void *lpArg)
 {
-	HRESULT hr = hrSuccess;
 	auto lpHandlerArgs = static_cast<HandlerArgs *>(lpArg);
 	ECChannel *lpChannel = lpHandlerArgs->lpChannel;
-	bool bUseSSL = lpHandlerArgs->bUseSSL;	
+	bool bUseSSL = lpHandlerArgs->bUseSSL;
 
 	delete lpHandlerArgs;
 
@@ -561,7 +494,7 @@ static void *HandlerClient(void *lpArg)
     }
 
 	while (!g_bQuit) {
-		hr = lpChannel->HrSelect(KEEP_ALIVE_TIME);
+		auto hr = lpChannel->HrSelect(KEEP_ALIVE_TIME);
 		if (hr == MAPI_E_CANCEL)
 			/* signalled - reevaluate g_bQuit */
 			continue;
@@ -569,7 +502,6 @@ static void *HandlerClient(void *lpArg)
 			ec_log_info("Request timeout, closing connection");
 			break;
 		}
-
 		//Save mapi session between Requests
 		hr = HrHandleRequest(lpChannel);
 		if (hr != hrSuccess)
@@ -584,26 +516,21 @@ exit:
 
 static HRESULT HrHandleRequest(ECChannel *lpChannel)
 {
-	HRESULT hr = hrSuccess;
-	std::wstring wstrUser;
-	std::wstring wstrPass;
-	std::string strUrl;
-	std::string strMethod;
+	std::wstring wstrUser, wstrPass;
+	std::string strUrl, strMethod, strCharset;
 	std::string strServerTZ = g_lpConfig->GetSetting("server_timezone");
-	std::string strCharset;
 	std::string strUserAgent, strUserAgentVersion;
-	std::unique_ptr<ProtocolBase> lpBase;
 	KC::object_ptr<IMAPISession> lpSession;
 	Http lpRequest(lpChannel, g_lpConfig);
+	std::unique_ptr<ProtocolBase> lpBase;
 	ULONG ulFlag = 0;
 
 	ec_log_debug("New Request");
-	hr = lpRequest.HrReadHeaders();
+	auto hr = lpRequest.HrReadHeaders();
 	if(hr != hrSuccess) {
 		hr = MAPI_E_USER_CANCEL; // connection is closed by client no data to be read
 		goto exit;
 	}
-
 	hr = lpRequest.HrValidateReq();
 	if(hr != hrSuccess) {
 		lpRequest.HrResponseHeader(501, "Not Implemented");
@@ -613,7 +540,6 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	// ignore Empty Body
 	lpRequest.HrReadBody();
-
 	// no error, defaults to UTF-8
 	lpRequest.HrGetCharSet(&strCharset);
 	// ignore Empty User field.
@@ -622,9 +548,8 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 	lpRequest.HrGetPass(&wstrPass);
 	// no checks required as HrValidateReq() checks Method
 	lpRequest.HrGetMethod(&strMethod);
-	// 
+	//
 	lpRequest.HrSetKeepAlive(KEEP_ALIVE_TIME);
-
 	lpRequest.HrGetUserAgent(&strUserAgent);
 	lpRequest.HrGetUserAgentVersion(&strUserAgentVersion);
 
@@ -635,14 +560,12 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 		lpRequest.HrResponseBody("Bad Request");
 		goto exit;
 	}
-
 	hr = HrParseURL(strUrl, &ulFlag);
 	if (hr != hrSuccess) {
 		kc_perror("Client request is invalid", hr);
-		lpRequest.HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
+		lpRequest.HrResponseHeader(400, "Bad Request: " + stringify_hex(hr));
 		goto exit;
 	}
-
 	if (ulFlag & SERVICE_CALDAV)
 		// this header is always present in a caldav response, but not in ical.
 		lpRequest.HrResponseHeader("DAV", "1, access-control, calendar-access, calendar-schedule, calendarserver-principal-property-search");
@@ -658,7 +581,7 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 		hr = hrSuccess;
 		goto exit;
 	}
-	
+
 	if (wstrUser.empty() || wstrPass.empty()) {
 		ec_log_info("Sending authentication request");
 		hr = MAPI_E_CALL_FAILED;
@@ -682,13 +605,13 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 	static_assert(std::is_polymorphic<ProtocolBase>::value, "ProtocolBase needs to be polymorphic for unique_ptr to work");
 	if( !strMethod.compare("GET") || !strMethod.compare("HEAD") || ((ulFlag & SERVICE_ICAL) && strMethod.compare("PROPFIND")) )
 	{
-		lpBase.reset(new iCal(&lpRequest, lpSession, strServerTZ, strCharset));
+		lpBase.reset(new iCal(lpRequest, lpSession, strServerTZ, strCharset));
 	}
 	//CALDAV Requests
 	else if((ulFlag & SERVICE_CALDAV) || ( !strMethod.compare("PROPFIND") && !(ulFlag & SERVICE_ICAL)))
 	{
-		lpBase.reset(new CalDAV(&lpRequest, lpSession, strServerTZ, strCharset));
-	} 
+		lpBase.reset(new CalDAV(lpRequest, lpSession, strServerTZ, strCharset));
+	}
 	else
 	{
 		hr = MAPI_E_CALL_FAILED;
@@ -702,9 +625,7 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 			hr = lpRequest.HrToHTTPCode(hr);
 		goto exit;
 	}
-
 	hr = lpBase->HrHandleCommand(strMethod);
-
 exit:
 	if(hr != hrSuccess && !strMethod.empty() && hr != MAPI_E_NOT_ME)
 		ec_log_err("Error processing %s request, error code 0x%08x %s", strMethod.c_str(), hr, GetMAPIErrorMessage(hr));

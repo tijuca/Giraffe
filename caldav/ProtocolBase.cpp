@@ -1,26 +1,14 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <string>
 #include <vector>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ProtocolBase.h"
 #include <kopano/stringutil.h>
+#include <kopano/timeutil.hpp>
 #include <kopano/CommonUtil.h>
 #include <kopano/MAPIErrors.h>
 #include "CalDavUtil.h"
@@ -28,7 +16,7 @@
 
 using namespace KC;
 
-ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession,
+ProtocolBase::ProtocolBase(Http &lpRequest, IMAPISession *lpSession,
     const std::string &strSrvTz, const std::string &strCharset) :
 	m_lpRequest(lpRequest), m_lpSession(lpSession), m_strSrvTz(strSrvTz),
 	m_strCharset(strCharset)
@@ -45,18 +33,14 @@ ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession,
  */
 HRESULT ProtocolBase::HrInitializeClass()
 {
-	HRESULT hr = hrSuccess;
-	std::string strUrl;
-	std::string strMethod, strFldOwner, strFldName;
+	std::string strUrl, strMethod, strFldOwner, strFldName;
 	memory_ptr<SPropValue> lpDefaultProp, lpFldProp;
 	SPropValuePtr lpEntryID;
-	ULONG ulRes = 0;
-	bool bIsPublic = false;
-	ULONG ulType = 0;
+	ULONG ulRes = 0, ulType = 0;
 	MAPIFolderPtr lpRoot;
 
 	/* URLs
-	 * 
+	 *
 	 * /caldav/							| depth: 0 results in root props, depth: 1 results in 0 + calendar FOLDER list current user. eg: the same happens /caldav/self/
 	 * /caldav/self/					| depth: 0 results in root props, depth: 1 results in 0 + calendar FOLDER list current user. see ^^
 	 * /caldav/self/Calendar/			| depth: 0 results in root props, depth: 1 results in 0 + _GIVEN_ calendar CONTENTS list current user.
@@ -67,19 +51,16 @@ HRESULT ProtocolBase::HrInitializeClass()
 	 * /caldav/user/folder/folder/		| subfolders are not allowed!
 	 * /caldav/user/folder/id.ics		| a message (note: not ending in /)
 	 */
-
-	m_lpRequest->HrGetUrl(&strUrl);
-	m_lpRequest->HrGetUser(&m_wstrUser);
-	m_lpRequest->HrGetMethod(&strMethod);	
-
+	m_lpRequest.HrGetUrl(&strUrl);
+	m_lpRequest.HrGetUser(&m_wstrUser);
+	m_lpRequest.HrGetMethod(&strMethod);
 	HrParseURL(strUrl, &m_ulUrlFlag, &strFldOwner, &strFldName);
 	m_wstrFldOwner = U2W(strFldOwner);
 	m_wstrFldName = U2W(strFldName);
-	bIsPublic = m_ulUrlFlag & REQ_PUBLIC;
+	bool bIsPublic = m_ulUrlFlag & REQ_PUBLIC;
 	if (m_wstrFldOwner.empty())
 		m_wstrFldOwner = m_wstrUser;
-
-	hr = m_lpSession->OpenAddressBook(0, NULL, 0, &~m_lpAddrBook);
+	auto hr = m_lpSession->OpenAddressBook(0, nullptr, 0, &~m_lpAddrBook);
 	if(hr != hrSuccess)
 		return kc_perror("Error opening addressbook", hr);
 	// default store required for various actions (delete, freebusy, ...)
@@ -90,7 +71,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 			m_wstrUser.c_str(), GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
-
 	hr = HrGetOwner(m_lpSession, m_lpDefStore, &~m_lpLoginUser);
 	if(hr != hrSuccess)
 		return hr;
@@ -127,7 +107,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 	hr = HrLookupNames(m_lpActiveStore, &~m_lpNamedProps);
 	if (hr != hrSuccess)
 		return hr;
-
 	// get active user info
 	if (bIsPublic)
 		hr = m_lpLoginUser->QueryInterface(IID_IMailUser, &~m_lpActiveUser);
@@ -146,7 +125,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 			m_wstrUser.c_str(), GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
-
 	// Get active store default calendar to prevent delete action on this folder
 	hr = m_lpActiveStore->OpenEntry(0, nullptr, &iid_of(lpRoot), 0, &ulType, &~lpRoot);
 	if(hr != hrSuccess)
@@ -155,7 +133,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 			m_wstrUser.c_str(), GetMAPIErrorMessage(hr), hr);
 		return hr;
 	}
-
 	if (!bIsPublic) {
 		// get default calendar entryid for non-public stores
 		hr = HrGetOneProp(lpRoot, PR_IPM_APPOINTMENT_ENTRYID, &~lpDefaultProp);
@@ -229,32 +206,26 @@ HRESULT ProtocolBase::HrInitializeClass()
 	/*
 	 * Workaround for old users with sunbird / lightning on old url base.
 	 */
-	{
-		std::vector<std::string> parts;
-		parts = tokenize(strUrl, '/', true);
-
-		m_lpRequest->HrGetHeaderValue("User-Agent", &strAgent);
-
-		// /caldav/
-		// /caldav/username/ (which we return in XML data! (and shouldn't)), since this isn't a calendar, but /caldav/username/Calendar/ is.
-		if ((strAgent.find("Sunbird/1") != std::string::npos || strAgent.find("Lightning/1") != std::string::npos) && parts.size() <= 2) {
-			// Mozilla Sunbird / Lightning doesn't handle listing of calendars, only contents.
-			// We therefore redirect them to the default calendar url.
-			SPropValuePtr ptrDisplayName;
-			auto strLocation = "/caldav/" + urlEncode(m_wstrFldOwner, "utf-8");
-
-			if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &~ptrDisplayName) == hrSuccess) {
-				std::string part = urlEncode(ptrDisplayName->Value.lpszW, "UTF-8"); 
-				strLocation += "/" + part + "/";
-			} else {
-				// return 404 ?
-				strLocation += "/Calendar/";
-			}
-
-			m_lpRequest->HrResponseHeader(301, "Moved Permanently");
-			m_lpRequest->HrResponseHeader("Location", m_converter.convert_to<std::string>(strLocation));
-			return MAPI_E_NOT_ME;
+	std::vector<std::string> parts;
+	parts = tokenize(strUrl, '/', true);
+	m_lpRequest.HrGetHeaderValue("User-Agent", &strAgent);
+	// /caldav/
+	// /caldav/username/ (which we return in XML data! (and shouldn't)), since this isn't a calendar, but /caldav/username/Calendar/ is.
+	if ((strAgent.find("Sunbird/1") != std::string::npos || strAgent.find("Lightning/1") != std::string::npos) && parts.size() <= 2) {
+		// Mozilla Sunbird / Lightning doesn't handle listing of calendars, only contents.
+		// We therefore redirect them to the default calendar url.
+		SPropValuePtr ptrDisplayName;
+		auto strLocation = "/caldav/" + urlEncode(m_wstrFldOwner, "utf-8");
+		if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &~ptrDisplayName) == hrSuccess) {
+			std::string part = urlEncode(ptrDisplayName->Value.lpszW, "UTF-8");
+			strLocation += "/" + part + "/";
+		} else {
+			// return 404 ?
+			strLocation += "/Calendar/";
 		}
+		m_lpRequest.HrResponseHeader(301, "Moved Permanently");
+		m_lpRequest.HrResponseHeader("Location", strLocation);
+		return MAPI_E_NOT_ME;
 	}
 
 	/*
@@ -273,13 +244,13 @@ HRESULT ProtocolBase::HrInitializeClass()
 		if (hr != hrSuccess || ulCmp == TRUE)
 			m_blFolderAccess = false;
 	}
-	if (m_blFolderAccess) {
-		hr = HrGetOneProp(m_lpUsrFld, PR_SUBFOLDERS, &~lpFldProp);
-		if(hr != hrSuccess)
-			return hr;
-		if(lpFldProp->Value.b == (unsigned short)true && !strMethod.compare("DELETE"))
-			m_blFolderAccess = false;
-	}
+	if (!m_blFolderAccess)
+		return hr;
+	hr = HrGetOneProp(m_lpUsrFld, PR_SUBFOLDERS, &~lpFldProp);
+	if (hr != hrSuccess)
+		return hr;
+	if (lpFldProp->Value.b == (unsigned short)true && !strMethod.compare("DELETE"))
+		m_blFolderAccess = false;
 	return hr;
 }
 
@@ -310,21 +281,21 @@ std::string ProtocolBase::W2U(const WCHAR* lpwWideChar)
  */
 std::wstring ProtocolBase::U2W(const std::string &strUtfChar)
 {
-	return m_converter.convert_to<std::wstring>(strUtfChar, rawsize(strUtfChar), m_strCharset.c_str());	
+	return m_converter.convert_to<std::wstring>(strUtfChar, rawsize(strUtfChar), m_strCharset.c_str());
 }
 
 /**
  * Convert SPropValue to string
- * 
+ *
  * @param[in]	lpSprop		SPropValue to be converted
  * @return		string
  */
 std::string ProtocolBase::SPropValToString(const SPropValue *lpSprop)
 {
 	std::string strRetVal;
-	
+
 	if (lpSprop == NULL)
-		return std::string();
+		return strRetVal;
 	if (PROP_TYPE(lpSprop->ulPropTag) == PT_SYSTIME)
 		strRetVal = stringify_int64(FileTimeToUnixTime(lpSprop->Value.ft), false);
 	else if (PROP_TYPE(lpSprop->ulPropTag) == PT_STRING8)
@@ -333,8 +304,8 @@ std::string ProtocolBase::SPropValToString(const SPropValue *lpSprop)
 		strRetVal = W2U(lpSprop->Value.lpszW);
 	//Global UID
 	else if (PROP_TYPE(lpSprop->ulPropTag) == PT_BINARY)
-		HrGetICalUidFromBinUid(lpSprop->Value.bin, &strRetVal);	
+		HrGetICalUidFromBinUid(lpSprop->Value.bin, &strRetVal);
 	else if (PROP_TYPE(lpSprop->ulPropTag) == PT_LONG)
-		strRetVal = stringify(lpSprop->Value.ul, false);
+		strRetVal = stringify(lpSprop->Value.ul);
 	return strRetVal;
 }

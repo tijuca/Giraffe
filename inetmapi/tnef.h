@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef TNEF_H
 #define TNEF_H
 
 #include <list>
-#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 
 // We loosely follow the MS class ITNEF with the following main exceptions:
@@ -44,7 +31,7 @@ struct AttachRendData {
 #define AttachTypeFile 0x0001
 #define AttachTypeOle 0x0002
 
-class ECTNEF _kc_final {
+class ECTNEF final {
 public:
 	ECTNEF(ULONG ulFlags, IMessage *lpMessage, IStream *lpStream);
     
@@ -64,12 +51,12 @@ public:
 	virtual HRESULT Finish();
     
 private:
-	HRESULT HrReadDWord(IStream *lpStream, ULONG *ulData);
-	HRESULT HrReadWord(IStream *lpStream, unsigned short *ulData);
+	HRESULT HrReadDWord(IStream *, uint32_t *value);
+	HRESULT HrReadWord(IStream *, uint16_t *value);
 	HRESULT HrReadByte(IStream *lpStream, unsigned char *ulData);
 	HRESULT HrReadData(IStream *, void *, size_t);
-	HRESULT HrWriteDWord(IStream *lpStream, ULONG ulData);
-	HRESULT HrWriteWord(IStream *lpStream, unsigned short ulData);
+	HRESULT HrWriteDWord(IStream *, uint32_t value);
+	HRESULT HrWriteWord(IStream *, uint16_t value);
 	HRESULT HrWriteByte(IStream *lpStream, unsigned char ulData);
 	HRESULT HrWriteData(IStream *, const void *, size_t);
 	HRESULT HrWritePropStream(IStream *lpStream, std::list<memory_ptr<SPropValue>> &proplist);

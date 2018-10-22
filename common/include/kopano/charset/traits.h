@@ -1,24 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef traits_INCLUDED
 #define traits_INCLUDED
 
 #include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 #include <string>
 #include <cstring>
 
@@ -28,7 +17,18 @@ template<typename Type> class iconv_charset _kc_final {
 };
 
 #define CHARSET_CHAR "//TRANSLIT"
-#define CHARSET_WCHAR "UTF-32LE"
+/*
+ * glibc iconv is missing support for wchar_t->wchar_t conversions
+ * (https://sourceware.org/bugzilla/show_bug.cgi?id=20804 ), and
+ * iconv_charset<> does not capture that special case either.
+ * UTF-32BE/LE needs to be used, because conversion to unspecified UTF-32
+ * leads to BOMs (and an upset testsuite).
+ */
+#ifdef KC_BIGENDIAN
+#	define CHARSET_WCHAR "UTF-32BE"
+#else
+#	define CHARSET_WCHAR "UTF-32LE"
+#endif
 #define CHARSET_TCHAR (iconv_charset<TCHAR*>::name())
 
 // Multibyte character specializations
@@ -175,7 +175,11 @@ public:
 template<> class iconv_charset<std::u16string> _kc_final {
 public:
 	static const char *name() {
+#ifdef KC_BIGENDIAN
+		return "UTF-16BE";
+#else
 		return "UTF-16LE";
+#endif
 	}
 	static const char *rawptr(const std::u16string &from)
 	{

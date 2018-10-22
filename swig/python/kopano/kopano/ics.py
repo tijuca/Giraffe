@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -5,6 +6,7 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
+import os
 import struct
 import sys
 import traceback
@@ -13,7 +15,8 @@ import time
 from MAPI import (
     ECImportContentsChanges, SYNC_E_IGNORE, WrapStoreEntryID,
     SYNC_NORMAL, SYNC_ASSOCIATED, SYNC_CATCHUP, SYNC_UNICODE, IStream,
-    STREAM_SEEK_SET, RELOP_GE, RELOP_LT, ECImportHierarchyChanges
+    STREAM_SEEK_SET, RELOP_GE, RELOP_LT, ECImportHierarchyChanges,
+    ECImportAddressbookChanges, MAPI_MAILUSER,
 )
 from MAPI.Defs import (
     PpropFindProp
@@ -21,7 +24,8 @@ from MAPI.Defs import (
 from MAPI.Tags import (
     PR_ENTRYID, PR_STORE_ENTRYID, PR_EC_PARENT_HIERARCHYID,
     PR_EC_HIERARCHYID, PR_STORE_RECORD_KEY, PR_CONTENTS_SYNCHRONIZER,
-    PR_MESSAGE_DELIVERY_TIME, PR_HIERARCHY_SYNCHRONIZER
+    PR_MESSAGE_DELIVERY_TIME, PR_HIERARCHY_SYNCHRONIZER,
+    IID_IECImportAddressbookChanges, IID_IECExportAddressbookChanges,
 )
 from MAPI.Tags import (
     IID_IExchangeImportContentsChanges, IID_IECImportContentsChanges,
@@ -30,7 +34,7 @@ from MAPI.Tags import (
 )
 from MAPI.Struct import (
     MAPIError, MAPIErrorNotFound, MAPIErrorNoAccess, SPropValue,
-    SPropertyRestriction, SAndRestriction,
+    SPropertyRestriction, SAndRestriction, MAPIErrorNetworkError,
 )
 from MAPI.Time import (
     unixtime
@@ -42,47 +46,61 @@ if sys.hexversion >= 0x03000000:
     from . import item as _item
     try:
         from . import folder as _folder
-    except ImportError:
+    except ImportError: # pragma: no cover
         _folder = sys.modules[__package__+'.folder']
     try:
+        from . import user as _user
+    except ImportError: # pragma: no cover
+        _user = sys.modules[__package__ + '.user']
+    try:
         from . import store as _store
-    except ImportError:
-        _store = sys.modules[__package__+'.store']
+    except ImportError: # pragma: no cover
+        _store = sys.modules[__package__ + '.store']
     try:
         from . import utils as _utils
-    except ImportError:
-        _utils = sys.modules[__package__+'.utils']
-else:
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
     import item as _item
     import folder as _folder
     import store as _store
     import utils as _utils
+    import user as _user
+
+TESTING = False
+if os.getenv('PYKO_TESTING'): # env variable used in testset
+    TESTING = True
 
 class TrackingHierarchyImporter(ECImportHierarchyChanges):
-    def __init__(self, server, importer, log, stats):
+    def __init__(self, server, importer, stats):
         ECImportHierarchyChanges.__init__(self, [IID_IExchangeImportHierarchyChanges, IID_IECImportHierarchyChanges])
+        self.server = server
+        self.log = server.log
         self.importer = importer
+        self.stats = stats
 
     def ImportFolderChange(self, props):
-        eid = _benc(PpropFindProp(props, PR_ENTRYID).Value)
-        folder = self.importer.store.folder(entryid=eid)
-        self.importer.update(folder)
+        if hasattr(self.importer, 'update'):
+            eid = _benc(PpropFindProp(props, PR_ENTRYID).Value)
+            folder = self.importer.store.folder(entryid=eid)
+            self.importer.update(folder)
 
     def ImportFolderDeletion(self, flags, sourcekeys):
-        for sourcekey in sourcekeys:
-            folder = _folder.Folder(self.importer.store)
-            folder._sourcekey = _benc(sourcekey)
-            self.importer.delete(folder, flags)
+        if hasattr(self.importer, 'delete'):
+            for sourcekey in sourcekeys:
+                folder = _folder.Folder(self.importer.store, _check_mapiobj=False)
+                folder._sourcekey = _benc(sourcekey)
+                self.importer.delete(folder, flags)
 
     def UpdateState(self, stream):
         pass
 
 class TrackingContentsImporter(ECImportContentsChanges):
-    def __init__(self, server, importer, log, stats):
+    def __init__(self, server, importer, stats):
         ECImportContentsChanges.__init__(self, [IID_IExchangeImportContentsChanges, IID_IECImportContentsChanges])
         self.server = server
+        self.log = server.log
         self.importer = importer
-        self.log = log
         self.stats = stats
         self.skip = False
 
@@ -111,14 +129,10 @@ class TrackingContentsImporter(ECImportContentsChanges):
                 if hasattr(self.importer, 'update'):
                     self.importer.update(item, flags)
             except (MAPIErrorNotFound, MAPIErrorNoAccess): # XXX, mail already deleted, can we do this in a cleaner way?
-                if self.log:
-                    self.log.debug('received change for entryid %s, but it could not be opened' % _benc(entryid.Value))
+                self.log.debug('received change for entryid %s, but it could not be opened', _benc(entryid.Value))
         except Exception:
-            if self.log:
-                self.log.error('could not process change for entryid %s (%r):' % (_benc(entryid.Value), props))
-                self.log.error(traceback.format_exc())
-            else:
-                traceback.print_exc()
+            self.log.error('could not process change for entryid %s (%r):', _benc(entryid.Value), props)
+            self.log.error(traceback.format_exc())
             if self.stats:
                 self.stats['errors'] += 1
         raise MAPIError(SYNC_E_IGNORE)
@@ -134,16 +148,33 @@ class TrackingContentsImporter(ECImportContentsChanges):
                 if hasattr(self.importer, 'delete'):
                     self.importer.delete(item, flags)
         except Exception:
-            if self.log:
-                self.log.error('could not process delete for entries: %s' % [_benc(entry) for entry in entries])
-                self.log.error(traceback.format_exc())
-            else:
-                traceback.print_exc()
+            self.log.error('could not process delete for entries: %s', [_benc(entry) for entry in entries])
+            self.log.error(traceback.format_exc())
             if self.stats:
                 self.stats['errors'] += 1
 
     def ImportPerUserReadStateChange(self, states):
         pass
+
+    def UpdateState(self, stream):
+        pass
+
+class TrackingGABImporter(ECImportAddressbookChanges):
+    def __init__(self, server, importer):
+        ECImportAddressbookChanges.__init__(self, [IID_IECImportAddressbookChanges])
+        self.server = server
+        self.importer = importer
+
+    def ImportABChange(self, type_, entryid):
+        if hasattr(self.importer, 'update') and type_ == MAPI_MAILUSER:
+            user = self.server.user(userid=_benc(entryid))
+            self.importer.update(user)
+
+    def ImportABDeletion(self, type_, entryid):
+        if hasattr(self.importer, 'delete') and type_ == MAPI_MAILUSER:
+            user = _user.User(server=self.server)
+            user._userid = _benc(entryid)
+            self.importer.delete(user)
 
     def UpdateState(self, stream):
         pass
@@ -162,8 +193,8 @@ def state(mapiobj, associated=False):
     stream.Seek(0, STREAM_SEEK_SET)
     return _benc(stream.Read(0xFFFFF))
 
-def hierarchy_sync(server, syncobj, importer, state, log=None, stats=None):
-    importer = TrackingHierarchyImporter(server, importer, log, stats)
+def sync_hierarchy(server, syncobj, importer, state, stats=None):
+    importer = TrackingHierarchyImporter(server, importer, stats)
     exporter = syncobj.OpenProperty(PR_HIERARCHY_SYNCHRONIZER, IID_IExchangeExportChanges, 0, 0)
 
     stream = IStream()
@@ -184,8 +215,10 @@ def hierarchy_sync(server, syncobj, importer, state, log=None, stats=None):
     stream.Seek(0, STREAM_SEEK_SET)
     return _benc(stream.Read(0xFFFFF))
 
-def sync(server, syncobj, importer, state, log, max_changes, associated=False, window=None, begin=None, end=None, stats=None):
-    importer = TrackingContentsImporter(server, importer, log, stats)
+def sync(server, syncobj, importer, state, max_changes, associated=False, window=None, begin=None, end=None, stats=None):
+    log = server.log
+
+    importer = TrackingContentsImporter(server, importer, stats)
     exporter = syncobj.OpenProperty(PR_CONTENTS_SYNCHRONIZER, IID_IExchangeExportChanges, 0, 0)
 
     stream = IStream()
@@ -215,10 +248,11 @@ def sync(server, syncobj, importer, state, log, max_changes, associated=False, w
     if associated:
         flags |= SYNC_ASSOCIATED
     try:
+        if TESTING and os.getenv('PYKO_TEST_NOT_FOUND'):
+            raise MAPIErrorNotFound()
         exporter.Config(stream, flags, importer, restriction, None, None, 0)
     except MAPIErrorNotFound: # syncid purged because of 'sync_lifetime' option in server.cfg: get new syncid.
-        if log:
-            log.warn("Sync state does not exist on server (anymore); requesting new one")
+        log.warn("Sync state does not exist on server (anymore); requesting new one")
 
         syncid, changeid = struct.unpack('<II', _bdec(state))
         stream = IStream()
@@ -233,6 +267,8 @@ def sync(server, syncobj, importer, state, log, max_changes, associated=False, w
     while True:
         try:
             try:
+                if TESTING and os.getenv('PYKO_TEST_NETWORK_ERROR') and not importer.skip:
+                    raise MAPIErrorNetworkError()
                 (steps, step) = exporter.Synchronize(step)
             finally:
                 importer.skip = False
@@ -244,8 +280,7 @@ def sync(server, syncobj, importer, state, log, max_changes, associated=False, w
                 break
 
         except MAPIError as e:
-            if log:
-                log.warn("Received a MAPI error or timeout (error=0x%x, retry=%d/5)" % (e.hr, retry))
+            log.warn("Received a MAPI error or timeout (error=0x%x, retry=%d/5)", e.hr, retry)
 
             time.sleep(sleep_time)
 
@@ -255,15 +290,33 @@ def sync(server, syncobj, importer, state, log, max_changes, associated=False, w
             if retry < 5:
                 retry += 1
             else:
-                if log:
-                    log.error("Too many retries, skipping change")
-                if stats:
+                log.error("Too many retries, skipping change")
+                if stats is not None:
                     stats['errors'] += 1
 
                 importer.skip = True # in case of a timeout or other issue, try to skip the change after trying several times
 
                 retry = 0
 
+    exporter.UpdateState(stream)
+
+    stream.Seek(0, STREAM_SEEK_SET)
+    return _benc(stream.Read(0xFFFFF))
+
+def sync_gab(server, mapistore, importer, state):
+    stream = IStream()
+    stream.Write(_bdec(state))
+    stream.Seek(0, STREAM_SEEK_SET)
+
+    importer = TrackingGABImporter(server, importer)
+    exporter = mapistore.OpenProperty(PR_CONTENTS_SYNCHRONIZER, IID_IECExportAddressbookChanges, 0, 0)
+
+    exporter.Config(stream, 0, importer)
+    steps, step = None, 0
+    while steps != step:
+        steps, step = exporter.Synchronize(step)
+
+    stream = IStream()
     exporter.UpdateState(stream)
 
     stream.Seek(0, STREAM_SEEK_SET)

@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <algorithm>
 #include <cwctype>
@@ -54,18 +41,15 @@ CHtmlToTextParser::CHtmlToTextParser(void)
 	tagMap[L"h4"] = tagParser(false, &CHtmlToTextParser::parseTagHeading);
 	tagMap[L"h5"] = tagParser(false, &CHtmlToTextParser::parseTagHeading);
 	tagMap[L"h6"] = tagParser(false, &CHtmlToTextParser::parseTagHeading);
-
 	tagMap[L"ol"] = tagParser(false, &CHtmlToTextParser::parseTagOL);
 	tagMap[L"/ol"] = tagParser(false, &CHtmlToTextParser::parseTagPopList);
 	tagMap[L"ul"] = tagParser(false, &CHtmlToTextParser::parseTagUL);
 	tagMap[L"/ul"] = tagParser(false, &CHtmlToTextParser::parseTagPopList);
 	tagMap[L"li"] = tagParser(false, &CHtmlToTextParser::parseTagLI);
-	
 	tagMap[L"/dl"] = tagParser(false, &CHtmlToTextParser::parseTagPopList);
 	tagMap[L"dt"] = tagParser(false, &CHtmlToTextParser::parseTagDT);
 	tagMap[L"dd"] = tagParser(false, &CHtmlToTextParser::parseTagDD);
 	tagMap[L"dl"] = tagParser(false, &CHtmlToTextParser::parseTagDL);
-	
 	// @todo check span
 }
 
@@ -79,7 +63,6 @@ void CHtmlToTextParser::Init()
 	fPreMode = false;
 	fTextMode = false;
 	fAddSpace = false;
-
 	strText.clear();
 }
 
@@ -94,7 +77,6 @@ bool CHtmlToTextParser::Parse(const WCHAR *lpwHTML)
 				fAddSpace = true;
 			else
 				fAddSpace = false;
-
 			++lpwHTML;
 			continue;
 		} else if(*lpwHTML == '<' && *lpwHTML+1 != ' ') { // The next char can not be a space!
@@ -145,10 +127,8 @@ std::wstring& CHtmlToTextParser::GetText() {
 void CHtmlToTextParser::addNewLine(bool forceLine) {
 	if (strText.empty())
 		return;
-
 	if (forceLine || cNewlines == 0)
 		strText += L"\r\n";
-
 	++cNewlines;
 }
 
@@ -161,7 +141,6 @@ void CHtmlToTextParser::addChar(WCHAR c) {
 }
 
 void CHtmlToTextParser::addSpace(bool force) {
-	
 	if (force || (!strText.empty() && strText.back() != ' '))
 		addChar(' ');
 }
@@ -175,7 +154,6 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 
 	if(*lpwHTML != '&')
 		return false;
-
 	++lpwHTML;
 
 	if (*lpwHTML == '#') {
@@ -186,7 +164,6 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 			++lpwHTML;
 			base = 16;
 		}
-
 		for (int i = 0; iswxdigit(*lpwHTML) && *lpwHTML != ';' && i < 10; ++i) {
 			entity += *lpwHTML;
 			++lpwHTML;
@@ -205,22 +182,18 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 
 	if(*lpwHTML == ';')
 		++lpwHTML;
-
 	return true;
 }
 
 void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 {
-	bool bTagName = true;
-	bool bTagEnd = false;
-	bool bParseAttrs = false;
+	bool bTagName = true, bTagEnd = false, bParseAttrs = false;
 	decltype(tagMap)::const_iterator iterTag;
 	std::wstring tagName;
 
-	while (*lpwHTML != 0 && !bTagEnd) 
+	while (*lpwHTML != 0 && !bTagEnd)
 	{
 		if (bTagName && *lpwHTML == '!') {
-			
 			// HTML comment or doctype detect, ignore all the text
 			bool fCommentMode = false;
 			++lpwHTML;
@@ -279,11 +252,8 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 
 void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 {
-	std::wstring attrName;
-	std::wstring attrValue;
-	bool bAttrName = true;
-	bool bAttrValue = false;
-	bool bEndTag = false;
+	std::wstring attrName, attrValue;
+	bool bAttrName = true, bAttrValue = false, bEndTag = false;
 	MapAttrs mapAttrs;
 
 	WCHAR firstQuote = 0;
@@ -299,7 +269,6 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 			bAttrName = false;
 			bAttrValue = true;
 		} else if(*lpwHTML == ' ' && bAttrValue && firstQuote == 0) {
-
 			if (!attrValue.empty())
 				bAttrValue = false;
 			// ignore space
@@ -312,7 +281,6 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 					bAttrValue = false;
 				}
 			}
-
 			if(bAttrValue)
 				attrValue.push_back(*lpwHTML);
 		} else if (bAttrName) {
@@ -327,10 +295,8 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 			attrValue.clear();
 			attrName.clear();
 		}
-
 		++lpwHTML;
 	}
-
 	stackAttrs.push(std::move(mapAttrs));
 }
 
@@ -356,7 +322,6 @@ void CHtmlToTextParser::parseTagTR()
 {
 	_TableRow t;
 	t.bFirstCol = true;
-
 	addNewLine( false );
 	stackTableRow.push(t);
 }
@@ -369,11 +334,10 @@ void CHtmlToTextParser::parseTagBTR()
 
 void CHtmlToTextParser::parseTagTDTH()
 {
-	if (!stackTableRow.empty() && stackTableRow.top().bFirstCol == true)
+	if (!stackTableRow.empty() && stackTableRow.top().bFirstCol)
 		 stackTableRow.top().bFirstCol = false;
 	else
 		addChar('\t');
-
 	fTDTHMode = true;
 }
 
@@ -383,7 +347,6 @@ void CHtmlToTextParser::parseTagIMG()
 		cNewlines = 0;
 		fTDTHMode = false;
 	}
-
 	if (!stackAttrs.empty())
 		stackAttrs.pop();
 }
@@ -398,10 +361,8 @@ void CHtmlToTextParser::parseTagBA()
 		cNewlines = 0;
 		fTDTHMode = false;
 	}
-
 	if(!stackAttrs.empty())
 		stackAttrs.pop();
-
 }
 
 bool CHtmlToTextParser::addURLAttribute(const WCHAR *lpattr, bool bSpaces) {

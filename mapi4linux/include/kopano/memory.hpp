@@ -1,18 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
  * Copyright 2016 Kopano and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #ifndef _KC_MEMORY_HPP
 #define _KC_MEMORY_HPP 1
@@ -140,7 +129,6 @@ template<typename T, typename Deleter = default_delete> class memory_ptr {
 	T *operator->(void) const noexcept { return m_ptr; }
 	T *get(void) const noexcept { return m_ptr; }
 	operator T *(void) const noexcept { return m_ptr; }
-	T *operator+(size_t n) const noexcept { return m_ptr + n; }
 	/* Modifiers */
 	T *release(void) noexcept
 	{
@@ -286,15 +274,30 @@ class rowset_delete {
 	void operator()(ROWLIST *x) const { FreeProws(reinterpret_cast<SRowSet *>(x)); }
 };
 
-class rowset_ptr : public memory_ptr<SRowSet, rowset_delete> {
+class rowset_ptr {
 	public:
 	typedef unsigned int size_type;
+	typedef SRowSet *pointer;
 	rowset_ptr() = default;
-	rowset_ptr(SRowSet *p) : memory_ptr(p) {}
+	rowset_ptr(SRowSet *p) : m_rp(p) {}
 	void operator&() = delete;
-	size_type size() const { return (*this)->cRows; }
-	const SRow &operator[](size_t i) const { return (*this)->aRow[i]; }
-	bool empty() const { return *this == nullptr || (*this)->cRows == 0; }
+	size_type size() const { return m_rp->cRows; }
+	const SRow &operator[](size_t i) const { return m_rp->aRow[i]; }
+	bool empty() const { return m_rp == nullptr || m_rp->cRows == 0; }
+	/*
+	 * rowset_ptr can only be turned back into a memory_ptr
+	 * subclass when memory_ptr loses its operator T*().
+	 */
+	SRowSet *operator->() { return m_rp.get(); }
+	memory_proxy2<SRowSet> operator~() { return ~m_rp; }
+	bool operator==(std::nullptr_t) const { return m_rp == nullptr; }
+	bool operator!=(std::nullptr_t) const { return m_rp != nullptr; }
+	SRowSet *get() { return m_rp.get(); }
+	SRowSet *release() { return m_rp.release(); }
+	void reset() { m_rp.reset(); }
+
+	protected:
+	memory_ptr<SRowSet, rowset_delete> m_rp;
 };
 
 typedef memory_ptr<ADRLIST, rowset_delete> adrlist_ptr;
@@ -361,6 +364,32 @@ template<typename T> template<typename P> P object_ptr<T>::as(void)
 	QueryInterface(tmp);
 	return tmp;
 }
+
+template<typename T> struct mkuniq_helper {
+	typedef std::unique_ptr<T> single_object;
+};
+
+template<typename T> struct mkuniq_helper<T[]> {
+	typedef std::unique_ptr<T[]> array;
+};
+
+template<typename T, size_t Z> struct mkuniq_helper<T[Z]> {
+	struct invalid_type {};
+};
+
+template<typename T, typename... Args> inline typename mkuniq_helper<T>::single_object
+make_unique_nt(Args &&...args)
+{
+	return std::unique_ptr<T>(new(std::nothrow) T(std::forward<Args>(args)...));
+}
+
+template<typename T> inline typename mkuniq_helper<T>::array make_unique_nt(size_t z)
+{
+	return std::unique_ptr<T>(new(std::nothrow) typename std::remove_extent<T>::type[z]);
+}
+
+template<typename T, typename... Args> inline typename mkuniq_helper<T>::invalid_type
+make_unique_nt(Args &&...) = delete;
 
 } /* namespace */
 

@@ -1,12 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """
 Part of the high-level python bindings for Kopano
 
 Copyright 2017 - Kopano and its licensors (see LICENSE file for details)
 """
 
+import sys
+
 from MAPI import (
-    ROW_REMOVE, FL_PREFIX, RELOP_NE, ROW_ADD, ROW_MODIFY, MAPI_BEST_ACCESS,
-    MAPI_UNICODE,
+    ROW_REMOVE, FL_PREFIX, RELOP_NE, ROW_ADD, MAPI_BEST_ACCESS,
+    MAPI_UNICODE, MAPI_TO,
 )
 from MAPI.Tags import (
     PR_RULE_CONDITION, PR_RULE_ACTIONS, PR_RULE_PROVIDER_W, ACTTYPE, PR_ENTRYID,
@@ -25,10 +28,17 @@ from MAPI.Struct import (
     SExistRestriction,
 )
 from .compat import (
-    hex as _hex, unhex as _unhex, repr as _repr,
+    bdec as _bdec, repr as _repr,
 )
-from .defs import *
 from .errors import NotFoundError
+
+if sys.hexversion >= 0x03000000:
+    try:
+        from . import utils as _utils
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
+    import utils as _utils
 
 USERPROPS = [
     PR_ENTRYID,
@@ -39,7 +49,6 @@ USERPROPS = [
     PR_SMTP_ADDRESS_W,
     PR_OBJECT_TYPE,
     PR_DISPLAY_TYPE,
-    PR_RECIPIENT_TYPE,
 ]
 
 class Delegation(object):
@@ -52,14 +61,14 @@ class Delegation(object):
     @property
     def see_private(self):
         fbmsg, (entryids, names, flags) = self.store._fbmsg_delgs()
-        pos = entryids.Value.index(_unhex(self.user.userid))
+        pos = entryids.Value.index(_bdec(self.user.userid))
 
         return bool(flags.Value[pos] & 1)
 
     @see_private.setter
     def see_private(self, b):
         fbmsg, (entryids, names, flags) = self.store._fbmsg_delgs()
-        pos = entryids.Value.index(_unhex(self.user.userid))
+        pos = entryids.Value.index(_bdec(self.user.userid))
 
         if b:
             flags.Value[pos] |= 1
@@ -67,7 +76,7 @@ class Delegation(object):
             flags.Value[pos] &= ~1
 
         fbmsg.SetProps([flags])
-        fbmsg.SaveChanges(0)
+        _utils._save(fbmsg)
 
     @staticmethod
     def _parse_rule(store):
@@ -111,17 +120,23 @@ class Delegation(object):
         userprops = []
         for userid in userids:
             user = store.server.gab.OpenEntry(userid, None, MAPI_BEST_ACCESS)
-            userprops.append(user.GetProps(USERPROPS, MAPI_UNICODE))
+            props = user.GetProps(USERPROPS, MAPI_UNICODE)
+            # Hardcode recipient type to TO
+            props.append(SPropValue(PR_RECIPIENT_TYPE, MAPI_TO))
+            userprops.append(props)
 
-        actions.append(ACTION( ACTTYPE.OP_DELEGATE, 0, None, None, 0, actFwdDelegate(userprops)))
+        actions.append(ACTION(ACTTYPE.OP_DELEGATE, 0, None, None, 0, actFwdDelegate(userprops)))
         if deletion:
-            actions.append(ACTION( ACTTYPE.OP_DELETE,  0, None, None, 0, None))
+            actions.append(ACTION(ACTTYPE.OP_DELETE, 0, None, None, 0, None))
         row.append(SPropValue(PR_RULE_ACTIONS, ACTIONS(1, actions)))
 
-        cond = SAndRestriction([SContentRestriction(FL_PREFIX, PR_MESSAGE_CLASS_W, SPropValue(PR_MESSAGE_CLASS_W, u"IPM.Schedule.Meeting")),
-            SNotRestriction( SExistRestriction(PR_DELEGATED_BY_RULE) ),
-            SOrRestriction([SNotRestriction( SExistRestriction(PR_SENSITIVITY)),
-            SPropertyRestriction(RELOP_NE, PR_SENSITIVITY, SPropValue(PR_SENSITIVITY, 2))])
+        cond = SAndRestriction([
+            SContentRestriction(FL_PREFIX, PR_MESSAGE_CLASS_W, SPropValue(PR_MESSAGE_CLASS_W, u"IPM.Schedule.Meeting")),
+            SNotRestriction(SExistRestriction(PR_DELEGATED_BY_RULE) ),
+            SOrRestriction([
+                SNotRestriction(SExistRestriction(PR_SENSITIVITY)),
+                SPropertyRestriction(RELOP_NE, PR_SENSITIVITY, SPropValue(PR_SENSITIVITY, 2))
+            ])
         ])
         row.append(SPropValue(PR_RULE_CONDITION, cond))
         rulerows = [ROWENTRY(ROW_ADD, row)]
@@ -132,15 +147,15 @@ class Delegation(object):
     def send_copy(self):
         """Delegate receives copies of meeting requests."""
         userids, deletion = self._parse_rule(self.store)
-        return _unhex(self.user.userid) in userids
+        return _bdec(self.user.userid) in userids
 
     @send_copy.setter
     def send_copy(self, value):
         userids, deletion = self._parse_rule(self.store)
         if value:
-            userids.append(_unhex(self.user.userid)) # XXX dupe
+            userids.append(_bdec(self.user.userid)) # XXX dupe
         else:
-            userids = [u for u in userids if u != _unhex(self.user.userid)]
+            userids = [u for u in userids if u != _bdec(self.user.userid)]
         self._save_rule(self.store, userids, deletion)
 
     @property
@@ -173,7 +188,7 @@ class Delegation(object):
 
         fbmsg, (entryids, names, flags) = self.store._fbmsg_delgs()
         try:
-            pos = entryids.Value.index(_unhex(self.user.userid))
+            pos = entryids.Value.index(_bdec(self.user.userid))
         except ValueError:
             raise NotFoundError("no delegation for user '%s'" % self.user.name)
 
@@ -182,11 +197,10 @@ class Delegation(object):
         del flags.Value[pos]
 
         fbmsg.SetProps([entryids, names, flags])
-        fbmsg.SaveChanges(0)
+        _utils._save(fbmsg)
 
     def __unicode__(self):
         return u"Delegation('%s')" % self.user.name
 
     def __repr__(self):
         return _repr(self)
-

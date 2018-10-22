@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -11,15 +12,15 @@ import time
 
 from MAPI import (
     PT_ERROR, PT_BINARY, PT_MV_BINARY, PT_UNICODE, PT_LONG, PT_OBJECT,
-    PT_BOOLEAN, PT_STRING8, MV_FLAG, PT_SHORT, PT_MV_SHORT, PT_LONGLONG,
+    PT_BOOLEAN, MV_FLAG, PT_SHORT, PT_MV_SHORT, PT_LONGLONG,
     PT_MV_LONG, PT_FLOAT, PT_MV_FLOAT, PT_DOUBLE, PT_MV_DOUBLE, PT_STRING8,
     PT_CURRENCY, PT_MV_CURRENCY, PT_APPTIME, PT_MV_APPTIME, PT_MV_LONGLONG,
-    PT_SYSTIME, MAPI_E_NOT_ENOUGH_MEMORY, KEEP_OPEN_READWRITE, PT_MV_STRING8,
+    PT_SYSTIME, MAPI_E_NOT_ENOUGH_MEMORY, PT_MV_STRING8,
     PT_MV_UNICODE, PT_MV_SYSTIME, PT_CLSID, PT_MV_CLSID, MNID_STRING,
-    MAPI_E_NOT_FOUND, MNID_ID, KEEP_OPEN_READWRITE, MAPI_UNICODE,
+    MAPI_E_NOT_FOUND, MNID_ID, MAPI_UNICODE,
 )
 from MAPI.Defs import (
-    PROP_ID, PROP_TAG, PROP_TYPE, HrGetOneProp, bin2hex,
+    PROP_ID, PROP_TYPE, HrGetOneProp,
     CHANGE_PROP_TYPE,
 )
 from MAPI.Struct import (
@@ -36,7 +37,7 @@ from .defs import (
     REV_TAG, REV_TYPE, GUID_NAMESPACE, MAPINAMEID, NAMESPACE_GUID, STR_GUID,
 )
 from .compat import (
-    repr as _repr, fake_unicode as _unicode, is_int as _is_int, hex as _hex,
+    benc as _benc, repr as _repr, fake_unicode as _unicode, is_int as _is_int,
     is_str as _is_str,
 )
 from .errors import Error, NotFoundError
@@ -44,9 +45,9 @@ from .errors import Error, NotFoundError
 if sys.hexversion >= 0x03000000:
     try:
         from . import utils as _utils
-    except ImportError:
-        _utils = sys.modules[__package__+'.utils']
-else:
+    except ImportError: # pragma: no cover
+        _utils = sys.modules[__package__ + '.utils']
+else: # pragma: no cover
     import utils as _utils
 
 TYPEMAP = {
@@ -134,19 +135,10 @@ def _name_to_proptag(proptag, mapiobj, proptype=None):
         return None, proptype, namespace, name
 
     nameid = MAPINAMEID(guid, MNID_ID if isinstance(name, int) else MNID_STRING, name)
-    lpname = mapiobj.GetIDsFromNames([nameid], 0)
+    lpname = mapiobj.GetIDsFromNames([nameid], 0) # TODO MAPI_CREATE, or too dangerous because of potential db overflow?
     proptag = CHANGE_PROP_TYPE(lpname[0], proptype)
 
     return proptag, proptype, namespace, name
-
-def _proptag_to_name(proptag, store, proptype=False):
-    lpname = store.mapiobj.GetNamesFromIDs([proptag], None, 0)[0]
-    namespace = GUID_NAMESPACE.get(lpname.guid)
-    name = lpname.id
-    if proptype:
-        type_ = REV_TYPE.get(PROP_TYPE(proptag))
-        return u'%s:%s:%s' % (namespace, name, type_)
-    return u'%s:%s' % (namespace, name)
 
 def create_prop(self, mapiobj, proptag, value=None, proptype=None): # XXX selfie
     if _is_int(proptag) or \
@@ -181,7 +173,7 @@ def create_prop(self, mapiobj, proptag, value=None, proptype=None): # XXX selfie
     # handle invalid type versus value. For example proptype=PT_UNICODE and value=True
     try:
         mapiobj.SetProps([SPropValue(proptag2, value)])
-        mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(mapiobj)
     except TypeError:
         raise Error('Could not create property, type and value did not match')
 
@@ -198,7 +190,7 @@ def prop(self, mapiobj, proptag, create=False, value=None, proptype=None): # XXX
         except MAPIErrorNotEnoughMemory:
             data = _utils.stream(mapiobj, proptag)
             sprop = SPropValue(proptag, data)
-        except MAPIErrorNotFound as e:
+        except MAPIErrorNotFound:
             # not found, create it?
             if create:
                 return create_prop(self, mapiobj, proptag, value=value, proptype=proptype)
@@ -265,9 +257,8 @@ class SPropDelayedValue(SPropValue):
 class Property(object):
     """Property class"""
 
-    def __init__(self, parent_mapiobj, mapiobj): # XXX rethink attributes, names.. add guidname..?
+    def __init__(self, parent_mapiobj, mapiobj):
         self._parent_mapiobj = parent_mapiobj
-        #: Property tag, e.g. 0x37001f for PR_SUBJECT
         self.proptag = mapiobj.ulPropTag
 
         if PROP_TYPE(mapiobj.ulPropTag) == PT_ERROR and mapiobj.Value == MAPI_E_NOT_ENOUGH_MEMORY:
@@ -275,7 +266,7 @@ class Property(object):
                 self.proptag = PR_BODY_W
                 mapiobj = SPropDelayedValue(parent_mapiobj, self.proptag)
             elif PROP_ID(self.proptag) in (PROP_ID(PR_RTF_COMPRESSED), PROP_ID(PR_HTML)):
-                self.proptag = PROP_TAG(PT_BINARY, PROP_ID(self.proptag))
+                self.proptag = CHANGE_PROP_TYPE(self.proptag, PT_BINARY)
                 mapiobj = SPropDelayedValue(parent_mapiobj, self.proptag)
             else: # XXX possible to use above trick to infer all proptags?
                 for proptype in (PT_BINARY, PT_UNICODE): # XXX slow, incomplete?
@@ -290,32 +281,70 @@ class Property(object):
                     except MAPIErrorNotFound:
                         pass
 
-        self.id_ = self.proptag >> 16
         self.mapiobj = mapiobj
+
         self._value = None
+        self.__lpname = None
 
-        self.idname = REV_TAG.get(self.proptag)
-        self.type_ = PROP_TYPE(self.proptag)
-        self.typename = REV_TYPE.get(self.type_)
-        self.named = False
-        self.kind = None
-        self.kindname = None
-        self.guid = None
-        self.name = None
-        self.namespace = None
+    @property
+    def id_(self):
+        return PROP_ID(self.proptag)
 
-        if self.id_ >= 0x8000: # possible named prop
+    @property
+    def idname(self):
+        return REV_TAG.get(self.proptag)
+
+    @property
+    def type_(self):
+        return PROP_TYPE(self.proptag)
+
+    @property
+    def typename(self):
+        return REV_TYPE.get(self.type_)
+
+    @property
+    def _lpname(self):
+        if self.__lpname is None and self.id_ >= 0x8000:
             try:
-                lpname = self._parent_mapiobj.GetNamesFromIDs([self.proptag], None, 0)[0]
-                if lpname:
-                    self.guid = bin2hex(lpname.guid)
-                    self.namespace = GUID_NAMESPACE.get(lpname.guid)
-                    self.name = lpname.id
-                    self.kind = lpname.kind
-                    self.kindname = 'MNID_STRING' if lpname.kind == MNID_STRING else 'MNID_ID'
-                    self.named = True
+                self.__lpname = self._parent_mapiobj.GetNamesFromIDs([self.proptag], None, 0)[0]
             except MAPIErrorNoSupport: # XXX user.props()?
                 pass
+        return self.__lpname
+
+    @property
+    def named(self):
+        lpname = self._lpname
+        return bool(lpname)
+
+    @property
+    def guid(self):
+        lpname = self._lpname
+        if lpname:
+            return _benc(lpname.guid)
+
+    @property
+    def namespace(self):
+        lpname = self._lpname
+        if lpname:
+            return GUID_NAMESPACE.get(lpname.guid)
+
+    @property
+    def name(self):
+        lpname = self._lpname
+        if lpname:
+            return lpname.id
+
+    @property
+    def kind(self):
+        lpname = self._lpname
+        if lpname:
+            return lpname.kind
+
+    @property
+    def kindname(self):
+        lpname = self._lpname
+        if lpname:
+            return u'MNID_STRING' if lpname.kind == MNID_STRING else u'MNID_ID'
 
     @property
     def value(self):
@@ -339,12 +368,12 @@ class Property(object):
         if self.type_ == PT_SYSTIME:
             value = unixtime(time.mktime(value.timetuple()))
         self._parent_mapiobj.SetProps([SPropValue(self.proptag, value)])
-        self._parent_mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+        _utils._save(self._parent_mapiobj)
 
     @property
     def strid(self):
         if self.named:
-            return u'%s:%s' % (self.namespace, self.name)
+            return u'%s:%s' % (self.namespace or self.guid, self.name)
         else:
             return self.idname or hex(self.proptag)
 
@@ -361,7 +390,7 @@ class Property(object):
             elif v is None:
                 return u''
             elif self.type_ in (PT_BINARY, PT_MV_BINARY) or isinstance(v, bytes):
-                return _hex(v)
+                return _benc(v)
             else:
                 return _unicode(v)
         return flatten(self.value)

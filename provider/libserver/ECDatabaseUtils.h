@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECDATABASEUTILS_H
@@ -25,7 +13,6 @@
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
 #include <kopano/ECLogger.h>
-
 #include <string>
 
 struct propVal;
@@ -80,15 +67,11 @@ unsigned int GetColWidth(unsigned int ulPropType);
 ECRESULT	GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize);
 ECRESULT	CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned int *ulColId, std::string &strColData, ECDatabase *lpMySQL, bool bTruncate);
 ECRESULT	CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LENGTHS lpLen, propVal *lpPropVal);
-
 gsoap_size_t GetMVItemCount(struct propVal *lpPropVal);
 ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem, std::string &strColName, std::string &strColData, ECDatabase *lpDatabase);
-
 ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize, unsigned int *lpulLastPos, std::string *lpstrData);
-
 unsigned int NormalizeDBPropTag(unsigned int ulPropTag);
 bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2);
-
 
 /**
  * This class is used to suppress the lock-error logging for the database passed to its
@@ -96,7 +79,7 @@ bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2);
  * This means the lock-error logging is restored when the scope in which an instance of
  * this class exists is exited.
  */
-class SuppressLockErrorLogging _kc_final {
+class SuppressLockErrorLogging final {
 public:
 	SuppressLockErrorLogging(ECDatabase *lpDatabase);
 	~SuppressLockErrorLogging();

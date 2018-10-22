@@ -1,37 +1,24 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
 #include <kopano/platform.h>
-#include "config.h"
 #include <chrono>
+#include <exception>
 #include <iostream>
 #include <string>
 #include <mapi.h>
 #include <mapiutil.h>
 #include <edkmdb.h>
-
 #ifdef HAVE_CURSES_H
 #include <curses.h>
 #endif
-
 #include <map>
 #include <set>
 #include <getopt.h>
-
 #include <kopano/CommonUtil.h>
 #include <kopano/stringutil.h>
 #include <kopano/ECTags.h>
@@ -40,6 +27,7 @@
 #include <kopano/memory.hpp>
 #include <kopano/ECLogger.h>
 #include <kopano/mapi_ptr.h>
+#include <kopano/timeutil.hpp>
 #include "ConsoleTable.h"
 
 using namespace KC;
@@ -124,10 +112,10 @@ struct SESSION {
 	std::string strUser, strIP, strBusy, strState, strPeer;
 	std::string strClientVersion, strClientApp, strClientAppVersion;
 	std::string strClientAppMisc;
-    
+
     bool operator <(const SESSION &b) const
     {
-        return this->dtimes.dblReal > b.dtimes.dblReal;
+		return dtimes.dblReal > b.dtimes.dblReal;
     }
 };
 
@@ -145,7 +133,7 @@ static std::string GetString(const SRow &row, ULONG ulPropTag)
 	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return "";
-        
+
     switch(PROP_TYPE(ulPropTag)) {
         case PT_STRING8: return lpProp->Value.lpszA;
         case PT_MV_STRING8: {
@@ -162,7 +150,7 @@ static std::string GetString(const SRow &row, ULONG ulPropTag)
             return s;
         }
     }
-    
+
     return "";
 }
 
@@ -171,7 +159,7 @@ static unsigned long long GetLongLong(const SRow &row, ULONG ulPropTag)
 	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return -1;
-        
+
     switch(PROP_TYPE(ulPropTag)) {
         case PT_LONG: return lpProp->Value.ul;
         case PT_LONGLONG: return lpProp->Value.li.QuadPart;
@@ -185,11 +173,11 @@ static double GetDouble(const SRow &row, ULONG ulPropTag)
 	auto lpProp = row.cfind(ulPropTag);
     if(lpProp == NULL)
         return 0;
-        
+
     switch(PROP_TYPE(ulPropTag)) {
         case PT_DOUBLE: return lpProp->Value.dbl;
     }
-    
+
     return 0;
 }
 
@@ -221,7 +209,7 @@ static void showtop(LPMDB lpStore)
         return;
     }
 
-    cbreak(); 
+	cbreak();
     noecho();
     nonl();
     nodelay(win, TRUE);
@@ -245,7 +233,7 @@ static void showtop(LPMDB lpStore)
 		auto cr_now = std::chrono::steady_clock::now();
 		auto dblTime = dur2dbl(cr_now - dblLast);
 		dblLast = std::move(cr_now);
-            
+
         for (ULONG i = 0; i < lpsRowSet->cRows; ++i) {
 		auto lpName  = lpsRowSet[i].cfind(PR_DISPLAY_NAME_A);
 		auto lpValue = lpsRowSet[i].cfind(PR_EC_STATS_SYSTEM_VALUE);
@@ -254,20 +242,20 @@ static void showtop(LPMDB lpStore)
                 mapStats[lpName->Value.lpszA] = lpValue->Value.lpszA;
             }
         }
-        
+
         hr = lpStore->OpenProperty(PR_EC_STATSTABLE_SESSIONS, &IID_IMAPITable, 0, 0, &~lpTable);
         if(hr != hrSuccess)
             goto exit;
         hr = lpTable->QueryRows(-1, 0, &~lpsRowSet);
         if(hr != hrSuccess)
             break;
-            
+
 		std::list<SESSION> lstSessions;
 		std::map<unsigned long long, unsigned int> mapSessionGroups;
 		std::set<std::string> setUsers;
 		double dblUser = 0, dblSystem = 0;
 		unsigned int ulSessGrp = 1;
-        
+
         for (ULONG i = 0; i < lpsRowSet->cRows; ++i) {
             SESSION session;
 
@@ -295,10 +283,10 @@ static void showtop(LPMDB lpStore)
                 session.dtimes.dblUser = (session.times.dblUser - iterTimes->second.dblUser) / dblTime;
                 session.dtimes.dblSystem = (session.times.dblSystem - iterTimes->second.dblSystem) / dblTime;
                 session.dtimes.dblReal = (session.times.dblReal - iterTimes->second.dblReal) / dblTime;
-                
+
                 dblUser += session.dtimes.dblUser;
                 dblSystem += session.dtimes.dblSystem;
-                
+
                 session.dtimes.ulRequests = session.times.ulRequests - iterTimes->second.ulRequests;
             } else {
                 session.dtimes.dblUser = session.dtimes.dblSystem = session.dtimes.dblReal = 0;
@@ -326,7 +314,7 @@ static void showtop(LPMDB lpStore)
 		auto now = time(nullptr);
 		strftime(date, sizeof(date), "%c", localtime(&now) );
         wprintw(win, "Last update: %s (%.1fs since last)", date, dblTime);
-		
+
         wmove(win, 1,0);
         wprintw(win, "Sess: %d", lstSessions.size());
         wmove(win, 1, 12);
@@ -367,7 +355,7 @@ static void showtop(LPMDB lpStore)
         if (bColumns[9]) { wmove(win, 4, ofs); wprintw(win, "NREQ");		ofs += cols[10]; }
         if (bColumns[10]) { wmove(win, 4, ofs); wprintw(win, "STAT");		ofs += cols[11]; }
         if (bColumns[11]) { wmove(win, 4, ofs); wprintw(win, "TASK"); }
-        
+
 	for (const auto &ses : lstSessions) {
 		if (ses.dtimes.dblUser + ses.dtimes.dblSystem > 0)
                 wattron(win, A_BOLD);
@@ -449,7 +437,7 @@ static void showtop(LPMDB lpStore)
 			}
 
             ++line;
-            
+
             if(line + 5>= wy)
             	break;
         }
@@ -480,7 +468,7 @@ exit:
 	cerr << "Not compiled with ncurses support." << endl;
 #endif
 }
- 
+
 static std::string mapitable_ToString(const SPropValue *lpProp)
 {
 	switch (PROP_TYPE(lpProp->ulPropTag)) {
@@ -527,7 +515,7 @@ static HRESULT MAPITablePrint(IMAPITable *lpTable, bool humanreadable /* = true 
 		return hr;
 	ct.Resize(ptrRows.size(), ptrColumns->cValues);
 	for (unsigned int i = 0; i < ptrColumns->cValues; ++i)
-		ct.SetHeader(i, stringify(ptrColumns->aulPropTag[i], true));
+		ct.SetHeader(i, stringify_hex(ptrColumns->aulPropTag[i]));
 	for (unsigned int i = 0; i < ptrRows.size(); ++i)
 		for (unsigned int j = 0; j < ptrRows[i].cValues; ++j)
 			ct.SetColumn(i, j, mapitable_ToString(&ptrRows[i].lpProps[j]));
@@ -537,10 +525,9 @@ static HRESULT MAPITablePrint(IMAPITable *lpTable, bool humanreadable /* = true 
 
 static void dumptable(eTableType eTable, LPMDB lpStore, bool humanreadable)
 {
-	HRESULT hr = hrSuccess;
 	object_ptr<IMAPITable> lpTable;
 
-	hr = lpStore->OpenProperty(ulTableProps[eTable], &IID_IMAPITable, 0, MAPI_DEFERRED_ERRORS, &~lpTable);
+	auto hr = lpStore->OpenProperty(ulTableProps[eTable], &IID_IMAPITable, 0, MAPI_DEFERRED_ERRORS, &~lpTable);
 	if (hr != hrSuccess) {
 		cout << "Unable to open requested statistics table" << endl;
 		return;
@@ -573,10 +560,8 @@ static void print_help(const char *name)
 	cout << "  --dump, -d" << "\t\tPrint output as comma separated fields" << endl;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv) try
 {
-	HRESULT hr = hrSuccess;
-	object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false), false);
 	AutoMAPI mapiinit;
 	object_ptr<IMAPISession> lpSession;
 	object_ptr<IMsgStore> lpStore;
@@ -586,7 +571,6 @@ int main(int argc, char *argv[])
 
 	setlocale(LC_MESSAGES, "");
 	setlocale(LC_CTYPE, "");
-	
 	if(argc < 2) {
 		print_help(argv[0]);
 		return 1;
@@ -627,12 +611,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	hr = mapiinit.Initialize();
+	auto hr = mapiinit.Initialize();
 	if (hr != hrSuccess) {
 		cerr << "Cannot init mapi" << endl;
 		return EXIT_FAILURE;
 	}
-	
+
 	if(user) {
         pass = get_password("Enter password:");
         if(!pass) {
@@ -658,4 +642,6 @@ int main(int argc, char *argv[])
 	else
 		dumptable(eTable, lpStore, humanreadable);
 	return EXIT_SUCCESS;
+} catch (...) {
+	std::terminate();
 }

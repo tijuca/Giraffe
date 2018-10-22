@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -27,4 +28,3 @@ class Restriction(object):
 
     def __repr__(self):
         return _repr(self)
-

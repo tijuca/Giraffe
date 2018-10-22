@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano
 
@@ -13,7 +14,7 @@ from .errors import ConfigError
 
 if sys.hexversion >= 0x03000000:
     from . import utils as _utils
-else:
+else: # pragma: no cover
     import utils as _utils
 
 class ConfigOption:
@@ -49,7 +50,10 @@ class ConfigOption:
             raise ConfigError("%s: '%s' is not a legal value" % (key, value))
         if self.kwargs.get('multiple'):
             return [int(x, base=self.kwargs.get('base', 10)) for x in value.split()]
-        return int(value, base=self.kwargs.get('base', 10))
+        try:
+            return int(value, base=self.kwargs.get('base', 10))
+        except ValueError:
+            raise ConfigError("%s: '%s' is not a legal value" % (key, value))
 
     def parse_boolean(self, key, value):
         return {'no': False, 'yes': True, '0': False, '1': True, 'false': False, 'true': True}[value]
@@ -92,10 +96,11 @@ Example::
 
         try:
             fh = open(filename, "r")
-            self._parse_config(fh)
         except:
-            msg = "cannot open config file %s running with defaults"
+            msg = "could not open config file %s, running with defaults" % filename
             self.info.append(msg)
+        else:
+            self._parse_config(fh)
 
         if self.config is not None:
             for key, val in self.config.items():
@@ -126,13 +131,13 @@ Example::
                     try:
                         self.data[key] = self.config[key].parse(key, value)
                     except ConfigError as e:
-                        if service:
-                            self.errors.append(e.message)
+                        if self.service:
+                            self.errors.append(str(e))
                         else:
                             raise
             else:
                 msg = "%s: unknown config option" % key
-                if service:
+                if self.service:
                     self.warnings.append(msg)
                 else:
                     raise ConfigError(msg)
@@ -175,7 +180,7 @@ CONFIG = {
     'pid_file': Config.string(default=None),
     'run_as_user': Config.string(default=None),
     'run_as_group': Config.string(default=None),
-    'running_path': Config.string(check_path=True, default='/var/lib/kopano'),
+    'running_path': Config.string(check_path=True, default='/var/lib/kopano/empty'),
     'server_socket': Config.string(default=None),
     'sslkey_file': Config.string(default=None),
     'sslkey_pass': Config.string(default=None),

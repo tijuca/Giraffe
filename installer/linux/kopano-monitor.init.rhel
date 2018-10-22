@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# kopano-monitor Kopano Core Quota Monitor
+# kopano-monitor Kopano Groupware Core Quota Monitor
 #
 # chkconfig: 345 86 24
 # processname: /usr/sbin/kopano-monitor
 # config: /etc/kopano/monitor.cfg
 # pidfile: /var/run/kopano/monitor.pid
-
+# SPDX-License-Identifier: AGPL-3.0-only
 ### BEGIN INIT INFO
 # Provides: kopano-monitor
 # Required-Start: $local_fs $network $remote_fs $syslog
 # Required-Stop: $local_fs $network $remote_fs $syslog
 # Should-Start: kopano-server
 # Should-Stop: kopano-server
-# Short-Description: Kopano Core Quota Monitor
+# Short-Description: Kopano Grouwware Core Quota Monitor
 ### END INIT INFO
 
 MONITORCONFIG=/etc/kopano/monitor.cfg
@@ -26,12 +26,7 @@ MONITORCONFIG_OPT=""
 [ ! -z $MONITORCONFIG -a -f $MONITORCONFIG ] && MONITORCONFIG_OPT="-c $MONITORCONFIG"
 
 # Switch to C, like at boot time.
-unset LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
-# Update with user settings.
-LC_CTYPE=en_US.UTF-8
-LC_TIME=en_US.UTF-8
-[ -f /etc/sysconfig/kopano ] && . /etc/sysconfig/kopano
-export LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
+unset LANG LC_CTYPE LC_NUMERIC LC_COLLATE LC_MESSAGES LC_ALL
 
 # Source function library.
 . /etc/rc.d/init.d/functions

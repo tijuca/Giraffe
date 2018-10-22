@@ -1,21 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <string>
 #include <utility>
@@ -41,7 +27,7 @@
 
 namespace KC {
 
-class servername _kc_final {
+class servername final {
 public:
 	servername(LPCTSTR lpszName): m_strName(lpszName) {}
 	servername(const servername &other): m_strName(other.m_strName) {}
@@ -70,11 +56,11 @@ static HRESULT GetMailboxDataPerServer(IMAPISession *lpSession, const char *lpsz
 static HRESULT UpdateServerList(IABContainer *lpContainer, std::set<servername> &listServers);
 
 template <typename string_type, ULONG prAccount>
-class UserListCollector _kc_final : public DataCollector {
+class UserListCollector final : public DataCollector {
 public:
 	UserListCollector(IMAPISession *lpSession);
-	virtual HRESULT GetRequiredPropTags(LPMAPIPROP prop, LPSPropTagArray *) const _kc_override;
-	virtual HRESULT CollectData(LPMAPITABLE store_table) _kc_override;
+	virtual HRESULT GetRequiredPropTags(IMAPIProp *, SPropTagArray **) const override;
+	virtual HRESULT CollectData(IMAPITable *store_table) override;
 	void move_result(std::list<string_type> *lplstUsers);
 
 private:
@@ -90,7 +76,6 @@ HRESULT	DataCollector::GetRequiredPropTags(LPMAPIPROP /*lpProp*/, LPSPropTagArra
 }
 
 HRESULT DataCollector::GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRestriction) {
-	HRESULT hr = hrSuccess;
 	SPropValue sPropOrphan;
 
 	PROPMAP_START(1)
@@ -100,7 +85,7 @@ HRESULT DataCollector::GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRest
 	sPropOrphan.ulPropTag = PR_EC_DELETED_STORE;
 	sPropOrphan.Value.b = TRUE;
 
-	hr = ECAndRestriction(
+	return ECAndRestriction(
 		ECNotRestriction(
 			ECAndRestriction(
 				ECExistRestriction(PR_EC_DELETED_STORE) +
@@ -109,7 +94,6 @@ HRESULT DataCollector::GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRest
 		) +
 		ECExistRestriction(CHANGE_PROP_TYPE(PROP_STORE_ENTRYIDS, PT_MV_BINARY))
 	).CreateMAPIRestriction(lppRestriction, ECRestriction::Full);
-	return hr;
 }
 
 template<typename string_type, ULONG prAccount>
@@ -134,12 +118,11 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 			if (ptrRows[i].lpProps[0].ulPropTag != PR_MAILBOX_OWNER_ENTRYID)
 				continue;
-			HRESULT hrTmp;
 			ULONG ulType;
 			MAPIPropPtr ptrUser;
 			SPropValuePtr ptrAccount;
 
-			hrTmp = m_ptrSession->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb,
+			auto hrTmp = m_ptrSession->OpenEntry(ptrRows[i].lpProps[0].Value.bin.cb,
 			        reinterpret_cast<ENTRYID *>(ptrRows[i].lpProps[0].Value.bin.lpb),
 			        &iid_of(ptrUser), 0, &ulType, &~ptrUser);
 			if (hrTmp != hrSuccess)
@@ -198,21 +181,14 @@ HRESULT GetArchivedUserList(IMAPISession *lpMapiSession, const char *lpSSLKey,
 HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
     const char *lpSSLPass, bool bLocalOnly, DataCollector *lpCollector)
 {
-	HRESULT			hr = S_OK;
-
 	AddrBookPtr		ptrAdrBook;
 	EntryIdPtr		ptrDDEntryID;
-	ABContainerPtr	ptrDefaultDir;
-	ABContainerPtr	ptrCompanyDir;
+	ABContainerPtr ptrDefaultDir, ptrCompanyDir;
 	MAPITablePtr	ptrHierarchyTable;
 	SRowSetPtr		ptrRows;
 	MsgStorePtr		ptrStore;
 	ECServiceAdminPtr	ptrServiceAdmin;
-
-	ULONG ulObj = 0;
-	ULONG cbDDEntryID = 0;
-	ULONG ulCompanyCount = 0;
-
+	unsigned int ulObj = 0, cbDDEntryID = 0, ulCompanyCount = 0;
 	std::set<servername>	listServers;
 	convert_context		converter;
 	memory_ptr<ECSVRNAMELIST> lpSrvNameList;
@@ -221,7 +197,7 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 
 	if (lpMapiSession == nullptr || lpCollector == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	hr = lpMapiSession->OpenAddressBook(0, &IID_IAddrBook, 0, &~ptrAdrBook);
+	auto hr = lpMapiSession->OpenAddressBook(0, &IID_IAddrBook, 0, &~ptrAdrBook);
 	if (hr != hrSuccess)
 		return kc_perror("Unable to open addressbook", hr);
 	hr = ptrAdrBook->GetDefaultDir(&cbDDEntryID, &~ptrDDEntryID);
@@ -329,7 +305,7 @@ HRESULT GetMailboxData(IMAPISession *lpMapiSession, const char *lpSSLKey,
 			}
 			wszPath = lpSrvList->lpsaServer[i].lpszSslPath;
 		}
-		hr = GetMailboxDataPerServer(converter.convert_to<char *>(wszPath), lpSSLKey, lpSSLPass, lpCollector);
+		hr = GetMailboxDataPerServer(converter.convert_to<std::string>(wszPath).c_str(), lpSSLKey, lpSSLPass, lpCollector);
 		if(FAILED(hr)) {
 			ec_log_err("Failed to collect data from server: \"%ls\": %s (%x)",
 				wszPath, GetMAPIErrorMessage(hr), hr);
@@ -415,8 +391,7 @@ HRESULT UpdateServerList(IABContainer *lpContainer,
 {
 	SRowSetPtr ptrRows;
 	MAPITablePtr ptrTable;
-	SPropValue sPropUser;
-	SPropValue sPropDisplayType;
+	SPropValue sPropUser, sPropDisplayType;
 	static constexpr const SizedSPropTagArray(2, sCols) =
 		{2, {PR_EC_HOMESERVER_NAME_W, PR_DISPLAY_NAME_W}};
 

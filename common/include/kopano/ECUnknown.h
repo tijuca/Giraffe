@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef ECUNKNOWN_H
 #define ECUNKNOWN_H
 
@@ -59,21 +46,6 @@ namespace KC {
 		} \
 	} while (false)
 
-/**
- * Return interface pointer on a specific interface query without incrementing the refcount.
- * @param[in]	_guid	The interface guid.
- * @param[in]	_interface	The class which implements the interface
- * @note guid variable must be named 'refiid', return variable must be named lppInterface.
- */
-#define REGISTER_INTERFACE_NOREF(_guid, _interface) \
-	do { \
-		if (refiid == (_guid)) { \
-			AddRef(); \
-			*lppInterface = reinterpret_cast<void *>(_interface); \
-			return hrSuccess; \
-		} \
-	} while (false)
-
 class _kc_export ECUnknown : public virtual IUnknown {
 public:
 	ECUnknown(const char *szClassName = NULL);
@@ -98,7 +70,7 @@ protected:
 
 	std::atomic<unsigned int> m_cRef{0};
 	const char *szClassName;
-	std::list<ECUnknown *>	lstChildren; 
+	std::list<ECUnknown *>	lstChildren;
 	std::mutex mutex;
 };
 

@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# kopano-search Kopano Core Search Indexer
+# kopano-search Kopano Groupware Core Search Daemon
 #
 # chkconfig: 345 86 24
 # processname: /usr/sbin/kopano-search
 # config: /etc/kopano/search.cfg
 # pidfile: /var/run/kopano/search.pid
-
+# SPDX-License-Identifier: AGPL-3.0-only
 ### BEGIN INIT INFO
 # Provides: kopano-search
 # Required-Start: $local_fs $network $remote_fs $syslog
 # Required-Stop: $local_fs $network $remote_fs $syslog
 # Should-Start: kopano-server
 # Should-Stop: kopano-server
-# Short-Description: Kopano Core Search Indexer
+# Short-Description: Kopano Groupware Core Search Daemon
 ### END INIT INFO
 
 SEARCHCONFIG=/etc/kopano/search.cfg
@@ -26,12 +26,7 @@ SEARCHCONFIG_OPT=""
 [ ! -z $SEARCHCONFIG -a -f $SEARCHCONFIG ] && SEARCHCONFIG_OPT="-c $SEARCHCONFIG"
 
 # Switch to C, like at boot time.
-unset LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
-# Update with user settings.
-LC_CTYPE=en_US.UTF-8
-LC_TIME=en_US.UTF-8
-[ -f /etc/sysconfig/kopano ] && . /etc/sysconfig/kopano
-export LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MESSAGES LC_ALL
+unset LANG LC_CTYPE LC_NUMERIC LC_COLLATE LC_MESSAGES LC_ALL
 
 # Source function library.
 . /etc/rc.d/init.d/functions

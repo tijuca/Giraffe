@@ -1,21 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <chrono>
 #include <exception>
@@ -29,16 +15,14 @@
 #include <set>
 #include <utility>
 #include <list>
-
 #include <cerrno>
 #include <cassert>
 #include <kopano/EMSAbTag.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
-#include "ECStatsCollector.h"
+#include "StatsClient.h"
 #include <kopano/stringutil.h>
 #include "LDAPUserPlugin.h"
 #include "ldappasswords.h"
@@ -50,6 +34,7 @@
 #endif
 
 using namespace KC;
+using namespace std::string_literals;
 
 extern "C" {
 
@@ -114,7 +99,7 @@ typedef memory_ptr<struct berval *, ldap_deleter> auto_free_ldap_berval;
 	do { \
 		if (m_ldap == NULL) \
 			/* this either returns a connection or throws an exception */ \
-			m_ldap = ConnectLDAP(m_config->GetSetting("ldap_bind_user"), m_config->GetSetting("ldap_bind_passwd")); \
+			m_ldap = ConnectLDAP(m_config->GetSetting("ldap_bind_user"), m_config->GetSetting("ldap_bind_passwd"), parseBool(m_config->GetSetting("ldap_starttls"))); \
 		/* set critical to 'F' to not force paging? @todo find an ldap server without support. */ \
 		rc = ldap_create_page_control(m_ldap, ldap_page_size, &sCookie, 0, &~pageControl); \
 		if (rc != LDAP_SUCCESS) {										\
@@ -152,8 +137,7 @@ typedef memory_ptr<struct berval *, ldap_deleter> auto_free_ldap_berval;
 
 #define END_FOREACH_LDAP_PAGING	\
 	} \
-	while (morePages == true); \
-	\
+	while (morePages); \
 	if (sCookie.bv_val != NULL) { \
 		ber_memfree(sCookie.bv_val); \
 		sCookie.bv_val = NULL; \
@@ -194,7 +178,7 @@ typedef memory_ptr<struct berval *, ldap_deleter> auto_free_ldap_berval;
 	}\
 }
 
-class attrArray _kc_final {
+class attrArray final {
 public:
 	attrArray(unsigned int ulSize) :
 		ulAttrs(0), ulMaxAttrs(ulSize),
@@ -247,7 +231,7 @@ std::unique_ptr<LDAPCache> LDAPUserPlugin::m_lpCache(new LDAPCache());
 
 template<typename T> static constexpr inline LONGLONG dur2us(const T &t)
 {
-	return std::chrono::duration_cast<std::chrono::milliseconds>(t).count();
+	return std::chrono::duration_cast<std::chrono::microseconds>(t).count();
 }
 
 LDAPUserPlugin::LDAPUserPlugin(std::mutex &pluginlock,
@@ -259,11 +243,12 @@ LDAPUserPlugin::LDAPUserPlugin(std::mutex &pluginlock,
 		{ "ldap_user_sendas_relation_attribute", "ldap_sendas_relation_attribute", CONFIGSETTING_ALIAS },
 		{ "ldap_user_sendas_attribute_type", "ldap_sendas_attribute_type", CONFIGSETTING_ALIAS },
 		{ "ldap_user_sendas_attribute", "ldap_sendas_attribute", CONFIGSETTING_ALIAS },
-		{ "ldap_host","localhost" },
-		{ "ldap_port","389" },
+		{"ldap_host", "localhost", CONFIGSETTING_OBSOLETE},
+		{"ldap_port", "389", CONFIGSETTING_OBSOLETE},
 		{ "ldap_uri","" },
-		{ "ldap_protocol", "ldap" },
+		{"ldap_protocol", "ldap", CONFIGSETTING_OBSOLETE},
 		{ "ldap_server_charset", "UTF-8" },
+		{"ldap_starttls", "no", CONFIGSETTING_RELOADABLE},
 		{ "ldap_bind_user","" },
 		{ "ldap_bind_passwd","", CONFIGSETTING_EXACT | CONFIGSETTING_RELOADABLE },
 		{ "ldap_search_base","", CONFIGSETTING_RELOADABLE },
@@ -418,24 +403,31 @@ LDAPUserPlugin::LDAPUserPlugin(std::mutex &pluginlock,
 	m_timeout.tv_usec = 0;
 }
 
-void LDAPUserPlugin::InitPlugin()
+void LDAPUserPlugin::InitPlugin(std::shared_ptr<ECStatsCollector> sc)
 {
+	m_lpStatsCollector = std::move(sc);
 	const char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
 	const char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
+	auto starttls = parseBool(m_config->GetSetting("ldap_starttls"));
 
 	/* FIXME encode the user and password, now it depends on which charset the config is saved in */
-	m_ldap = ConnectLDAP(ldap_binddn, ldap_bindpw);
-
+	m_ldap = ConnectLDAP(ldap_binddn, ldap_bindpw, starttls);
 	const char *ldap_server_charset = m_config->GetSetting("ldap_server_charset");
-	m_iconv.reset(new ECIConv("UTF-8", ldap_server_charset));
-	if (!m_iconv -> canConvert())
-		throw ldap_error(format("Cannot convert %s to UTF8", ldap_server_charset));
-	m_iconvrev.reset(new ECIConv(m_config->GetSetting("ldap_server_charset"), "UTF-8"));
-	if (!m_iconvrev -> canConvert())
-		throw ldap_error(format("Cannot convert UTF-8 to %s", ldap_server_charset));
+	try {
+		m_iconv.reset(new decltype(m_iconv)::element_type("UTF-8", ldap_server_charset));
+	} catch (const convert_exception &e) {
+		throw ldap_error(format("Cannot convert %s to UTF-8: %s", ldap_server_charset, e.what()));
+	}
+	try {
+		m_iconvrev.reset(new decltype(m_iconv)::element_type(m_config->GetSetting("ldap_server_charset"), "UTF-8"));
+	} catch (const convert_exception &e) {
+		throw ldap_error(format("Cannot convert UTF-8 to %s: %s", ldap_server_charset, e.what()));
+	}
 }
 
-LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
+LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn,
+    const char *bind_pw, bool starttls)
+{
 	int rc = -1;
 	LDAP *ld = NULL;
 	auto tstart = std::chrono::steady_clock::now();
@@ -458,8 +450,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 		biglock.unlock();
 
 		if (rc != LDAP_SUCCESS) {
-			m_lpStatsCollector->Increment(SCN_LDAP_CONNECT_FAILED);
-
+			m_lpStatsCollector->inc(SCN_LDAP_CONNECT_FAILED);
 			ec_log_crit("Failed to initialize LDAP for \"%s\": %s", currentServer.c_str(), ldap_err2string(rc));
 			goto fail2;
 		}
@@ -489,6 +480,24 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 			ec_log_err("LDAP_OPT_NETWORK_TIMEOUT failed: %s", ldap_err2string(rc));
 			goto fail;
 		}
+		if (starttls) {
+#ifdef HAVE_LDAP_START_TLS_S
+			/*
+			 * Initialize TLS-secured connection - this is the first
+			 * command after ldap_init, so it will be the call that
+			 * actually connects to the server.
+			 */
+			rc = ldap_start_tls_s(ld, nullptr, nullptr);
+			if (rc != LDAP_SUCCESS) {
+				ec_log_err("Failed to enable TLS on LDAP session: %s", ldap_err2string(rc));
+				goto fail;
+			}
+#else
+			ec_log_err("LDAP library does not have STARTTLS");
+			rc = LDAP_PROTOCOL_ERROR;
+			goto fail;
+#endif /* HAVE_LDAP_START_TLS_S */
+		}
 
 		// Bind
 		// For these two values: if they are both NULL, anonymous bind
@@ -505,8 +514,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 		++ldapServerIndex;
 		if (ldapServerIndex >= ldap_servers.size())
 			ldapServerIndex = 0;
-		m_lpStatsCollector->Increment(SCN_LDAP_CONNECT_FAILED);
-
+		m_lpStatsCollector->inc(SCN_LDAP_CONNECT_FAILED);
 		ld = NULL;
 
 		if (loop == ldap_servers.size() - 1)
@@ -514,8 +522,8 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 	}
 
 	auto llelapsedtime = dur2us(decltype(tstart)::clock::now() - tstart);
-	m_lpStatsCollector->Increment(SCN_LDAP_CONNECTS);
-	m_lpStatsCollector->Increment(SCN_LDAP_CONNECT_TIME, llelapsedtime);
+	m_lpStatsCollector->inc(SCN_LDAP_CONNECTS);
+	m_lpStatsCollector->inc(SCN_LDAP_CONNECT_TIME, llelapsedtime);
 	m_lpStatsCollector->Max(SCN_LDAP_CONNECT_TIME_MAX, llelapsedtime);
 
 	LOG_PLUGIN_DEBUG("ldaptiming [%08.2f] connected to ldap", llelapsedtime / 1000000.0);
@@ -565,6 +573,7 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 	if (m_ldap == NULL || LDAP_API_ERROR(result)) {
 		const char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
 		const char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
+		auto starttls = parseBool(m_config->GetSetting("ldap_starttls"));
 
 		if (m_ldap != NULL) {
 			ec_log_err("LDAP search error: %s. Will unbind, reconnect and retry.", ldap_err2string(result));
@@ -574,9 +583,8 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 		}
 
 		/// @todo encode the user and password, now it's depended in which charset the config is saved
-		m_ldap = ConnectLDAP(ldap_binddn, ldap_bindpw);
-
-		m_lpStatsCollector->Increment(SCN_LDAP_RECONNECTS);
+		m_ldap = ConnectLDAP(ldap_binddn, ldap_bindpw, starttls);
+		m_lpStatsCollector->inc(SCN_LDAP_RECONNECTS);
 		result = ldap_search_ext_s(m_ldap, base, scope, filter, attrs,
 		          attrsonly, serverControls, nullptr, nullptr, 0, &~res);
 	}
@@ -601,15 +609,13 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 	LOG_PLUGIN_DEBUG("ldaptiming [%08.2f] (\"%s\" \"%s\" %s), results: %d", llelapsedtime/1000000.0, base, filter, req.c_str(), ldap_count_entries(m_ldap, res));
 
 	*lppres = res.release(); // deref the pointer from object
-
-	m_lpStatsCollector->Increment(SCN_LDAP_SEARCH);
-	m_lpStatsCollector->Increment(SCN_LDAP_SEARCH_TIME, llelapsedtime);
+	m_lpStatsCollector->inc(SCN_LDAP_SEARCH);
+	m_lpStatsCollector->inc(SCN_LDAP_SEARCH_TIME, llelapsedtime);
 	m_lpStatsCollector->Max(SCN_LDAP_SEARCH_TIME_MAX, llelapsedtime);
 
 exit:
 	if (result != LDAP_SUCCESS) {
-		m_lpStatsCollector->Increment(SCN_LDAP_SEARCH_FAILED);
-
+		m_lpStatsCollector->inc(SCN_LDAP_SEARCH_FAILED);
 		// throw ldap error
 		throw ldap_error(string("ldap_search_ext_s: ") + ldap_err2string(result), result);
 	}
@@ -621,7 +627,7 @@ exit:
 	// ldap_search_s is inconsistent.
 	// The easiest way around this is to net let this function return with a NULL result.
 	else if (*lppres == NULL) {
-		m_lpStatsCollector->Increment(SCN_LDAP_SEARCH_FAILED);
+		m_lpStatsCollector->inc(SCN_LDAP_SEARCH_FAILED);
 		throw ldap_error("ldap_search_ext_s: spurious NULL result");
 	}
 }
@@ -649,12 +655,12 @@ std::string LDAPUserPlugin::GetObjectClassFilter(const char *lpszObjectClassAttr
 		return "";
 	}
 	else if(lstObjectClasses.size() == 1) {
-		return (std::string)"(" + lpszObjectClassAttr + "=" + lstObjectClasses.front() + ")";
+		return "("s + lpszObjectClassAttr + "=" + lstObjectClasses.front() + ")";
 	}
 	else {
 		std::string filter = "(&";
 		for (const auto &cls : lstObjectClasses)
-			filter += (std::string)"(" + lpszObjectClassAttr + "=" + cls + ")";
+			filter += "("s + lpszObjectClassAttr + "=" + cls + ")";
 		filter += ")";
 		return filter;
 	}
@@ -782,7 +788,6 @@ objectid_t LDAPUserPlugin::GetObjectIdForEntry(LDAPMessage *entry)
 		}
 
 		object_uid = user_unique;
-
 	}
 
 	if (objclass == NONACTIVE_CONTACT)
@@ -832,8 +837,7 @@ signatures_t LDAPUserPlugin::getAllObjectsByFilter(const std::string &basedn,
 	if (m_bHosted && !strCompanyDN.empty())
 		dnFilter = m_lpCache->getChildrenForDN(m_lpCache->getObjectDNCache(this, CONTAINER_COMPANY), strCompanyDN);
 
-	std::unique_ptr<attrArray> request_attrs(new attrArray(15));
-
+	auto request_attrs = std::make_unique<attrArray>(15);
 	/* Needed for GetObjectIdForEntry() */
 	CONFIG_TO_ATTR(request_attrs, class_attr, "ldap_object_type_attribute");
 	CONFIG_TO_ATTR(request_attrs, nonactive_attr, "ldap_nonactive_attribute");
@@ -1161,8 +1165,7 @@ string LDAPUserPlugin::objectUniqueIDtoAttributeData(const objectid_t &uniqueid,
 		}
 	}
 	END_FOREACH_ATTR
-
-	if(bDataAttrFound == false)
+	if (!bDataAttrFound)
 		throw data_error(string(lpAttr)+" attribute not found");
 
 	return strData;
@@ -1194,8 +1197,7 @@ string LDAPUserPlugin::objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool
 	 */
 	string			ldap_basedn = getSearchBase();
 	string			ldap_filter = getObjectSearchFilter(uniqueid);
-	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
-
+	auto request_attrs = std::make_unique<attrArray>(1);
 	request_attrs->add("dn");
 
 	my_ldap_search_s(
@@ -1335,7 +1337,7 @@ LDAPUserPlugin::resolveObjectsFromAttributesType(objectclass_t objclass,
 
 objectsignature_t LDAPUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)
 {
-	std::unique_ptr<attrArray> attrs(new attrArray(6));
+	auto attrs = std::make_unique<attrArray>(6);
 	const char *loginname_attr = m_config->GetSetting("ldap_loginname_attribute", "", NULL);
 	const char *groupname_attr = m_config->GetSetting("ldap_groupname_attribute", "", NULL);
 	const char *dyngroupname_attr = m_config->GetSetting("ldap_dynamicgroupname_attribute", "", NULL);
@@ -1433,16 +1435,15 @@ objectsignature_t LDAPUserPlugin::authenticateUser(const string &username, const
 		else
 			id = authenticateUserBind(username, password, company);
 	} catch (...) {
-		m_lpStatsCollector->Increment(SCN_LDAP_AUTH_DENIED);
+		m_lpStatsCollector->inc(SCN_LDAP_AUTH_DENIED);
 		throw;
 	}
 
 	auto llelapsedtime = dur2us(decltype(tstart)::clock::now() - tstart);
-	m_lpStatsCollector->Increment(SCN_LDAP_AUTH_LOGINS);
-	m_lpStatsCollector->Increment(SCN_LDAP_AUTH_TIME, llelapsedtime);
+	m_lpStatsCollector->inc(SCN_LDAP_AUTH_LOGINS);
+	m_lpStatsCollector->inc(SCN_LDAP_AUTH_TIME, llelapsedtime);
 	m_lpStatsCollector->Max(SCN_LDAP_AUTH_TIME_MAX, llelapsedtime);
-	m_lpStatsCollector->Avg(SCN_LDAP_AUTH_TIME_AVG, llelapsedtime);
-
+	m_lpStatsCollector->avg(SCN_LDAP_AUTH_TIME_AVG, llelapsedtime);
 	return id;
 }
 
@@ -1458,7 +1459,8 @@ objectsignature_t LDAPUserPlugin::authenticateUserBind(const string &username, c
 		 * skipping the cache.
 		 */
 		auto dn = objectUniqueIDtoObjectDN(signature.id, false);
-		ld = ConnectLDAP(dn.c_str(), m_iconvrev->convert(password).c_str());
+		ld = ConnectLDAP(dn.c_str(), m_iconvrev->convert(password).c_str(),
+			parseBool(m_config->GetSetting("ldap_starttls")));
 	} catch (const std::exception &e) {
 		throw login_error((string)"Trying to authenticate failed: " + e.what() + (string)"; username = " + username);
 	}
@@ -1476,7 +1478,7 @@ objectsignature_t LDAPUserPlugin::authenticateUserPassword(const string &usernam
 	objectdetails_t	d;
 	objectsignature_t signature;
 
-	std::unique_ptr<attrArray> request_attrs(new attrArray(4));
+	auto request_attrs = std::make_unique<attrArray>(4);
 	CONFIG_TO_ATTR(request_attrs, loginname_attr, "ldap_loginname_attribute" );
 	CONFIG_TO_ATTR(request_attrs, password_attr, "ldap_password_attribute");
 	CONFIG_TO_ATTR(request_attrs, unique_attr, "ldap_user_unique_attribute");
@@ -1626,8 +1628,7 @@ LDAPUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 	list<postaction> lPostActions;
 	std::set<objectid_t> setObjectIds;
 	list<configsetting_t>	lExtraAttrs = m_config->GetSettingGroup(CONFIGGROUP_PROPMAP);
-	std::unique_ptr<attrArray> request_attrs(new attrArray(33 + lExtraAttrs.size()));
-
+	auto request_attrs = std::make_unique<attrArray>(33 + lExtraAttrs.size());
 	CONFIG_TO_ATTR(request_attrs, object_attr, "ldap_object_type_attribute");
 	CONFIG_TO_ATTR(request_attrs, user_unique_attr, "ldap_user_unique_attribute");
 	CONFIG_TO_ATTR(request_attrs, user_unique_attr_type, "ldap_user_unique_attribute_type");
@@ -1779,7 +1780,7 @@ LDAPUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 			sObjDetails.SetPropObject(OB_PROP_O_SYSADMIN, objectid_t("SYSTEM", ACTIVE_USER));
 
 		// when cutoff is used, filter only the requested entries.
-		if(bCutOff == true && setObjectIds.find(objectid) == setObjectIds.end())
+		if (bCutOff && setObjectIds.find(objectid) == setObjectIds.end())
 			continue;
 
 		FOREACH_ATTR(entry) {
@@ -2351,9 +2352,8 @@ LDAPUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
 	const char *member_attr = nullptr, *member_attr_type = nullptr;
 	const char *base_attr = NULL;
 
-	std::unique_ptr<attrArray> member_attr_rel(new attrArray(5));
-	std::unique_ptr<attrArray> child_unique_attr(new attrArray(5));
-
+	auto member_attr_rel = std::make_unique<attrArray>(5);
+	auto child_unique_attr = std::make_unique<attrArray>(5);
 	CONFIG_TO_ATTR(child_unique_attr, user_unique_attr, "ldap_user_unique_attribute");
 	CONFIG_TO_ATTR(child_unique_attr, group_unique_attr, "ldap_group_unique_attribute");
 	CONFIG_TO_ATTR(child_unique_attr, company_unique_attr, "ldap_company_unique_attribute");
@@ -2598,7 +2598,7 @@ objectdetails_t LDAPUserPlugin::getPublicStoreDetails()
 	if (publicstore_attr)
 		search_filter = "(&" + search_filter + "(" + publicstore_attr + "=1))";
 
-	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
+	auto request_attrs = std::make_unique<attrArray>(1);
 	CONFIG_TO_ATTR(request_attrs, unique_attr, "ldap_server_unique_attribute");
 
 	// Do a search request to get all attributes for this user. The
@@ -2642,8 +2642,7 @@ serverlist_t LDAPUserPlugin::getServers()
 	LOG_PLUGIN_DEBUG("%s", __FUNCTION__);
 	auto ldap_basedn = getSearchBase();
 	auto search_filter = "(&" + getServerSearchFilter() + ")";
-
-	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
+	auto request_attrs = std::make_unique<attrArray>(1);
 	CONFIG_TO_ATTR(request_attrs, name_attr, "ldap_server_unique_attribute");
 
 	my_ldap_search_s(
@@ -2681,7 +2680,7 @@ serverdetails_t LDAPUserPlugin::getServerDetails(const std::string &server)
 		getSearchFilter(server, m_config->GetSetting("ldap_server_unique_attribute")) +
 		")";
 
-	std::unique_ptr<attrArray> request_attrs(new attrArray(5));
+	auto request_attrs = std::make_unique<attrArray>(5);
 	CONFIG_TO_ATTR(request_attrs, address_attr, "ldap_server_address_attribute");
 	CONFIG_TO_ATTR(request_attrs, http_port_attr, "ldap_server_http_port_attribute");
 	CONFIG_TO_ATTR(request_attrs, ssl_port_attr, "ldap_server_ssl_port_attribute");
@@ -2789,7 +2788,7 @@ quotadetails_t LDAPUserPlugin::getQuota(const objectid_t &id,
 	if (multiplier_s != nullptr)
 		multiplier = fromstring<const char *, long long>(multiplier_s);
 
-	std::unique_ptr<attrArray> request_attrs(new attrArray(4));
+	auto request_attrs = std::make_unique<attrArray>(4);
 	CONFIG_TO_ATTR(request_attrs, usedefaults_attr,
 		bGetUserDefault ?
 			"ldap_userdefault_quotaoverride_attribute" :

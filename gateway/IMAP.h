@@ -1,32 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef IMAP_H
 #define IMAP_H
 
 #include <memory>
 #include <mutex>
 #include <string>
-#include <utility>
 #include <vector>
 #include <list>
 #include <set>
-#include <kopano/zcdefs.h>
-#include <kopano/ECIConv.h>
+#include <cstring>
 #include <kopano/ECChannel.h>
 #include <kopano/memory.hpp>
 #include <kopano/hl.hpp>
@@ -37,20 +22,17 @@ class ECRestriction;
 }
 
 /**
- * @defgroup gateway_imap IMAP 
+ * @defgroup gateway_imap IMAP
  * @ingroup gateway
  * @{
  */
 
-#define ROWS_PER_REQUEST 200
+static const size_t ROWS_PER_REQUEST_SMALL = 200, ROWS_PER_REQUEST_BIG = 4000;
+static const size_t IMAP_RESP_MAX = 65536;
 #define IMAP_HIERARCHY_DELIMITER '/'
 #define PUBLIC_FOLDERS_NAME L"Public folders"
-
-#define IMAP_RESP_MAX	65536
-
 #define RESP_UNTAGGED "* "
 #define RESP_CONTINUE "+ "
-
 #define RESP_TAGGED_OK " OK "
 #define RESP_TAGGED_NO " NO "
 #define RESP_TAGGED_BAD " BAD "
@@ -58,7 +40,7 @@ class ECRestriction;
 /**
  * An ownership-indicating wrapper atop SBinary.
  */
-class BinaryArray _kc_final : public SBinary {
+class BinaryArray final : public SBinary {
 public:
 	BinaryArray() : SBinary() {}
 	BinaryArray(const void *lpData, ULONG cbData, bool b = false) :
@@ -141,16 +123,15 @@ public:
 };
 
 // FLAGS: \Seen \Answered \Flagged \Deleted \Draft \Recent
-class IMAP _kc_final : public ClientProto {
+class IMAP final : public ClientProto {
 public:
-	IMAP(const char *path, KC::ECChannel *, KC::ECLogger *, KC::ECConfig *);
+	IMAP(const char *path, std::shared_ptr<KC::ECChannel>, std::shared_ptr<KC::ECConfig>);
 	~IMAP();
 
 	// getTimeoutMinutes: 30 min when logged in otherwise 1 min
 	int getTimeoutMinutes() const { return lpStore == nullptr ? 1 : 30; }
 	bool isIdle() const { return m_bIdleMode; }
 	bool isContinue() const { return m_bContinue; }
-
 	HRESULT HrSendGreeting(const std::string &strHostString);
 	HRESULT HrCloseConnection(const std::string &strQuitMsg);
 	HRESULT HrProcessCommand(const std::string &strInput);
@@ -160,12 +141,10 @@ public:
 private:
 	void CleanupObject();
 	void ReleaseContentsCache();
-
 	std::string GetCapabilityString(bool bAllFlags);
 	HRESULT HrSplitInput(const std::string &input, std::vector<std::string> &words);
 	HRESULT HrSplitPath(const std::wstring &input, std::vector<std::wstring> &folders);
 	HRESULT HrUnsplitPath(const std::vector<std::wstring> &folders, std::wstring &path);
-
 	// All IMAP4rev1 commands
 	HRESULT HrCmdCapability(const std::string &tag);
 	template<bool check> HRESULT HrCmdNoop(const std::string &tag) { return HrCmdNoop(tag, check); }
@@ -201,7 +180,6 @@ private:
 	HRESULT HrCmdGetQuotaRoot(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdGetQuota(const std::string &tag, const std::vector<std::string> &args);
 	HRESULT HrCmdSetQuota(const std::string &tag, const std::vector<std::string> &args);
-
 	/* Untagged response, * or + */
 	void HrResponse(const std::string &untag, const std::string &resp);
 	/* Tagged response with result OK, NO or BAD */
@@ -233,10 +211,10 @@ private:
 		bool bRecent;				// \Recent flag
 		std::string strFlags;		// String of all flags, including \Recent
 
-		bool operator<(const SMail &sMail) const noexcept { return this->ulUid < sMail.ulUid; }
-		bool operator<(ULONG ulUid) const noexcept { return this->ulUid < ulUid; }
-		operator ULONG() const noexcept { return this->ulUid; }
-		bool operator==(ULONG ulUid) const noexcept { return this->ulUid == ulUid; }
+		bool operator<(const SMail &sMail) const noexcept { return ulUid < sMail.ulUid; }
+		bool operator<(ULONG uid) const noexcept { return ulUid < uid; }
+		operator ULONG() const noexcept { return ulUid; }
+		bool operator==(ULONG uid) const noexcept { return ulUid == uid; }
 	};
 
 	KC::object_ptr<IMAPISession> lpSession;
@@ -295,11 +273,11 @@ private:
 
 	/* subscribed folders */
 	std::vector<BinaryArray> m_vSubscriptions;
+
 	HRESULT HrGetSubscribedList();
 	HRESULT HrSetSubscribedList();
 	HRESULT ChangeSubscribeList(bool bSubscribe, ULONG eid_size, const ENTRYID *);
 	HRESULT HrMakeSpecialsList();
-
 	HRESULT HrRefreshFolderMails(bool bInitialLoad, bool bResetRecent, unsigned int *lpulUnseen, ULONG *lpulUIDValidity = NULL);
 	HRESULT HrGetSubTree(std::list<SFolder> &folders, bool public_folders, std::list<SFolder>::const_iterator parent_folder);
 	HRESULT HrGetFolderPath(std::list<SFolder>::const_iterator lpFolder, const std::list<SFolder> &lstFolder, std::wstring &path);
@@ -327,14 +305,11 @@ private:
 	bool StringToFileTime(std::string t, FILETIME &sFileTime, bool date_only = false);
 	// add 24 hour to the time to be able to check if a time is on a date
 	FILETIME AddDay(const FILETIME &sFileTime);
-
 	// Folder names are in a *modified* utf-7 form. See RFC2060, chapter 5.1.3
 	HRESULT MAPI2IMAPCharset(const std::wstring &input, std::string &output);
 	HRESULT IMAP2MAPICharset(const std::string &input, std::wstring &output);
-	
 	// Match a folder path
 	bool MatchFolderPath(const std::wstring &folder, const std::wstring &pattern);
-
 	// Various conversion functions
 	std::string PropsToFlags(LPSPropValue props, unsigned int nprops, bool recent, bool read);
 	void HrParseHeaders(const std::string &, std::list<std::pair<std::string, std::string> > &);

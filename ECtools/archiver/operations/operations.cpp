@@ -1,20 +1,9 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
+#include <memory>
+#include <utility>
 #include <kopano/platform.h>
 #include <kopano/ECConfig.h>
 #include "operations.h"
@@ -23,37 +12,37 @@
 #include "helpers/ArchiveHelper.h"
 #include "ArchiverSession.h"
 #include <kopano/ECRestriction.h>
-
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
-
 #include <kopano/Util.h>
 #include <kopano/stringutil.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/mapiguidext.h>
-
 #include <algorithm>
+
 using namespace KC::helpers;
 
 namespace KC { namespace operations {
 
 /**
- * Constructor.
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
  */
-ArchiveOperationBase::ArchiveOperationBase(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
-: m_lpLogger(lpLogger)
-, m_ulAge(ulAge)
-, m_bProcessUnread(bProcessUnread)
-, m_ulInhibitMask(ulInhibitMask)
+ArchiveOperationBase::ArchiveOperationBase(std::shared_ptr<ECArchiverLogger> lpLogger,
+    int ulAge, bool bProcessUnread, ULONG ulInhibitMask) :
+	m_lpLogger(std::move(lpLogger)), m_ulAge(ulAge),
+	m_bProcessUnread(bProcessUnread), m_ulInhibitMask(ulInhibitMask)
 {
 	GetSystemTimeAsFileTime(&m_ftCurrent);
 }
 
 HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestriction *lppRestriction)
 {
-	HRESULT hr = hrSuccess;
+	if (lppRestriction == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (m_ulAge < 0)
+		return MAPI_E_NOT_FOUND;
+
 	ULARGE_INTEGER li;
 	SPropValue sPropRefTime;
 	ECAndRestriction resResult;
@@ -62,19 +51,13 @@ HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestricti
 	PROPMAP_NAMED_ID(FLAGS, PT_LONG, PSETID_Archive, dispidFlags)
 	PROPMAP_INIT(lpMapiProp)
 
-	if (lppRestriction == nullptr)
-		return MAPI_E_INVALID_PARAMETER;
-	if (m_ulAge < 0)
-		return MAPI_E_NOT_FOUND;
-
 	li.LowPart = m_ftCurrent.dwLowDateTime;
 	li.HighPart = m_ftCurrent.dwHighDateTime;
-	
 	li.QuadPart -= (m_ulAge * _DAY);
-		
 	sPropRefTime.ulPropTag = PROP_TAG(PT_SYSTIME, 0);
 	sPropRefTime.Value.ft.dwLowDateTime = li.LowPart;
 	sPropRefTime.Value.ft.dwHighDateTime = li.HighPart;
+
 	resResult += ECOrRestriction(
 		ECAndRestriction(
 			ECExistRestriction(PR_MESSAGE_DELIVERY_TIME) +
@@ -93,16 +76,13 @@ HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestricti
 				ECBitMaskRestriction(BMR_NEZ, PROP_FLAGS, m_ulInhibitMask)
 			)
 		);
-	hr = resResult.CreateMAPIRestriction(lppRestriction, ECRestriction::Full);
-	return hr;
+	return resResult.CreateMAPIRestriction(lppRestriction, ECRestriction::Full);
 }
 
 HRESULT ArchiveOperationBase::VerifyRestriction(LPMESSAGE lpMessage)
 {
-	HRESULT hr = hrSuccess;
 	SRestrictionPtr ptrRestriction;
-
-	hr = GetRestriction(lpMessage, &~ptrRestriction);
+	auto hr = GetRestriction(lpMessage, &~ptrRestriction);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -110,12 +90,12 @@ HRESULT ArchiveOperationBase::VerifyRestriction(LPMESSAGE lpMessage)
 }
 
 /**
- * Constructor.
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
  */
-ArchiveOperationBaseEx::ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
-: ArchiveOperationBase(lpLogger, ulAge, bProcessUnread, ulInhibitMask)
+ArchiveOperationBaseEx::ArchiveOperationBaseEx(std::shared_ptr<ECArchiverLogger> lpLogger,
+    int ulAge, bool bProcessUnread, ULONG ulInhibitMask) :
+	ArchiveOperationBase(std::move(lpLogger), ulAge, bProcessUnread, ulInhibitMask)
 { }
 
 /**
@@ -133,7 +113,6 @@ ArchiveOperationBaseEx::ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int u
 HRESULT ArchiveOperationBaseEx::ProcessEntry(IMAPIFolder *lpFolder,
     const SRow &proprow)
 {
-	HRESULT hr;
 	bool bReloadFolder = false;
 	ULONG ulType = 0;
 
@@ -145,16 +124,16 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(IMAPIFolder *lpFolder,
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_PARENT_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
 	}
-	
+
 	if (m_ptrCurFolderEntryId != nullptr) {
 		int nResult = 0;
 		// @todo: Create correct locale.
-		hr = Util::CompareProp(m_ptrCurFolderEntryId, lpFolderEntryId, createLocaleFromName(""), &nResult);
+		auto hr = Util::CompareProp(m_ptrCurFolderEntryId, lpFolderEntryId, createLocaleFromName(""), &nResult);
 		if (hr != hrSuccess)
 			return Logger()->perr("Failed to compare current and new entryid", hr);
-		
+
 		if (nResult != 0) {
-			Logger()->Log(EC_LOGLEVEL_DEBUG, "Leaving folder (%s)", bin2hex(m_ptrCurFolderEntryId->Value.bin).c_str());
+			Logger()->logf(EC_LOGLEVEL_DEBUG, "Leaving folder (%s)", bin2hex(m_ptrCurFolderEntryId->Value.bin).c_str());
 			Logger()->SetFolder(KC_T(""));
 			hr = LeaveFolder();
 			if (hr != hrSuccess)
@@ -167,8 +146,8 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(IMAPIFolder *lpFolder,
 		return DoProcessEntry(proprow);
 
 	SPropValuePtr ptrPropValue;
-	Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin).c_str());
-	hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb,
+	Logger()->logf(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin).c_str());
+	auto hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb,
 	     reinterpret_cast<ENTRYID *>(lpFolderEntryId->Value.bin.lpb),
 	     &iid_of(m_ptrCurFolder), MAPI_BEST_ACCESS | fMapiDeferredErrors,
 	     &ulType, &~m_ptrCurFolder);

@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef __INETMAPI_OPTIONS_H
@@ -37,6 +25,9 @@ struct delivery_options {
 	 * worsen the result.
 	 */
 	bool charset_strict_rfc;
+
+	/* Enables the joining of HTML parts (one document's stylesheet can hack another). */
+	bool insecure_html_join;
 
 	LPSBinary user_entryid;			// If not NULL, specifies the entryid of the user for whom we are delivering. If set, allows generating PR_MESSAGE_*_ME properties.
 	const char *ascii_upgrade; // Upgrade ASCII parts to this new (ASCII-compatible) charset

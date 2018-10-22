@@ -1,27 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <kopano/zcdefs.h>
 #include <memory>
 #include <mutex>
 #include <utility>
 #include <cstdint>
 #include <kopano/platform.h>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include "ECSyncContext.h"
 #include "ECSyncUtil.h"
@@ -38,7 +23,6 @@
 #include <mapiutil.h>
 #include <edkguid.h>
 #include <edkmdb.h>
-
 #include <kopano/mapi_ptr.h>
 
 using namespace KC;
@@ -48,7 +32,7 @@ typedef object_ptr<IECChangeAdvisor> ECChangeAdvisorPtr;
 #define EC_SYNC_STATUS_VERSION			1
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-class ECChangeAdviseSink _kc_final :
+class ECChangeAdviseSink final :
     public ECUnknown, public IECChangeAdviseSink {
 public:
 	typedef ULONG(ECSyncContext::*NOTIFYCALLBACK)(ULONG,LPENTRYLIST);
@@ -59,7 +43,7 @@ public:
 	{ }
 
 	// IUnknown
-	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override
+	HRESULT QueryInterface(const IID &refiid, void **lppInterface) override
 	{
 		REGISTER_INTERFACE2(ECChangeAdviseSink, this);
 		REGISTER_INTERFACE2(ECUnknown, this);
@@ -86,8 +70,8 @@ static HRESULT HrCreateECChangeAdviseSink(ECSyncContext *lpsSyncContext,
 	       .as(IID_IECChangeAdviseSink, lppAdviseSink);
 }
 
-ECSyncContext::ECSyncContext(IMsgStore *lpStore, ECLogger *lpLogger) :
-	m_lpLogger(lpLogger), m_lpStore(lpStore),
+ECSyncContext::ECSyncContext(IMsgStore *lpStore, std::shared_ptr<ECLogger> lpLogger) :
+	m_lpLogger(std::move(lpLogger)), m_lpStore(lpStore),
 	m_lpSettings(&ECSyncSettings::instance)
 {
 	if (m_lpSettings->ChangeNotificationsEnabled())
@@ -273,7 +257,7 @@ HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULON
 		auto iterNotifiedSyncId = m_mapNotifiedSyncIds.find(sSyncState.ulSyncId);
 		if (iterNotifiedSyncId == m_mapNotifiedSyncIds.cend()) {
 			*lpulSteps = 0;
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=yes, steps=0 (unsignalled)", bin2hex(*lpSourceKey).c_str(), sSyncState.ulSyncId);
+			m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=yes, steps=0 (unsignalled)", bin2hex(*lpSourceKey).c_str(), sSyncState.ulSyncId);
 			lk.unlock();
 			return hr;
 		}
@@ -322,7 +306,7 @@ fallback:
 	}
 
 	*lpulSteps = ulChangeCount;
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=%s, steps=%u",
+	m_lpLogger->logf(EC_LOGLEVEL_DEBUG, "GetSteps: sourcekey=%s, syncid=%u, notified=%s, steps=%u",
 		bin2hex(*lpSourceKey).c_str(), sSyncState.ulSyncId,
 		(bNotified ? "yes" : "no"), *lpulSteps);
 	return hrSuccess;
@@ -637,7 +621,7 @@ ULONG ECSyncContext::OnChange(ULONG ulFlags, LPENTRYLIST lpEntryList)
 		ULONG ulChangeId = CHANGEID(lpEntryList->lpbin[i].lpb);
 		m_mapNotifiedSyncIds[ulSyncId] = ulChangeId;
 
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "change notification: syncid=%u, changeid=%u", ulSyncId, ulChangeId);
+		m_lpLogger->logf(EC_LOGLEVEL_INFO, "change notification: syncid=%u, changeid=%u", ulSyncId, ulChangeId);
 	}
 	return 0;
 }

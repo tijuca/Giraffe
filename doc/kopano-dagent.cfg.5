@@ -66,11 +66,6 @@ Include and process
 Example: !include common.cfg
 .RE
 .SH "EXPLANATION OF EACH PARAMETER"
-.SS server_bind
-.PP
-Bind to a particular IP address. Leave empty to bind to all addresses.
-.PP
-Default: (empty)
 .SS server_socket
 .PP
 Unix socket to find the connection to the Kopano server.
@@ -99,6 +94,13 @@ When a crash occurs or an assertion fails, a coredump file can be generated.
 This file should be sent along with the crash report. It is turned on by
 default in Kopano, but your system may have it disabled. For details, see the
 \fBkopano\-coredump\fP(5) manpage.
+.SS process_model
+.PP
+You can change the process model between \fBfork\fP and \fBthread\fP. The
+forked model uses more resources.
+.PP
+Default:
+\fIfork\fP
 .SS sslkey_file
 .PP
 Use this file as key to logon to the server. This is only used when server_socket is set to an HTTPS transport. See the
@@ -111,12 +113,33 @@ Default: value not set.
 The password of the SSL key file that is set in sslkey_file.
 .PP
 Default: value not set.
-.SS lmtp_port
+.SS lmtp_listen
 .PP
-Port to listen to for LMTP requests
+A space-separated list of address:port specifiers for where the server should
+listen for connections. IPv6 addresses need to be enclosed in brackets (as in
+\fB[2001:db8::1]:236\fP). The asterisk is the multi-protocol address
+("*:2003"). Local sockets are supported with "\fBunix:\fP\fI/path\fP".
+Hostnames are not allowed (since the mapped address can resolve to multiple
+addresses, any of which can change without notice).
 .PP
-Default:
-\fI2003\fR
+Default: \fI*:2003\fP
+.PP
+To set up a secure local socket that is only accessible by Postfix, a directory
+like this may be created:
+.nf
+	mkdir -p /var/spool/kopano
+	chown kopano:kopano /var/spool/kopano
+	chmod go= /var/spool/kopano
+	setfacl -m u:postfix:rwx /var/spool/kopano
+.fi
+In dagent.cfg, the listen line would be:
+.nf
+	lmtp_listen = unix:/var/spool/kopano/dagent.sock
+.fi
+And in postfix's main.cf, a transport line might look like:
+.nf
+	virtual_transport = lmtp:unix:/var/spool/kopano/dagent.sock
+.fi
 .SS lmtp_max_threads
 .PP
 The maximum number of LMTP threads that can be running simultaneously. This is also limited by your SMTP server. (20 is the postfix default concurrency limit)
@@ -142,16 +165,20 @@ Default:
 .PP
 The method which should be used for logging. Valid values are:
 .TP
-\fIsyslog\fR
-Use the Linux system log. All messages will be written to the mail facility. See also
-\fBsyslog.conf\fR(5).
+\fBsyslog\fR
+Use the syslog service. Messages will be sent using the "mail" facility tag. See also
+\fBjournald.conf\fP(5) or \fBsyslog.conf\fP(5).
 .TP
-\fIfile\fR
+\fBfile\fP
 Log to a file. The filename will be specified in
 \fBlog_file\fR.
+.TP
+\fBauto\fP
+Autoselect mode: If \fBlog_file\fP is set, that will be used.
+Else, syslog will be used if it looks like it is available.
+Else, stderr.
 .PP
-Default:
-\fIfile\fR
+Default: \fIauto\fP
 .SS log_file
 .PP
 When logging to a file, specify the filename in this parameter. Use
@@ -181,17 +208,29 @@ Default:
 \fI3\fP
 .SS log_raw_message
 .PP
-Log the raw message to a file. The file is saved to the location specified in
-\fBlog_raw_message_path\fR.
+A space-separated list of usernames for whom the incoming Internet e-mail (RFC
+5322) messages should be dumped to files in the directory specified by
+\fBlog_raw_message_path\fP. Alternatively, instead of such a list, the
+following magic keywords are recognized:
+.TP
+\fByes\fP, \fBall\fP
+Dump incoming messages irrespective of recipient.
+.TP
+\fBno\fP
+Do not dump any incoming messages.
+.TP
+\fBerror\fP
+Only dump when automatic processing programs (e.g. \fBkopano\-mr\-process\fP(8)
+or \fBkopano\-mr\-accept\fP(8)) have returned a non-success exit code.
 .PP
 Default:
-\fIno\fR
+\fIerror\fP
 .SS log_raw_message_path
 .PP
 Path to save the raw message.
 .PP
 Default:
-\fI/tmp\fR
+\fI/var/lib/kopano\fR
 .SS archive_on_delivery
 .PP
 Archive incoming message on delivery. If an archive is attached to the target mailbox, the message will immediately be archived upon delivery.
@@ -268,7 +307,7 @@ Default:
 Enable this option to prevent rules to cause a loop. An e\-mail can only be forwarded once. When this option is enabled, the set_rule_headers option must also be enabled.
 .PP
 Default:
-\fIno\fR
+\fIyes\fR
 .SS forward_whitelist_domains
 .PP
 A list of space\-separated domains to which forwarding via a rule is allowed. The "*" matches zero or more characters (including dots, i.e. subdomains at multiple levels). Do not use "*kopano.com" to permit both "@kopano.com" and "@sub.kopano.com", as that would also allow "@notkopano.com".
@@ -306,6 +345,28 @@ within the MAPI message, the indexed_headers directive may be used to list
 the header fields to keep.
 .PP
 Default: (empty)
+.SS statsclient_url
+.PP
+A HTTP URL or filesystem-local socket specification for a kopano-statsd
+compatible web service that ingests service statistics such as memory usage or
+mail processing counters.
+.PP
+Example: \fIhttps://my.local.org/collector.php\fP
+.PP
+Default: \fIunix:/var/run/kopano/statsd.sock\fP
+.SS statsclient_interval
+.PP
+The time interval at which the statsd service is to be contacted, in seconds.
+When "statsclient_url" points to a kopano-statsd instance, the value should be
+\fI60\fP (for now), because its rrdtool archives are set to expect data at this
+rate.
+.PP
+Default: \fI0\fP (submission service is deactivated)
+.SS statsclient_ssl_verify
+.PP
+This setting can be used to control SSL certificate validation.
+.PP
+Default: \fIyes\fP
 .RE
 .SH "RELOADING"
 .PP

@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #ifndef PROTOCOLBASE_H
 #define PROTOCOLBASE_H
 
@@ -24,14 +11,13 @@
 
 class ProtocolBase {
 public:
-	ProtocolBase(Http *, IMAPISession *, const std::string &srv_tz, const std::string &charset);
+	ProtocolBase(Http &, IMAPISession *, const std::string &srv_tz, const std::string &charset);
 	virtual ~ProtocolBase() = default;
 	HRESULT HrInitializeClass();
-
 	virtual HRESULT HrHandleCommand(const std::string &strMethod) = 0;
-	
+
 protected:
-	Http *m_lpRequest = nullptr;
+	Http &m_lpRequest;
 	KC::object_ptr<IMAPISession> m_lpSession;
 	std::string m_strSrvTz;
 	std::string m_strCharset;
@@ -45,11 +31,9 @@ protected:
 	KC::memory_ptr<SPropTagArray> m_lpNamedProps; //!< named properties of the active store
 	std::wstring m_wstrFldOwner;   //!< url owner part
 	std::wstring m_wstrFldName;	   //!< url foldername part
-
 	std::wstring m_wstrUser;	//!< login username (http auth user)
 	bool m_blFolderAccess = true; //!< can we delete the current folder
-	ULONG m_ulUrlFlag = 0;
-	ULONG m_ulFolderFlag = 0;
+	ULONG m_ulUrlFlag = 0, m_ulFolderFlag = 0;
 	KC::convert_context m_converter;
 
 	std::string W2U(const std::wstring&); //!< convert widestring to UTF-8

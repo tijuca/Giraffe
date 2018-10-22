@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Part of the high-level python bindings for Kopano.
 
@@ -11,7 +12,7 @@ from MAPI import (
     MAPI_UNICODE, RELOP_EQ, TBL_BATCH, ECSTORE_TYPE_PUBLIC,
     WrapStoreEntryID
 )
-from MAPI.Defs import bin2hex, PpropFindProp
+from MAPI.Defs import PpropFindProp
 from MAPI.Struct import (
     MAPIErrorNotFound, SPropertyRestriction, SPropValue,
     MAPIErrorCollision
@@ -28,23 +29,23 @@ from .errors import (
     NotFoundError, DuplicateError
 )
 from .compat import (
-    hex as _hex, unhex as _unhex, repr as _repr, fake_unicode as _unicode
+    benc as _benc, bdec as _bdec, fake_unicode as _unicode,
 )
 
 if sys.hexversion >= 0x03000000:
     try:
         from . import server as _server
-    except ImportError:
-        _server = sys.modules[__package__+'.server']
+    except ImportError: # pragma: no cover
+        _server = sys.modules[__package__ + '.server']
     try:
         from . import user as _user
-    except ImportError:
-        _user = sys.modules[__package__+'.user']
+    except ImportError: # pragma: no cover
+        _user = sys.modules[__package__ + '.user']
     try:
         from . import store as _store
-    except ImportError:
-        _store = sys.modules[__package__+'.store']
-else:
+    except ImportError: # pragma: no cover
+        _store = sys.modules[__package__ + '.store']
+else: # pragma: no cover
     import server as _server
     import user as _user
     import store as _store
@@ -79,7 +80,7 @@ class Company(Properties):
     @property
     def companyid(self): # XXX single-tenant case
         if self._name != u'Default':
-            return bin2hex(self._eccompany.CompanyID)
+            return _benc(self._eccompany.CompanyID)
 
     @property
     def admin(self):
@@ -121,8 +122,9 @@ class Company(Properties):
         """
         if guid == 'public':
             if not self.public_store:
-                raise NotFoundError("no public store for company '%s'" % \
-                    self.name)
+                raise NotFoundError(
+                    "no public store for company '%s'" % self.name
+                )
             return self.public_store
         else:
             return self.server.store(guid)
@@ -131,13 +133,17 @@ class Company(Properties):
         """Return all company :class:`stores <Store>`."""
         if self.server.multitenant:
             table = self.server.sa.OpenUserStoresTable(MAPI_UNICODE)
-            restriction = SPropertyRestriction(RELOP_EQ, PR_EC_COMPANY_NAME_W,
-                SPropValue(PR_EC_COMPANY_NAME_W, self.name))
+            restriction = SPropertyRestriction(
+                RELOP_EQ, PR_EC_COMPANY_NAME_W, SPropValue(PR_EC_COMPANY_NAME_W, self.name)
+            )
             table.Restrict(restriction, TBL_BATCH)
             for row in table.QueryRows(-1, 0):
                 prop = PpropFindProp(row, PR_EC_STOREGUID)
                 if prop:
-                    yield _store.Store(_hex(prop.Value), self.server)
+                    yield _store.Store(_benc(prop.Value), self.server)
+            public_store = self.public_store # TODO why not included above?
+            if public_store:
+                yield public_store
         else:
             for store in self.server.stores():
                 yield store
@@ -158,7 +164,7 @@ class Company(Properties):
                 except MAPIErrorNotFound:
                     self._public_store = None
                 else:
-                    self._public_store = _store.Store(entryid=_hex(entryid), server=self.server)
+                    self._public_store = _store.Store(entryid=_benc(entryid), server=self.server)
 
         return self._public_store
 
@@ -177,7 +183,7 @@ class Company(Properties):
 
         store_entryid = WrapStoreEntryID(0, b'zarafa6client.dll', storeid_rootid[0][:-4]) + self.server.pseudo_url + b'\x00'
 
-        self._public_store = _store.Store(entryid=_hex(store_entryid), server=self.server)
+        self._public_store = _store.Store(entryid=_benc(store_entryid), server=self.server)
         return self._public_store
 
     def hook_public_store(self, store):
@@ -187,12 +193,12 @@ class Company(Properties):
         """
         if self._name == u'Default':
             try:
-                self.server.sa.HookStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE, _unhex(store.guid))
+                self.server.sa.HookStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE, _bdec(store.guid))
             except MAPIErrorCollision:
                 raise DuplicateError("hooked public store already exists")
         else:
             try:
-                self.server.sa.HookStore(ECSTORE_TYPE_PUBLIC, _unhex(self.companyid), _unhex(store.guid))
+                self.server.sa.HookStore(ECSTORE_TYPE_PUBLIC, _bdec(self.companyid), _bdec(store.guid))
             except MAPIErrorCollision:
                 raise DuplicateError("hooked public store already exists for company '%s'" % self.name)
 
@@ -207,7 +213,7 @@ class Company(Properties):
                 raise NotFoundError("no hooked public store")
         else:
             try:
-                self.server.sa.UnhookStore(ECSTORE_TYPE_PUBLIC, _unhex(self.companyid))
+                self.server.sa.UnhookStore(ECSTORE_TYPE_PUBLIC, _bdec(self.companyid))
             except MAPIErrorNotFound:
                 raise NotFoundError("no hooked public store for company '%s'" % self.name)
         self._public_store = None
@@ -218,7 +224,7 @@ class Company(Properties):
         :param name: user name
         :param create: create user if it doesn't exist (default False)
         """
-        if not '@' in name and self._name != 'Default':
+        if '@' not in name and self._name != 'Default':
             name = name + '@' + self._name
         try:
             return self.server.user(name)
@@ -310,7 +316,7 @@ class Company(Properties):
         self.server.create_user(name, password=password, company=self._name)
         return self.user('%s@%s' % (name, self._name))
 
-    #XXX create_group/create=True
+    # XXX create_group/create=True
     def group(self, name):
         """Return :class:`group <Group>` with given name.
 

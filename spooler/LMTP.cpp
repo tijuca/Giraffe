@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <cstdio>
 #include <cstdlib>
@@ -30,15 +17,14 @@
 #include <mapiutil.h>
 #include <inetmapi/inetmapi.h>
 #include <kopano/mapiext.h>
-
 #include <kopano/CommonUtil.h>
 #include <kopano/MAPIErrors.h>
-#include <fileutil.h>
+#include <kopano/fileutil.hpp>
 #include <kopano/ECTags.h>
 #include <kopano/ECChannel.h>
 #include "LMTP.h"
 #include <kopano/stringutil.h>
-#include "fileutil.h"
+#include <kopano/fileutil.hpp>
 
 using namespace KC;
 using std::string;
@@ -47,7 +33,7 @@ LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECConfig *lpConf) :
 	m_lpChannel(lpChan), m_lpConfig(lpConf), m_strPath(szServerPath)
 {}
 
-/** 
+/**
  * Tests the start of the input for the LMTP command. LMTP is case
  * insensitive.
  * LMTP commands are:
@@ -57,10 +43,10 @@ LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECConfig *lpConf) :
  * @arg DATA
  * @arg RSET
  * @arg QUIT
- * 
+ *
  * @param[in]  strCommand The received line from the LMTP client
  * @param[out] eCommand enum describing the received command
- * 
+ *
  * @return MAPI error code
  * @retval MAPI_E_CALL_FAILED unknown or unsupported command received
  */
@@ -83,11 +69,11 @@ HRESULT LMTP::HrGetCommand(const string &strCommand, LMTP_Command &eCommand)
 	return hrSuccess;
 }
 
-/** 
+/**
  * Send the following response to the LMTP client.
- * 
+ *
  * @param[in] strResponse String to send
- * 
+ *
  * @return Possible error during write to the client
  */
 HRESULT LMTP::HrResponse(const string &strResponse)
@@ -99,11 +85,11 @@ HRESULT LMTP::HrResponse(const string &strResponse)
 	return hr;
 }
 
-/** 
+/**
  * Parse the received string for a valid LHLO command.
- * 
+ *
  * @param[in] strInput the full LHLO command received
- * 
+ *
  * @return always hrSuccess
  */
 HRESULT LMTP::HrCommandLHLO(const string &strInput, string & nameOut)
@@ -117,67 +103,66 @@ HRESULT LMTP::HrCommandLHLO(const string &strInput, string & nameOut)
 	return hrSuccess;
 }
 
-/** 
+/**
  * Parse the received string for a valid MAIL FROM: command.
- * The correct syntax for the MAIL FROM is:
- *  MAIL FROM:<email@address.domain>
+ * The correct syntax for the MAIL FROM is (RFC 5321 §3.3):
+ *  "MAIL FROM:" <reverse-path> [ SP <mail-parameters> ] <CRLF>
  *
  * However, it's possible extra spaces are added in the string, and we
  * should correctly accept this to deliver the mail.
  * We ignore the contents from the address, and use the From: header.
- * 
+ *
  * @param[in] strFrom the full MAIL FROM command
- * 
+ *
  * @return MAPI error code
  * @retval MAPI_E_NOT_FOUND < or > character was not found: this is fatal.
  */
-HRESULT LMTP::HrCommandMAILFROM(const string &strFrom, std::string *const strAddress)
+HRESULT LMTP::HrCommandMAILFROM(const string &strFrom, std::string &strAddress)
 {
 	// strFrom is only checked for syntax
 	return HrParseAddress(strFrom, strAddress);
 }
 
-/** 
+/**
  * Parse the received string for a valid RCPT TO: command.
- * 
+ *
  * @param[in]  strTo the full RCPT TO command
  * @param[out] strUnresolved the parsed email address from the command, user will be resolved by DAgent.
- * 
+ *
  * @return MAPI error code
  * @retval MAPI_E_NOT_FOUND < or > character was not found: this is fatal.
  */
-HRESULT LMTP::HrCommandRCPTTO(const string &strTo, string *strUnresolved)
+HRESULT LMTP::HrCommandRCPTTO(const std::string &strTo,
+    std::string &strUnresolved)
 {
 	HRESULT hr = HrParseAddress(strTo, strUnresolved);
 	if (hr == hrSuccess)
 		ec_log_debug("Resolved command \"%s\" to recipient address \"%s\"",
-			strTo.c_str(), strUnresolved->c_str());
+			strTo.c_str(), strUnresolved.c_str());
 	else
 		ec_log_err("Invalid recipient address in command \"%s\": %s (%x)",
 			strTo.c_str(), GetMAPIErrorMessage(hr), hr);
 	return hr;
 }
 
-/** 
+/**
  * Receive the DATA from the client and save to a file using \r\n
  * enters. This file will be mmap()ed by the DAgent.
- * 
+ *
  * @param[in] tmp a FILE pointer to a temporary file with write access
- * 
+ *
  * @return MAPI error code, read/write errors from client.
  */
 HRESULT LMTP::HrCommandDATA(FILE *tmp)
 {
-	std::string inBuffer;
-	std::string message;
-
+	std::string inBuffer, message;
 	auto hr = HrResponse("354 2.1.5 Start mail input; end with <CRLF>.<CRLF>");
 	if (hr != hrSuccess)
 		return kc_perror("Error during DATA communication with client", hr);
 
 	// Now the mail body needs to be read line by line until <CRLF>.<CRLF> is encountered
 	while (1) {
-		hr = m_lpChannel->HrReadLine(&inBuffer);
+		hr = m_lpChannel->HrReadLine(inBuffer);
 		if (hr != hrSuccess)
 			return kc_perror("Error during DATA communication with client", hr);
 		if (inBuffer == ".")
@@ -193,32 +178,31 @@ HRESULT LMTP::HrCommandDATA(FILE *tmp)
 			ec_log_err("Error during DATA communication with client: %s", strerror(errno));
 			return MAPI_E_FAILURE;
 		}
-
 		// The data from HrReadLine does not contain the CRLF, so add that here
 		if (fwrite("\r\n", 1, 2, tmp) != 2) {
 			ec_log_err("Error during DATA communication with client: %s", strerror(errno));
 			return MAPI_E_FAILURE;
 		}
-
 		message += inBuffer + "\r\n";
 	}
 #if 0
-	if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG + 1)) // really hidden output (limited to 10k in logger)
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Received message:\n" + message);
+	if (ec_log(EC_LOGLEVEL_DEBUG + 1)) // really hidden output (limited to 10k in logger)
+		ec_log_debug("Received message:\n" + message);
 #endif
 	return hrSuccess;
 }
 
-/** 
+/**
  * Parse an address given in a MAIL FROM or RCPT TO command.
- * 
+ *
  * @param[in]  strInput a full MAIL FROM or RCPT TO command
  * @param[out] strAddress the address found in the command
- * 
+ *
  * @return MAPI error code
  * @retval MAPI_E_NOT_FOUND mandatory < or > not found in command.
  */
-HRESULT LMTP::HrParseAddress(const std::string &strInput, std::string *strAddress)
+HRESULT LMTP::HrParseAddress(const std::string &strInput,
+    std::string &strAddress)
 {
 	auto pos1 = strInput.find('<');
 	auto pos2 = strInput.find('>', pos1);
@@ -226,6 +210,6 @@ HRESULT LMTP::HrParseAddress(const std::string &strInput, std::string *strAddres
 		return MAPI_E_NOT_FOUND;
 	auto strAddr = strInput.substr(pos1 + 1, pos2 - pos1 - 1);
 	trim(strAddr);
-	*strAddress = std::move(strAddr);
+	strAddress = std::move(strAddr);
 	return hrSuccess;
 }

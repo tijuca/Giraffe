@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef ECSYNCCONTEXT_H
 #define ECSYNCCONTEXT_H
 
 #include <mutex>
-#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include "../provider/client/ics_client.hpp"
 #include <map>
@@ -40,7 +27,7 @@ class ECSyncSettings;
  * ECSyncContext:	This class encapsulates all synchronization related information that is
  *					only related to one side of the sync process (online or offline).
  */
-class ECSyncContext _kc_final {
+class ECSyncContext final {
 public:
 	/**
 	 * Construct a sync context.
@@ -50,7 +37,7 @@ public:
 	 * @param[in]	lpLogger
 	 *					The logger to log to.
 	 */
-	ECSyncContext(LPMDB lpStore, ECLogger *lpLogger);
+	ECSyncContext(LPMDB lpStore, std::shared_ptr<ECLogger>);
 
 	/**
 	 * Get a pointer to the message store on which this sync context operates.
@@ -309,7 +296,7 @@ private:	// methods
 	 */
 	HRESULT HrReleaseChangeAdvisor();
 
-	object_ptr<ECLogger> m_lpLogger;
+	std::shared_ptr<ECLogger> m_lpLogger;
 	object_ptr<IMsgStore> m_lpStore;
 	ECSyncSettings			*m_lpSettings;
 	object_ptr<IECChangeAdviseSink> m_lpChangeAdviseSink;

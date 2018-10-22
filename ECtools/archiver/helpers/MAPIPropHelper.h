@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef MAPIPROPHELPER_INCLUDED
@@ -21,11 +9,8 @@
 #include <memory>
 #include <kopano/zcdefs.h>
 #include <mapix.h>
-
 #include <kopano/mapi_ptr.h>
-
 #include <kopano/CommonUtil.h>
-
 #include <kopano/archiver-common.h>
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 
@@ -56,7 +41,6 @@ public:
 	HRESULT SetClean();
 	HRESULT DetachFromArchives();
 	virtual HRESULT GetParentFolder(ArchiverSessionPtr ptrSession, LPMAPIFOLDER *lppFolder);
-	_kc_hidden static HRESULT GetArchiveList(MAPIPropPtr, LPSPropValue props, ULONG nprop, ObjectEntryList *archives);
 
 protected:
 	_kc_hidden MAPIPropHelper(MAPIPropPtr);
@@ -76,7 +60,7 @@ private:
 	PROPMAP_DEF_NAMED_ID(REF_PREV_ENTRYID)
 };
 
-class MessageState _kc_final {
+class MessageState final {
 public:
 	bool isStubbed() const { return m_ulState & msStubbed; }
 	bool isDirty() const { return m_ulState & msDirty; }

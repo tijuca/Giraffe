@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 // Standard Conversion Library (Currently for Python only)
@@ -142,22 +130,22 @@ namespace priv {
 	}
 
 	/**
-	 * Specialization for extracting an ECENTRYID from a script value.
+	 * Specialization for extracting an SBinary from a script value.
 	 *
 	 * @tparam		_Type	The type of the resulting value.
 	 * @param[in]	Value	The scripted value to convert.
 	 * @param[out]	result	The native value.
 	 */
 	template <>
-	void conv_out<ECENTRYID>(PyObject* value, LPVOID lpBase, ULONG /*ulFlags*/, ECENTRYID *lpResult) {
+	void conv_out<SBinary>(PyObject *value, void *lpBase, ULONG /*ulFlags*/, SBinary *lpResult)
+	{
 		char *data;
 		Py_ssize_t size;
-		if(value == Py_None) {
+		if (value == Py_None || PyString_AsStringAndSize(value, &data, &size) < 0) {
 			lpResult->cb = 0;
 			lpResult->lpb = NULL;
 			return;
 		}
-		PyString_AsStringAndSize(value, &data, &size);
 		lpResult->cb = size;
 		if (KAllocCopy(data, size, reinterpret_cast<void **>(&lpResult->lpb), lpBase) != hrSuccess)
 			throw std::bad_alloc();

@@ -1,61 +1,40 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <kopano/stringutil.h>
 #include <kopano/pcuser.hpp>
-
 #include <sstream>
 
 namespace KC {
 
 objectid_t::objectid_t(const std::string &str)
 {
-	std::string objclass;
-	std::string objid;
-	size_t pos;
-
 	// sendas users are "encoded" like this in a string
-	pos = str.find_first_of(';');
+	auto pos = str.find_first_of(';');
 	if (pos == std::string::npos) {
-		this->id = hex2bin(str);
-		this->objclass = ACTIVE_USER;
+		id = hex2bin(str);
+		objclass = ACTIVE_USER;
 	} else {
-		objid.assign(str, pos + 1, str.size() - pos);
-		objclass.assign(str, 0, pos);
-		this->id = hex2bin(objid);
-		this->objclass = (objectclass_t)atoi(objclass.c_str());
+		id = hex2bin(std::string(str, pos + 1, str.size() - pos));
+		objclass = (objectclass_t)atoi(std::string(str, 0, pos).c_str());
 	}
 }
 
 bool objectid_t::operator==(const objectid_t &x) const noexcept
 {
-	return this->objclass == x.objclass && this->id == x.id;
+	return objclass == x.objclass && id == x.id;
 }
 
 bool objectid_t::operator!=(const objectid_t &x) const noexcept
 {
-	return this->objclass != x.objclass || this->id != x.id;
+	return objclass != x.objclass || id != x.id;
 }
 
 std::string objectid_t::tostring() const
 {
-	return stringify(this->objclass) + ";" + bin2hex(this->id);
+	return stringify(objclass) + ";" + bin2hex(id);
 }
 
 unsigned int objectdetails_t::GetPropInt(property_key_t propname) const
@@ -187,14 +166,14 @@ bool objectdetails_t::PropListStringContains(property_key_t propname,
 {
 	const std::list<std::string> list = GetPropListString(propname);
 	if (ignoreCase)
-		return std::find_if(list.begin(), list.end(),
+		return std::any_of(list.begin(), list.end(),
 			[&](const std::string &o) {
 				return value.size() == o.size() && strcasecmp(value.c_str(), o.c_str()) == 0;
-			}) != list.end();
-	return std::find_if(list.begin(), list.end(),
+			});
+	return std::any_of(list.begin(), list.end(),
 		[&](const std::string &o) {
 			return value.size() == o.size() && strcmp(value.c_str(), o.c_str()) == 0;
-		}) != list.end();
+		});
 }
 
 void objectdetails_t::ClearPropList(property_key_t propname)
@@ -212,11 +191,11 @@ objectclass_t objectdetails_t::GetClass() const {
 }
 
 void objectdetails_t::MergeFrom(const objectdetails_t &from) {
-	assert(this->m_objclass == from.m_objclass);
+	assert(m_objclass == from.m_objclass);
 	for (const auto &p : from.m_mapProps)
-		this->m_mapProps[p.first].assign(p.second);
+		m_mapProps[p.first].assign(p.second);
 	for (const auto &p : from.m_mapMVProps)
-		this->m_mapMVProps[p.first].assign(p.second.cbegin(), p.second.cend());
+		m_mapMVProps[p.first].assign(p.second.cbegin(), p.second.cend());
 }
 
 /**
@@ -241,9 +220,7 @@ size_t objectdetails_t::GetObjectSize(void) const
 
 std::string objectdetails_t::ToStr(void) const
 {
-	std::string str;
-
-	str = "propmap: ";
+	std::string str = "propmap: ";
 	for (auto i = m_mapProps.cbegin(); i != m_mapProps.cend(); ++i) {
 		if (i != m_mapProps.cbegin())
 			str += ", ";

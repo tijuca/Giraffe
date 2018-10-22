@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <new>
 #include "SOAPUtils.h"
@@ -22,6 +9,8 @@
 #include "WSUtil.h"
 #include "ECSyncSettings.h"
 #include "soapKCmdProxy.h"
+
+using namespace KC;
 
 /**
  * Create a new WSMessageStreamSink instance
@@ -41,27 +30,24 @@ HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout,
  * @param[in]	lpData	Pointer to the data
  * @param[in]	cbData	The amount of data in bytes.
  */
-HRESULT WSMessageStreamSink::Write(LPVOID lpData, ULONG cbData)
+HRESULT WSMessageStreamSink::Write(const void *lpData, unsigned int cbData)
 {
-	HRESULT hr = hrSuccess;
 	HRESULT hrAsync = hrSuccess;
+	auto hr = kcerr_to_mapierr(m_lpFifoBuffer->Write(lpData, cbData, 0, nullptr));
+	if (hr == hrSuccess)
+		return hrSuccess;
+	// Write failed, close the write-side of the FIFO
+	m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
 
-	hr = kcerr_to_mapierr(m_lpFifoBuffer->Write(lpData, cbData, 0, NULL));
-	if(hr != hrSuccess) {
-		// Write failed, close the write-side of the FIFO
-		m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
+	// Failure writing to the fifo. This means there must have been some error
+	// on the other side of the FIFO. Since that is the root cause of the write failure,
+	// return that instead of the error from the FIFO buffer (most probably a network
+	// error, but others also possible, eg logon failure, session lost, etc)
+	m_lpImporter->GetAsyncResult(&hrAsync);
 
-		// Failure writing to the fifo. This means there must have been some error
-		// on the other side of the FIFO. Since that is the root cause of the write failure,
-		// return that instead of the error from the FIFO buffer (most probably a network
-		// error, but others also possible, eg logon failure, session lost, etc)
-		m_lpImporter->GetAsyncResult(&hrAsync);
-
-		// Make sure that we only use the async error if there really was an error
-		if(hrAsync != hrSuccess)
-			hr = hrAsync;
-	}
-
+	// Make sure that we only use the async error if there really was an error
+	if (hrAsync != hrSuccess)
+		hr = hrAsync;
 	return hr;
 }
 
@@ -81,32 +67,29 @@ WSMessageStreamSink::~WSMessageStreamSink()
 	m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
 }
 
-HRESULT WSMessageStreamImporter::Create(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSTransport *lpTransport, WSMessageStreamImporter **lppStreamImporter)
+HRESULT WSMessageStreamImporter::Create(ULONG ulFlags, ULONG ulSyncId,
+    ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG cbFolderEntryID,
+    const ENTRYID *lpFolderEntryID, bool bNewMessage,
+    const SPropValue *lpConflictItems, WSTransport *lpTransport,
+    WSMessageStreamImporter **lppStreamImporter)
 {
-	HRESULT hr = hrSuccess;
+	if (lppStreamImporter == nullptr || lpEntryID == nullptr ||
+	    cbEntryID == 0 || lpFolderEntryID == nullptr ||
+	    cbFolderEntryID == 0 || lpTransport == nullptr ||
+	    (bNewMessage && lpConflictItems != nullptr))
+		return MAPI_E_INVALID_PARAMETER;
+
 	entryId sEntryId, sFolderEntryId;
 	struct propVal sConflictItems;
 	WSMessageStreamImporterPtr ptrStreamImporter;
 	ECSyncSettings* lpSyncSettings = NULL;
 
-	if (lppStreamImporter == NULL || 
-		lpEntryID == NULL || cbEntryID == 0 || 
-		lpFolderEntryID == NULL || cbFolderEntryID == 0 || 
-		(bNewMessage == true && lpConflictItems != NULL) ||
-		lpTransport == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, false);
+	auto hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryID, lpEntryID, &sEntryId, false);
 	if (hr != hrSuccess)
 		goto exit;
-
 	hr = CopyMAPIEntryIdToSOAPEntryId(cbFolderEntryID, lpFolderEntryID, &sFolderEntryId, false);
 	if (hr != hrSuccess)
 		goto exit;
-
 	if (lpConflictItems) {
 		hr = CopyMAPIPropValToSOAPPropVal(&sConflictItems, lpConflictItems);
 		if (hr != hrSuccess)
@@ -136,13 +119,11 @@ exit:
 
 HRESULT WSMessageStreamImporter::StartTransfer(WSMessageStreamSink **lppSink)
 {
-	HRESULT hr;
 	KC::object_ptr<WSMessageStreamSink> ptrSink;
-	
-	if (!m_threadPool.dispatch(this))
-		return MAPI_E_CALL_FAILED;
 
-	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &~ptrSink);
+	if (!m_threadPool.enqueue(this))
+		return MAPI_E_CALL_FAILED;
+	auto hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &~ptrSink);
 	if (hr != hrSuccess) {
 		m_fifoBuffer.Close(ECFifoBuffer::cfWrite);
 		return hr;
@@ -174,11 +155,11 @@ WSMessageStreamImporter::WSMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, 
 , m_fifoBuffer(ulBufferSize)
 , m_threadPool(1)
 , m_ulTimeout(ulTimeout)
-{ 
+{
 }
 
 WSMessageStreamImporter::~WSMessageStreamImporter()
-{ 
+{
 	s_free(nullptr, m_sEntryId.__ptr);
 	s_free(nullptr, m_sFolderEntryId.__ptr);
 	if (m_sConflictItems.Value.bin)
@@ -199,9 +180,8 @@ void WSMessageStreamImporter::run()
 	sStreamData.xop__Include.__ptr = (unsigned char*)this;
 	sStreamData.xop__Include.type = const_cast<char *>("application/binary");
 
-	m_ptrTransport->LockSoap();
-
-	soap_set_omode(lpSoap, SOAP_ENC_MTOM | SOAP_IO_CHUNK);	
+	soap_lock_guard spg(*m_ptrTransport);
+	soap_set_omode(lpSoap, SOAP_ENC_MTOM | SOAP_IO_CHUNK);
     lpSoap->mode &= ~SOAP_XML_TREE;
     lpSoap->omode &= ~SOAP_XML_TREE;
 	lpSoap->fmimereadopen = &StaticMTOMReadOpen;
@@ -215,8 +195,6 @@ void WSMessageStreamImporter::run()
 		m_hr = MAPI_E_NETWORK_ERROR;
 	else if (m_hr == hrSuccess) // Could be set from callback
 		m_hr = kcerr_to_mapierr(ulResult, MAPI_E_NOT_FOUND);
-
-	m_ptrTransport->UnLockSoap();
 }
 
 void* WSMessageStreamImporter::StaticMTOMReadOpen(struct soap *soap, void *handle, const char *id, const char *type, const char *description)
@@ -241,15 +219,12 @@ void* WSMessageStreamImporter::MTOMReadOpen(struct soap* /*soap*/, void *handle,
 
 size_t WSMessageStreamImporter::MTOMRead(struct soap* soap, void* /*handle*/, char *buf, size_t len)
 {
-	ECRESULT er = erSuccess;
 	ECFifoBuffer::size_type cbRead = 0;
-
-	er = m_fifoBuffer.Read(buf, len, 0, &cbRead);
+	auto er = m_fifoBuffer.Read(buf, len, 0, &cbRead);
 	if (er != erSuccess) {
 		m_hr = kcerr_to_mapierr(er);
 		return 0;
 	}
-
 	return cbRead;
 }
 

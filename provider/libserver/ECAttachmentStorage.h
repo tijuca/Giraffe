@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef EC_ATTACHMENT_STORAGE
@@ -20,40 +8,38 @@
 
 #include <kopano/zcdefs.h>
 #include "ECDatabase.h"
-#include <atomic>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 struct soap;
 
 namespace KC {
 
 class ECAttachmentStorage;
+class ECConfig;
 class ECSerializer;
 class ECLogger;
 
 class ext_siid {
 	public:
 	ext_siid() = default;
-	explicit ext_siid(unsigned int a) : siid(a) {}
+	explicit ext_siid(unsigned int a, std::string f = "") : siid(a), filename(f) {}
 	unsigned int siid = 0;
-	inline constexpr bool operator==(const ext_siid &o) const { return siid == o.siid; }
-	inline constexpr bool operator<(const ext_siid &r) const { return siid < r.siid; }
+	std::string filename;
+	inline bool operator==(const ext_siid &o) const { return siid == o.siid; }
+	inline bool operator<(const ext_siid &r) const { return siid < r.siid; }
 };
 
 class ECAttachmentConfig {
 	public:
 	virtual ~ECAttachmentConfig() = default;
-	static ECRESULT create(ECConfig *, ECAttachmentConfig **);
+	static ECRESULT create(const GUID &sguid, std::shared_ptr<ECConfig>, ECAttachmentConfig **);
 	virtual ECAttachmentStorage *new_handle(ECDatabase *) = 0;
 
 	private:
-	virtual ECRESULT init(ECConfig *) { return hrSuccess; }
+	virtual ECRESULT init(std::shared_ptr<ECConfig>) { return hrSuccess; }
 };
 
 class ECAttachmentStorage : public kt_completion {
@@ -87,8 +73,8 @@ protected:
 	/* Single Instance Attachment handlers (must be overridden by subclasses) */
 	virtual ECRESULT LoadAttachmentInstance(struct soap *, const ext_siid &, size_t *size, unsigned char **data) = 0;
 	virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *size, ECSerializer *sink) = 0;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, unsigned char *) = 0;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, ECSerializer *) = 0;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, unsigned char *) = 0;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, ECSerializer *) = 0;
 	virtual ECRESULT DeleteAttachmentInstances(const std::list<ext_siid> &, bool replace) = 0;
 	virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) = 0;
 	virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *size, bool *comp = nullptr) = 0;
@@ -105,7 +91,7 @@ protected:
 	std::string m_CompressionLevel;
 };
 
-class _kc_export_dycast ECDatabaseAttachment _kc_final :
+class _kc_export_dycast ECDatabaseAttachment final :
     public ECAttachmentStorage {
 public:
 	ECDatabaseAttachment(ECDatabase *lpDatabase);
@@ -114,8 +100,8 @@ protected:
 	/* Single Instance Attachment handlers */
 	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, const ext_siid &, size_t *size, unsigned char **data) override;
 	virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *size, ECSerializer *sink) override;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, unsigned char *) override;
-	virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, ECSerializer *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, unsigned char *) override;
+	virtual ECRESULT SaveAttachmentInstance(ext_siid &, ULONG propid, size_t, ECSerializer *) override;
 	virtual ECRESULT DeleteAttachmentInstances(const std::list<ext_siid> &, bool replace) override;
 	virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) override;
 	virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *size, bool *comp = nullptr) override;
@@ -124,45 +110,6 @@ protected:
 	private:
 	virtual ECRESULT Commit() override;
 	virtual ECRESULT Rollback() override;
-};
-
-class ECFileAttachment _kc_final :
-    public ECAttachmentStorage {
-	public:
-	_kc_hidden ECFileAttachment(ECDatabase *, const std::string &basepath, unsigned int compr_lvl, bool sync);
-
-protected:
-	_kc_hidden virtual ~ECFileAttachment(void);
-	
-	/* Single Instance Attachment handlers */
-	_kc_hidden virtual ECRESULT LoadAttachmentInstance(struct soap *, const ext_siid &, size_t *, unsigned char **) override;
-	_kc_hidden virtual ECRESULT LoadAttachmentInstance(const ext_siid &, size_t *, ECSerializer *) override;
-	_kc_hidden virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, unsigned char *) override;
-	_kc_hidden virtual ECRESULT SaveAttachmentInstance(const ext_siid &, ULONG propid, size_t, ECSerializer *) override;
-	_kc_hidden virtual ECRESULT DeleteAttachmentInstances(const std::list<ext_siid> &, bool replace) override;
-	_kc_hidden virtual ECRESULT DeleteAttachmentInstance(const ext_siid &, bool replace) override;
-	_kc_hidden virtual ECRESULT GetSizeInstance(const ext_siid &, size_t *size, bool *compr = nullptr) override;
-	_kc_hidden virtual kd_trans Begin(ECRESULT &) override;
-private:
-	_kc_hidden std::string CreateAttachmentFilename(const ext_siid &, bool compressed);
-	virtual ECRESULT Commit() override;
-	virtual ECRESULT Rollback() override;
-
-	size_t attachment_size_safety_limit;
-	int m_dirFd = -1;
-	DIR *m_dirp = nullptr;
-	bool force_changes_to_disk;
-
-	/* helper functions for transacted deletion */
-	_kc_hidden ECRESULT MarkAttachmentForDeletion(const ext_siid &);
-	_kc_hidden ECRESULT DeleteMarkedAttachment(const ext_siid &);
-	_kc_hidden ECRESULT RestoreMarkedAttachment(const ext_siid &);
-	_kc_hidden bool VerifyInstanceSize(const ext_siid &, size_t expected_size, const std::string &filename);
-	_kc_hidden void give_filesize_hint(const int fd, const off_t len);
-	_kc_hidden void my_readahead(int fd);
-	std::string m_basepath;
-	bool m_bTransaction = false;
-	std::set<ext_siid> m_setNewAttachment, m_setDeletedAttachment, m_setMarkedAttachment;
 };
 
 } /* namespace */

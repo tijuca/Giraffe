@@ -1,24 +1,13 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <string>
 #include "HtmlEntity.h"
 #include <kopano/charset/convert.h>
+
+using namespace std::string_literals;
 
 namespace KC {
 
@@ -537,40 +526,26 @@ WCHAR CHtmlEntity::toChar( const WCHAR *name )
 {
 	HTMLEntity_t key = {0};
 	key.s = name;
-
-	HTMLEntity_t *result;
-
-	result = (HTMLEntity_t *)bsearch(&key, &_HTMLEntity, cHTMLEntity, sizeof( HTMLEntity_t), (int (*)(const void*, const void*))compareHTMLEntityToChar );
-
-	if (result)
-		return result->c;
-	else
-		return 0;
+	auto result = static_cast<HTMLEntity_t *>(bsearch(&key, &_HTMLEntity, cHTMLEntity, sizeof(HTMLEntity_t), compareHTMLEntityToChar));
+	return result != nullptr ? result->c : 0;
 }
 
 const WCHAR *CHtmlEntity::toName( WCHAR c )
 {
 	HTMLEntityToName_t key = {0};
 	key.c = c;
-
-	HTMLEntityToName_t *result;
-
-	result = (HTMLEntityToName_t *)bsearch(&key, &_HTMLEntityToName, cHTMLEntityToName, sizeof( HTMLEntityToName_t), (int (*)(const void*, const void*))compareHTMLEntityToName );
-
-	if (result)
-		return result->s;
-	else
-		return NULL;
+	auto result = static_cast<HTMLEntityToName_t *>(bsearch(&key, &_HTMLEntityToName, cHTMLEntityToName, sizeof(HTMLEntityToName_t), compareHTMLEntityToName));
+	return result != nullptr ? result->s : nullptr;
 }
 
 /**
  * Convert a character to HTML entity. when no entity is needed, false
  * is returned. Output parameter will always contain correct
  * representation of input.
- * 
+ *
  * @param[in] c wide character to convert into HTML entity
  * @param[out] strHTML HTML version of input
- * 
+ *
  * @return false if no conversion took place, true if it did.
  */
 bool CHtmlEntity::CharToHtmlEntity(WCHAR c, std::wstring &strHTML)
@@ -597,7 +572,7 @@ bool CHtmlEntity::CharToHtmlEntity(WCHAR c, std::wstring &strHTML)
 		const WCHAR *lpChar = CHtmlEntity::toName(c);
 		if (lpChar == nullptr)
 			break;
-		strHTML = std::wstring(L"&") + lpChar + L";";
+		strHTML = L"&"s + lpChar + L";";
 		bHTML = true;
 		break;
 	}
@@ -606,71 +581,58 @@ bool CHtmlEntity::CharToHtmlEntity(WCHAR c, std::wstring &strHTML)
 	return bHTML;
 }
 
-/** 
+/**
  * Validate HTML entity
  *
  * Valid:
  *   &{#100 | #x64 | amp};test
- * 
+ *
  * @param[in] strEntity a string part to test if this is a HTML entity, which could be a single wide character
- * 
+ *
  * @return true if input is HTML, false if it is a normal string
  */
 bool CHtmlEntity::validateHtmlEntity(const std::wstring &strEntity)
 {
 	if(strEntity.size() < 3 || strEntity[0] != '&')
 		return false;
-	
-	size_t pos = strEntity.find(';');
 
+	size_t pos = strEntity.find(';');
 	if (pos == std::wstring::npos || pos < 3)
 		return false;
-	
-	std::wstring str;
-
 	if (strEntity[1] == '#') {
-		int base = 10;
-		str = strEntity.substr(2, pos-2);
-
-		if(str[0] == 'x')
-			base = 16;
+		auto str = strEntity.substr(2, pos - 2);
+		auto base = (str[0] == 'x') ? 16 : 10;
 		return wcstoul(str.c_str() + 1, NULL, base) != 0;
 	}
-	str = strEntity.substr(1, pos - 2);
+	auto str = strEntity.substr(1, pos - 2);
 	return CHtmlEntity::toChar(str.c_str()) > 0;
 }
 
-/** 
+/**
  * Convert HTML entity to a single wide character.
- * 
+ *
  * @param[in] strEntity valid HTML entity to convert
- * 
+ *
  * @return wide character for entity, or ? if conversion failed.
  */
 WCHAR CHtmlEntity::HtmlEntityToChar(const std::wstring &strEntity)
 {
-	unsigned int ulCode;
-
 	if (strEntity[0] != '#') {
-		ulCode = toChar(strEntity.c_str());
-		if (ulCode > 0)
-			return (WCHAR)ulCode;
-		return '?';
+		unsigned int ulCode = toChar(strEntity.c_str());
+		return (ulCode > 0) ? ulCode : L'?';
 	}
 	// We have a unicode number, use iconv to get the WCHAR
-
 	std::string strUnicode;
 	int base = 10;
 	auto pNum = strEntity.c_str() + 1;
-
 	if (strEntity.size() > 2 && strEntity[1] == 'x') {
 		base = 16;
 		++pNum;
 	}
-	ulCode = wcstoul(pNum, NULL, base);
+
+	unsigned int ulCode = wcstoul(pNum, nullptr, base);
 	if (ulCode <= 0xFFFF /*USHRT_MAX*/)
 		return (WCHAR)ulCode;
-
 	strUnicode.append(1, (ulCode & 0xff));
 	strUnicode.append(1, (ulCode >> 8) & 0xff);
 	strUnicode.append(1, (ulCode >> 16) & 0xff);

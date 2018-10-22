@@ -1,18 +1,6 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 /* ArchiveManage.h
@@ -55,7 +43,7 @@ public:
 	};
 
 	virtual ~ArchiveManage(void) = default;
-	_kc_export static HRESULT Create(LPMAPISESSION, ECLogger *, const TCHAR *user, std::unique_ptr<ArchiveManage> *manage);
+	_kc_export static HRESULT Create(IMAPISession *, std::shared_ptr<ECLogger>, const TCHAR *user, std::unique_ptr<ArchiveManage> *manage);
 	virtual eResult AttachTo(const char *lpszArchiveServer, const TCHAR *lpszArchive, const TCHAR *lpszFolder, unsigned int ulFlags) = 0;
 	virtual eResult DetachFrom(const char *lpszArchiveServer, const TCHAR *lpszArchive, const TCHAR *lpszFolder) = 0;
 	virtual eResult DetachFrom(unsigned int ulArchive) = 0;

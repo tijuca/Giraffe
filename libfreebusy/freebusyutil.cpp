@@ -1,22 +1,8 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
-
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapix.h>
@@ -25,7 +11,6 @@
 #include <kopano/memory.hpp>
 #include "freebusyutil.h"
 #include <kopano/stringutil.h>
-
 #include "freebusytags.h"
 #include <kopano/mapiext.h>
 #include <edkmdb.h>
@@ -49,7 +34,6 @@ struct sfbEvent {
 	short rtmStart, rtmEnd;
 };
 
-#define FB_DATE(yearmonth,daytime)	((static_cast<ULONG>(static_cast<unsigned short>(yearmonth)) << 16) | static_cast<ULONG>(static_cast<unsigned short>(daytime)))
 #define FB_YEARMONTH(year, month)	(((static_cast<unsigned short>(year) << 4) & 0xFFF0) | static_cast<unsigned short>(month))
 #define FB_YEAR(yearmonth)		(static_cast<unsigned short>(yearmonth) >> 4)
 #define FB_MONTH(yearmonth)		(static_cast<unsigned short>(yearmonth) & 0x000F)
@@ -239,7 +223,7 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 	ULONG ulMvItems = 4;
 	// Get current freebusy entryid array
 	if (HrGetOneProp(lpFolder, PR_FREEBUSY_ENTRYIDS, &~lpPropfbEntryids) == hrSuccess)
-		ulMvItems = (lpPropfbEntryids->Value.MVbin.cValues > ulMvItems) ? lpPropfbEntryids->Value.MVbin.cValues : ulMvItems;
+		ulMvItems = std::max(lpPropfbEntryids->Value.MVbin.cValues, ulMvItems);
 	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropfbEntryidsNew);
 	if (hr != hrSuccess)
 		return hr;
@@ -251,15 +235,11 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 	memset(lpPropfbEntryidsNew->Value.MVbin.lpbin, 0, sizeof(SBinary) * lpPropfbEntryidsNew->Value.MVbin.cValues);
 
 	// move the old entryids to the new array
-	if (lpPropfbEntryids) {
-		for (i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; ++i) {
-			lpPropfbEntryidsNew->Value.MVbin.lpbin[i].cb = lpPropfbEntryids->Value.MVbin.lpbin[i].cb;
-			lpPropfbEntryidsNew->Value.MVbin.lpbin[i].lpb = lpPropfbEntryids->Value.MVbin.lpbin[i].lpb; //cheap copy
-		}
-	}
+	if (lpPropfbEntryids != nullptr)
+		for (i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; ++i)
+			lpPropfbEntryidsNew->Value.MVbin.lpbin[i] = lpPropfbEntryids->Value.MVbin.lpbin[i]; /* cheap copy */
 	// Add the new entryid on position 3
-	lpPropfbEntryidsNew->Value.MVbin.lpbin[2].cb = lpPropFBMessage->Value.bin.cb;
-	lpPropfbEntryidsNew->Value.MVbin.lpbin[2].lpb = lpPropFBMessage->Value.bin.lpb;
+	lpPropfbEntryidsNew->Value.MVbin.lpbin[2] = lpPropFBMessage->Value.bin;
 	lpPropfbEntryidsNew->ulPropTag = PR_FREEBUSY_ENTRYIDS;
 	hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
 	if (hr != hrSuccess)
@@ -356,7 +336,6 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 			PR_FREEBUSY_TENTATIVE_EVENTS,
 			PR_FREEBUSY_TENTATIVE_MONTHS,
 			PR_FREEBUSY_NUM_MONTHS
-
 		}
 	};
 
@@ -463,7 +442,6 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	while (lpfbBlockList->Next(&fbBlk) == hrSuccess &&
 	       iMonth < static_cast<LONG>(ulMonths))
 	{
-
 		if(fbBlk.m_fbstatus == fbStatus || fbStatus == fbKopanoAllBusy)
 		{
 			gmtime_safe(RTimeToUnixTime(fbBlk.m_tmStart), &tmStart);
@@ -551,8 +529,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 		assert(fbd.cValues <= ulMonths + 1);
 		assert(xmo.cValues <= ulMonths + 1);
 	}
-
-	if(bFound == false)
+	if (!bFound)
 		return MAPI_E_NOT_FOUND;
 	*lppPropFBDataArray = lpPropFBDataArray.release();
 	return hr;

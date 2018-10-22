@@ -1,10 +1,6 @@
 /*
+ * SPDX-License-Identifier: LGPL-3.0-or-later
  * Copyright 2018, Kopano and its licensors
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation; either version 3 or
- * (at your option) any later version.
  */
 #include <memory>
 #include <set>
@@ -19,6 +15,7 @@
 #include <kopano/MAPIErrors.h>
 #include <kopano/scope.hpp>
 #include <kopano/stringutil.h>
+#include <kopano/timeutil.hpp>
 
 using namespace KC;
 
@@ -74,7 +71,7 @@ static ECRESULT remove_helper_index(std::shared_ptr<KDatabase> db)
 	ECRESULT coll = erSuccess;
 	for (const auto &tbl : our_proptables) {
 		auto ret = hidx_remove(*db.get(), tbl);
-		if (coll != erSuccess)
+		if (coll == erSuccess)
 			coll = ret;
 	}
 	if (coll != erSuccess)
@@ -487,7 +484,8 @@ int main(int argc, char **argv)
 
 	cfg->AddSetting("log_method", "file");
 	cfg->AddSetting("log_file", "-");
-	ec_log_set(CreateLogger(cfg, argv[0], "kopano-dbadm", false));
+	std::shared_ptr<ECLogger> g_logger(CreateLogger(cfg, argv[0], "kopano-dbadm", false));
+	ec_log_set(g_logger);
 	if (!ec_log_get()->Log(EC_LOGLEVEL_INFO))
 		ec_log_get()->SetLoglevel(EC_LOGLEVEL_INFO);
 	auto db = std::make_shared<KDatabase>();

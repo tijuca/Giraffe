@@ -1,31 +1,17 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ECExchangeImportHierarchyChanges.h"
 #include "ECExchangeImportContentsChanges.h"
-
 #include <kopano/Util.h>
 #include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include <mapiguid.h>
 #include <kopano/mapiext.h>
-#include <kopano/ECDebug.h>
 #include <kopano/stringutil.h>
 #include "pcutil.hpp"
 #include "ics.h"
@@ -33,7 +19,6 @@
 #include "Mem.h"
 #include <kopano/mapi_ptr.h>
 #include "EntryPoint.h"
-
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
 #include <kopano/charset/convstring.h>
@@ -45,7 +30,6 @@ ECExchangeImportHierarchyChanges::ECExchangeImportHierarchyChanges(ECMAPIFolder 
 {}
 
 HRESULT ECExchangeImportHierarchyChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTHIERARCHYCHANGES* lppExchangeImportHierarchyChanges){
-
 	if(!lpFolder)
 		return MAPI_E_INVALID_PARAMETER;
 	return alloc_wrap<ECExchangeImportHierarchyChanges>(lpFolder)
@@ -63,12 +47,11 @@ HRESULT	ECExchangeImportHierarchyChanges::QueryInterface(REFIID refiid, void **l
 }
 
 HRESULT ECExchangeImportHierarchyChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError){
-	HRESULT		hr = hrSuccess;
 	ecmem_ptr<MAPIERROR> lpMapiError;
 	memory_ptr<TCHAR> lpszErrorMsg;
-	
+
 	//FIXME: give synchronization errors messages
-	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
+	auto hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ECAllocateBuffer(sizeof(MAPIERROR), &~lpMapiError);
@@ -85,8 +68,7 @@ HRESULT ECExchangeImportHierarchyChanges::GetLastError(HRESULT hResult, ULONG ul
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
 			return hr;
-		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str()); 
-
+		wcscpy((wchar_t *)lpMapiError->lpszComponent, wstrCompName.c_str());
 	} else {
 		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg.get());
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
@@ -114,56 +96,47 @@ HRESULT ECExchangeImportHierarchyChanges::Config(LPSTREAM lpStream, ULONG ulFlag
 	memory_ptr<SPropValue> lpPropSourceKey;
 
 	m_lpStream = lpStream;
-
 	if(lpStream == NULL) {
 		m_ulSyncId = 0;
 		m_ulChangeId = 0;
-	} else {
-		hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
-		if(hr != hrSuccess)
-			return hr;
-
-		hr = lpStream->Read(&m_ulSyncId, 4, &ulLen);
-		if(hr != hrSuccess)
-			return hr;
-
-		if(ulLen != 4)
-			return MAPI_E_INVALID_PARAMETER;
-
-		hr = lpStream->Read(&m_ulChangeId, 4, &ulLen);
-		if(hr != hrSuccess)
-			return hr;
-
-		if(ulLen != 4) {
-			return MAPI_E_INVALID_PARAMETER;
-		}
-		hr = HrGetOneProp(m_lpFolder, PR_SOURCE_KEY, &~lpPropSourceKey);
-		if(hr != hrSuccess)
-			return hr;
-
-		// The user specified the special sync key '0000000000000000', get a sync key from the server.
-		if(m_ulSyncId == 0) {
-			hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetSyncStatus(std::string((char *)lpPropSourceKey->Value.bin.lpb, lpPropSourceKey->Value.bin.cb), m_ulSyncId, m_ulChangeId, ICS_SYNC_HIERARCHY, 0, &m_ulSyncId);
-			if(hr != hrSuccess)
-				return hr;
-		}
-
-		// The sync key we got from the server can be used to retrieve all items in the database now when given to IEEC->Config(). At the same time, any
-		// items written to this importer will send the sync ID to the server so that any items written here will not be returned by the exporter,
-		// preventing local looping of items.
+		m_ulFlags = ulFlags;
+		return hrSuccess;
 	}
+	hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpStream->Read(&m_ulSyncId, 4, &ulLen);
+	if (hr != hrSuccess)
+		return hr;
+	if (ulLen != 4)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpStream->Read(&m_ulChangeId, 4, &ulLen);
+	if (hr != hrSuccess)
+		return hr;
+	if (ulLen != 4)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = HrGetOneProp(m_lpFolder, PR_SOURCE_KEY, &~lpPropSourceKey);
+	if(hr != hrSuccess)
+		return hr;
 
+	// The user specified the special sync key '0000000000000000', get a sync key from the server.
+	if (m_ulSyncId == 0) {
+		hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetSyncStatus(std::string((char *)lpPropSourceKey->Value.bin.lpb, lpPropSourceKey->Value.bin.cb), m_ulSyncId, m_ulChangeId, ICS_SYNC_HIERARCHY, 0, &m_ulSyncId);
+		if (hr != hrSuccess)
+			return hr;
+	}
+	// The sync key we got from the server can be used to retrieve all items in the database now when given to IEEC->Config(). At the same time, any
+	// items written to this importer will send the sync ID to the server so that any items written here will not be returned by the exporter,
+	// preventing local looping of items.
 	m_ulFlags = ulFlags;
-
 	return hrSuccess;
 }
 
 //write into the stream 4 bytes syncid and 4 bytes changeid
 HRESULT ECExchangeImportHierarchyChanges::UpdateState(LPSTREAM lpStream){
-	HRESULT hr;
 	LARGE_INTEGER zero = {{0,0}};
 	ULONG ulLen = 0;
-	
+
 	if(lpStream == NULL) {
 		if (m_lpStream == NULL)
 			return hrSuccess;
@@ -172,11 +145,9 @@ HRESULT ECExchangeImportHierarchyChanges::UpdateState(LPSTREAM lpStream){
 
 	if(m_ulSyncId == 0)
 		return hrSuccess; // config() called with NULL stream, so we'll ignore the UpdateState()
-	
-	hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
+	auto hr = lpStream->Seek(zero, STREAM_SEEK_SET, nullptr);
 	if(hr != hrSuccess)
 		return hr;
-		
 	hr = lpStream->Write(&m_ulSyncId, 4, &ulLen);
 	if(hr != hrSuccess)
 		return hr;
@@ -186,8 +157,6 @@ HRESULT ECExchangeImportHierarchyChanges::UpdateState(LPSTREAM lpStream){
 }
 
 HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray){
-	HRESULT hr = hrSuccess;
-
 	////The array must contain at least the PR_PARENT_SOURCE_KEY, PR_SOURCE_KEY, PR_CHANGE_KEY, PR_PREDECESSOR_CHANGE_LIST, and MAPI PR_DISPLAY_NAME properties.
 	auto lpPropParentSourceKey = PCpropFindProp(lpPropArray, cValue, PR_PARENT_SOURCE_KEY);
 	auto lpPropSourceKey = PCpropFindProp(lpPropArray, cValue, PR_SOURCE_KEY);
@@ -200,34 +169,25 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 	auto lpPropAdditionalREN = PCpropFindProp(lpPropArray, cValue, PR_ADDITIONAL_REN_ENTRYIDS);
 	memory_ptr<SPropValue> lpPropVal;
 	memory_ptr<ENTRYID> lpEntryId, lpDestEntryId;
-	ULONG cbEntryId;
-	ULONG cbDestEntryId;
-	ULONG ulObjType;
+	unsigned int cbEntryId, cbDestEntryId, ulObjType;
 	object_ptr<IMAPIFolder> lpFolder, lpParentFolder;
 	object_ptr<ECMAPIFolder> lpECFolder, lpECParentFolder;
 	ULONG ulFolderType = FOLDER_GENERIC;
-
 	utf8string strFolderComment;
-	ULONG cbOrigEntryId = 0;
+	unsigned int ulPos = 0, cbOrigEntryId = 0;
 	BYTE *lpOrigEntryId = NULL;
 	const SBinary *lpOrigSourceKey = NULL;
-
 	std::string strChangeList;
-	ULONG ulPos = 0;
-	ULONG ulSize = 0;
-	bool bConflict = false;
 
 	if (lpPropParentSourceKey == nullptr || lpPropSourceKey == nullptr ||
 	    lpPropDisplayName == nullptr)
 		return MAPI_E_CALL_FAILED;
 	if (lpPropComment)
 		strFolderComment = convert_to<utf8string>(lpPropComment->Value.lpszW);
-
 	if (lpPropEntryId && IsKopanoEntryId(lpPropEntryId->Value.bin.cb, lpPropEntryId->Value.bin.lpb)) {
 		cbOrigEntryId = lpPropEntryId->Value.bin.cb;
 		lpOrigEntryId = lpPropEntryId->Value.bin.lpb;
 	}
-
 	if (lpPropSourceKey != nullptr)
 		lpOrigSourceKey = &lpPropSourceKey->Value.bin;
 	if (lpPropFolderType != nullptr)
@@ -236,7 +196,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 		//ignore search folder
 		return hrSuccess;
 
-	hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpPropSourceKey->Value.bin.cb, lpPropSourceKey->Value.bin.lpb, 0, NULL, &cbEntryId, &~lpEntryId);
+	auto hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpPropSourceKey->Value.bin.cb, lpPropSourceKey->Value.bin.lpb, 0, NULL, &cbEntryId, &~lpEntryId);
 	if(hr == MAPI_E_NOT_FOUND){
 		// Folder is not yet available in our store
 		if(lpPropParentSourceKey->Value.bin.cb > 0){
@@ -252,7 +212,6 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 			hr = lpParentFolder->QueryInterface(IID_ECMAPIFolder, &~lpECParentFolder);
 			if(hr != hrSuccess)
 				return hr;
-			
 			// Create the folder, loop through some names if it collides
 			hr = lpECParentFolder->lpFolderOps->HrCreateFolder(ulFolderType, convstring(lpPropDisplayName->Value.lpszW), strFolderComment, 0, m_ulSyncId, lpOrigSourceKey, cbOrigEntryId, (LPENTRYID)lpOrigEntryId, &cbEntryId, &~lpEntryId);
 			if(hr != hrSuccess)
@@ -293,7 +252,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 		hr = HrGetOneProp(lpFolder, PR_PARENT_SOURCE_KEY, &~lpPropVal);
 		if(hr != hrSuccess)
 			return hr;
-		
+
 		//check if we have to move the folder
 		if(bRestored || lpPropVal->Value.bin.cb != lpPropParentSourceKey->Value.bin.cb || memcmp(lpPropVal->Value.bin.lpb, lpPropParentSourceKey->Value.bin.lpb, lpPropVal->Value.bin.cb) != 0){
 			if(lpPropParentSourceKey->Value.bin.cb > 0){
@@ -309,21 +268,21 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 				if(hr != hrSuccess)
 					return hr;
 			}
-			
+
 			// Do the move
 			hr = m_lpFolder->lpFolderOps->HrCopyFolder(cbEntryId, lpEntryId, cbDestEntryId, lpDestEntryId, utf8string(), FOLDER_MOVE, m_ulSyncId);
 			if(hr != hrSuccess)
 				return hr;
 		}
 	}
-	
+
 	//ignore change if remote changekey is in local changelist
 	if (lpPropChangeKey && HrGetOneProp(lpFolder, PR_PREDECESSOR_CHANGE_LIST, &~lpPropVal) == hrSuccess) {
 		strChangeList.assign((char *)lpPropVal->Value.bin.lpb, lpPropVal->Value.bin.cb);
 		ulPos = 0;
 
 		while(ulPos < strChangeList.size()){
-			ulSize = strChangeList.at(ulPos);
+			auto ulSize = strChangeList.at(ulPos);
 			if (ulSize <= sizeof(GUID))
 				break;
 			else if (ulSize == lpPropChangeKey->Value.bin.cb &&
@@ -339,20 +298,18 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 		ulPos = 0;
 
 		while(ulPos < strChangeList.size()){
-			ulSize = strChangeList.at(ulPos);
+			auto ulSize = strChangeList.at(ulPos);
 			if(ulSize <= sizeof(GUID)){
 				break;
 			}else if(lpPropVal->Value.bin.cb > sizeof(GUID) && memcmp(strChangeList.substr(ulPos+1, ulSize).c_str(), lpPropVal->Value.bin.lpb, sizeof(GUID)) == 0){
-				bConflict = !(ulSize == lpPropVal->Value.bin.cb && memcmp(strChangeList.substr(ulPos+1, ulSize).c_str(), lpPropVal->Value.bin.lpb, ulSize) == 0);
+				/* bConflict = !(ulSize == lpPropVal->Value.bin.cb && memcmp(strChangeList.substr(ulPos + 1, ulSize).c_str(), lpPropVal->Value.bin.lpb, ulSize) == 0); */
 				break;
 			}
 			ulPos += ulSize + 1;
 		}
 	}
 
-	if(bConflict){
-		//TODO: handle conflicts
-	}
+	/* if (bConflict) TODO: handle conflicts */
 	hr = lpFolder->QueryInterface(IID_ECMAPIFolder, &~lpECFolder);
 	if(hr != hrSuccess)
 		return hr;
@@ -373,31 +330,29 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 	 * they're supposed to be in sync.
 	 * NOTE: This is a workaround for Kopano not handling this property (and some others) as special properties.
 	 */
-	if (lpPropAdditionalREN != NULL && lpPropEntryId != NULL && lpPropEntryId->Value.bin.cb > 0) {
-		HRESULT hrTmp = hrSuccess;
-		MAPIFolderPtr ptrRoot;
+	if (lpPropAdditionalREN == nullptr || lpPropEntryId == nullptr || lpPropEntryId->Value.bin.cb == 0)
+		return hrSuccess;
 
-		hrTmp = m_lpFolder->OpenEntry(0, nullptr, &iid_of(ptrRoot), MAPI_BEST_ACCESS | MAPI_DEFERRED_ERRORS, &ulObjType, &~ptrRoot);
-		if (hrTmp != hrSuccess)
-			return hr;
-		hrTmp = ptrRoot->SetProps(1, lpPropAdditionalREN, NULL);
-		if (hrTmp != hrSuccess)
-			return hr;
-		hrTmp = ptrRoot->SaveChanges(KEEP_OPEN_READWRITE);
-		if (hrTmp != hrSuccess)
-			return hr;
-		hrTmp = ECExchangeImportContentsChanges::HrUpdateSearchReminders(ptrRoot, lpPropAdditionalREN);
-	}
+	MAPIFolderPtr ptrRoot;
+	auto hrTmp = m_lpFolder->OpenEntry(0, nullptr, &iid_of(ptrRoot), MAPI_BEST_ACCESS | MAPI_DEFERRED_ERRORS, &ulObjType, &~ptrRoot);
+	if (hrTmp != hrSuccess)
+		return hr;
+	hrTmp = ptrRoot->SetProps(1, lpPropAdditionalREN, NULL);
+	if (hrTmp != hrSuccess)
+		return hr;
+	hrTmp = ptrRoot->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hrTmp != hrSuccess)
+		return hr;
+	hrTmp = ECExchangeImportContentsChanges::HrUpdateSearchReminders(ptrRoot, lpPropAdditionalREN);
 	return hrSuccess;
 }
 
 //ulFlags = SYNC_SOFT_DELETE, SYNC_EXPIRY
 HRESULT ECExchangeImportHierarchyChanges::ImportFolderDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList){
 	HRESULT hr = hrSuccess;
-	ULONG ulSKNr;
 	ULONG cbEntryId;
 
-	for (ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ++ulSKNr) {
+	for (unsigned int ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ++ulSKNr) {
 		memory_ptr<ENTRYID> lpEntryId;
 
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, 0, NULL, &cbEntryId, &~lpEntryId);

@@ -1,25 +1,12 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 
 #ifndef postsaveiidupdater_INCLUDED
 #define postsaveiidupdater_INCLUDED
 
 #include <memory>
-#include <kopano/zcdefs.h>
 #include "postsaveaction.h"
 #include <kopano/mapi_ptr.h>
 #include "instanceidmapper_fwd.h"
@@ -45,26 +32,26 @@ private:
 typedef std::shared_ptr<TaskBase> TaskPtr;
 typedef std::list<TaskPtr> TaskList;
 
-class TaskMapInstanceId _kc_final : public TaskBase {
+class TaskMapInstanceId final : public TaskBase {
 public:
 	TaskMapInstanceId(const AttachPtr &ptrSourceAttach, const MessagePtr &ptrDestMsg, ULONG ulDestAttachNum);
-	HRESULT DoExecute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper, const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID) _kc_override;
+	HRESULT DoExecute(unsigned int proptag, const InstanceIdMapperPtr &, const SBinary &src_server_uid, unsigned int src_size, ENTRYID *src_inst, const SBinary &dest_server_uid, unsigned int dest_size, ENTRYID *dest_inst) override;
 };
 
-class TaskVerifyAndUpdateInstanceId _kc_final : public TaskBase {
+class TaskVerifyAndUpdateInstanceId final : public TaskBase {
 public:
 	TaskVerifyAndUpdateInstanceId(const AttachPtr &ptrSourceAttach, const MessagePtr &ptrDestMsg, ULONG ulDestAttachNum, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID);
-	HRESULT DoExecute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper, const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID) _kc_override;
+	HRESULT DoExecute(unsigned int proptag, const InstanceIdMapperPtr &, const SBinary &src_server_uid, unsigned int src_size, ENTRYID *src_inst, const SBinary &dest_server_uid, unsigned int dest_size, ENTRYID *dest_inst) override;
 
 private:
 	entryid_t m_destInstanceID;
 };
 
-class PostSaveInstanceIdUpdater _kc_final : public IPostSaveAction {
+class PostSaveInstanceIdUpdater final : public IPostSaveAction {
 public:
 
 	PostSaveInstanceIdUpdater(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper, const TaskList &lstDeferred);
-	HRESULT Execute(void) _kc_override;
+	HRESULT Execute() override;
 
 private:
 	ULONG m_ulPropTag;

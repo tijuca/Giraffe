@@ -1,27 +1,14 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
 #include <new>
 #include <stdexcept>
 #include <utility>
-#include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include <mapispi.h>
 #include <mapix.h>
-#include <kopano/ECDebug.h>
 #include <kopano/ECLogger.h>
 #include "ECMsgStore.h"
 #include "ECNotifyClient.h"
@@ -38,20 +25,16 @@
 using namespace KC;
 
 struct ECADVISE {
-	ULONG cbKey = 0;
-	ULONG ulEventMask = 0;
+	unsigned int cbKey = 0, ulEventMask = 0;
+	unsigned int ulConnection = 0, ulSupportConnection = 0;
 	memory_ptr<BYTE> lpKey;
 	object_ptr<IMAPIAdviseSink> lpAdviseSink;
-	ULONG ulConnection = 0;
 	GUID guid{};
-	ULONG ulSupportConnection = 0;
 };
 
 struct ECCHANGEADVISE {
-	ULONG ulSyncId = 0;
-	ULONG ulChangeId = 0;
-	ULONG ulEventMask = 0;
-	ULONG ulConnection = 0;
+	unsigned int ulSyncId = 0, ulChangeId = 0;
+	unsigned int ulEventMask = 0, ulConnection = 0;
 	object_ptr<IECChangeAdviseSink> lpAdviseSink;
 	GUID guid{};
 };
@@ -77,14 +60,11 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider,
     /* Get the sessiongroup ID of the provider that we will be handling notifications for */
 	if (m_lpTransport->HrGetSessionId(&ecSessionId, &m_ecSessionGroupId) != hrSuccess)
 		throw std::runtime_error("ECNotifyClient/HrGetSessionId failed");
-
     /* Get the session group that this session belongs to */
 	if (g_ecSessionManager.GetSessionGroupData(m_ecSessionGroupId, m_lpTransport->GetProfileProps(), &~m_lpSessionGroup) != hrSuccess)
 		throw std::runtime_error("ECNotifyClient/GetSessionGroupData failed");
-
 	if (m_lpSessionGroup->GetOrCreateNotifyMaster(&m_lpNotifyMaster) != hrSuccess)
 		throw std::runtime_error("ECNotifyClient/GetOrCreateNotifyMaster failed");
-
 	m_lpNotifyMaster->AddSession(this);
 }
 
@@ -139,18 +119,17 @@ HRESULT ECNotifyClient::QueryInterface(REFIID refiid, void **lppInterface)
  */
 HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, bool bSynchronous, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
 {
-	HRESULT		hr = MAPI_E_NO_SUPPORT;
-	ULONG		ulConnection = 0;
-
 	if (lpKey == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	std::unique_ptr<ECADVISE> pEcAdvise(new(std::nothrow) ECADVISE);
+
+	ULONG		ulConnection = 0;
+	auto pEcAdvise = make_unique_nt<ECADVISE>();
 	if (pEcAdvise == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	*lpulConnection = 0;
 	pEcAdvise->lpKey = NULL;
 	pEcAdvise->cbKey = cbKey;
-	hr = KAllocCopy(lpKey, cbKey, &~pEcAdvise->lpKey);
+	auto hr = KAllocCopy(lpKey, cbKey, &~pEcAdvise->lpKey);
 	if (hr != hrSuccess)
 		return hr;
 	pEcAdvise->lpAdviseSink.reset(lpAdviseSink);
@@ -173,7 +152,6 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 		hr = CoCreateGuid((GUID *)lpKeySupport->ab);
 		if(hr != hrSuccess)
 			return hr;
-
 		// Get support object connection id
 		hr = m_lpSupport->Subscribe(lpKeySupport, (ulEventMask&~fnevLongTermEntryIDs), 0, lpAdviseSink, &pEcAdvise->ulSupportConnection);
 		if(hr != hrSuccess)
@@ -199,9 +177,8 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
     IECChangeAdviseSink *lpChangeAdviseSink, ULONG *lpulConnection)
 {
-	HRESULT			hr = MAPI_E_NO_SUPPORT;
 	ULONG			ulConnection = 0;
-	std::unique_ptr<ECCHANGEADVISE> pEcAdvise(new(std::nothrow) ECCHANGEADVISE);
+	auto pEcAdvise = make_unique_nt<ECCHANGEADVISE>();
 	if (pEcAdvise == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	*lpulConnection = 0;
@@ -213,7 +190,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
 	/*
 	 * Request unique connection id from Master.
 	 */
-	hr = m_lpNotifyMaster->ReserveConnection(&ulConnection);
+	auto hr = m_lpNotifyMaster->ReserveConnection(&ulConnection);
 	if(hr != hrSuccess)
 		return hr;
 	/*
@@ -248,7 +225,7 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 	if (iIterAdvise != m_mapAdvise.cend()) {
 		if(iIterAdvise->second->ulSupportConnection)
 			m_lpSupport->Unsubscribe(iIterAdvise->second->ulSupportConnection);
-		m_mapAdvise.erase(iIterAdvise);	
+		m_mapAdvise.erase(iIterAdvise);
 		return hr;
 	}
 	auto iIterChangeAdvise = m_mapChangeAdvise.find(ulConnection);
@@ -259,7 +236,6 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 }
 
 HRESULT ECNotifyClient::Advise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection){
-
 	ULONG		ulConnection = 0;
 	auto hr = RegisterAdvise(cbKey, lpKey, ulEventMask, false, lpAdviseSink, &ulConnection);
 	if (hr != hrSuccess)
@@ -270,8 +246,7 @@ HRESULT ECNotifyClient::Advise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPM
 	if(hr != hrSuccess) {
 		UnRegisterAdvise(ulConnection);
 		return MAPI_E_NO_SUPPORT;
-	} 
-	
+	}
 	// Set out value
 	*lpulConnection = ulConnection;
 	return hrSuccess;
@@ -305,22 +280,21 @@ HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates,
 				for (auto iSyncUnadvise = lstAdvises.cbegin();
 				     iSyncUnadvise != iSyncAdvise; ++iSyncUnadvise)
 					m_lpTransport->HrUnSubscribe(iSyncUnadvise->ulConnection);
-				
+
 				hr = MAPI_E_NO_SUPPORT;
 				goto exit;
-			} 
+			}
 		}
 	}
 
 	std::transform(lstAdvises.begin(), lstAdvises.end(), std::back_inserter(*lplstConnections), &SyncAdviseToConnection);
 
 exit:
-	if (hr != hrSuccess) {
+	if (hr != hrSuccess)
 		// Unregister all advises.
 		for (auto iSyncAdvise = lstAdvises.cbegin();
 		     iSyncAdvise != lstAdvises.cend(); ++iSyncAdvise)
 			UnRegisterAdvise(iSyncAdvise->ulConnection);
-	}
 	return hr;
 }
 
@@ -335,23 +309,21 @@ HRESULT ECNotifyClient::Unadvise(ULONG ulConnection)
 
 HRESULT ECNotifyClient::Unadvise(const ECLISTCONNECTION &lstConnections)
 {
-	HRESULT hr	= MAPI_E_NO_SUPPORT;
-	HRESULT hrTmp;
 	bool bWithErrors = false;
 
 	// Logoff the advisors
-	hr = m_lpTransport->HrUnSubscribeMulti(lstConnections);
+	auto hr = m_lpTransport->HrUnSubscribeMulti(lstConnections);
 	if (hr != hrSuccess) {
 		hr = hrSuccess;
 
 		for (const auto &p : lstConnections) {
-			hrTmp = m_lpTransport->HrUnSubscribe(p.second);
+			auto hrTmp = m_lpTransport->HrUnSubscribe(p.second);
 			if (FAILED(hrTmp))
 				bWithErrors = true;
 		}
 	}
 	for (const auto &p : lstConnections) {
-		hrTmp = UnRegisterAdvise(p.second);
+		auto hrTmp = UnRegisterAdvise(p.second);
 		if (FAILED(hrTmp))
 			bWithErrors = true;
 	}
@@ -394,7 +366,6 @@ HRESULT ECNotifyClient::Reregister(ULONG ulConnection, ULONG cbKey, LPBYTE lpKey
 HRESULT ECNotifyClient::ReleaseAll()
 {
 	scoped_rlock biglock(m_hMutex);
-
 	for (auto &p : m_mapAdvise)
 		p.second->lpAdviseSink.reset();
 	return hrSuccess;
@@ -410,7 +381,6 @@ HRESULT ECNotifyClient::NotifyReload()
 	NOTIFYLIST notifications;
 
 	memset(&table, 0, sizeof(table));
-
 	notif.ulEventType = fnevTableModified;
 	notif.tab = &table;
 	notif.tab->ulTableEvent = TABLE_RELOAD;
@@ -433,14 +403,12 @@ HRESULT ECNotifyClient::NotifyReload()
 HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotifications)
 {
 	HRESULT						hr = hrSuccess;
-	ECMAPADVISE::const_iterator iterAdvise;
 	NOTIFICATIONLIST			notifications;
 
 	for (auto notp : lNotifications) {
 		LPNOTIFICATION tmp = NULL;
-
-		hr = CopySOAPNotificationToMAPINotification(m_lpProvider, notp, &tmp);
-		if (hr != hrSuccess)
+		auto ret = CopySOAPNotificationToMAPINotification(m_lpProvider, notp, &tmp);
+		if (ret != hrSuccess)
 			continue;
 		notifications.emplace_back(tmp);
 	}
@@ -448,7 +416,7 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 	ulock_rec biglock(m_hMutex);
 
 	/* Search for the right connection */
-	iterAdvise = m_mapAdvise.find(ulConnection);
+	auto iterAdvise = m_mapAdvise.find(ulConnection);
 	if (iterAdvise == m_mapAdvise.cend() ||
 	    iterAdvise->second->lpAdviseSink == nullptr)
 		goto exit;
@@ -459,8 +427,8 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 		while (iterNotification != notifications.cend()) {
 			memory_ptr<NOTIFICATION> lpNotifs;
 			/* Create a straight array of all the notifications */
-			hr = MAPIAllocateBuffer(sizeof(NOTIFICATION) * MAX_NOTIFS_PER_CALL, &~lpNotifs);
-			if (hr != hrSuccess)
+			auto ret = MAPIAllocateBuffer(sizeof(NOTIFICATION) * MAX_NOTIFS_PER_CALL, &~lpNotifs);
+			if (ret != hrSuccess)
 				continue;
 
 			ULONG i = 0;
@@ -476,9 +444,9 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 					ec_log_debug("ECNotifyClient::Notify: Error by notify a client");
 				continue;
 			}
+
 			memory_ptr<NOTIFKEY> lpKey;
 			ULONG ulResult = 0;
-
 			hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), &~lpKey);
 			if (hr != hrSuccess)
 				goto exit;
@@ -498,14 +466,12 @@ exit:
 
 HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNotifications)
 {
-	HRESULT						hr = hrSuccess;
 	memory_ptr<ENTRYLIST> lpSyncStates;
-	ECMAPCHANGEADVISE::const_iterator iterAdvise;
 	BINARYLIST					syncStates;
 	ulock_rec biglock(m_hMutex, std::defer_lock_t());
 
 	/* Create a straight array of MAX_NOTIFS_PER_CALL sync states */
-	hr = MAPIAllocateBuffer(sizeof *lpSyncStates, &~lpSyncStates);
+	auto hr = MAPIAllocateBuffer(sizeof(*lpSyncStates), &~lpSyncStates);
 	if (hr != hrSuccess)
 		return hr;
 	memset(lpSyncStates, 0, sizeof *lpSyncStates);
@@ -526,7 +492,7 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 
 	/* Search for the right connection */
 	biglock.lock();
-	iterAdvise = m_mapChangeAdvise.find(ulConnection);
+	auto iterAdvise = m_mapChangeAdvise.find(ulConnection);
 	if (iterAdvise == m_mapChangeAdvise.cend() ||
 	    iterAdvise->second->lpAdviseSink == nullptr)
 		return hr;

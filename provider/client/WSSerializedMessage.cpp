@@ -1,20 +1,7 @@
 /*
+ * SPDX-License-Identifier: AGPL-3.0-only
  * Copyright 2005 - 2016 Zarafa and its licensors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
 #include <kopano/platform.h>
 #include <kopano/Util.h>
 #include "WSSerializedMessage.h"
@@ -44,8 +31,7 @@ HRESULT WSSerializedMessage::GetProps(ULONG *lpcbProps, LPSPropValue *lppProps)
 {
 	if (lpcbProps == NULL || lppProps == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	return Util::HrCopyPropertyArray(m_lpProps, m_cbProps, lppProps, lpcbProps);
+	return KC::Util::HrCopyPropertyArray(m_lpProps, m_cbProps, lppProps, lpcbProps);
 }
 
 /**
@@ -55,15 +41,11 @@ HRESULT WSSerializedMessage::GetProps(ULONG *lpcbProps, LPSPropValue *lppProps)
  */
 HRESULT WSSerializedMessage::CopyData(LPSTREAM lpDestStream)
 {
-	HRESULT hr;
-
 	if (lpDestStream == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-
-	hr = DoCopyData(lpDestStream);
+	auto hr = DoCopyData(lpDestStream);
 	if (hr != hrSuccess)
 		return hr;
-
 	return lpDestStream->Commit(0);
 }
 
@@ -85,16 +67,13 @@ HRESULT WSSerializedMessage::DoCopyData(LPSTREAM lpDestStream)
 {
 	if (m_bUsed)
 		return MAPI_E_UNCONFIGURED;
-
 	m_bUsed = true;
 	m_hr = hrSuccess;
 	m_ptrDestStream.reset(lpDestStream);
-
 	m_lpSoap->fmimewriteopen = StaticMTOMWriteOpen;
 	m_lpSoap->fmimewrite = StaticMTOMWrite;
 	m_lpSoap->fmimewriteclose = StaticMTOMWriteClose;
-
-	soap_get_mime_attachment(m_lpSoap, (void*)this);
+	soap_get_mime_attachment(m_lpSoap, this);
 	if (m_lpSoap->error != 0)
 		return MAPI_E_NETWORK_ERROR;
 	return m_hr;
@@ -123,26 +102,22 @@ void* WSSerializedMessage::MTOMWriteOpen(struct soap *soap, void *handle, const 
 		m_hr = MAPI_E_INVALID_TYPE;
 		m_ptrDestStream.reset();
 	}
-
 	return handle;
 }
 
 int WSSerializedMessage::MTOMWrite(struct soap *soap, void* /*handle*/, const char *buf, size_t len)
 {
-	HRESULT hr = hrSuccess;
 	ULONG cbWritten = 0;
 
 	if (!m_ptrDestStream)
 		return SOAP_OK;
-
-	hr = m_ptrDestStream->Write(buf, (ULONG)len, &cbWritten);
-	if (hr != hrSuccess) {
-		soap->error = SOAP_ERR;
-		m_hr = hr;
-		m_ptrDestStream.reset();
-	}
+	auto hr = m_ptrDestStream->Write(buf, static_cast<unsigned int>(len), &cbWritten);
+	if (hr == hrSuccess)
+		return SOAP_OK;
+	soap->error = SOAP_ERR;
+	m_hr = hr;
+	m_ptrDestStream.reset();
 	// @todo: Should we check if everything was written?
-
 	return SOAP_OK;
 }
 
