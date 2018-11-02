@@ -9,6 +9,8 @@ usr/bin/kopano-passwd
 usr/bin/kopano-set-oof
 usr/bin/kopano-stats
 usr/lib/python*/*/kopano_cli
+usr/libexec/kopano/kscriptrun usr/lib/@DEB_HOST_MULTIARCH@/kopano
+usr/libexec/kopano/mapitime usr/lib/@DEB_HOST_MULTIARCH@/kopano
 usr/sbin/kopano-admin
 usr/sbin/kopano-archiver-aclset
 usr/sbin/kopano-archiver-aclsync
