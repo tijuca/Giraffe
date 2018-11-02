@@ -1,6 +1,6 @@
-etc/kopano/userscripts
 etc/kopano/server.cfg
 etc/kopano/unix.cfg
+usr/lib/kopano/userscripts
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-db.so
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-ldap.so
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/libkcserver-unix.so
