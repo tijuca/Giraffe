@@ -1,2 +1,4 @@
 etc/logrotate.d/kopano
 etc/default/kopano
+usr/lib/sysusers.d/kopano-sysusers.conf
+usr/lib/tmpfiles.d/kopano-tmpfiles.conf
