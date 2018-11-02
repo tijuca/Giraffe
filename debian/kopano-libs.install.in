@@ -4,8 +4,8 @@ usr/lib/@DEB_HOST_MULTIARCH@/libkcfreebusy.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcicalmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcinetmapi.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libmapi.so.*
-usr/lib/@DEB_HOST_MULTIARCH@/libkcpyconv-2.7.so
-usr/lib/@DEB_HOST_MULTIARCH@/libkcpydirector-2.7.so
+usr/lib/@DEB_HOST_MULTIARCH@/libkcpyconv-3.*.so
+usr/lib/@DEB_HOST_MULTIARCH@/libkcpydirector-3.*.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcpyplug.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcserver.so.*
 usr/lib/@DEB_HOST_MULTIARCH@/libkcsoap.so.*

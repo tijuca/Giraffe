@@ -38,8 +38,8 @@ Build-Depends:
  m4,
  php-dev,
  pkg-config (>= 0.18),
- python-dev,
- python-setuptools,
+ python3-dev,
+ python3-setuptools,
  swig,
  uuid-dev,
  xmlto,
@@ -107,8 +107,8 @@ Depends:
  ${misc:Depends},
  kopano-common (>= ${source:Version}),
  python,
- python-dateutil,
- python-kopano (>= ${source:Version}),
+ python3-dateutil,
+ python3-kopano (>= ${source:Version}),
 Description: Complete and feature rich groupware solution - backup
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -170,7 +170,7 @@ Depends:
  php-mapi (= ${binary:Version}),
  php-cli,
  python,
- python-mapi (= ${binary:Version}),
+ python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - delivery agent
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -181,7 +181,7 @@ Description: Complete and feature rich groupware solution - delivery agent
 
 Package: kopano-gateway
 Architecture: any
-Suggests: python-mapi
+Suggests: python3-mapi
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
@@ -237,7 +237,7 @@ Depends:
  lsb-base (>= 3.0-6),
  php-mapi (= ${binary:Version}),
  php-cli,
- python-mapi (= ${binary:Version}),
+ python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - quota monitor
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -254,9 +254,9 @@ Depends:
  kopano-common (>= ${binary:Version}),
  lsb-base (>= 3.0-6),
  python,
- python-flask,
- python-kopano (= ${binary:Version}),
- python-sleekxmpp,
+ python3-flask,
+ python3-kopano (= ${binary:Version}),
+ python3-sleekxmpp,
 Description: Complete and feature rich groupware solution - presence daemon
  A daemon for collecting and exporting user presence information across
  multiple protocols in a unified way.
@@ -278,10 +278,10 @@ Depends:
  lsb-base (>= 3.0-6),
  poppler-utils,
  python,
- python-dateutil,
- python-kopano (>= ${source:Version}),
- python-magic,
- python-xapian,
+ python3-dateutil,
+ python3-kopano (>= ${source:Version}),
+ python3-magic,
+ python3-xapian,
  unzip,
  w3m,
  xsltproc,
@@ -333,7 +333,7 @@ Depends:
  ${shlibs:Depends},
  kopano-common (= ${binary:Version}),
  lsb-base (>= 3.0-6),
- python-mapi (= ${binary:Version}),
+ python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - email spooler
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -349,7 +349,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  python,
- python-kopano,
+ python3-kopano,
 Description: Complete and feature rich groupware solution - admin tools
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -357,7 +357,7 @@ Description: Complete and feature rich groupware solution - admin tools
  .
  This package contains the command line tools for server administration.
 
-Package: python-mapi
+Package: python3-mapi
 Architecture: any
 Section: python
 Depends:
@@ -372,21 +372,21 @@ Description: Complete and feature rich groupware solution - Python MAPI bindings
  Using this module, you can create Python programs which use MAPI
  calls to interact with Kopano.
 
-Package: python-kopano
+Package: python3-kopano
 Architecture: all
 Section: python
 Depends:
  ${misc:Depends},
  python,
- python-dateutil,
- python-mapi,
+ python3-dateutil,
+ python3-mapi,
 Description: Complete and feature rich groupware solution - Python bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  Using this module, you can create Python programs which access the
- Kopano server using a higher level abstraction than python-mapi
+ Kopano server using a higher level abstraction than python3-mapi
  provides.
 
 Package: php-mapi

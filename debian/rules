@@ -38,6 +38,8 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --disable-static \
     --enable-epoll \
     --with-distro=debian \
+    --enable-python \
+    PYTHON="python3" \
     $(CONFFLAG) \
     $(NULL)
 
@@ -83,8 +85,6 @@ override_dh_install:
 	mv debian/tmp/usr/share/doc/kopano-server/example-config/*.cfg \
 	   debian/tmp/usr/share/doc/kopano-server/example-config/autorespond \
            debian/tmp/etc/kopano/
-	# remove magic.py, it's provided by python-magic
-	rm $(INSTDIR)/usr/lib/python2.7/dist-packages/kopano_search/magic.py
 	dh_install
 
 	for p in server dagent search; do \
