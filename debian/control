@@ -108,6 +108,7 @@ Depends:
  ${misc:Depends},
  ${python3:Depends},
  kopano-common (>= ${source:Version}),
+ python3-bsddb3,
  python3-dateutil,
  python3-kopano (>= ${source:Version}),
 Description: Complete and feature rich groupware solution - backup
@@ -279,6 +280,7 @@ Depends:
  kopano-common (>= ${source:Version}),
  lsb-base (>= 3.0-6),
  poppler-utils,
+ python3-bsddb3,
  python3-dateutil,
  python3-kopano (>= ${source:Version}),
  python3-magic,
@@ -319,6 +321,7 @@ Depends:
  ${python3:Depends},
  kopano-common (>= ${binary:Version}),
  lsb-base (>= 3.0-6),
+ python3-bsddb3,
 Description: Complete and feature rich groupware solution - Spam daemon
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -352,6 +355,7 @@ Depends:
  ${misc:Depends},
  ${perl:Depends},
  ${python3:Depends},
+ python3-bsddb3,
  python3-kopano,
 Description: Complete and feature rich groupware solution - admin tools
  The Kopano Collaboration Platform (KCP) is a complete, stable and
