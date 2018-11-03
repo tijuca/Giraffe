@@ -15,7 +15,7 @@ include /usr/share/dpkg/pkg-info.mk
 DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
-PHP_VERSION=$(shell basename $$(readlink -f /usr/bin/php-config) | sed 's/php-config//g')
+PHP_VERSION=7.2
 PHP_API_DATE=$(shell php-config$(PHPVERSION) --phpapi)
 PREPROCESS_FILES := $(wildcard debian/*.in)
 
