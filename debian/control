@@ -350,6 +350,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
+ ${perl:Depends},
  ${python3:Depends},
  python3-kopano,
 Description: Complete and feature rich groupware solution - admin tools
