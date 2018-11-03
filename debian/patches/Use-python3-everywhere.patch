@@ -1,0 +1,425 @@
+From: =?utf-8?q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
+Date: Sat, 3 Nov 2018 15:14:04 +0100
+Subject: Use python3 everywhere
+
+---
+ ECtools/backup/kopano_backup/__init__.py                 | 2 +-
+ ECtools/cli/kopano_cli/__init__.py                       | 2 +-
+ ECtools/migration-pst/kopano_migration_pst/__init__.py   | 2 +-
+ ECtools/migration-pst/kopano_migration_pst/pst.py        | 2 +-
+ ECtools/presence/kopano_presence/__init__.py             | 2 +-
+ ECtools/search/kopano-search-upgrade-findroots.py        | 2 +-
+ ECtools/search/kopano-search-xapian-compact.py           | 2 +-
+ ECtools/search/kopano_search/__init__.py                 | 2 +-
+ ECtools/search/kopano_search/plaintext.py                | 2 +-
+ ECtools/spamd/kopano_spamd/__init__.py                   | 2 +-
+ swig/python/kopano/kopano/daemon/version/version_info.py | 2 +-
+ swig/python/kopano/scripts/delete_pattern.py             | 2 +-
+ swig/python/kopano/scripts/dump-att.py                   | 2 +-
+ swig/python/kopano/scripts/fromto.py                     | 2 +-
+ swig/python/kopano/scripts/goocal.py                     | 2 +-
+ swig/python/kopano/scripts/import_rfc.py                 | 2 +-
+ swig/python/kopano/scripts/kopano-monitor.py             | 2 +-
+ swig/python/kopano/scripts/kopano-spamhandler.py         | 2 +-
+ swig/python/kopano/scripts/kopano-stats.py               | 2 +-
+ swig/python/kopano/scripts/kopano-tracer.py              | 2 +-
+ swig/python/kopano/scripts/list-folder-size.py           | 2 +-
+ swig/python/kopano/scripts/loadsim.py                    | 2 +-
+ swig/python/kopano/scripts/loop.py                       | 2 +-
+ swig/python/kopano/scripts/mapidump.py                   | 2 +-
+ swig/python/kopano/scripts/rfcdump.py                    | 2 +-
+ swig/python/kopano/scripts/rule.py                       | 2 +-
+ swig/python/kopano/scripts/send.py                       | 2 +-
+ swig/python/kopano/scripts/sync.py                       | 2 +-
+ swig/python/kopano/scripts/tables.py                     | 2 +-
+ swig/python/kopano/scripts/tree.py                       | 2 +-
+ swig/python/kopano/scripts/urwap.py                      | 2 +-
+ swig/python/kopano/scripts/userentryid.py                | 2 +-
+ swig/python/kopano/scripts/z-fuse.py                     | 2 +-
+ swig/python/kopano/scripts/z-plot.py                     | 2 +-
+ swig/python/kopano/scripts/z-rest.py                     | 2 +-
+ swig/python/kopano/scripts/zarapy.py                     | 2 +-
+ tools/python-scripts/optimize-imap.py                    | 2 +-
+ tools/searchfolder_cleaning.py                           | 2 +-
+ 38 files changed, 38 insertions(+), 38 deletions(-)
+
+diff --git a/ECtools/backup/kopano_backup/__init__.py b/ECtools/backup/kopano_backup/__init__.py
+index 83a51fe..a3d53be 100644
+--- a/ECtools/backup/kopano_backup/__init__.py
++++ b/ECtools/backup/kopano_backup/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ from .version import __version__
+ 
+diff --git a/ECtools/cli/kopano_cli/__init__.py b/ECtools/cli/kopano_cli/__init__.py
+index c9c7d15..93d0e7f 100755
+--- a/ECtools/cli/kopano_cli/__init__.py
++++ b/ECtools/cli/kopano_cli/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ from __future__ import print_function
+ from .version import __version__
+diff --git a/ECtools/migration-pst/kopano_migration_pst/__init__.py b/ECtools/migration-pst/kopano_migration_pst/__init__.py
+index df6a47f..a747b70 100644
+--- a/ECtools/migration-pst/kopano_migration_pst/__init__.py
++++ b/ECtools/migration-pst/kopano_migration_pst/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ from .version import __version__
+ 
+diff --git a/ECtools/migration-pst/kopano_migration_pst/pst.py b/ECtools/migration-pst/kopano_migration_pst/pst.py
+index 164e228..77721e2 100644
+--- a/ECtools/migration-pst/kopano_migration_pst/pst.py
++++ b/ECtools/migration-pst/kopano_migration_pst/pst.py
+@@ -1,4 +1,4 @@
+-#! /usr/bin/python
++#! /usr/bin/python3
+ # SPDX-License-Identifier: BSD-3-Clause
+ #
+ # Copyright (c) 2014, Dionach Ltd.
+diff --git a/ECtools/presence/kopano_presence/__init__.py b/ECtools/presence/kopano_presence/__init__.py
+index 450252e..2488194 100644
+--- a/ECtools/presence/kopano_presence/__init__.py
++++ b/ECtools/presence/kopano_presence/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ from .version import __version__
+ 
+diff --git a/ECtools/search/kopano-search-upgrade-findroots.py b/ECtools/search/kopano-search-upgrade-findroots.py
+index 55fa462..df77e5a 100644
+--- a/ECtools/search/kopano-search-upgrade-findroots.py
++++ b/ECtools/search/kopano-search-upgrade-findroots.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ from MAPI.Util import *
+diff --git a/ECtools/search/kopano-search-xapian-compact.py b/ECtools/search/kopano-search-xapian-compact.py
+index 8eb0d80..3876388 100644
+--- a/ECtools/search/kopano-search-xapian-compact.py
++++ b/ECtools/search/kopano-search-xapian-compact.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ from __future__ import print_function
+ import fcntl
+diff --git a/ECtools/search/kopano_search/__init__.py b/ECtools/search/kopano_search/__init__.py
+index eb17df2..2cd2274 100644
+--- a/ECtools/search/kopano_search/__init__.py
++++ b/ECtools/search/kopano_search/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ from __future__ import print_function
+ from .version import __version__
+diff --git a/ECtools/search/kopano_search/plaintext.py b/ECtools/search/kopano_search/plaintext.py
+index 08e567e..3ed349b 100644
+--- a/ECtools/search/kopano_search/plaintext.py
++++ b/ECtools/search/kopano_search/plaintext.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ import magic
+ import mimetypes
+diff --git a/ECtools/spamd/kopano_spamd/__init__.py b/ECtools/spamd/kopano_spamd/__init__.py
+index 8b5941e..c867e8d 100644
+--- a/ECtools/spamd/kopano_spamd/__init__.py
++++ b/ECtools/spamd/kopano_spamd/__init__.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ from .version import __version__
+ 
+diff --git a/swig/python/kopano/kopano/daemon/version/version_info.py b/swig/python/kopano/kopano/daemon/version/version_info.py
+index 8d816f8..d1800e1 100644
+--- a/swig/python/kopano/kopano/daemon/version/version_info.py
++++ b/swig/python/kopano/kopano/daemon/version/version_info.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ """This file is automatically generated by generate_version_info
+ It uses the current working tree to determine the revision.
+ So don't edit it. :)
+diff --git a/swig/python/kopano/scripts/delete_pattern.py b/swig/python/kopano/scripts/delete_pattern.py
+index 3acbd1c..c31cc8e 100755
+--- a/swig/python/kopano/scripts/delete_pattern.py
++++ b/swig/python/kopano/scripts/delete_pattern.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # delete items which contain character string in subject
+diff --git a/swig/python/kopano/scripts/dump-att.py b/swig/python/kopano/scripts/dump-att.py
+index 37565d0..a885685 100755
+--- a/swig/python/kopano/scripts/dump-att.py
++++ b/swig/python/kopano/scripts/dump-att.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # Dumps all attachments for a given user to files.
+diff --git a/swig/python/kopano/scripts/fromto.py b/swig/python/kopano/scripts/fromto.py
+index 12c1a28..fb5dd58 100755
+--- a/swig/python/kopano/scripts/fromto.py
++++ b/swig/python/kopano/scripts/fromto.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # print names and email addresses of sender/recipients
+diff --git a/swig/python/kopano/scripts/goocal.py b/swig/python/kopano/scripts/goocal.py
+index 8b1f627..7edc6f3 100755
+--- a/swig/python/kopano/scripts/goocal.py
++++ b/swig/python/kopano/scripts/goocal.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ # Copyright 2015 Zarafa and its licensors
+ 
+diff --git a/swig/python/kopano/scripts/import_rfc.py b/swig/python/kopano/scripts/import_rfc.py
+index 9b4dc89..f5c462d 100755
+--- a/swig/python/kopano/scripts/import_rfc.py
++++ b/swig/python/kopano/scripts/import_rfc.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # import .eml/.ics/.vcf file
+diff --git a/swig/python/kopano/scripts/kopano-monitor.py b/swig/python/kopano/scripts/kopano-monitor.py
+index 0c98b7a..93442d0 100755
+--- a/swig/python/kopano/scripts/kopano-monitor.py
++++ b/swig/python/kopano/scripts/kopano-monitor.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ # example of using Service class, in the form of an (incomplete) python version of kopano-monitor
+diff --git a/swig/python/kopano/scripts/kopano-spamhandler.py b/swig/python/kopano/scripts/kopano-spamhandler.py
+index 3ee63c9..e6bdd2b 100755
+--- a/swig/python/kopano/scripts/kopano-spamhandler.py
++++ b/swig/python/kopano/scripts/kopano-spamhandler.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # call (learning) "spam command" for items in junk folders, optionally deleting them
+diff --git a/swig/python/kopano/scripts/kopano-stats.py b/swig/python/kopano/scripts/kopano-stats.py
+index 774ef1e..85a48d9 100755
+--- a/swig/python/kopano/scripts/kopano-stats.py
++++ b/swig/python/kopano/scripts/kopano-stats.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # replacement for regular kopano-stats (practically complete)
+diff --git a/swig/python/kopano/scripts/kopano-tracer.py b/swig/python/kopano/scripts/kopano-tracer.py
+index bbcf98a..1bfb3f4 100755
+--- a/swig/python/kopano/scripts/kopano-tracer.py
++++ b/swig/python/kopano/scripts/kopano-tracer.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # traces ICS events of a user and displays the changed/new MAPI properties
+diff --git a/swig/python/kopano/scripts/list-folder-size.py b/swig/python/kopano/scripts/list-folder-size.py
+index 1b3a8bc..9871070 100755
+--- a/swig/python/kopano/scripts/list-folder-size.py
++++ b/swig/python/kopano/scripts/list-folder-size.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # recursively show folder structure and total size
+diff --git a/swig/python/kopano/scripts/loadsim.py b/swig/python/kopano/scripts/loadsim.py
+index f212a06..05091f6 100755
+--- a/swig/python/kopano/scripts/loadsim.py
++++ b/swig/python/kopano/scripts/loadsim.py
+@@ -1,4 +1,4 @@
+-#! /usr/bin/python
++#! /usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # very simple load simulator
+diff --git a/swig/python/kopano/scripts/loop.py b/swig/python/kopano/scripts/loop.py
+index 8940ad6..54ab9e7 100755
+--- a/swig/python/kopano/scripts/loop.py
++++ b/swig/python/kopano/scripts/loop.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # basic looping examples (users, items, properties, folders, attachments, companies..)
+diff --git a/swig/python/kopano/scripts/mapidump.py b/swig/python/kopano/scripts/mapidump.py
+index 57adee2..dc6a53a 100755
+--- a/swig/python/kopano/scripts/mapidump.py
++++ b/swig/python/kopano/scripts/mapidump.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ from __future__ import print_function
+ import datetime
+diff --git a/swig/python/kopano/scripts/rfcdump.py b/swig/python/kopano/scripts/rfcdump.py
+index 20505ad..bc5ecde 100755
+--- a/swig/python/kopano/scripts/rfcdump.py
++++ b/swig/python/kopano/scripts/rfcdump.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ from __future__ import print_function
+ import logging
+diff --git a/swig/python/kopano/scripts/rule.py b/swig/python/kopano/scripts/rule.py
+index 25e2345..7a951fb 100755
+--- a/swig/python/kopano/scripts/rule.py
++++ b/swig/python/kopano/scripts/rule.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # client-side rule, which moves incoming mails with 'spam' in the subject to the junk folder
+diff --git a/swig/python/kopano/scripts/send.py b/swig/python/kopano/scripts/send.py
+index 7576e52..94adabd 100755
+--- a/swig/python/kopano/scripts/send.py
++++ b/swig/python/kopano/scripts/send.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # sending a basic mail
+diff --git a/swig/python/kopano/scripts/sync.py b/swig/python/kopano/scripts/sync.py
+index 1affc52..70635f5 100755
+--- a/swig/python/kopano/scripts/sync.py
++++ b/swig/python/kopano/scripts/sync.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # basic system and folder level synchronization
+diff --git a/swig/python/kopano/scripts/tables.py b/swig/python/kopano/scripts/tables.py
+index 4a93cd7..6fc1b63 100755
+--- a/swig/python/kopano/scripts/tables.py
++++ b/swig/python/kopano/scripts/tables.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # some example of working with MAPI tables
+diff --git a/swig/python/kopano/scripts/tree.py b/swig/python/kopano/scripts/tree.py
+index 8ce4315..773dd75 100755
+--- a/swig/python/kopano/scripts/tree.py
++++ b/swig/python/kopano/scripts/tree.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # print store structure, down to attachments
+diff --git a/swig/python/kopano/scripts/urwap.py b/swig/python/kopano/scripts/urwap.py
+index 4de94e8..5d55e86 100755
+--- a/swig/python/kopano/scripts/urwap.py
++++ b/swig/python/kopano/scripts/urwap.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # 100-line "graphical" email client
+diff --git a/swig/python/kopano/scripts/userentryid.py b/swig/python/kopano/scripts/userentryid.py
+index 8f63e8c..2c0648b 100644
+--- a/swig/python/kopano/scripts/userentryid.py
++++ b/swig/python/kopano/scripts/userentryid.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ from __future__ import print_function
+diff --git a/swig/python/kopano/scripts/z-fuse.py b/swig/python/kopano/scripts/z-fuse.py
+index ba42897..17a45b7 100755
+--- a/swig/python/kopano/scripts/z-fuse.py
++++ b/swig/python/kopano/scripts/z-fuse.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # experimental mounting of users/folders/item in filesystem
+diff --git a/swig/python/kopano/scripts/z-plot.py b/swig/python/kopano/scripts/z-plot.py
+index 6518dd6..cbbb1cc 100755
+--- a/swig/python/kopano/scripts/z-plot.py
++++ b/swig/python/kopano/scripts/z-plot.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # generate graphs, containing e.g. the store size for each user
+diff --git a/swig/python/kopano/scripts/z-rest.py b/swig/python/kopano/scripts/z-rest.py
+index 8e02538..475da47 100755
+--- a/swig/python/kopano/scripts/z-rest.py
++++ b/swig/python/kopano/scripts/z-rest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # experimental REST interface on top of python-kopano
+diff --git a/swig/python/kopano/scripts/zarapy.py b/swig/python/kopano/scripts/zarapy.py
+index 3a9b9a3..af6abf8 100755
+--- a/swig/python/kopano/scripts/zarapy.py
++++ b/swig/python/kopano/scripts/zarapy.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ # simple html-based viewer (users, folders, items)
+diff --git a/tools/python-scripts/optimize-imap.py b/tools/python-scripts/optimize-imap.py
+index 0614a50..f89a989 100755
+--- a/tools/python-scripts/optimize-imap.py
++++ b/tools/python-scripts/optimize-imap.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import sys
+diff --git a/tools/searchfolder_cleaning.py b/tools/searchfolder_cleaning.py
+index a273b42..1cc6e09 100644
+--- a/tools/searchfolder_cleaning.py
++++ b/tools/searchfolder_cleaning.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ import datetime
