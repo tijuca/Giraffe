@@ -1,6 +1,7 @@
 etc/kopano/search.cfg
 etc/kopano/searchscripts
 usr/lib/python3/dist-packages/kopano_search/*.py
+usr/lib/python3/dist-packages/kopano_search/xmltotext.xslt
 usr/lib/python3/dist-packages/kopano_search-*.egg-info/
 usr/lib/systemd/system/kopano-search.service  lib/systemd/system/
 usr/sbin/kopano-search
