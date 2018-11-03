@@ -367,6 +367,8 @@ Depends:
  ${misc:Depends},
  ${python3:Depends},
  ${shlibs:Depends},
+Provides: ${python3:Provides}
+XB-Python-Version: ${python3:Versions}
 Description: Complete and feature rich groupware solution - Python MAPI bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -384,6 +386,8 @@ Depends:
  python3-dateutil,
  python3-mapi,
  python3-tz,
+Provides: ${python3:Provides}
+XB-Python-Version: ${python3:Versions}
 Description: Complete and feature rich groupware solution - Python bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary

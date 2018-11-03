@@ -1,2 +1,2 @@
-usr/lib/python3/dist-packages/kopano_*.egg-info/*
+usr/lib/python3/dist-packages/kopano-*.egg-info/*
 usr/lib/python3/dist-packages/kopano/*.py
