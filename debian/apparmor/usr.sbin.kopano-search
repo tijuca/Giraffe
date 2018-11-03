@@ -18,7 +18,7 @@
   @{PROC}/@{pid}/status r,
   @{PROC}/@{pid}/task/@{tid}/comm rw,
 
-  deny /usr/lib/python2.7/dist-packages/kopano_search/*.pyc w,
+  deny /usr/lib/python{3,2.?}/dist-packages/kopano_search/*.pyc w,
 
   # FIXME: it would be nice if search would use search- like pa
   /dev/shm/* rwl,
@@ -27,7 +27,7 @@
   /etc/gss/mech.d/*.conf r,
 
   /lib/x86_64-linux-gnu/ld-*.so mr,
-  /usr/bin/python2.7 ix,
+  /usr/bin/python{2,3}.? ix,
   /usr/sbin/kopano-search r,
 
   /etc/kopano/search.cfg r,

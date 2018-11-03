@@ -1,0 +1,30 @@
+From: =?utf-8?q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
+Date: Sat, 3 Nov 2018 15:27:29 +0100
+Subject: apparmor: Be less strict on the Python binary
+
+---
+ installer/linux/usr.sbin.kopano-search | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/installer/linux/usr.sbin.kopano-search b/installer/linux/usr.sbin.kopano-search
+index dfcff93..f39c82d 100644
+--- a/installer/linux/usr.sbin.kopano-search
++++ b/installer/linux/usr.sbin.kopano-search
+@@ -18,7 +18,7 @@
+   @{PROC}/@{pid}/status r,
+   @{PROC}/@{pid}/task/@{tid}/comm rw,
+ 
+-  deny /usr/lib/python2.7/dist-packages/kopano_search/*.pyc w,
++  deny /usr/lib/python{2.?,3}/dist-packages/kopano_search/*.pyc w,
+ 
+   # FIXME: it would be nice if search would use search- like pa
+   /dev/shm/* rwl,
+@@ -26,7 +26,7 @@
+   /lib/ld-*.so mr,
+   /lib64/ld-*.so mr,
+   /lib/@{multiarch}/ld-*.so mr,
+-  /usr/bin/python2.7 ix,
++  /usr/bin/python{2,3}.? ix,
+   /usr/sbin/kopano-search r,
+ 
+   /etc/kopano/search.cfg r,
