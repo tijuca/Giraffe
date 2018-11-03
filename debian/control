@@ -380,6 +380,7 @@ Depends:
  python,
  python3-dateutil,
  python3-mapi,
+ python3-tz,
 Description: Complete and feature rich groupware solution - Python bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
