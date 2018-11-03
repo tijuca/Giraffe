@@ -1,0 +1,4 @@
+# Wait until we have a user
+usr/lib/python3/dist-packages/kopano_rest/*
+usr/lib/python3/dist-packages/kopano_rest-*.egg-info/*
+usr/libexec/kopano/kopano-mfr.py
