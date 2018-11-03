@@ -402,6 +402,7 @@ Depends:
  python3-tz,
 Provides: ${python3:Provides}
 XB-Python-Version: ${python3:Versions}
+Recommends: python3-pil
 Description: Complete and feature rich groupware solution - Python bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
