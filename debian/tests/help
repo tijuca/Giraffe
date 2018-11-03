@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+set -x
+
+# Run the python parts with --help so we're sure we've got the imports right.
+for p in backup cli search spamd presence; do
+    kopano-${p} --help
+done

@@ -1,4 +1,10 @@
+Tests: help
+Depends: @
+Restrictions: allow-stderr,
+ needs-root,
+
 Tests: smoke
 Depends: python-nose
 Restrictions: allow-stderr,
  needs-root,
+
