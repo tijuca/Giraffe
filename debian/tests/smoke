@@ -30,6 +30,10 @@ kopano-admin -c testadmin -p r00tme \
              -e admin@example.com -f "Your admin" -a 1 | grep -qs "User created."
 echo "done."
 
+echo "Check that we can create a store for the user..."
+kopano-admin --create-store testadmin
+echo "done."
+
 apt-get -y install kopano-dagent
 echo "Check that we can deliver..."
 cat <<EOF | kopano-dagent -n -v testadmin
