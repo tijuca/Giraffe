@@ -92,6 +92,8 @@ override_dh_install:
 	for p in server dagent search; do \
 	  dh_apparmor --profile-name=usr.sbin.kopano-$${p} -pkopano-$${p}; \
 	done
+	# Don't ship upstream's profiles as example-config
+	rm -r debian/tmp/usr/share/doc/kopano-server/example-config/apparmor.d/
 
 	# Use upstream version
 	rm debian/tmp/usr/lib/python3/dist-packages/kopano/lockfile.py
