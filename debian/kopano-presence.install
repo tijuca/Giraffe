@@ -1,4 +1,5 @@
 etc/kopano/presence.cfg
-usr/lib/python*/*/kopano_presence*
 usr/lib/systemd/system/kopano-presence.service lib/systemd/system/
 usr/sbin/kopano-presence
+usr/lib/python3/dist-packages/kopano_presence-*.egg-info/*
+usr/lib/python3/dist-packages/kopano_presence/*.py

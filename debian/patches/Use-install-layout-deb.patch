@@ -1,0 +1,181 @@
+From: =?utf-8?q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
+Date: Sat, 3 Nov 2018 13:41:31 +0100
+Subject: Use install-layout=deb
+
+---
+ ECtools/backup/Makefile.am        | 2 +-
+ ECtools/cli/Makefile.am           | 4 ++--
+ ECtools/migration-pst/Makefile.am | 4 ++--
+ ECtools/presence/Makefile.am      | 4 ++--
+ ECtools/rest/Makefile.am          | 4 ++--
+ ECtools/search/Makefile.am        | 4 ++--
+ ECtools/spamd/Makefile.am         | 4 ++--
+ ECtools/utils/Makefile.am         | 4 ++--
+ swig/python/Makefile.am           | 4 ++--
+ swig/python/kopano/Makefile.am    | 4 ++--
+ swig/python/zarafa/Makefile.am    | 4 ++--
+ 11 files changed, 21 insertions(+), 21 deletions(-)
+
+diff --git a/ECtools/backup/Makefile.am b/ECtools/backup/Makefile.am
+index 0f7cace..d1cce9c 100644
+--- a/ECtools/backup/Makefile.am
++++ b/ECtools/backup/Makefile.am
+@@ -13,7 +13,7 @@ install-exec-local:
+ 	cp -a kopano_backup/version.py staging/kopano_backup/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
+ 		--prefix ${prefix} --install-purelib ${pythondir}
+ 	rm -Rf build staging
+ 
+diff --git a/ECtools/cli/Makefile.am b/ECtools/cli/Makefile.am
+index eba452f..fcb145b 100644
+--- a/ECtools/cli/Makefile.am
++++ b/ECtools/cli/Makefile.am
+@@ -13,8 +13,8 @@ install-exec-local:
+ 	cp -a kopano_cli/version.py staging/kopano_cli/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix ${prefix} --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:
+diff --git a/ECtools/migration-pst/Makefile.am b/ECtools/migration-pst/Makefile.am
+index f728cf8..cb0aa85 100644
+--- a/ECtools/migration-pst/Makefile.am
++++ b/ECtools/migration-pst/Makefile.am
+@@ -14,8 +14,8 @@ install-exec-local:
+ 	cp -a kopano_migration_pst/version.py staging/kopano_migration_pst/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix ${prefix} --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:
+diff --git a/ECtools/presence/Makefile.am b/ECtools/presence/Makefile.am
+index 2a7ed50..b4d9771 100644
+--- a/ECtools/presence/Makefile.am
++++ b/ECtools/presence/Makefile.am
+@@ -16,8 +16,8 @@ install-exec-local:
+ 	cp -a kopano_presence/version.py staging/kopano_presence/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix="${prefix}" --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:
+diff --git a/ECtools/rest/Makefile.am b/ECtools/rest/Makefile.am
+index 57126ba..2df5808 100644
+--- a/ECtools/rest/Makefile.am
++++ b/ECtools/rest/Makefile.am
+@@ -32,8 +32,8 @@ install-exec-local:
+ 	cp -a kopano_rest/version.py staging/kopano_rest/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix ${prefix} --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:
+diff --git a/ECtools/search/Makefile.am b/ECtools/search/Makefile.am
+index 4ec4be0..3487dec 100644
+--- a/ECtools/search/Makefile.am
++++ b/ECtools/search/Makefile.am
+@@ -16,8 +16,8 @@ install-exec-local:
+ 	cp -a kopano_search/version.py staging/kopano_search/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix="${prefix}" --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ install-data-local:
+diff --git a/ECtools/spamd/Makefile.am b/ECtools/spamd/Makefile.am
+index bdedbdd..3d0bc5f 100644
+--- a/ECtools/spamd/Makefile.am
++++ b/ECtools/spamd/Makefile.am
+@@ -13,8 +13,8 @@ install-exec-local:
+ 	cp -a kopano_spamd/version.py staging/kopano_spamd/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix ${prefix} --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build staging
+ 
+ uninstall-local:
+diff --git a/ECtools/utils/Makefile.am b/ECtools/utils/Makefile.am
+index f280a10..8696bcc 100644
+--- a/ECtools/utils/Makefile.am
++++ b/ECtools/utils/Makefile.am
+@@ -16,8 +16,8 @@ install-exec-local:
+ 	cp -a kopano_utils/version.py staging/kopano_utils/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix ${prefix} --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build staging
+ 
+ uninstall-local:
+diff --git a/swig/python/Makefile.am b/swig/python/Makefile.am
+index 682a4bf..6a16be7 100644
+--- a/swig/python/Makefile.am
++++ b/swig/python/Makefile.am
+@@ -174,8 +174,8 @@ install-exec-local:
+ 	cp -a MAPI/version.py staging/MAPI/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix="${prefix}" --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:
+diff --git a/swig/python/kopano/Makefile.am b/swig/python/kopano/Makefile.am
+index 6524cfb..88fd804 100644
+--- a/swig/python/kopano/Makefile.am
++++ b/swig/python/kopano/Makefile.am
+@@ -16,8 +16,8 @@ install-exec-local:
+ 	cp -a kopano/version.py staging/kopano/
+ 	cd staging/ && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix="${prefix}" --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build staging
+ 
+ uninstall-local:
+diff --git a/swig/python/zarafa/Makefile.am b/swig/python/zarafa/Makefile.am
+index bb21352..48984da 100644
+--- a/swig/python/zarafa/Makefile.am
++++ b/swig/python/zarafa/Makefile.am
+@@ -3,8 +3,8 @@ EXTRA_DIST = setup.py zarafa/__init__.py
+ install-exec-local:
+ 	cd ${srcdir} && ${PYTHON} setup.py \
+ 		build --build-base="${abs_builddir}/build" \
+-		install -f $${DESTDIR+--root=${DESTDIR}} \
+-		--prefix="${prefix}" --install-purelib ${pythondir}
++		install --install-layout=deb -f $${DESTDIR+--root=${DESTDIR}} \
++		${NULL}
+ 	rm -Rf build
+ 
+ uninstall-local:

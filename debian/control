@@ -16,6 +16,7 @@ Build-Depends:
  dh-apparmor,
  dh-exec,
  dh-php,
+ dh-python,
  dpkg-dev (>= 1.16.1~),
  flex,
  gettext,
@@ -105,8 +106,8 @@ Package: kopano-backup
 Architecture: all
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  kopano-common (>= ${source:Version}),
- python,
  python3-dateutil,
  python3-kopano (>= ${source:Version}),
 Description: Complete and feature rich groupware solution - backup
@@ -164,12 +165,12 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  ${shlibs:Depends},
  kopano-common (= ${binary:Version}),
  lsb-base (>= 3.0-6),
  php-mapi (= ${binary:Version}),
  php-cli,
- python,
  python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - delivery agent
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -251,9 +252,9 @@ Architecture: all
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  kopano-common (>= ${binary:Version}),
  lsb-base (>= 3.0-6),
- python,
  python3-flask,
  python3-kopano (= ${binary:Version}),
  python3-sleekxmpp,
@@ -271,13 +272,13 @@ Architecture: all
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  catdoc,
  file,
  gawk,
  kopano-common (>= ${source:Version}),
  lsb-base (>= 3.0-6),
  poppler-utils,
- python,
  python3-dateutil,
  python3-kopano (>= ${source:Version}),
  python3-magic,
@@ -315,9 +316,9 @@ Package: kopano-spamd
 Architecture: all
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  kopano-common (>= ${binary:Version}),
  lsb-base (>= 3.0-6),
- python,
 Description: Complete and feature rich groupware solution - Spam daemon
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -330,6 +331,7 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  ${shlibs:Depends},
  kopano-common (= ${binary:Version}),
  lsb-base (>= 3.0-6),
@@ -348,7 +350,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
- python,
+ ${python3:Depends},
  python3-kopano,
 Description: Complete and feature rich groupware solution - admin tools
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -362,8 +364,8 @@ Architecture: any
 Section: python
 Depends:
  ${misc:Depends},
+ ${python3:Depends},
  ${shlibs:Depends},
- python,
 Description: Complete and feature rich groupware solution - Python MAPI bindings
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -377,7 +379,7 @@ Architecture: all
 Section: python
 Depends:
  ${misc:Depends},
- python,
+ ${python3:Depends},
  python3-dateutil,
  python3-mapi,
  python3-tz,

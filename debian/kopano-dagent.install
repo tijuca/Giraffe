@@ -1,6 +1,5 @@
 etc/kopano/autorespond.cfg
 etc/kopano/dagent.cfg
-usr/lib/python*/*/kopano_utils
 usr/lib/systemd/system/kopano-dagent.service  lib/systemd/system/
 usr/sbin/kopano-autorespond
 usr/sbin/kopano-dagent

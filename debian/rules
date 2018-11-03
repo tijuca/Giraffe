@@ -50,7 +50,7 @@ $(PREPROCESS_FILES:.in=): %: %.in
 	-e 's,/@PHP_API_DATE@,$(PHP_API_DATE:%=/%),g' $< > $@
 
 %:
-	dh $@ --builddirectory=$(DEB_BUILD_DIR) --with php
+	dh $@ --builddirectory=$(DEB_BUILD_DIR) --with php,python3
 
 override_dh_auto_configure: $(PREPROCESS_FILES:.in=)
 	echo ${DEB_VERSION} > $(CURDIR)/revision
@@ -117,3 +117,4 @@ override_dh_makeshlibs:
 override_dh_shlibdeps:
 	dh_shlibdeps -a -l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/kopano \
 			-l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
+

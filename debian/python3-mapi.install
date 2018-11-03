@@ -1,10 +1,13 @@
-usr/lib/python*/*/MAPICore.py
-usr/lib/python*/*/_MAPICore.so
-usr/lib/python*/*/inetmapi.py
-usr/lib/python*/*/_inetmapi.so
-usr/lib/python*/*/icalmapi.py
-usr/lib/python*/*/_icalmapi.so
-usr/lib/python*/*/MAPI*.egg-info
-usr/lib/python*/*/MAPI/
-usr/lib/python*/*/libfreebusy.py
-usr/lib/python*/*/_libfreebusy.so
+usr/lib/python3/dist-packages/MAPI/*.py
+usr/lib/python3/dist-packages/MAPI/Util/*.py
+usr/lib/python3/dist-packages/MAPI*.egg-info/*
+
+usr/lib/python3.6/site-packages/icalmapi.py     usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/_icalmapi.so    usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/inetmapi.py     usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/_inetmapi.so    usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/libfreebusy.py  usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/_libfreebusy.so usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/MAPICore.py     usr/lib/python3/dist-packages
+usr/lib/python3.6/site-packages/_MAPICore.so    usr/lib/python3/dist-packages
+
