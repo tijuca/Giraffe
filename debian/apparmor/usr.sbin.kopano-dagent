@@ -24,9 +24,11 @@
 
   /run/kopano/server.sock rw,
 
+  /usr/share/kopano-dagent/python/ r,
   /usr/share/kopano-dagent/python/*.py{,c} r,
 
   /var/lib/kopano/dagent/plugins/ r,
+  /var/lib/kopano/dagent/plugins/*.py{,c} r,
 
   /etc/mapi/ r,
   /etc/mapi/* r,
