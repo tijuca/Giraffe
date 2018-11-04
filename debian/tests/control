@@ -4,7 +4,7 @@ Restrictions: allow-stderr,
  needs-root,
 
 Tests: smoke
-Depends: python-nose
+Depends: python3-nose
 Restrictions: allow-stderr,
  needs-root,
 

@@ -24,8 +24,12 @@ apt-get -y install mariadb-server
 apt-get -y install kopano-server kopano-utils
 echo "done."
 
+echo "(Re)start the kopano-server..."
+/etc/init.d/kopano-server restart
+echo "done."
+
 echo "Check that we have a running server and can create users..."
-kopano-admin -l | grep -qs "SYSTEM.*Kopano"
+kopano-admin -l | grep -qs "SYSTEM"
 kopano-admin -c testadmin -p r00tme \
              -e admin@example.com -f "Your admin" -a 1 | grep -qs "User created."
 echo "done."
@@ -48,7 +52,7 @@ echo "Checking that we can backup and retrieve email"
 cd debian/tests
 export AUTH_USER='testadmin'
 export AUTH_PASS='r00tme'
-nosetests -v
+nosetests3 -v
 echo "done."
 
 echo 'Smoke test of kopano server succesful'
