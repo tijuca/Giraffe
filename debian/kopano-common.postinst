@@ -33,6 +33,9 @@ case "$1" in
     configure)
         add_users_groups
         logs
+        if ! dpkg-statoverride --list /etc/kopano/debian-db.cfg >/dev/null; then
+            dpkg-statoverride --add --update root kopano 0640 /etc/kopano/debian-db.cfg
+        fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
