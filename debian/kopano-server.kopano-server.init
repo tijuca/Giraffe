@@ -51,7 +51,7 @@ case "$1" in
         log_begin_msg "Starting $DESC: $NAME"
         export LC_ALL=$KOPANO_LOCALE
         export LANG=$KOPANO_LOCALE
-        chown kopano /var/lib/kopano
+        chown -R kopano /var/lib/kopano
         mkdir -p /var/run/kopano
         chown kopano /var/run/kopano
         start-stop-daemon --start $QUIETDAEMON --pidfile $PIDFILE --exec $SERVER -- $SERVER_OPTS
