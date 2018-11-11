@@ -1,8 +1,16 @@
 #!/bin/sh
 
+SQL_CMDS="\
+CREATE DATABASE kopanoserver; \
+CREATE USER 'kopano'@'localhost' IDENTIFIED VIA unix_socket; \
+GRANT ALL PRIVILEGES on kopanoserver.* TO 'kopano'@'localhost'; \
+FLUSH PRIVILEGES;
+"
+
 set -e
 
-echo "Setting up datebase configuration..."
+echo "#######################################################################"
+echo "# Setting up database configuration...                                #"
 cat <<EOF | debconf-set-selections
 kopano kopano-server/mysql/method select unix socket
 kopano kopano-server/missing-db-package-error select abort
@@ -16,44 +24,92 @@ kopano kopano-server/mysql/admin-user string root
 kopano kopano-server/database-type select mysql
 kopano kopano-server/db/dbname string kopanoserver
 EOF
-echo "done."
+echo "# Setting up database configuration... done.                          #"
+echo "#######################################################################"
+echo
 
-echo "Installing database and server packages..."
+echo "#######################################################################"
+echo "# Installing MariaDB server package...                                #"
 apt-get -y install mariadb-server
+echo "# Installing MariaDB server package... done.                          #"
+echo "#######################################################################"
+echo
+
+echo "#######################################################################"
+echo "# Restart MariaDB server...                                           #"
 /etc/init.d/mysql start
+echo "# Restart MariaDB server... done.                                     #"
+echo "#######################################################################"
+echo
+
+echo "#######################################################################"
+echo "# Create MariaDB database and user...                                 #"
+echo "${SQL_CMDS}" | /usr/bin/mysql -u root
+sed -i 's/kopano-server/kopano/' /etc/kopano/debian-db.cfg
+/etc/init.d/mysql restart
+#echo "select user, host, password, plugin from mysql.user;" | /usr/bin/mysql -u root
+echo "# Create MariaDB database and user...                                 #"
+echo "#######################################################################"
+echo
+
+echo "#######################################################################"
+echo "# Installing kopano-server and kopano-utils...                        #"
 apt-get -y install kopano-server kopano-utils
-echo "done."
+echo "# Installing kopano-server and kopano-utils... done.                  #"
+echo "#######################################################################"
+echo
 
-echo "(Re)start the kopano-server..."
+echo "#######################################################################"
+echo "# (Re)start the kopano-server...                                      #"
 /etc/init.d/kopano-server restart
-echo "done."
+echo "# (Re)start the kopano-server... done                                 #"
+echo "#######################################################################"
+echo
 
-echo "Check that we have a running server and can create users..."
+echo "#######################################################################"
+echo "# Check that we have a running server...                              #"
 kopano-admin -l | grep -qs "SYSTEM"
+echo "# Check that we have a running server... done                         #"
+echo "#######################################################################"
+echo
+
+echo "#######################################################################"
+echo "# Check we can create users...                                        #"
 kopano-admin -c testadmin -p r00tme \
-             -e admin@example.com -f "Your admin" -a 1 | grep -qs "User created."
-echo "done."
+             -e admin@example.com \
+             -f "Your admin" -a 1 | grep -qs "User created."
+echo "# Check we can create users... done                                   #"
+echo "#######################################################################"
+echo
 
-echo "Check that we can create a store for the user..."
+echo "#######################################################################"
+echo "# Check that we can create a store for the user...                    #"
 kopano-admin --create-store testadmin
-echo "done."
+echo "# Check that we can create a store for the user... done.              #"
+echo "#######################################################################"
+echo
 
+echo "#######################################################################"
+echo "# Check that we can deliver...                                        #"
 apt-get -y install kopano-dagent
-echo "Check that we can deliver..."
 cat <<EOF | kopano-dagent -n -v testadmin
 From: hwm@example.com
 To: testadmin@example.com
 Subject: the towers
 EOF
-echo "done."
+echo "# Check that we can deliver... done.                                  #"
+echo "#######################################################################"
+echo
 
+echo "#######################################################################"
+echo "# Checking that we can backup and retrieve email...                   #"
 apt-get -y install kopano-backup
-echo "Checking that we can backup and retrieve email"
 cd debian/tests
 export AUTH_USER='testadmin'
 export AUTH_PASS='r00tme'
 nosetests3 -v
-echo "done."
+echo "# Checking that we can backup and retrieve email... done              #"
+echo "#######################################################################"
 
-echo 'Smoke test of kopano server succesful'
+echo " ---> Smoke test of kopano server successful! <--- "
 exit 0
