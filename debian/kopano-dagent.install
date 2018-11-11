@@ -1,6 +1,6 @@
 etc/kopano/autorespond.cfg
 etc/kopano/dagent.cfg
-usr/lib/systemd/system/kopano-dagent.service  lib/systemd/system/
+#usr/lib/systemd/system/kopano-dagent.service  lib/systemd/system/
 usr/sbin/kopano-autorespond
 usr/sbin/kopano-dagent
 usr/sbin/kopano-mr-accept
