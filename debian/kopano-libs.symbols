@@ -1,4 +1,5 @@
 libkcarchiver.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -8,6 +9,7 @@ libkcarchiver.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcarchivercore.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -17,6 +19,7 @@ libkcarchivercore.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcfreebusy.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -26,6 +29,7 @@ libkcfreebusy.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcicalmapi.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -35,6 +39,7 @@ libkcicalmapi.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcinetmapi.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -44,6 +49,7 @@ libkcinetmapi.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcpyconv-3.7.so kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
  *@KC_8.6.80 8.6.82
  _Z11DoExceptioni@Base 8.5.0~8.4.99
  _Z13CopyPyUnicodePPwP7_objectPv@Base 8.5.0~8.4.99
@@ -91,15 +97,18 @@ libkcpyconv-3.7.so kopano-libs #MINVER#
  _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
 
 libkcpydirector-3.7.so kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
  *@KC_8.6.80 8.6.82
  _Z21mark_call_from_pythonv@Base 8.6.90
  _Z22check_call_from_pythonv@Base 8.6.90
  _Z23unmark_call_from_pythonv@Base 8.6.90
 
 libkcpyplug.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
  *@KC_8.6.80 8.6.82
 
 libkcserver.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)EC_8.1.0 8.0.1
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
@@ -109,6 +118,7 @@ libkcserver.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcsoap.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
 #MISSING: 8.6.90-1# (symver|optional)KC_8.5 8.5.0
@@ -117,6 +127,7 @@ libkcsoap.so.0 kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
 
 libkcutil.so.0 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
 #MISSING: 8.6.90-1# (symver|optional)KC_8.5 8.5.0
@@ -127,6 +138,7 @@ libkcutil.so.0 kopano-libs #MINVER#
  *@KERNEL32_1 8.3.2
 
 libmapi.so.1 kopano-libs #MINVER#
+* Build-Depends-Package: kopano-dev
 #MISSING: 8.6.90-1# (symver|optional)KC_8.3 8.3.2
 #MISSING: 8.6.90-1# (symver|optional)KC_8.4.90 8.5.0~8.4.99
 #MISSING: 8.6.90-1# (symver|optional)KC_8.5 8.5.0
