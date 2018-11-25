@@ -2,12 +2,12 @@ usr/lib/python3/dist-packages/MAPI/*.py
 usr/lib/python3/dist-packages/MAPI/Util/*.py
 usr/lib/python3/dist-packages/MAPI*.egg-info/*
 
-usr/lib/python3.6/site-packages/icalmapi.py     usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/_icalmapi.so    usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/inetmapi.py     usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/_inetmapi.so    usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/libfreebusy.py  usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/_libfreebusy.so usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/MAPICore.py     usr/lib/python3/dist-packages
-usr/lib/python3.6/site-packages/_MAPICore.so    usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/icalmapi.py     usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/_icalmapi.so    usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/inetmapi.py     usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/_inetmapi.so    usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/libfreebusy.py  usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/_libfreebusy.so usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/MAPICore.py     usr/lib/python3/dist-packages
+usr/lib/python3.*/site-packages/_MAPICore.so    usr/lib/python3/dist-packages
 
