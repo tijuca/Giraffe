@@ -43,7 +43,7 @@ libkcinetmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.6.90-1# (symver|optional)KC_8.6.1 8.6.1
  *@KC_8.6.80 8.6.82
 
-libkcpyconv-3.6.so kopano-libs #MINVER#
+libkcpyconv-3.7.so kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
  _Z11DoExceptioni@Base 8.5.0~8.4.99
  _Z13CopyPyUnicodePPwP7_objectPv@Base 8.5.0~8.4.99
@@ -90,7 +90,7 @@ libkcpyconv-3.6.so kopano-libs #MINVER#
  (arch-bits=32)_ZN4priv8conv_outIxEEvP7_objectPvjPT_@Base 8.3.3
  _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.5.0~8.4.99
 
-libkcpydirector-3.6.so kopano-libs #MINVER#
+libkcpydirector-3.7.so kopano-libs #MINVER#
  *@KC_8.6.80 8.6.82
  _Z21mark_call_from_pythonv@Base 8.6.90
  _Z22check_call_from_pythonv@Base 8.6.90
