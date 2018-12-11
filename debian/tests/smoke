@@ -1,12 +1,5 @@
 #!/bin/sh
 
-SQL_CMDS="\
-CREATE DATABASE kopanoserver; \
-CREATE USER 'kopano'@'localhost' IDENTIFIED VIA unix_socket; \
-GRANT ALL PRIVILEGES on kopanoserver.* TO 'kopano'@'localhost'; \
-FLUSH PRIVILEGES;
-"
-
 set -e
 
 echo "#######################################################################"
@@ -43,16 +36,6 @@ echo "#######################################################################"
 echo
 
 echo "#######################################################################"
-echo "# Create MariaDB database and user...                                 #"
-echo "${SQL_CMDS}" | /usr/bin/mysql -u root
-sed -i 's/kopano-server/kopano/' /etc/kopano/debian-db.cfg
-/etc/init.d/mysql restart
-#echo "select user, host, password, plugin from mysql.user;" | /usr/bin/mysql -u root
-echo "# Create MariaDB database and user...                                 #"
-echo "#######################################################################"
-echo
-
-echo "#######################################################################"
 echo "# Installing kopano-server and kopano-utils...                        #"
 apt-get -y install kopano-server kopano-utils
 echo "# Installing kopano-server and kopano-utils... done.                  #"
@@ -62,14 +45,14 @@ echo
 echo "#######################################################################"
 echo "# (Re)start the kopano-server...                                      #"
 /etc/init.d/kopano-server restart
-echo "# (Re)start the kopano-server... done                                 #"
+echo "# (Re)start the kopano-server... done.                                #"
 echo "#######################################################################"
 echo
 
 echo "#######################################################################"
 echo "# Check that we have a running server...                              #"
 kopano-admin -l | grep -qs "SYSTEM"
-echo "# Check that we have a running server... done                         #"
+echo "# Check that we have a running server... done.                        #"
 echo "#######################################################################"
 echo
 
@@ -78,7 +61,7 @@ echo "# Check we can create users...                                        #"
 kopano-admin -c testadmin -p r00tme \
              -e admin@example.com \
              -f "Your admin" -a 1 | grep -qs "User created."
-echo "# Check we can create users... done                                   #"
+echo "# Check we can create users... done.                                  #"
 echo "#######################################################################"
 echo
 
@@ -108,8 +91,8 @@ cd debian/tests
 export AUTH_USER='testadmin'
 export AUTH_PASS='r00tme'
 nosetests3 -v
-echo "# Checking that we can backup and retrieve email... done              #"
+echo "# Checking that we can backup and retrieve email... done.             #"
 echo "#######################################################################"
 
-echo " ---> Smoke test of kopano server successful! <--- "
+echo " ---> Smoke test of kopano-server successful! <--- "
 exit 0

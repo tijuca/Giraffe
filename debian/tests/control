@@ -1,10 +1,12 @@
-Tests: help
-Depends: @
-Restrictions: allow-stderr,
- needs-root,
-
 Tests: smoke
 Depends: python3-nose
 Restrictions: allow-stderr,
  needs-root,
 
+Tests: help
+Depends: kopano-backup,
+ kopano-presence,
+ kopano-search,
+ kopano-spamd
+Restrictions: allow-stderr,
+ needs-root,
