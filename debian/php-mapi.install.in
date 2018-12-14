@@ -1,0 +1,3 @@
+etc/php/*/cli/conf.d/mapi.ini /etc/php/@PHP_VERSION@/mods-available
+usr/share/kopano/php/mapi/
+usr/lib/php
