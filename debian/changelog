@@ -1,3 +1,205 @@
+kopanocore (8.6.90-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [c96dd73] d/watch: update file due changed upstream behaviour
+    Modify the URI for the Kopano Core packages on GitHub to track the
+    'releases' instead of 'tags'. Bump file also to version 4 compliance.
+  * [1390c07] New upstream version 8.6.90
+  * [9cf27a9] rebuild patch queue from patch-queue branch
+    updated patch:
+    debian/Run-deamons-as-user-group-kopano.patch
+  * [d6e0199] d/control: adjusting build dependencies
+    The build requires now libhx-dev and python-setuptools, package libopt-dev
+    isn't needed any more.
+  * [a87daf8] d/control: increase Standards-Version to 4.2.1
+    No further changes needed.
+  * [d04c7ff] kopano libs: update installation of libraries
+    The libraries libkc{mapi,ssl,sync}.so aren't created any longer, but there
+    is libkcpyplug.so as a new library.
+  * [4e86b06] d/rules: detect PHP_VERSION dynamically
+    Try to detect the current used PHP version while building the packages so
+    this can be used later elsewhere.
+  * [5d7f853] d/kopano-utils: adjust install for bash-completion
+    The origin of the Bash completion files has been moved by upstream which
+    is almost right but still needs some adjustment for the packaging.
+  * [6af9235] kopano-libs.symbols: update symbols to 8.6.90
+  * [13f712c] d/kopano-dagent: remove already commented out stuff
+    Remove dead entries from the install sequencer file. We won't ever install
+    files into /usr/bin/ with an file extension.
+  * [cef6661] d/kopano-server: add additional man pages and AppArmor file
+    New man pages provided by upstream for the kopano-server package, regarding
+    kopano-{coredump,cfgchecker}. Also installing the provided apparmor files
+    into /u/s/d/kopano-server/example-config/apparmor.d.
+  * [d1233ee] d/kopano-utils: add kopano-ibrule
+    Adding related files for kopano-ibrule (Inbox rule inspection and
+    manipulation utility) to kopano-utils.
+  * [595874f] move over to dh 12
+    Let's start moving over to debhelper 12, even it's not released finally.
+    A lot of useful additions are made (especially a improved dh-missing
+    helper).
+  * [f0f09cb] d/control: adding various Pre-Depends: ${misc:Pre-Depends}
+    Some packages (mainly with systemd units) need the Pre-Depends variable
+    so deb-systemd-invoke can do the right thing while installation or
+    update.
+  * [50f775e] install various systemd unit files
+    More systemd unit files are distributed by upstream, as for
+    kopano-{dagent,gateway,ical,monitor,search,server,spooler}.
+  * [604265d] d/rules: remove *.la file more globally before install
+
+  [ Guido Günther ]
+  * [879b464] Drop unused configure options
+    Options '--with-userscript-prefix' and '--enable-unicode' are not used
+    and available any more.
+  * [f5fc83a] Switch to python3
+    Drop all Python2 packages we have provided until the previous upload and
+    move them all into Python3 based packages. Thus the following changes are
+    happen by this change:
+    python-kopano  -->  python3-kopano
+    python-mapi    -->  python3-mapi
+
+  [ Carsten Schoenert ]
+  * [bedd577] usr.sbin.kopano-server: update kopano-server apparmor profile
+    Updating the AppArmor profile for kopano-server. Thanks Teun Kloosterman
+    for this update.
+    (Closes: #907400)
+  * [cd8cf58] d/rules: remove zarafa things from tmp install folder
+    We don't serve any Zarafa related packages or files thus we can ignore
+    them and simply remove the related Python3 files before installing the
+    content into the binary packages.
+  * [5d37847] d/k-common.install: also install kopano-tmpfiles.conf
+    More common used files that coming by the new upstream version.
+  * [ee31d38] d/k-dagent.install: install the correct cfg file
+    The configuration file was renamed to autorespond.cfg, adjust the
+    installation accordingly.
+  * [1bfd5fc] d/k-presence.install: install also Unit file
+    Installing the systemd Unit file for k-presence now too, it was already
+    prepared tough.
+  * [6954f17] d/k-server.install.in: fix install for userscripts
+    The userscripts are installed now into /usr/lib instead to /etc.
+  * [6209c21] d/k-libs.symbols: updating after switch over to Python3
+    Updating the entries due changed library names libkcpyconv-{2.7->3.6}.so
+    and libkcpydirector-{2.7->3.6}.so.
+  * [2510d5d] d/k-presence.install: adjust install of systemd unit
+    The Unit file needs to go into /lib/systemd/system.
+  * [7016d94] apparmor: allowing access to Python files
+    The kopano-dagent profile needs read rights on the associated plugin files.
+  * [b6c31fe] d/control: additional dependency for kopano-python
+    python3-tz is now additional needed.
+  * [26a0f00] autopkgtest: add new needed step for testing
+    After the user is added to the database a store
+    (kopano-admin --create-store) is also needed to be created for the user
+    now. Adding this requirement to the autopkgtest.
+  * [0a6587e] d/k-utils.install: add new files to install
+    The binaries kscriptrun and mapitime are platform depended linked and act
+    like private libs, thus they get installed like any other private library
+    into usr/lib/MULTIARCH/kopano.
+
+  [ Guido Günther ]
+  * [0276892] Use dh_python3
+    Due the move over to python3 based packages adjust the controlling of the
+    build like using of ${python3:Depends} variable.
+    To create a better usable installation layout of the Python3 related files
+    within the upstream source another patch is added to the patch queue
+    (which is also forwarded upstream). The related sequencer files for
+    installing the Python3 binary packages got updated due the changes to
+    installation of the upstream source.
+  * [f740a86] kopano-utils: Add ${perl:Depends}
+    kopano-utils should benefit from adding ${perl:Depends} to the Depends
+    field.
+  * [5535f06] dh_python3
+    Extend the control file with more dh_python3 related additions.
+  * [b966595] Ignore python3-rest for now
+    Adding Python3 related kopano_rest files to not-installed so they get
+    ignored by dh-missing for now.
+  * [ea9ab85] Use packaged versions of lockfile and daemon
+    Ignore the provided files from Kopano and use the Debian packages instead.
+  * [21f9602] Use python3 everywhere
+    Hard code the shebang for using python3 in all Python files which did have
+    used a shebang of /usr/bin/python in the upstream source.
+    Added these modifications to the patch queue.
+  * [e3827c1] autopkgtests: install all packages
+    Install all created packages while the autopkgtest and do a check of the
+    option '--help' for the Python based files.
+  * [a659ed6] apparmor: Be less strict on the Python binary and module paths
+    Be more flexible with the Python version within the profile for
+    kopano-search so the profile is usable in Python2 and Python3 environments.
+  * [76e61f3] Python3 fixes
+    One more patch for the patch queue related to the usage of Python3.
+  * [cc63fb0] Depend on python3-bdbdb3
+    Adding a additional package dependency to kopano-{backup,search,spamd}.
+  * [91b4939] d/rules: Don't hardcode Python 3 version
+    Related to [cd8cf58], after the modifications to the patch queue stuff get
+    installed into usr/lib/python3 and thus the deletion of the old zarafa
+    stuff needs an update in d/rules.
+  * [2328c55] Don't ship upstreams apparmor profiles as examples
+    Ignore the apparmor example config installation for k-server, upstream will
+    adopt the changes made by Debian and Contributors.
+  * [875be0f] kopano-search: Ship xslt for plain text conversion
+
+  [ Carsten Schoenert ]
+  * [182324e] d/k-dev.links.in remove obsolete sequencer file
+    The file ldapmsplugin.so isn't shipped by upstream any more and we can drop
+    the complete sequencer file as this was the only content.
+    (Closes: #909622)
+  * [45707a7] Revert "d/rules: detect PHP_VERSION dynamically"
+    Revert commit [4e86b06] so the patches provided by Ondřej Surý can apply,
+    we will need the variable PHP_VERSION anyhow later again.
+
+  [ Ondřej Surý ]
+  * [7c6aaea] Use default Debian PHP version provided by php-dev
+    The provided patch was needing some adjustment as the sed call was getting
+    broken otherwise.
+    (Closes: 911360)
+  * [a736023] Use wildcard to catch files for php-mapi.php
+
+  [ Carsten Schoenert ]
+  * [59dd0ea] kopano libs: update lintian override for libraries
+    Adjust the lintian override due the changed library name after the Python2
+    -> Python3 change.
+  * [7d840e4] d/k-common.postinst: adding a override for SQL config
+    Now the kopano-server is running as user 'kopano' the database access
+    configuration file needs a modification of the owner and access rights.
+  * [84fb468] kopano-server: do recursive chown on folder
+    Also by the changed owner the kopano-server is running it has been shown
+    the SysV init script for kopano-server needs also get modified so
+    /var/lib/kopano can get accessed by kopano-server.
+  * [ca0138f] systemd units: ignore some upstream service files
+    At least for kopano-{dagent,presence,server} we have some more
+    instructions within the unit files which ensures the correct behaviour
+    while installation or package updates.
+  * [4a03fd1] python3-mapi: be relaxed on the python minor version
+    Just be lazy on The Python version and catch all 3.* versions while
+    installing the python3-mapi files.
+  * [a02f58e] kopano-libs.symbols: move over to Python 3.7 libraries
+  * [2aebe5d] kopano-libs.symbols: adding information about dependency
+    Adding Build-Depends-Package information.
+  * [2e4e8d1] dh-php: change file extension php-mapi.{php->ini}
+    The file extension needed for using dh_php seems to have changed again,
+    Accordingly to the output of dh it's need to be *.ini or *.so.
+  * [6f2fa25] php-mapi: adjust .install sequencer file
+    Even after the change of the file extension for php-mapi the previous
+    working dh_php call isn't working. So adding again a variable @PHP_VERSION@
+    which will get substituted within debian/rules.
+  * [d741a68] d/rules: (re-)introduce PHP_VERSION variable
+    Adding the old functionality to read out the PHP version from php-dev and
+    use this variable to be substituted in php-mapi sequencer files.
+    It's a hack yes, but currently the only way to get the things dynamically
+    handled.
+
+  [ Jelle van der Waa ]
+  * [575c8dd] debian: Add missing perl dep's of kopano-migration-imap
+  * [768f43a] debian: Add python3-pil as recommends
+
+  [ Carsten Schoenert ]
+  * [73bb2c3,507bfd8,41e094a] autopkgtests: various modifications on the
+    autopkgtests so we can check the packages successfully
+  * [67890b7] kopano-server.postinst: add optional dbc_debug line
+    No functional change, just adding a line with a comment block about
+    dbg_debug=1, useful in case we need to debug some dbconfig-common
+    behaviour.
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Mon, 17 Dec 2018 10:27:52 +0100
+
 kopanocore (8.6.5-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
