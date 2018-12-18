@@ -23,6 +23,7 @@ case "$1" in
         else
             rm -f /etc/kopano/debian-db.cfg
         fi
+        rm -rf /var/lib/kopano/attachments
     ;;
 
     *)
