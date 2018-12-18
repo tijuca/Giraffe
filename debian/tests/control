@@ -7,6 +7,7 @@ Tests: help
 Depends: kopano-backup,
  kopano-presence,
  kopano-search,
- kopano-spamd
+ kopano-spamd,
+ kopano-utils,
 Restrictions: allow-stderr,
  needs-root,
