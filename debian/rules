@@ -45,8 +45,8 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
 
 
 $(PREPROCESS_FILES:.in=): %: %.in
-	sed -e 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' \
-		-e 's,/@PHP_VERSION@,$(PHP_VERSION:%=/%),g' \
+	sed -e 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH:%=%)/g' \
+		-e 's/@PHP_VERSION@/$(PHP_VERSION:%=%)/g' \
 		$< > $@
 
 %:
