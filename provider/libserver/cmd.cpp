@@ -258,68 +258,32 @@ static ECRESULT GetABEntryID(unsigned int ulUserId, soap *lpSoap,
 	return erSuccess;
 }
 
+/**
+ * Determine if the client can reach @strServerName via a pipe.
+ * In other words, determine if @strServerName is local to the client.
+ */
 static ECRESULT PeerIsServer(struct soap *soap,
     const std::string &strServerName, const std::string &strHttpPath,
     const std::string &strSslPath, bool *lpbResult)
 {
-	bool			bResult = false;
-
 	if (soap == NULL || lpbResult == NULL)
 		return KCERR_INVALID_PARAMETER;
-
-	// First check if we are connecting through Unix socket/named pipe and if the request URL matches this server
-	if (SOAP_CONNECTION_TYPE_NAMED_PIPE(soap) &&
-	    strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0) {
-		*lpbResult = true;
-		return hrSuccess;
-	}
-	const std::string *lpstrPath = &strHttpPath;
-	if (lpstrPath->empty())
-		lpstrPath = &strSslPath;
-	if (lpstrPath->empty()) {
-		*lpbResult = false;
-		return erSuccess;
-	}
-
-	struct addrinfo	sHint = {0}, *lpsAddrInfo = nullptr, *lpsAddrIter = nullptr;
-	auto ulHostStart = lpstrPath->find("://");
-	if (ulHostStart == std::string::npos)
-		return KCERR_INVALID_PARAMETER;
-	ulHostStart += 3;	// Skip the '://'
-	auto ulHostEnd = lpstrPath->find(':', ulHostStart);
-	if (ulHostEnd == std::string::npos)
-		return KCERR_INVALID_PARAMETER;
-	auto strHost = lpstrPath->substr(ulHostStart, ulHostEnd - ulHostStart);
-	sHint.ai_family = AF_UNSPEC;
-	sHint.ai_socktype = SOCK_STREAM;
-	if (getaddrinfo(strHost.c_str(), NULL, &sHint, &lpsAddrInfo) != 0)
-		return KCERR_NOT_FOUND;
-
-	for (lpsAddrIter = lpsAddrInfo; lpsAddrIter != nullptr && !bResult; lpsAddrIter = lpsAddrIter->ai_next) {
-		if (soap->peerlen < sizeof(sockaddr) ||
-		    lpsAddrIter->ai_family != reinterpret_cast<const struct sockaddr *>(&soap->peer)->sa_family)
-			continue;
-		switch (lpsAddrIter->ai_family) {
-		case AF_INET:
-		{
-			auto lpsLeft = reinterpret_cast<struct sockaddr_in *>(lpsAddrIter->ai_addr);
-			auto lpsRight = reinterpret_cast<struct sockaddr_in *>(&soap->peer);
-			bResult = (memcmp(&lpsLeft->sin_addr, &lpsRight->sin_addr, sizeof(lpsLeft->sin_addr)) == 0);
-			break;
-		}
-		case AF_INET6:
-		{
-			auto lpsLeft = reinterpret_cast<struct sockaddr_in6 *>(lpsAddrIter->ai_addr);
-			auto lpsRight = reinterpret_cast<struct sockaddr_in6 *>(&soap->peer);
-			bResult = (memcmp(&lpsLeft->sin6_addr, &lpsRight->sin6_addr, sizeof(lpsLeft->sin6_addr)) == 0);
-			break;
-		}
-		default:
-			break;
-		}
-	}
-	freeaddrinfo(lpsAddrInfo);
-	*lpbResult = bResult;
+	/*
+	 * If the client tries to connect to the same server as it
+	 * already is, and the existing connection was AF_LOCAL, then
+	 * obviously the new connection can be AF_LOCAL too. (Unhandled
+	 * caveat emptor: local mount namespaces!)
+	 *
+	 * SSL->AF_LOCAL transition could lead to rejected logins later when
+	 * using password-less auth, since AF_LOCAL does not implement
+	 * certificates.
+	 *
+	 * More importantly: Due to the possibility of NAT, or mount namespaces
+	 * on the client, any AF_INET->AF_LOCAL transitions cannot be made to
+	 * work reliably.
+	 */
+	*lpbResult = SOAP_CONNECTION_TYPE_NAMED_PIPE(soap) &&
+	             strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0;
 	return erSuccess;
 }
 
@@ -879,15 +843,15 @@ int KCmdService::fname(ULONG64 ulSessionId, ##__VA_ARGS__) \
 	DB_RESULT UNUSED_VAR lpDBResult; \
 	std::string		UNUSED_VAR		strQuery;
 
-#define USE_DATABASE() \
+#define USE_DATABASE_NORESULT() \
        ECDatabase*             lpDatabase = NULL; \
-       ALLOC_DBRESULT(); \
-    \
        er = lpecSession->GetDatabase(&lpDatabase); \
        if (er != erSuccess) { \
 		ec_log_err(" GetDatabase failed"); \
                return KCERR_DATABASE_ERROR; \
        }
+
+#define USE_DATABASE() USE_DATABASE_NORESULT(); ALLOC_DBRESULT();
 
 #define ROLLBACK_ON_ERROR() \
 	if (lpDatabase && FAILED(er)) \
@@ -1168,7 +1132,7 @@ SOAP_ENTRY_START(getStore, lpsResponse->er, entryId* lpsEntryId, struct getStore
 				return er;
             strServerName = sUserDetails.GetPropString(OB_PROP_S_SERVERNAME);
 			if (strServerName.empty())
-				return er;
+				return KCERR_NOT_FOUND;
             if (strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0)  {
                 er = GetBestServerPath(soap, lpecSession, strServerName, &strServerPath);
                 if (er != erSuccess)
@@ -1293,8 +1257,7 @@ static ECRESULT ReadProps(struct soap *soap, ECSession *lpecSession,
 	unsigned int ulCompanyId = 0, ulStoreOwner = 0;
 	struct propVal sPropVal;
 	ECStringCompat stringCompat(lpecSession->GetCapabilities() & KOPANO_CAP_UNICODE);
-
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	if(ulObjType == MAPI_STORE) //fimxe: except public stores
 	{
@@ -2638,15 +2601,28 @@ static HRESULT loadobject_cache(ECCacheManager *cache,
     std::map<unsigned int, CHILDPROPS> *p, unsigned int objid)
 {
 	struct propValArray arr;
+	struct propTagArray pta;
 	auto iter = p->find(objid);
 	if (iter == p->cend() || iter->second.lpPropVals == nullptr)
 		return erSuccess;
 	auto ret = iter->second.lpPropVals->GetPropValArray(&arr, false);
 	if (ret != erSuccess)
 		return ret;
-	for (int i = 0; i < arr.__size; ++i) {
+	ret = iter->second.lpPropTags->GetPropTagArray(&pta);
+	if (ret != erSuccess)
+		return ret;
+
+	struct propVal pv{};
+	for (int i = 0, j = 0; i < pta.__size && j < arr.__size; ++i) {
+		/* Assumes that @arr and @pta have their things in the same order */
 		sObjectTableKey key(objid, 0);
-		cache->SetCell(&key, arr.__ptr[i].ulPropTag, &arr.__ptr[i]);
+		if (pta.__ptr[i] != arr.__ptr[j].ulPropTag) {
+			pv.ulPropTag = CHANGE_PROP_TYPE(pta.__ptr[i], PT_NULL);
+			cache->SetCell(&key, pta.__ptr[i], &pv);
+			continue;
+		}
+		cache->SetCell(&key, arr.__ptr[j].ulPropTag, &arr.__ptr[j]);
+		++j;
 	}
 	cache->SetComplete(objid);
 	return erSuccess;
@@ -2707,6 +2683,8 @@ static ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession,
 			if (PROP_TYPE(proptag) == PT_MV_STRING8)
 				proptag = CHANGE_PROP_TYPE(proptag, PT_MV_UNICODE);
 			sChild.lpPropTags->AddPropTag(proptag);
+			if (PROP_TYPE(prop.ulPropTag) == PT_NULL)
+				continue;
 			sChild.lpPropVals->AddPropVal(prop);
 		}
 
@@ -3125,7 +3103,7 @@ SOAP_ENTRY_START(createFolder, lpsResponse->er, const entryId &sParentId,
     struct createFolderResponse *lpsResponse)
 {
 	unsigned int ulParentId = 0, ulFolderId = 0;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	if (szName == nullptr)
 		return KCERR_INVALID_PARAMETER;
@@ -3708,7 +3686,7 @@ SOAP_ENTRY_START(deleteObjects, *result, unsigned int ulFlags, struct entryList 
 {
 	ECListInt	lObjectList;
 	unsigned int ulDeleteFlags = EC_DELETE_ATTACHMENTS | EC_DELETE_RECIPIENTS | EC_DELETE_CONTAINER | EC_DELETE_MESSAGES;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	if (lpEntryList == nullptr)
 		return KCERR_INVALID_PARAMETER;
@@ -3728,7 +3706,7 @@ SOAP_ENTRY_START(emptyFolder, *result, const entryId &sEntryId,
 {
 	unsigned int		ulId = 0;
 	ECListInt			lObjectIds;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	er = lpecSession->GetObjectFromEntryId(&sEntryId, &ulId);
 	if(er != erSuccess)
@@ -3762,7 +3740,7 @@ SOAP_ENTRY_START(deleteFolder, *result, const entryId &sEntryId,
 {
 	unsigned int ulId = 0, ulFolderFlags = 0;
 	ECListInt			lObjectIds;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	er = lpecSession->GetObjectFromEntryId(&sEntryId, &ulId);
 	if(er != erSuccess)
@@ -4108,7 +4086,7 @@ SOAP_ENTRY_END()
 SOAP_ENTRY_START(getNamesFromIDs, lpsResponse->er, struct propTagArray *lpPropTags, struct getNamesFromIDsResponse *lpsResponse)
 {
 	struct namedPropArray lpsNames;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	if (lpPropTags == nullptr)
 		return KCERR_INVALID_PARAMETER;
@@ -4691,7 +4669,8 @@ SOAP_ENTRY_START(getUserList, lpsUserList->er, unsigned int ulCompanyId,
 		er = sec->IsUserObjectVisible(ulCompanyId);
 	if (er != erSuccess)
 		return er;
-	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_USER, ulCompanyId, &unique_tie(lpUsers), 0);
+	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_USER,
+	     ulCompanyId, nullptr, &unique_tie(lpUsers), 0);
 	if(er != erSuccess)
 		return er;
 
@@ -5171,7 +5150,8 @@ SOAP_ENTRY_START(getGroupList, lpsGroupList->er, unsigned int ulCompanyId,
 		er = sec->IsUserObjectVisible(ulCompanyId);
 	if (er != erSuccess)
 		return er;
-	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_DISTLIST, ulCompanyId, &unique_tie(lpGroups), 0);
+	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_DISTLIST,
+	     ulCompanyId, nullptr, &unique_tie(lpGroups), 0);
 	if (er != erSuccess)
 		return er;
 
@@ -5804,7 +5784,7 @@ SOAP_ENTRY_START(submitMessage, *result, const entryId &sEntryId,
 	objectdetails_t details;
 	auto cache = lpecSession->GetSessionManager()->GetCacheManager();
 	auto sec = lpecSession->GetSecurity();
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	er = lpecSession->GetObjectFromEntryId(&sEntryId, &ulObjId);
 	if(er != erSuccess)
@@ -5846,7 +5826,7 @@ SOAP_ENTRY_START(submitMessage, *result, const entryId &sEntryId,
 	if(!(ulFlags & EC_SUBMIT_MASTER)) {
 	    // Set the submit flag (because it has just been submitted), and set it to UNSENT, as it has definitely
 	    // not been sent if the user has just submitted it.
-		strQuery = "UPDATE properties SET val_ulong=val_ulong|"+stringify(MSGFLAG_SUBMIT|MSGFLAG_UNSENT)+" where hierarchyid="+stringify(ulObjId) + " and tag=" + stringify(PROP_ID(PR_MESSAGE_FLAGS)) + " and type=" + stringify(PROP_TYPE(PR_MESSAGE_FLAGS));
+		auto strQuery = "UPDATE properties SET val_ulong=val_ulong|" + stringify(MSGFLAG_SUBMIT | MSGFLAG_UNSENT) + " where hierarchyid=" + stringify(ulObjId) + " and tag=" + stringify(PROP_ID(PR_MESSAGE_FLAGS)) + " and type=" + stringify(PROP_TYPE(PR_MESSAGE_FLAGS));
 		er = lpDatabase->DoUpdate(strQuery);
 		if(er != erSuccess)
 			return er;
@@ -5864,7 +5844,7 @@ SOAP_ENTRY_START(submitMessage, *result, const entryId &sEntryId,
 		return er;
 
 	// Insert the message into the outgoing queue
-	strQuery = "INSERT IGNORE INTO outgoingqueue (store_id, hierarchy_id, flags) VALUES("+stringify(ulStoreId)+", "+stringify(ulObjId)+","+stringify(ulFlags)+")";
+	auto strQuery = "INSERT IGNORE INTO outgoingqueue (store_id, hierarchy_id, flags) VALUES(" + stringify(ulStoreId) + ", " + stringify(ulObjId) + "," + stringify(ulFlags) + ")";
 	er = lpDatabase->DoInsert(strQuery);
 	if(er != erSuccess)
 		return er;
@@ -7203,7 +7183,7 @@ SOAP_ENTRY_START(copyObjects, *result, struct entryList *aMessages,
 	unsigned int ulGrandParent = 0, ulDestFolderId = 0;
 	ECListInt			lObjectIds;
 	std::set<EntryId> setEntryIds;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	const EntryId dstEntryId(&sDestFolderId);
 	if(aMessages == NULL) {
@@ -7553,7 +7533,7 @@ SOAP_ENTRY_START(notify, *result, const struct notification &sNotification,
     unsigned int *result)
 {
 	unsigned int ulKey = 0;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 
 	// You are only allowed to send newmail notifications at the moment. This could currently
 	// only be misused to send other users new mail popup notification for e-mails that aren't
@@ -8590,7 +8570,7 @@ SOAP_ENTRY_START(setSyncStatus, lpsResponse->er,
 		ec_log_err("setSyncStatus(): row/col NULL");
 		return er = KCERR_DATABASE_ERROR; /* this should never happen */
 	}
-	if (lpDBLen[0] != sSourceKey.size() || sSourceKey.size() == 0 ||
+	if (lpDBLen[0] != sSourceKey.size() ||
 	    memcmp(lpDBRow[0], sSourceKey, sSourceKey.size()) != 0) {
 		ec_log_err("setSyncStatus(): collision");
 		return er = KCERR_COLLISION;
@@ -8620,9 +8600,9 @@ SOAP_ENTRY_START(getEntryIDFromSourceKey, lpsResponse->er,
 	unsigned int ulObjType = 0, ulObjId = 0, ulMessageId = 0, ulFolderId = 0;
 	unsigned int ulParent = 0, ulStoreId = 0, ulStoreFound = 0;
 	EID				eid;
-
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 	kd_trans dtx;
+
 	er = BeginLockFolders(lpDatabase, SOURCEKEY(folderSourceKey), LOCK_SHARED, dtx, er);
 	if(er != erSuccess)
 		return er;
@@ -8943,7 +8923,7 @@ SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er,
 	auto gcache = g_lpSessionManager->GetCacheManager();
 	auto sec = lpecSession->GetSecurity();
 	std::shared_ptr<ECAttachmentStorage> lpAttachmentStorage;
-	USE_DATABASE();
+	USE_DATABASE_NORESULT();
 	kd_trans dtx;
 
 	if(ulPropTag == PR_ENTRYID) {
@@ -9000,6 +8980,7 @@ SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er,
 	soap_info(soap)->fdoneparam = lpMTOMSessionInfo;
 	lpsResponse->sMsgStreams.__ptr = s_alloc<messageStream>(soap, sSourceKeyPairs.__size);
 
+	std::string strQuery;
 	for (gsoap_size_t i = 0; i < sSourceKeyPairs.__size; ++i) {
 		// Progress information
 		lpsResponse->sMsgStreams.__ptr[ulObjCnt].ulStep = i;
@@ -9328,12 +9309,20 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags,
 	lpsStreamInfo->lpSessionInfo = lpMTOMSessionInfo;
 
 	if (soap_check_mime_attachments(soap)) {
+#if GSOAP_VERSION >= 20873
+		auto content = soap_recv_mime_attachment(soap, lpsStreamInfo);
+#else
 		auto content = soap_get_mime_attachment(soap, lpsStreamInfo);
+#endif
 		if (content == nullptr)
 			return er = lpMTOMSessionInfo->er ? lpMTOMSessionInfo->er : KCERR_CALL_FAILED;
 		// Flush remaining attachments (that shouldn't even be there)
 		while (true) {
+#if GSOAP_VERSION >= 20873
+			content = soap_recv_mime_attachment(soap, lpsStreamInfo);
+#else
 			content = soap_get_mime_attachment(soap, lpsStreamInfo);
+#endif
 			if (!content)
 				break;
 		};

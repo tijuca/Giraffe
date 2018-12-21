@@ -37,8 +37,8 @@ void DBPlugin::InitPlugin(std::shared_ptr<ECStatsCollector> sc)
 	    throw runtime_error(string("db_init: cannot get handle to database"));
 }
 
-signatures_t
-DBPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
+signatures_t DBPlugin::getAllObjects(const objectid_t &company,
+    objectclass_t objclass, const restrictTable *rst)
 {
 	string strQuery =
 		"SELECT om.externid, om.objectclass, op.value "
@@ -99,7 +99,7 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"LEFT JOIN "+(string)DB_OBJECTPROPERTY_TABLE+" AS op "
 		"ON op.objectid=o.id "
-		"WHERE (" + std::move(strSubQuery) + ") "
+		"WHERE (" + strSubQuery + ") "
 		"ORDER BY o.externid, o.objectclass";
 	auto er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)

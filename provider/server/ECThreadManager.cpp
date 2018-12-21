@@ -66,7 +66,6 @@ static string GetSoapError(int err)
 		RETURN_CASE(SOAP_GET_METHOD)
 		RETURN_CASE(SOAP_PUT_METHOD)
 		RETURN_CASE(SOAP_DEL_METHOD)
-		RETURN_CASE(SOAP_HEAD_METHOD)
 		RETURN_CASE(SOAP_HTTP_METHOD)
 		RETURN_CASE(SOAP_EOM)
 		RETURN_CASE(SOAP_MOE)
@@ -127,7 +126,12 @@ void WORKITEM::run()
 	if (soap->ctx && soap->ssl == nullptr) {
 		err = soap_ssl_accept(soap);
 		if (err) {
-			ec_log_warn("%s", *soap_faultdetail(soap));
+#if GSOAP_VERSION >= 20873
+			auto se = soap_ssl_error(soap, 0, SSL_ERROR_NONE);
+#else
+			auto se = soap_ssl_error(soap, 0);
+#endif
+			ec_log_warn("K-2171: soap_ssl_accept: %s: %s", *soap_faultdetail(soap), se);
 			ec_log_debug("%s: %s", GetSoapError(err).c_str(), *soap_faultstring(soap));
 		}
 	} else {

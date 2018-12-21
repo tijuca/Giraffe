@@ -17,6 +17,7 @@
 #include <kopano/stringutil.h>
 #include <kopano/timeutil.hpp>
 
+using namespace std::string_literals;
 using namespace KC;
 
 static int adm_sigterm_count = 3;
@@ -413,6 +414,112 @@ static ECRESULT k1216(std::shared_ptr<KDatabase> db)
 	return np_defrag(db);
 }
 
+static ECRESULT usmp_shrink_columns(std::shared_ptr<KDatabase> db)
+{
+	unsigned int aff = 0;
+	ec_log_notice("dbadm: executing action \"usmp-column-shrink\"");
+	ec_log_notice("usmp: discovering overly long named properties...");
+	auto ret = db->DoUpdate("CREATE TEMPORARY TABLE n (SELECT id, 34049+id AS tag FROM names WHERE LENGTH(namestring) > 185)");
+	if (ret != erSuccess)
+		return ret;
+	for (const auto &tbl : our_proptables) {
+		if (adm_quit)
+			break;
+		ec_log_notice("usmp: purging long namedprops from \"%s\"...", tbl.c_str());
+		ret = db->DoDelete("DELETE p FROM " + tbl + " AS p INNER JOIN n ON p.tag=n.tag", &aff);
+		if (ret != erSuccess)
+			return ret;
+		ec_log_notice("usmp: expunged %u rows", aff);
+	}
+	/* For now, the hope for these tables is that no user has strings longer than 185 */
+	if (adm_quit)
+		return erSuccess;
+	ec_log_notice("usmp: resizing names.namestring...");
+	ret = db->DoUpdate("ALTER TABLE `names` MODIFY COLUMN `namestring` varchar(185) BINARY DEFAULT NULL");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	ec_log_notice("usmp: resizing receivefolder.messageclass...");
+	ret = db->DoUpdate("ALTER TABLE `receivefolder` MODIFY COLUMN `messageclass` varchar(185) NOT NULL DEFAULT ''");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	ec_log_notice("usmp: resizing objectproperty.propname...");
+	ret = db->DoUpdate("ALTER TABLE `objectproperty` MODIFY COLUMN `propname` varchar(185) BINARY NOT NULL");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	ec_log_notice("usmp: resizing objectmvproperty.propname...");
+	ret = db->DoUpdate("ALTER TABLE `objectmvproperty` MODIFY COLUMN `propname` varchar(185) BINARY NOT NULL");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	ec_log_notice("usmp: resizing settings.name...");
+	return db->DoUpdate("ALTER TABLE `settings` MODIFY COLUMN `name` varchar(185) BINARY NOT NULL");
+}
+
+static ECRESULT usmp_charset(std::shared_ptr<KDatabase> db)
+{
+	ec_log_notice("dbadm: executing action \"usmp-charset\"");
+	for (const auto &tbl : {"abchanges", "acl", "changes", "deferredupdate",
+	    "hierarchy", "indexedproperties", "lob", "mvproperties",
+	    "object", "objectrelation",
+	    "outgoingqueue", "properties", "receivefolder", "searchresults",
+	    "settings", "singleinstances", "stores", "syncedmessages", "syncs",
+	    "tproperties", "users", "versions"}) {
+		if (adm_quit)
+			break;
+		ec_log_notice("usmp: converting \"%s\" to utf8mb4...", tbl);
+		auto ret = db->DoUpdate("ALTER TABLE `"s + tbl + "` CONVERT TO CHARSET utf8mb4");
+		if (ret != erSuccess)
+			return ret;
+	}
+	/*
+	 * "CONVERT TO CHARACTER SET" resets the collation, which we do not want.
+	 * It is split into individual operations here and the collation is reassured.
+	 */
+	for (const auto &tbl : {"names", "objectmvproperty", "objectproperty", "settings"}) {
+		if (adm_quit)
+			break;
+		auto ret = db->DoUpdate("ALTER TABLE `"s + tbl + "` DEFAULT CHARSET utf8mb4");
+		if (ret != erSuccess)
+			return ret;
+	}
+	if (adm_quit)
+		return erSuccess;
+	auto ret = db->DoUpdate("ALTER TABLE `names` MODIFY COLUMN `namestring` varchar(185) CHARACTER SET utf8mb4 BINARY DEFAULT NULL");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	for (const auto &tbl : {"objectproperty", "objectmvproperty"}) {
+		if (adm_quit)
+			break;
+		ec_log_notice("usmp: converting \"%s\" to utf8mb4...", tbl);
+		ret = db->DoUpdate("ALTER TABLE `"s + tbl + "` MODIFY COLUMN `propname` varchar(185) CHARACTER SET utf8mb4 BINARY DEFAULT NULL");
+		if (ret != erSuccess)
+			return ret;
+	}
+	ret = db->DoUpdate("ALTER TABLE `settings` MODIFY COLUMN `name` varchar(185) CHARACTER SET utf8mb4 BINARY DEFAULT NULL");
+	if (ret != erSuccess)
+		return ret;
+	if (adm_quit)
+		return erSuccess;
+	return erSuccess;
+}
+
+static ECRESULT usmp(std::shared_ptr<KDatabase> db)
+{
+	auto ret = usmp_shrink_columns(db);
+	if (ret != erSuccess)
+		return ret;
+	return usmp_charset(db);
+}
+
 static void adm_sigterm(int sig)
 {
 	if (--adm_sigterm_count <= 0) {
@@ -516,6 +623,12 @@ int main(int argc, char **argv)
 			ret = index_tags(db);
 		else if (strcmp(argv[i], "rm-helper-index") == 0)
 			ret = remove_helper_index(db);
+		else if (strcmp(argv[i], "usmp-shrink-columns") == 0)
+			ret = usmp_shrink_columns(db);
+		else if (strcmp(argv[i], "usmp-charset") == 0)
+			ret = usmp_charset(db);
+		else if (strcmp(argv[i], "usmp") == 0)
+			ret = usmp(db);
 		if (ret == KCERR_NOT_FOUND) {
 			ec_log_err("dbadm: unknown action \"%s\"", argv[i]);
 			return EXIT_FAILURE;
