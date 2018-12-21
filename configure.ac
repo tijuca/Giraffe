@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.6.90], [development@kopano.io])
+AC_INIT([kopano], [8.6.91], [development@kopano.io])
 
 dnl ABI tags are used to prevent inadvertent mixing of wildly different
 dnl versions of KC components without knowing it.
@@ -671,11 +671,12 @@ AS_IF([test -n "$PYTHON"], [
 	PYTHON=$(echo "$PYTHON $@")
 	PYTHON_MAJOR_VERSION=$($PYTHON -c "from __future__ import print_function;import sys;print(sys.version_info[[0]])" 2>/dev/null)
 ])
+AS_IF([test "$PYTHON_MAJOR_VERSION" = "3"], [PYTHON_PC="python3"], [PYTHON_PC="python"])
 AH_TEMPLATE([ENABLE_PYTHON], [Build dagent/spooler with Python plugin support])
 AC_ARG_ENABLE([python], [AS_HELP_STRING([--enable-python], [Enable building of Python bindings (default: auto)])],
 	[want_python="$enableval"], [want_python=auto])
 AS_IF([test "$want_python" != no], [
-	PKG_CHECK_MODULES([PYTHON], [python], [], [:])
+	PKG_CHECK_MODULES([PYTHON], [$PYTHON_PC], [], [:])
 	AS_IF([test -n "$PYTHON_LIBS"], [
 		AC_PATH_PROG([SWIG_EXEC], [swig])
 		AM_PATH_PYTHON([2.5])
@@ -712,7 +713,6 @@ AC_CONFIG_FILES([Makefile
 		ECtools/utils/Makefile
 		installer/Makefile
 		installer/linux/Makefile
-		installer/linux/kopano-statsd.service
 		installer/userscripts/Makefile
 		installer/quotamail/Makefile
 		installer/searchscripts/Makefile

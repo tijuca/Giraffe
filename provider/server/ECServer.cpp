@@ -87,7 +87,6 @@ static pthread_t mainthread;
 std::shared_ptr<ECConfig> g_lpConfig;
 static bool g_listen_http, g_listen_https, g_listen_pipe;
 static std::shared_ptr<ECLogger> g_lpLogger, g_lpAudit;
-static std::unique_ptr<ECScheduler> g_lpScheduler;
 static std::unique_ptr<ECSoapServerConnection> g_lpSoapServerConn;
 static bool m_bDatabaseUpdateIgnoreSignals = false;
 static bool g_dump_config;
@@ -151,20 +150,20 @@ server_stats::server_stats(std::shared_ptr<ECConfig> cfg) :
 	AddStat(SCN_LDAP_CONNECTS, SCT_INTEGER, "ldap_connect", "Number of connections made to LDAP server");
 	AddStat(SCN_LDAP_RECONNECTS, SCT_INTEGER, "ldap_reconnect", "Number of re-connections made to LDAP server");
 	AddStat(SCN_LDAP_CONNECT_FAILED, SCT_INTEGER, "ldap_connect_fail", "Number of failed connections made to LDAP server");
-	AddStat(SCN_LDAP_CONNECT_TIME, SCT_INTEGER, "ldap_connect_time", "Total duration of connections made to LDAP server");
-	AddStat(SCN_LDAP_CONNECT_TIME_MAX, SCT_INTGAUGE, "ldap_max_connect", "Longest connection time made to LDAP server");
+	AddStat(SCN_LDAP_CONNECT_TIME, SCT_INTEGER, "ldap_connect_time", "Total duration (µs) of connections made to LDAP server");
+	AddStat(SCN_LDAP_CONNECT_TIME_MAX, SCT_INTGAUGE, "ldap_max_connect", "Longest connection time (µs) made to LDAP server");
 
 	/* potentially useless because of SCN_LOGIN_* */
 	AddStat(SCN_LDAP_AUTH_LOGINS, SCT_INTEGER, "ldap_auth", "Number of LDAP authentications");
 	AddStat(SCN_LDAP_AUTH_DENIED, SCT_INTEGER, "ldap_auth_fail", "Number of failed authentications");
-	AddStat(SCN_LDAP_AUTH_TIME, SCT_INTEGER, "ldap_auth_time", "Total authentication time");
-	AddStat(SCN_LDAP_AUTH_TIME_MAX, SCT_INTGAUGE, "ldap_max_auth", "Longest duration of authentication made to LDAP server");
-	AddStat(SCN_LDAP_AUTH_TIME_AVG, SCT_INTGAUGE, "ldap_avg_auth", "Average duration of authentication made to LDAP server");
+	AddStat(SCN_LDAP_AUTH_TIME, SCT_INTEGER, "ldap_auth_time", "Total authentication time (µs)");
+	AddStat(SCN_LDAP_AUTH_TIME_MAX, SCT_INTGAUGE, "ldap_max_auth", "Longest duration (µs) of authentication made to LDAP server");
+	AddStat(SCN_LDAP_AUTH_TIME_AVG, SCT_INTGAUGE, "ldap_avg_auth", "Average duration (µs) of authentication made to LDAP server");
 
 	AddStat(SCN_LDAP_SEARCH, SCT_INTEGER, "ldap_search", "Number of searches made to LDAP server");
 	AddStat(SCN_LDAP_SEARCH_FAILED, SCT_INTEGER, "ldap_search_fail", "Number of failed searches made to LDAP server");
-	AddStat(SCN_LDAP_SEARCH_TIME, SCT_INTEGER, "ldap_search_time", "Total duration of LDAP searches");
-	AddStat(SCN_LDAP_SEARCH_TIME_MAX, SCT_INTGAUGE, "ldap_max_search", "Longest duration of LDAP search");
+	AddStat(SCN_LDAP_SEARCH_TIME, SCT_INTEGER, "ldap_search_time", "Total duration (µs) of LDAP searches");
+	AddStat(SCN_LDAP_SEARCH_TIME_MAX, SCT_INTGAUGE, "ldap_max_search", "Longest duration (µs) of LDAP search");
 
 	AddStat(SCN_INDEXER_SEARCH_ERRORS, SCT_INTEGER, "index_search_errors", "Number of failed indexer queries");
 	AddStat(SCN_INDEXER_SEARCH_MAX, SCT_INTGAUGE, "index_search_max", "Maximum duration of an indexed search query");
@@ -964,6 +963,7 @@ static int running_server(char *szName, const char *szConfig, bool exp_config,
 		{ "hide_everyone",			"no", CONFIGSETTING_RELOADABLE },			// whether internal group Everyone should be removed for users
 		{ "hide_system",			"yes", CONFIGSETTING_RELOADABLE },			// whether internal user SYSTEM should be removed for users
 		{ "enable_gab",				"yes", CONFIGSETTING_RELOADABLE },			// whether the GAB is enabled
+		{"abtable_initially_empty", "no", CONFIGSETTING_RELOADABLE},
         { "enable_enhanced_ics",    "yes", CONFIGSETTING_RELOADABLE },			// (dis)allow enhanced ICS operations (stream and notifications)
         { "enable_sql_procedures",  "no" },			// (dis)allow SQL procedures (requires mysql config stack adjustment), not reloadable because in the middle of the streaming flip
 
@@ -1327,13 +1327,11 @@ static int running_server(char *szName, const char *szConfig, bool exp_config,
 		g_lpSessionManager->GetSearchFolders()->RestartSearches();
 
 	// Create scheduler system
-	g_lpScheduler.reset(new(std::nothrow) ECScheduler);
-	if (g_lpScheduler == nullptr)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
+	ECScheduler sch;
 	// Add a task on the scheduler
-	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 0, &SoftDeleteRemover, &g_Quit);
-	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 15, &CleanupSyncsTable);
-	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 16, &CleanupSyncedMessagesTable);
+	sch.AddSchedule(SCHEDULE_HOUR, 00, &SoftDeleteRemover, &g_Quit);
+	sch.AddSchedule(SCHEDULE_HOUR, 15, &CleanupSyncsTable);
+	sch.AddSchedule(SCHEDULE_HOUR, 16, &CleanupSyncedMessagesTable);
 
 	// high loglevel to always see when server is started.
 	ec_log_notice("Startup succeeded on pid %d", getpid() );

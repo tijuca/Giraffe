@@ -325,7 +325,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
 
             // Handle category header rows
             if (row.ulObjId == 0) {
-		if (lpThis->GetPropCategory(soap, lpsPropTagArray->__ptr[k], row, &lpsRowSet->__ptr[i].__ptr[k]) != erSuccess) {
+				if (lpThis == nullptr || lpThis->GetPropCategory(soap, lpsPropTagArray->__ptr[k], row, &lpsRowSet->__ptr[i].__ptr[k]) != erSuccess) {
             		// Other properties are not found
             		lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
             		lpsRowSet->__ptr[i].__ptr[k].Value.ul = KCERR_NOT_FOUND;
@@ -344,7 +344,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
 
 			// Handle PR_DEPTH
 			if(ulPropTag == PR_DEPTH) {
-				if (lpThis->GetComputedDepth(soap, lpSession, row.ulObjId, &lpsRowSet->__ptr[i].__ptr[k]) != erSuccess) {
+				if (lpThis == nullptr || lpThis->GetComputedDepth(soap, lpSession, row.ulObjId, &lpsRowSet->__ptr[i].__ptr[k]) != erSuccess) {
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PR_DEPTH;
 					lpsRowSet->__ptr[i].__ptr[k].Value.ul = 0;
@@ -364,7 +364,8 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
 			}
     	    // FIXME bComputed always false
     	    // FIXME optimisation possible to GetCell: much more efficient to get all cells in one row at once
-			if (cache->GetCell(&row, ulPropTag, &lpsRowSet->__ptr[i].__ptr[k], soap, false) == erSuccess) {
+			if (cache->GetCell(&row, ulPropTag, &lpsRowSet->__ptr[i].__ptr[k], soap, false) == erSuccess &&
+			    PROP_TYPE(lpsRowSet->__ptr[i].__ptr[k].ulPropTag) != PT_NULL) {
 				setCellDone.emplace(i, k);
 	            continue;
 			}
