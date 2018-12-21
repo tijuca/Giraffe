@@ -1,7 +1,5 @@
 debian/Add-include-for-database-configuration.patch
 debian/Run-deamons-as-user-group-kopano.patch
-Use-proper-python-pkg-config.patch
 Use-install-layout-deb.patch
 Use-python3-everywhere.patch
 apparmor-Be-less-strict-on-the-Python-binary.patch
-Python3-fixes.patch
