@@ -1,3 +1,27 @@
+kopanocore (8.6.91-1) unstable; urgency=medium
+
+  * [07e91b4] New upstream version 8.6.91
+  * [d304356] rebuild patch queue from patch-queue branch
+    removed patches (applied upstream):
+    Python3-fixes.patch
+    Use-proper-python-pkg-config.patch
+  * [db3d5f0] kopano-libs.symbols: update symbols to 8.6.91
+  * [30338ed] autopkgtest: adding kopano-utils to test target
+    The kopano-utils package need to be added as an explicit dependency
+    for the test target, otherwise the output of kopano-cli can't get tested.
+  * [c2a39b1] d/kopano-server: remove /v/lib/k/attachments on purging
+  * [a8cfa34] d/kopano-common: remove /v/log/kopano on purging
+  * [b52d45d] kopano-server: use logrotate config from upstream
+    We can drop the logrotate script we've added long ago by our self.
+  * [e8929c2] d/rules: normalize sed call
+    Without that we can't substitute the PHP version in the php-mapi.postrm
+    script within the build.
+  * [c803d6d] php-mapi: add a postrm script
+    Adding a postrm script which will disable all possible enabled module
+    usage of the provided mapi module if the package get purged.
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sun, 23 Dec 2018 20:01:31 +0100
+
 kopanocore (8.6.90-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
