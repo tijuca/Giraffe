@@ -1,0 +1,17 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Thu, 27 Dec 2018 19:37:38 +0100
+Subject: tmpfiles.conf: don't add /var/run/kopano
+
+/var/run is a symlink to /run and the tmpfile configuration did also
+have a entry for /run, so /var/run is useless if added too.
+---
+ installer/linux/kopano-tmpfiles.conf | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/installer/linux/kopano-tmpfiles.conf b/installer/linux/kopano-tmpfiles.conf
+index 8fbda22..6dd5c4b 100644
+--- a/installer/linux/kopano-tmpfiles.conf
++++ b/installer/linux/kopano-tmpfiles.conf
+@@ -1,2 +1 @@
+ d /run/kopano 0775 kopano kopano
+-d /var/run/kopano 0775 kopano kopano

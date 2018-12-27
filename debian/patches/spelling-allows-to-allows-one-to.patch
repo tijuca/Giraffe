@@ -1,0 +1,21 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sun, 30 Dec 2018 15:24:11 +0100
+Subject: spelling: allows to -> allows one to
+
+---
+ doc/kopano-storeadm.8 | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/kopano-storeadm.8 b/doc/kopano-storeadm.8
+index 8602be9..c942660 100644
+--- a/doc/kopano-storeadm.8
++++ b/doc/kopano-storeadm.8
+@@ -10,7 +10,7 @@ kopano\-storeadm \(em store management utility
+ .SH Description
+ .PP
+ This tool is used to manage message stores on the Kopano server. Specifically,
+-it allows to create, delete, attach, detach such stores. The storage server
++it allows one to create, delete, attach, detach such stores. The storage server
+ must be running for kopano-storeadm to work.
+ .SH Options
+ .TP

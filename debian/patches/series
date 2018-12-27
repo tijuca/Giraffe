@@ -3,3 +3,7 @@ debian/Run-deamons-as-user-group-kopano.patch
 Use-install-layout-deb.patch
 Use-python3-everywhere.patch
 apparmor-Be-less-strict-on-the-Python-binary.patch
+debian/tmpfiles.conf-don-t-add-var-run-kopano.patch
+spelling-fix-seperated-separated.patch
+spelling-accomodate-accommodate.patch
+spelling-allows-to-allows-one-to.patch

@@ -1,0 +1,21 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sun, 30 Dec 2018 15:21:05 +0100
+Subject: spelling: fix seperated -> separated
+
+---
+ doc/kopano-backup.cfg.5 | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/kopano-backup.cfg.5 b/doc/kopano-backup.cfg.5
+index 21913a8..7926cbf 100644
+--- a/doc/kopano-backup.cfg.5
++++ b/doc/kopano-backup.cfg.5
+@@ -138,7 +138,7 @@ Default: 1
+ .PP
+ \fBbackup_servers\fR
+ .RS 4
+-Only servers in this list will be processed by the backup tool. Servernames are SPACE seperated. Default is empty which will process all servers.
++Only servers in this list will be processed by the backup tool. Servernames are SPACE separated. Default is empty which will process all servers.
+ .sp
+ Default: value not set
+ .RE
