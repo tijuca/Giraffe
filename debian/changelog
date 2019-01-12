@@ -1,3 +1,31 @@
+kopanocore (8.6.92-1) unstable; urgency=medium
+
+  * [7a44c71] New upstream version 8.6.92
+  * [37acb2d] rebuild patch queue from patch-queue branch
+    added patches:
+    tmpfiles.conf-don-t-add-var-run-kopano.patch
+    spelling-accomodate-accommodate.patch
+    spelling-allows-to-allows-one-to.patch
+    spelling-fix-seperated-separated.patch
+  * [d9c07f8] kopano-libs.symbols: update symbols to 8.6.92
+  * [5571111] d/control: increase Standards-Version to 4.3.0
+    No further changes needed.
+  * [0a40554] d/control: increase to debhelper version 12 in B-D
+    As now debhelper is now available with version 12 adjust the Build-Depends.
+  * [4d6066b] apparmor kopano-search: sorting entries, add more rules
+    Sort the entries so they are better sorted alphabetical and entries are
+    in the some order of existing folders within the file system root folder.
+    Also adding more obvious rules after some analysis of dmesg lines which
+    did hold denied access messages.
+  * [ff84436] kopano-common: turn package into Architecture: all
+    This package does not have any Architecture specific files and can be
+    shipped as Architecture independent package.
+  * [1824d58] autopkgtest: use kopano-storeadm for creating the store
+    Small adjustment within the autopkgtest smoke script to use the "correct"
+    command for the creation of the user store.
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sat, 12 Jan 2019 10:26:04 +0100
+
 kopanocore (8.6.91-1) unstable; urgency=medium
 
   * [07e91b4] New upstream version 8.6.91
