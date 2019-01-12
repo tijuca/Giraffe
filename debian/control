@@ -119,7 +119,7 @@ Description: Complete and feature rich groupware solution - backup
  This package provides the backup facilities.
 
 Package: kopano-common
-Architecture: any
+Architecture: all
 Depends:
  ${misc:Depends},
  adduser,
@@ -168,7 +168,7 @@ Depends:
  ${misc:Depends},
  ${python3:Depends},
  ${shlibs:Depends},
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
  php-mapi (= ${binary:Version}),
  php-cli,
@@ -188,7 +188,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
 Description: Complete and feature rich groupware solution - POP3 and IMAP gateway
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -204,7 +204,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
 Description: Complete and feature rich groupware solution - CalDAV and CalDAV gateway
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -235,7 +235,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
  php-mapi (= ${binary:Version}),
  php-cli,
@@ -302,7 +302,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  dbconfig-common,
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
  mariadb-client | default-mysql-client | virtual-mysql-client,
 Recommends: mariadb-server | default-mysql-server
@@ -336,7 +336,7 @@ Depends:
  ${misc:Depends},
  ${python3:Depends},
  ${shlibs:Depends},
- kopano-common (= ${binary:Version}),
+ kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
  python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - email spooler
