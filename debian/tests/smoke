@@ -67,7 +67,7 @@ echo
 
 echo "#######################################################################"
 echo "# Check that we can create a store for the user...                    #"
-kopano-admin --create-store testadmin
+kopano-storeadm -h default: -Cn testadmin
 echo "# Check that we can create a store for the user... done.              #"
 echo "#######################################################################"
 echo
