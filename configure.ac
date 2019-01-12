@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([kopano], [8.6.91], [development@kopano.io])
+AC_INIT([kopano], [8.6.92], [development@kopano.io])
 
 dnl ABI tags are used to prevent inadvertent mixing of wildly different
 dnl versions of KC components without knowing it.
@@ -222,9 +222,7 @@ AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
 			NCURSES_LIBS="-lncurses -ltinfo"
 		]
 	)
-	dnl We should be using ncurses.h - or is portability to non-ncurses
-	dnl that important?
-	AC_CHECK_HEADERS([curses.h])
+	AC_CHECK_HEADERS([ncurses.h])
 	LIBS="$LIBS_system"
 	CFLAGS="$CFLAGS_system"
 	CXXFLAGS="$CXXFLAGS_system"
@@ -388,7 +386,9 @@ CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
 AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
 CPPFLAGS="$CPPFLAGS_system"
 PKG_CHECK_MODULES([VMIME], [vmime >= 0.9.2])
-PKG_CHECK_MODULES([jsoncpp], [jsoncpp >= 1.4.0])
+PKG_CHECK_MODULES([jsoncpp], [jsoncpp >= 1.4.0], [], [
+	PKG_CHECK_MODULES([jsoncpp], [jsoncpp >= 0.8 jsoncpp < 1])
+])
 
 
 #
