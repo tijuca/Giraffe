@@ -31,6 +31,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --prefix=/usr \
     --localstatedir=/var \
     --sysconfdir=/etc \
+	--with-systemunitdir=/usr/lib/systemd/system \
     --mandir=\$${prefix}/share/man \
     --infodir=\$${prefix}/share/info \
     --with-php-config=/usr/bin/php-config \
