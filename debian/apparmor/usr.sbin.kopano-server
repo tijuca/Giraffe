@@ -14,6 +14,8 @@
 
   network tcp,
 
+  signal (send) set=("term") peer=unconfined,
+
   /etc/kopano/debian-db.cfg r,
   /etc/kopano/ldap.cfg r,
   /etc/kopano/ldap.openldap.cfg r,
