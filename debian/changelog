@@ -1,3 +1,14 @@
+kopanocore (8.7.0-2) unstable; urgency=medium
+
+  * [546e3ba] apparmor: kopano-server: allowing signaling
+  * [8684c6e] apparmor: fix profile for kopano-search
+    (Closes: #922313)
+  * [c86f098] d/rules: expand dh_clean so we can build multiple times
+    (Closes: #913750)
+  * [bc20a0c] kopano-libs.symbols: update symbols to 8.7.0(-2)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Tue, 19 Feb 2019 18:59:07 +0100
+
 kopanocore (8.7.0-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
