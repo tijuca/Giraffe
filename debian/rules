@@ -59,6 +59,8 @@ override_dh_auto_configure: $(PREPROCESS_FILES:.in=)
 	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_ARGS)
 
 override_dh_auto_clean:
+	rm -rf $(DEB_BUILD_DIR)
+	rm -f revision
 	[ ! -f Makefile ] || dh_auto_clean
 
 override_dh_install:
