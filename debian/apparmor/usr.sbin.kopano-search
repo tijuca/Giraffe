@@ -34,7 +34,7 @@
   /etc/mapi/ r,
   /etc/mapi/kopano.inf r,
   /etc/mapi/zcontacts.inf r,
-  /etc/ssl/openssl.cnf r
+  /etc/ssl/openssl.cnf r,
 
   /lib/@{multiarch}/ld-*.so mr,
 
