@@ -1,4 +1,4 @@
-# Last Modified: Sat, 29 Dec 2018 20:47:00 +0100
+# Last Modified: Sat, 20 Apr 2019 07:55:00 +0200
 #include <tunables/global>
 
 /usr/sbin/kopano-search flags=(attach_disconnected) {
@@ -21,8 +21,8 @@
 
   deny /usr/lib/python{3,2.?}/dist-packages/kopano_search/*.pyc w,
 
-  /bin/dash Pix,
-  /bin/rm Pix,
+  {,/usr}/bin/dash Pix,
+  {,/usr}/bin/rm Pix,
 
   # FIXME: it would be nice if search would use search- like pa
   /dev/shm/* rwl,
@@ -38,7 +38,7 @@
 
   /lib/@{multiarch}/ld-*.so mr,
 
-  /sbin/ldconfig Pix,
+  {,/usr}/sbin/ldconfig Pix,
 
   /run/kopano/search.pid rw,
   /run/kopano/search.pid.lock lrw,
