@@ -1,3 +1,17 @@
+kopanocore (8.7.0-3) unstable; urgency=medium
+
+  [ Julian Andres Klode ]
+  * [0a74ec0] kopano-search apparmor profile: Account for usrmerge
+    Adjust the AA profile for kopano-search so it does also work on systems
+    with a merged /usr folder.
+    (Closes: #927215)
+
+  [ Carsten Schoenert ]
+  * [bf56cb6] d/control: switch Simon as Uploader with Mark
+  * [8acc590] kopano-libs.symbols: update symbols to 8.7.0(-3)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Thu, 25 Apr 2019 08:51:01 +0200
+
 kopanocore (8.7.0-2) unstable; urgency=medium
 
   * [546e3ba] apparmor: kopano-server: allowing signaling
