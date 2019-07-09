@@ -21,7 +21,7 @@ SERVER=/usr/sbin/kopano-server
 DESC="Kopano server"
 NAME=`basename $SERVER`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/$NAME.pid
+PIDFILE=/var/run/kopano/server.pid
 
 test -x $SERVER || exit 0
 

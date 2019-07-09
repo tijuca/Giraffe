@@ -19,7 +19,7 @@ SPOOLER=/usr/sbin/kopano-spooler
 DESC="Kopano spooler"
 NAME=`basename $SPOOLER`
 #QUIETDAEMONDAEMON=--quiet
-PIDFILE=/var/run/kopano-spooler.pid
+PIDFILE=/var/run/kopano/spooler.pid
 
 test -x $SPOOLER || exit 0
 

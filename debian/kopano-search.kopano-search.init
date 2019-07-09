@@ -18,7 +18,7 @@ SEARCH=/usr/sbin/kopano-search
 DESC="Kopano search"
 NAME=`basename $SEARCH`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/$NAME.pid
+PIDFILE=/var/run/kopano/search.pid
 
 test -x $SEARCH || exit 0
 

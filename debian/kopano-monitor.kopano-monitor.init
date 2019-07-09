@@ -18,7 +18,7 @@ MONITOR=/usr/sbin/kopano-monitor
 DESC="Kopano monitor"
 NAME=`basename $MONITOR`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/kopano-monitor.pid
+PIDFILE=/var/run/kopano/monitor.pid
 
 test -x $MONITOR || exit 0
 

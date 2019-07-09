@@ -17,7 +17,7 @@ SPAMD=/usr/sbin/kopano-spamd
 DESC="Kopano spamd gateway"
 NAME=`basename $SPAMD`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/kopano-spamd.pid
+PIDFILE=/var/run/kopano/spamd.pid
 
 test -x $SPAMD || exit 0
 

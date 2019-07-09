@@ -18,7 +18,7 @@ GATEWAY=/usr/sbin/kopano-gateway
 DESC="Kopano gateway"
 NAME=`basename $GATEWAY`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/kopano-gateway.pid
+PIDFILE=/var/run/kopano/gateway.pid
 
 test -x $GATEWAY || exit 0
 

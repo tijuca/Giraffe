@@ -18,7 +18,7 @@ ICAL=/usr/sbin/kopano-ical
 DESC="Kopano ical gateway"
 NAME=`basename $ICAL`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/kopano-ical.pid
+PIDFILE=/var/run/kopano/ical.pid
 
 test -x $ICAL || exit 0
 

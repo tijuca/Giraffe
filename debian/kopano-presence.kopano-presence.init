@@ -19,7 +19,7 @@ PRESENCE=/usr/sbin/kopano-presence
 DESC="kopano presence daemon"
 NAME=`basename $PRESENCE`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/$NAME.pid
+PIDFILE=/var/run/kopano/presence.pid
 
 test -x $PRESENCE || exit 0
 

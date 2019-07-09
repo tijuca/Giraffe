@@ -19,7 +19,7 @@ DAGENT=/usr/sbin/kopano-dagent
 DESC="kopano LMTP dagent"
 NAME=`basename $DAGENT`
 #QUIETDAEMON=--quiet
-PIDFILE=/var/run/$NAME.pid
+PIDFILE=/var/run/kopano/dagent.pid
 
 test -x $DAGENT || exit 0
 
