@@ -47,14 +47,14 @@ case "$1" in
         log_begin_msg "Starting $DESC: $NAME"
         export LC_ALL=$KOPANO_LOCALE
         export LANG=$KOPANO_LOCALE
-        start-stop-daemon --start $QUIETDAEMON --pidfile $PIDFILE --exec /usr/bin/python $SEARCH -- $SEARCH_OPTS
+        start-stop-daemon --start $QUIETDAEMON --pidfile $PIDFILE --exec /usr/bin/python3 $SEARCH -- $SEARCH_OPTS
         log_end_msg $?
         unset LC_ALL LANG
     ;;
 
     stop)
         log_begin_msg "Stopping $DESC: $NAME"
-        start-stop-daemon --stop $QUIETDAEMON --pidfile $PIDFILE --retry TERM/15/KILL --exec /usr/bin/python $SEARCH
+        start-stop-daemon --stop $QUIETDAEMON --pidfile $PIDFILE --retry TERM/15/KILL --exec /usr/bin/python3 $SEARCH
         RETVAL=$?
         rm -f $PIDFILE
         log_end_msg $RETVAL
@@ -71,7 +71,7 @@ case "$1" in
    
     reload|force-reload)
         log_begin_msg "Reloading $DESC: $NAME"
-        start-stop-daemon --stop $QUIETDAEMON --signal HUP --pidfile $PIDFILE --exec /usr/bin/python $SEARCH
+        start-stop-daemon --stop $QUIETDAEMON --signal HUP --pidfile $PIDFILE --exec /usr/bin/python3 $SEARCH
         log_end_msg $?
     ;;
 
