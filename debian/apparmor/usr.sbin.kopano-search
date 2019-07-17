@@ -21,8 +21,8 @@
 
   deny /usr/lib/python{3,2.?}/dist-packages/kopano_search/*.pyc w,
 
-  {,/usr}/bin/dash Pix,
-  {,/usr}/bin/rm Pix,
+  /{,usr/}bin/dash Pix,
+  /{,usr/}bin/rm Pix,
 
   # FIXME: it would be nice if search would use search- like pa
   /dev/shm/* rwl,
@@ -38,7 +38,7 @@
 
   /lib/@{multiarch}/ld-*.so mr,
 
-  {,/usr}/sbin/ldconfig Pix,
+  /{,usr/}sbin/ldconfig Pix,
 
   /run/kopano/search.pid rw,
   /run/kopano/search.pid.lock lrw,
