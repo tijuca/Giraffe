@@ -37,6 +37,7 @@
   /var/log/kopano/server.log rw,
 
   /etc/kopano/userscripts/* Cxr -> kopano_userscripts,
+  /usr/lib/kopano/userscripts/* Cxr -> kopano_userscripts,
 
   # New features in 8.5.2 need this, and read-only on those is safe
   @{PROC}/sys/kernel/core_pattern r,
