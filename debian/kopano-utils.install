@@ -20,6 +20,7 @@ usr/sbin/kopano-localize-folders
 usr/sbin/kopano-mailbox-permissions
 usr/sbin/kopano-migration-pst
 usr/sbin/kopano-recreate-systemfolders
+usr/sbin/kopano-rules
 #usr/sbin/kopano-search-upgrade-findroots.py
 usr/sbin/kopano-srvadm
 usr/sbin/kopano-storeadm
