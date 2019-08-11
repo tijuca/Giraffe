@@ -1,3 +1,4 @@
+etc/kopano/admin.cfg
 etc/kopano/ldap.cfg
 etc/kopano/server.cfg
 etc/kopano/unix.cfg
