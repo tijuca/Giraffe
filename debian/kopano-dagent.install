@@ -1,3 +1,4 @@
+etc/kopano/autorespond
 etc/kopano/autorespond.cfg
 etc/kopano/dagent.cfg
 #usr/lib/systemd/system/kopano-dagent.service  lib/systemd/system/
