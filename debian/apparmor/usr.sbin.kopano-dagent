@@ -1,3 +1,4 @@
+# Last Modified: Sun, 12 Aug 2019 14:45:00 +0200
 #include <tunables/global>
 
 /usr/sbin/kopano-dagent flags=(attach_disconnected) {
@@ -19,6 +20,7 @@
   /etc/gss/mech.d/ r,
   /etc/gss/mech.d/*.conf r,
   /etc/kopano/dagent.cfg r,
+  /etc/ssl/openssl.cnf r,
 
   /usr/sbin/kopano-dagent r,
 
