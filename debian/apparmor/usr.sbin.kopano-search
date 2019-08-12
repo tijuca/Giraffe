@@ -1,4 +1,4 @@
-# Last Modified: Sat, 20 Apr 2019 07:55:00 +0200
+# Last Modified: Sun, 11 Aug 2019 22:53:00 +0200
 #include <tunables/global>
 
 /usr/sbin/kopano-search flags=(attach_disconnected) {
@@ -23,6 +23,8 @@
 
   /{,usr/}bin/dash Pix,
   /{,usr/}bin/rm Pix,
+  /{,usr/}bin/iconv Cxr -> kopano_search_workers,
+  /{,usr/}bin/pdftotext Cxr -> kopano_search_workers,
 
   # FIXME: it would be nice if search would use search- like pa
   /dev/shm/* rwl,
@@ -34,6 +36,7 @@
   /etc/mapi/ r,
   /etc/mapi/kopano.inf r,
   /etc/mapi/zcontacts.inf r,
+  /etc/mime.types r,
   /etc/ssl/openssl.cnf r,
 
   /lib/@{multiarch}/ld-*.so mr,
@@ -50,4 +53,13 @@
 
   /var/lib/kopano/search/** rwlk,
   /var/log/kopano/search.log rw,
+
+  # Only allow file access to invoked programs
+  # TODO: restrict further
+  profile kopano_search_workers flags=(attach_disconnected) {
+    file,
+  }
+
+  # Site-specific additions and overrides. See local/README for details.
+  #include <local/usr.sbin.kopano-search>
 }
