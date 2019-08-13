@@ -1,0 +1,6 @@
+# These folders are empty, there is no content installed into.
+# And that is correct as these folders are for scripts added by the user.
+kopano-server: package-contains-empty-directory usr/lib/kopano/userscripts/creategroup.d/
+kopano-server: package-contains-empty-directory usr/lib/kopano/userscripts/deletecompany.d/
+kopano-server: package-contains-empty-directory usr/lib/kopano/userscripts/deletegroup.d/
+kopano-server: package-contains-empty-directory usr/lib/kopano/userscripts/deleteuser.d/
