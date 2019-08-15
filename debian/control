@@ -170,8 +170,6 @@ Depends:
  ${shlibs:Depends},
  kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
- php-mapi (= ${binary:Version}),
- php-cli,
  python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - delivery agent
  The Kopano Collaboration Platform (KCP) is a complete, stable and
@@ -237,8 +235,6 @@ Depends:
  ${shlibs:Depends},
  kopano-common (= ${source:Version}),
  lsb-base (>= 3.0-6),
- php-mapi (= ${binary:Version}),
- php-cli,
  python3-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - quota monitor
  The Kopano Collaboration Platform (KCP) is a complete, stable and
