@@ -1,0 +1,40 @@
+From: Roel van Meer <roel@1afa.com>
+Date: Thu, 17 Oct 2019 21:30:59 +0200
+Subject: Decrease ICS processing batch size
+
+This fixes the following Z-push error:
+
+   StatusException: ExportChangesICS->InitializeExporter():
+       Error, mapi_exportchanges_config() failed: 0xFFFFFFFF8004010F
+       - code: 12
+       - file: /usr/share/z-push/backend/kopano/exporter.php:230
+
+when running kopanocore with Mariadb 10.3.
+
+Closes: #939751
+---
+ provider/libserver/ECICS.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/provider/libserver/ECICS.cpp b/provider/libserver/ECICS.cpp
+index 2292202..7d973c5 100644
+--- a/provider/libserver/ECICS.cpp
++++ b/provider/libserver/ECICS.cpp
+@@ -490,7 +490,7 @@ static ECRESULT getchanges_contents(struct soap *soap, ECSession *lpSession, ECD
+ 	std::vector<DB_ROW> db_rows;
+ 	std::vector<DB_LENGTHS> db_lengths;
+ 	static constexpr unsigned int ncols = 7;
+-	unsigned long col_lengths[1000*ncols];
++	unsigned long col_lengths[500*ncols];
+ 	unsigned int length_counter = 0;
+ 
+ 	while (lpDBResult && (lpDBRow = lpDBResult.fetch_row()) != nullptr) {
+@@ -506,7 +506,7 @@ static ECRESULT getchanges_contents(struct soap *soap, ECSession *lpSession, ECD
+ 		}
+ 		db_rows.emplace_back(lpDBRow);
+ 		db_lengths.emplace_back(lpDBLen);
+-		if (db_rows.size() == 1000) {
++		if (db_rows.size() == 500) {
+ 			er = lpHelper->ProcessRows(db_rows, db_lengths);
+ 			if (er != erSuccess)
+ 				return er;

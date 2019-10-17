@@ -7,3 +7,6 @@ debian/tmpfiles.conf-don-t-add-var-run-kopano.patch
 spelling-fix-seperated-separated.patch
 spelling-accomodate-accommodate.patch
 spelling-allows-to-allows-one-to.patch
+server-check-for-NULL-SSL-context-before-calling-soap_ssl.patch
+server-cure-use-after-free-crash-on-shutdown.patch
+z-push/Decrease-ICS-processing-batch-size.patch

@@ -1,0 +1,50 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Mon, 16 Sep 2019 01:42:50 +0200
+Subject: server: cure use-after-free crash on shutdown
+
+==13416==ERROR: AddressSanitizer: heap-use-after-free on address 0x6040018f4ea0 at pc 0x7f77dc7f1d8b bp 0x7f77ccbc3af0 sp 0x7f77ccbc3ae8
+READ of size 8 at 0x6040018f4ea0 thread T22 (net/idle)
+    f0 0x7f77dc7f1d8a in std::__shared_ptr<KC::ECDatabase, (__gnu_cxx::_Lock_policy)2>::get() const /usr/include/c++/9/bits/shared_ptr_base.h:1310
+    f1 0x7f77dc7f2a2f in std::__shared_ptr_access<KC::ECDatabase, (__gnu_cxx::_Lock_policy)2, false, false>::_M_get() const /usr/include/c++/9/bits/shared_ptr_base.h:1021
+    f2 0x7f77dc7f2013 in std::__shared_ptr_access<KC::ECDatabase, (__gnu_cxx::_Lock_policy)2, false, false>::operator->() const /usr/include/c++/9/bits/shared_ptr_base.h:1015
+    f3 0x7f77dc7f03e5 in KC::ECDatabaseFactory::S_thread_end(void*) provider/libserver/ECDatabaseFactory.cpp:49
+    f4 0x7f77dbe20160 in __nptl_deallocate_tsd /usr/src/debug/glibc-2.29-7.3.x86_64/nptl/pthread_create.c:301
+    f5 0x7f77dbe20fca in __nptl_deallocate_tsd /usr/src/debug/glibc-2.29-7.3.x86_64/nptl/pthread_create.c:256
+    f6 0x7f77dbe20fca in start_thread /usr/src/debug/glibc-2.29-7.3.x86_64/nptl/pthread_create.c:497
+    f7 0x7f77dbb5373e in clone (/lib64/libc.so.6+0xfd73e)
+
+0x6040018f4ea0 is located 16 bytes inside of 40-byte region [0x6040018f4e90,0x6040018f4eb8)
+freed by thread T22 (net/idle) here:
+    f0 0x7f77dd2c9f07 in operator delete(void*) (/usr/lib64/libasan.so.5+0x10cf07)
+    f1 0x7f77dc7f5d8b in __gnu_cxx::new_allocator<std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true> >::deallocate(std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true>*, unsigned long) (/home/jengelh/work/kc/.libs/libkcserver.so.0+0x186d8b)
+    f2 0x7f77dc7f543a in std::allocator_traits<std::allocator<std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true> > >::deallocate(std::allocator<std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true> >&, std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true>*, unsigned long) /usr/include/c++/9/bits/alloc_traits.h:470
+    f3 0x7f77dc7f4eb0 in std::__detail::_Hashtable_alloc<std::allocator<std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true> > >::_M_deallocate_node_ptr(std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true>*) (/home/jengelh/work/kc/.libs/libkcserver.so.0+0x185eb0)
+    f4 0x7f77dc7f3f69 in std::__detail::_Hashtable_alloc<std::allocator<std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true> > >::_M_deallocate_node(std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true>*) (/home/jengelh/work/kc/.libs/libkcserver.so.0+0x184f69)
+    f5 0x7f77dc7f46b3 in std::_Hashtable<KC::ECDatabaseFactory::dfpair, KC::ECDatabaseFactory::dfpair, std::allocator<KC::ECDatabaseFactory::dfpair>, std::__detail::_Identity, std::equal_to<KC::ECDatabaseFactory::dfpair>, KC::ECDatabaseFactory::dfhash, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, true, true> >::_M_erase(unsigned long, std::__detail::_Hash_node_base*, std::__detail::_Hash_node<KC::ECDatabaseFactory::dfpair, true>*) (/home/jengelh/work/kc/.libs/libkcserver.so.0+0x1856b3)
+    f6 0x7f77dc7f358e in std::_Hashtable<KC::ECDatabaseFactory::dfpair, KC::ECDatabaseFactory::dfpair, std::allocator<KC::ECDatabaseFactory::dfpair>, std::__detail::_Identity, std::equal_to<KC::ECDatabaseFactory::dfpair>, KC::ECDatabaseFactory::dfhash, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, true, true> >::erase(std::__detail::_Node_const_iterator<KC::ECDatabaseFactory::dfpair, true, true>) (/home/jengelh/work/kc/.libs/libkcserver.so.0+0x18458e)
+    f7 0x7f77dc7f29c5 in std::_Hashtable<KC::ECDatabaseFactory::dfpair, KC::ECDatabaseFactory::dfpair, std::allocator<KC::ECDatabaseFactory::dfpair>, std::__detail::_Identity, std::equal_to<KC::ECDatabaseFactory::dfpair>, KC::ECDatabaseFactory::dfhash, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, true, true> >::erase(std::__detail::_Node_iterator<KC::ECDatabaseFactory::dfpair, true, true>) /usr/include/c++/9/bits/hashtable.h:768
+    f8 0x7f77dc7f1fc3 in std::unordered_set<KC::ECDatabaseFactory::dfpair, KC::ECDatabaseFactory::dfhash, std::equal_to<KC::ECDatabaseFactory::dfpair>, std::allocator<KC::ECDatabaseFactory::dfpair> >::erase(std::__detail::_Node_iterator<KC::ECDatabaseFactory::dfpair, true, true>) /usr/include/c++/9/bits/unordered_set.h:528
+    f9 0x7f77dc7f03d2 in KC::ECDatabaseFactory::S_thread_end(void*) provider/libserver/ECDatabaseFactory.cpp:48 [p->db->
+    f10 0x7f77dbe20160 in __nptl_deallocate_tsd /usr/src/debug/glibc-2.29-7.3.x86_64/nptl/pthread_create.c:301
+
+References: KC-1531
+---
+ provider/libserver/ECDatabaseFactory.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/provider/libserver/ECDatabaseFactory.cpp b/provider/libserver/ECDatabaseFactory.cpp
+index 6fc3f9d..acac6aa 100644
+--- a/provider/libserver/ECDatabaseFactory.cpp
++++ b/provider/libserver/ECDatabaseFactory.cpp
+@@ -45,8 +45,10 @@ void ECDatabaseFactory::S_thread_end(void *q)
+ 		ec_log_err("K-1249: abandoned dfpair/ECDatabase instance");
+ 		return;
+ 	}
++	/* .erase will drop the refcount on db, so pick it up first */
++	decltype(p->db) db(std::move(p->db));
+ 	fac->m_children.erase(i);
+-	p->db->ThreadEnd();
++	db->ThreadEnd();
+ }
+ 
+ void ECDatabaseFactory::destroy_database(ECDatabase *db)
