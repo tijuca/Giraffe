@@ -23,7 +23,7 @@ echo
 
 echo "#######################################################################"
 echo "# Installing MariaDB server package...                                #"
-apt-get -y install mariadb-server
+apt-get -y install mariadb-server || exit 77
 echo "# Installing MariaDB server package... done.                          #"
 echo "#######################################################################"
 echo

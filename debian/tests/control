@@ -2,6 +2,7 @@ Tests: smoke
 Depends: python3-nose
 Restrictions: allow-stderr,
  needs-root,
+ skippable,
 
 Tests: help
 Depends: kopano-backup,
