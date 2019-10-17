@@ -67,7 +67,7 @@ case "$1" in
     ;;
   
     status)
-        status_of_proc "$DAGENT" "$NAME" && exit 0 || exit $?
+        status_of_proc -p $PIDFILE "$DAGENT" "$NAME" && exit 0 || exit $?
     ;;
     
     reload|force-reload)
