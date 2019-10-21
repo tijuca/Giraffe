@@ -1,0 +1,66 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Wed, 13 Mar 2019 18:05:52 +0100
+Subject: common: the SSL proto list string is "TLSv1" not "TLSv1.0"
+
+Correct a misspelling that caused TLSv1.0 not to get disabled.
+
+References: KC-1439
+---
+ common/SSLUtil.h         | 2 +-
+ doc/kopano-gateway.cfg.5 | 2 +-
+ doc/kopano-ical.cfg.5    | 2 +-
+ doc/kopano-server.cfg.5  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/common/SSLUtil.h b/common/SSLUtil.h
+index 14bf947..0471f94 100644
+--- a/common/SSLUtil.h
++++ b/common/SSLUtil.h
+@@ -17,7 +17,7 @@ extern _kc_export void SSL_library_cleanup(void);
+ extern _kc_export void ssl_random_init(void);
+ extern _kc_export void ssl_random(bool b64bit, uint64_t *out);
+ 
+-#define KC_DEFAULT_SSLPROTOLIST "!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1"
++#define KC_DEFAULT_SSLPROTOLIST "!SSLv2 !SSLv3 !TLSv1 !TLSv1.1"
+ #define KC_DEFAULT_CIPHERLIST "DEFAULT:!LOW:!SSLv2:!SSLv3:!TLSv1.0:!TLSv1.1:!EXPORT:!DH:!PSK:!kRSA:!aDSS:!aNULL:+AES"
+ #ifdef NID_X25519
+ #	define KC_DEFAULT_ECDH_CURVES "X25519:P-521:P-384:P-256"
+diff --git a/doc/kopano-gateway.cfg.5 b/doc/kopano-gateway.cfg.5
+index ab434cb..8e0dbf2 100644
+--- a/doc/kopano-gateway.cfg.5
++++ b/doc/kopano-gateway.cfg.5
+@@ -252,7 +252,7 @@ depending on version, one or more of the following are available:
+ \fBSSLv2\fP. To disable a protocol, prefix the name with an
+ exclamation mark.
+ .PP
+-Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
++Default: \fI!SSLv2 !SSLv3 !TLSv1 !TLSv1.1\fP
+ .SS ssl_ciphers
+ .PP
+ A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
+diff --git a/doc/kopano-ical.cfg.5 b/doc/kopano-ical.cfg.5
+index 883aa10..e32175c 100644
+--- a/doc/kopano-ical.cfg.5
++++ b/doc/kopano-ical.cfg.5
+@@ -165,7 +165,7 @@ more of the following are available: \fBTLSv1.3\fP, \fBTLSv1.2\fP,
+ \fBTLSv1.1\fP, \fBSSLv3\fP, \fBSSLv2\fP. To disable a protocol, prefix the name
+ with an exclamation mark.
+ .PP
+-Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
++Default: \fI!SSLv2 !SSLv3 !TLSv1 !TLSv1.1\fP
+ .SS ssl_ciphers
+ .PP
+ A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
+diff --git a/doc/kopano-server.cfg.5 b/doc/kopano-server.cfg.5
+index 907eb85..e9329f1 100644
+--- a/doc/kopano-server.cfg.5
++++ b/doc/kopano-server.cfg.5
+@@ -451,7 +451,7 @@ more of the following are available: \fBTLSv1.3\fP, \fBTLSv1.2\fP,
+ \fBTLSv1.1\fP, \fBSSLv3\fP, \fBSSLv2\fP. To disable a protocol, prefix the name
+ with an exclamation mark.
+ .PP
+-Default: \fI!SSLv2 !SSLv3 !TLSv1.0 !TLSv1.1\fP
++Default: \fI!SSLv2 !SSLv3 !TLSv1 !TLSv1.1\fP
+ .SS server_ssl_ciphers
+ .PP
+ A colon-separated list of disabled or enabled SSL/TLS ciphers. Supported cipher
