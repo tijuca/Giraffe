@@ -12,3 +12,4 @@ server-cure-use-after-free-crash-on-shutdown.patch
 z-push/Decrease-ICS-processing-batch-size.patch
 common-the-SSL-proto-list-string-is-TLSv1-not-TLSv1.0.patch
 server-recognize-TLSv1.0-for-backward-compat.patch
+gateway-avoid-uncaught-exception-when-client-disconnects-.patch

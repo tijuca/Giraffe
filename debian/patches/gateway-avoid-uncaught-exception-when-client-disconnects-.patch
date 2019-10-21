@@ -1,0 +1,55 @@
+From: Roel van Meer <roel@1afa.com>
+Date: Mon, 21 Oct 2019 12:53:24 +0200
+Subject: gateway: avoid uncaught exception when client disconnects midway
+
+Upstream commit: https://stash.kopano.io/projects/KC/repos/kopanocore/commits/6f9f5d9532
+
+Upstream bug report: https://jira.kopano.io/browse/KC-1452
+---
+ gateway/IMAP.cpp | 13 ++++++++++++-
+ gateway/IMAP.h   |  1 +
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/gateway/IMAP.cpp b/gateway/IMAP.cpp
+index be6e544..7c5b194 100644
+--- a/gateway/IMAP.cpp
++++ b/gateway/IMAP.cpp
+@@ -2075,7 +2075,7 @@ std::string IMAP::PropsToFlags(LPSPropValue lpProps, unsigned int cValues, bool
+  *
+  * @return MAPI Error code
+  */
+-LONG IMAP::IdleAdviseCallback(void *lpContext, ULONG cNotif,
++int IMAP::IdleAdviseCallback2(void *lpContext, unsigned int cNotif,
+     LPNOTIFICATION lpNotif)
+ {
+ 	auto lpIMAP = static_cast<IMAP *>(lpContext);
+@@ -2168,6 +2168,17 @@ LONG IMAP::IdleAdviseCallback(void *lpContext, ULONG cNotif,
+ 	return S_OK;
+ }
+ 
++int IMAP::IdleAdviseCallback(void *ctx, unsigned int z, NOTIFICATION *nt)
++{
++	int ret = S_OK;
++	try {
++		ret = IdleAdviseCallback2(ctx, z, nt);
++	} catch (const KMAPIError &e) {
++		return e.code();
++	}
++	return ret;
++}
++
+ /**
+  * @brief Handles the IDLE command
+  *
+diff --git a/gateway/IMAP.h b/gateway/IMAP.h
+index 75bf58e..701ba81 100644
+--- a/gateway/IMAP.h
++++ b/gateway/IMAP.h
+@@ -185,6 +185,7 @@ private:
+ 	/* Tagged response with result OK, NO or BAD */
+ 	void HrResponse(const std::string &result, const std::string &tag, const std::string &resp);
+ 	static LONG IdleAdviseCallback(void *ctx, ULONG numnotif, LPNOTIFICATION);
++	static LONG IdleAdviseCallback2(void *ctx, unsigned int numnotif, NOTIFICATION *);
+ 
+ 	bool bOnlyMailFolders;
+ 	bool bShowPublicFolder;
