@@ -1,0 +1,56 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Wed, 20 Mar 2019 17:41:34 +0100
+Subject: m4lcommon: add new helper for loading large properties transparently
+
+References: KC-1443
+---
+ m4lcommon/CommonUtil.cpp              | 23 +++++++++++++++++++++++
+ m4lcommon/include/kopano/CommonUtil.h |  1 +
+ 2 files changed, 24 insertions(+)
+
+diff --git a/m4lcommon/CommonUtil.cpp b/m4lcommon/CommonUtil.cpp
+index 1176aa6..bef7298 100644
+--- a/m4lcommon/CommonUtil.cpp
++++ b/m4lcommon/CommonUtil.cpp
+@@ -1768,6 +1768,29 @@ HRESULT spv_postload_large_props(IMAPIProp *lpProp,
+ 	}
+ 	return had_err ? MAPI_W_ERRORS_RETURNED : hrSuccess;
+ }
++
++/**
++ * A HrGetOneProp-alike that loads large properties as needed.
++ */
++HRESULT HrGetFullProp(IMAPIProp *prop, unsigned int tag, SPropValue **pvout)
++{
++	SizedSPropTagArray(1, taglist) = {1, {tag}};
++	unsigned int nvals = 0;
++	memory_ptr<SPropValue> pv;
++	auto ret = prop->GetProps(taglist, 0, &nvals, &~pv);
++	if (FAILED(ret))
++		return ret;
++	if (nvals == 0)
++		return MAPI_E_NOT_FOUND;
++	nvals = 1; /* caller only expects one anyway, don't postload more */
++	ret = spv_postload_large_props(prop, taglist, nvals, pv);
++	if (FAILED(ret))
++		return ret;
++	if (PROP_TYPE(pv->ulPropTag) == PT_ERROR)
++		return pv->Value.err;
++	*pvout = pv.release();
++	return ret;
++}
+ 	
+ /**
+  * Gets all properties for passed object
+diff --git a/m4lcommon/include/kopano/CommonUtil.h b/m4lcommon/include/kopano/CommonUtil.h
+index 615283a..972adac 100644
+--- a/m4lcommon/include/kopano/CommonUtil.h
++++ b/m4lcommon/include/kopano/CommonUtil.h
+@@ -56,6 +56,7 @@ extern _kc_export HRESULT GetClientVersion(unsigned int *);
+ extern _kc_export HRESULT OpenSubFolder(LPMDB, const wchar_t *folder, wchar_t psep, bool is_public, bool create_folder, LPMAPIFOLDER *subfolder);
+ extern _kc_export HRESULT spv_postload_large_props(IMAPIProp *, const SPropTagArray *, unsigned int, SPropValue *);
+ extern _kc_export HRESULT HrOpenDefaultCalendar(LPMDB, LPMAPIFOLDER *default_folder);
++extern _kc_export HRESULT HrGetFullProp(IMAPIProp *prop, unsigned int tag, SPropValue **);
+ extern _kc_export HRESULT HrGetAllProps(IMAPIProp *prop, ULONG flags, ULONG *nvals, LPSPropValue *props);
+ extern _kc_export HRESULT UnWrapStoreEntryID(ULONG eid_size, const ENTRYID *eid, ULONG *ret_size, ENTRYID **ret);
+ extern _kc_export HRESULT GetECObject(IMAPIProp *, const IID &, void **);

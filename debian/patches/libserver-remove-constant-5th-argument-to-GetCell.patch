@@ -1,0 +1,113 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Wed, 6 Mar 2019 22:30:02 +0100
+Subject: libserver: remove constant 5th argument to GetCell
+
+---
+ provider/libserver/ECCacheManager.cpp     | 7 +++----
+ provider/libserver/ECCacheManager.h       | 2 +-
+ provider/libserver/ECSessionManager.cpp   | 2 +-
+ provider/libserver/ECStoreObjectTable.cpp | 2 +-
+ provider/libserver/StreamUtil.cpp         | 2 +-
+ provider/libserver/cmd.cpp                | 4 ++--
+ 6 files changed, 9 insertions(+), 10 deletions(-)
+
+diff --git a/provider/libserver/ECCacheManager.cpp b/provider/libserver/ECCacheManager.cpp
+index e7f504a..bd905b9 100644
+--- a/provider/libserver/ECCacheManager.cpp
++++ b/provider/libserver/ECCacheManager.cpp
+@@ -1193,7 +1193,7 @@ ECRESULT ECCacheManager::GetObjectFlags(unsigned int ulObjId, unsigned int *ulFl
+ 
+ ECRESULT ECCacheManager::GetCell(const sObjectTableKey *lpsRowItem,
+     unsigned int ulPropTag, struct propVal *lpDest, struct soap *soap,
+-    bool bComputed, bool truncate)
++    bool truncate)
+ {
+     ECRESULT er = erSuccess;
+     ECsCells *sCell;
+@@ -1209,10 +1209,9 @@ ECRESULT ECCacheManager::GetCell(const sObjectTableKey *lpsRowItem,
+ 	    goto exit;
+ 
+     if (!sCell->GetPropVal(ulPropTag, lpDest, soap, truncate)) {
+-        if(!sCell->GetComplete() || bComputed) {
++		if (!sCell->GetComplete()) {
+             // Object is not complete, and item is not in cache. We simply don't know anything about
+-            // the item, so return NOT_FOUND. Or, the item is complete but the requested property is computed, and therefore
+-            // not in the cache.
++			// the item, so return NOT_FOUND.
+ 			m_CellCache.DecrementValidCount();
+             er = KCERR_NOT_FOUND;
+         } else {
+diff --git a/provider/libserver/ECCacheManager.h b/provider/libserver/ECCacheManager.h
+index bba5223..5a3f9ba 100644
+--- a/provider/libserver/ECCacheManager.h
++++ b/provider/libserver/ECCacheManager.h
+@@ -278,7 +278,7 @@ public:
+ 	ECRESULT GetEntryListFromObjectList(ECListInt* lplObjectList, struct soap *soap, struct entryList **lppEntryList);
+ 
+ 	// Table data functions (pure cache functions, they will never access the DB themselves. Data must be provided through Set functions)
+-	ECRESULT GetCell(const sObjectTableKey *, unsigned int tag, struct propVal *, struct soap *, bool computed, bool truncated = true);
++	ECRESULT GetCell(const sObjectTableKey *, unsigned int tag, struct propVal *, struct soap *, bool truncated = true);
+ 	ECRESULT SetCell(const sObjectTableKey *, unsigned int tag, const struct propVal *);
+ 	ECRESULT UpdateCell(unsigned int ulObjId, unsigned int ulPropTag, int lDelta);
+ 	ECRESULT UpdateCell(unsigned int ulObjId, unsigned int ulPropTag, unsigned int ulMask, unsigned int ulValue);
+diff --git a/provider/libserver/ECSessionManager.cpp b/provider/libserver/ECSessionManager.cpp
+index e7ae096..4bb224a 100644
+--- a/provider/libserver/ECSessionManager.cpp
++++ b/provider/libserver/ECSessionManager.cpp
+@@ -1194,7 +1194,7 @@ ECRESULT ECSessionManager::GetStoreSortLCID(ULONG ulStoreId, ULONG *lpLcid)
+ 	auto cache = GetCacheManager();
+ 	sObjectTableKey key(ulStoreId, 0);
+ 	struct propVal prop;
+-	if (cache->GetCell(&key, PR_SORT_LOCALE_ID, &prop, nullptr, false) == erSuccess) {
++	if (cache->GetCell(&key, PR_SORT_LOCALE_ID, &prop, nullptr) == erSuccess) {
+ 		if (prop.ulPropTag == CHANGE_PROP_TYPE(PR_SORT_LOCALE_ID, PT_ERROR))
+ 			return prop.Value.ul;
+ 		*lpLcid = prop.Value.ul;
+diff --git a/provider/libserver/ECStoreObjectTable.cpp b/provider/libserver/ECStoreObjectTable.cpp
+index 1d4d05b..e61a611 100644
+--- a/provider/libserver/ECStoreObjectTable.cpp
++++ b/provider/libserver/ECStoreObjectTable.cpp
+@@ -364,7 +364,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
+ 			}
+     	    // FIXME bComputed always false
+     	    // FIXME optimisation possible to GetCell: much more efficient to get all cells in one row at once
+-			if (cache->GetCell(&row, ulPropTag, &lpsRowSet->__ptr[i].__ptr[k], soap, false) == erSuccess &&
++			if (cache->GetCell(&row, ulPropTag, &lpsRowSet->__ptr[i].__ptr[k], soap) == erSuccess &&
+ 			    PROP_TYPE(lpsRowSet->__ptr[i].__ptr[k].ulPropTag) != PT_NULL) {
+ 				setCellDone.emplace(i, k);
+ 	            continue;
+diff --git a/provider/libserver/StreamUtil.cpp b/provider/libserver/StreamUtil.cpp
+index d796856..e4d2375 100644
+--- a/provider/libserver/StreamUtil.cpp
++++ b/provider/libserver/StreamUtil.cpp
+@@ -1668,7 +1668,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
+ 			if(er != erSuccess)
+ 				goto exit;
+ 			// Update cache if it's actually in the cache
+-			if (gcache->GetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach, nullptr, false) == erSuccess) {
++			if (gcache->GetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach, nullptr) == erSuccess) {
+ 				sPropHasAttach.Value.ul &= ~MSGFLAG_HASATTACH;
+ 				sPropHasAttach.Value.ul |= fHasAttach ? MSGFLAG_HASATTACH : 0;
+ 				gcache->SetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach);
+diff --git a/provider/libserver/cmd.cpp b/provider/libserver/cmd.cpp
+index 20a7298..d3e2b3f 100644
+--- a/provider/libserver/cmd.cpp
++++ b/provider/libserver/cmd.cpp
+@@ -2251,7 +2251,7 @@ static unsigned int SaveObject(struct soap *soap, ECSession *lpecSession,
+ 				return er;
+ 
+ 			// Update cache if it's actually in the cache
+-			if (g_lpSessionManager->GetCacheManager()->GetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach, soap, false) == erSuccess) {
++			if (g_lpSessionManager->GetCacheManager()->GetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach, soap) == erSuccess) {
+ 				sPropHasAttach.Value.ul &= ~MSGFLAG_HASATTACH;
+ 				sPropHasAttach.Value.ul |= fHasAttach ? MSGFLAG_HASATTACH : 0;
+ 				g_lpSessionManager->GetCacheManager()->SetCell(&key, PR_MESSAGE_FLAGS, &sPropHasAttach);
+@@ -2670,7 +2670,7 @@ static ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession,
+ 		for (auto proptag : proptags) {
+ 			sObjectTableKey key(ulObjId, 0);
+ 			struct propVal prop;
+-			er = cache->GetCell(&key, proptag, &prop, soap, false, false);
++			er = cache->GetCell(&key, proptag, &prop, soap, false);
+ 			if (er != erSuccess)
+ 				return er;
+ 			if (PROP_TYPE(prop.ulPropTag) == PT_ERROR)

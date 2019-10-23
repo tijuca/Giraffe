@@ -1,0 +1,61 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Wed, 6 Mar 2019 22:50:05 +0100
+Subject: libserver: only return PT_NULL cacheentry info when so requested
+
+Loading a "large" property causes a PT_NULL pseudo entry to be placed
+into the cache, indicating that the proptag exists, but is willfully
+uncached. Some callers of GetCell however did not anticipate an
+erSuccess return code with PT_NULL data, and would rather want to see
+the KCERR_NOT_FOUND return code.
+
+References: KC-1417
+---
+ provider/libserver/ECCacheManager.cpp | 7 +++++--
+ provider/libserver/ECCacheManager.h   | 1 +
+ provider/libserver/cmd.cpp            | 2 +-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/provider/libserver/ECCacheManager.cpp b/provider/libserver/ECCacheManager.cpp
+index 9c4f5d5..f3c6296 100644
+--- a/provider/libserver/ECCacheManager.cpp
++++ b/provider/libserver/ECCacheManager.cpp
+@@ -1209,9 +1209,12 @@ ECRESULT ECCacheManager::GetCell(const sObjectTableKey *lpsRowItem,
+ 	    goto exit;
+ 
+ 	if (!sCell->GetPropVal(ulPropTag, lpDest, soap, flags & KC_GETCELL_TRUNCATE)) {
+-		if (!sCell->GetComplete()) {
+-            // Object is not complete, and item is not in cache. We simply don't know anything about
++		if (!sCell->GetComplete() ||
++		    (PROP_TYPE(lpDest->ulPropTag) == PT_NULL && !(flags & KC_GETCELL_NEGATIVES))) {
++			// Object taglist is not complete, and item is not in cache. We simply don't know anything about
+ 			// the item, so return NOT_FOUND.
++			// Or, proptaglist is complete, but propval is not in cache,
++			// and the caller did not want to know about this special case.
+ 			m_CellCache.DecrementValidCount();
+             er = KCERR_NOT_FOUND;
+         } else {
+diff --git a/provider/libserver/ECCacheManager.h b/provider/libserver/ECCacheManager.h
+index 531f8c8..01bd65e 100644
+--- a/provider/libserver/ECCacheManager.h
++++ b/provider/libserver/ECCacheManager.h
+@@ -234,6 +234,7 @@ namespace KC {
+ enum {
+ 	KC_GETCELL_TRUNCATE = 1 << 0,
+ 	KC_GETCELL_NOTRUNC  = 0,
++	KC_GETCELL_NEGATIVES = 1 << 1,
+ };
+ 
+ class ECCacheManager final {
+diff --git a/provider/libserver/cmd.cpp b/provider/libserver/cmd.cpp
+index bb8071b..895a531 100644
+--- a/provider/libserver/cmd.cpp
++++ b/provider/libserver/cmd.cpp
+@@ -2670,7 +2670,7 @@ static ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession,
+ 		for (auto proptag : proptags) {
+ 			sObjectTableKey key(ulObjId, 0);
+ 			struct propVal prop;
+-			er = cache->GetCell(&key, proptag, &prop, soap, KC_GETCELL_NOTRUNC);
++			er = cache->GetCell(&key, proptag, &prop, soap, KC_GETCELL_NOTRUNC | KC_GETCELL_NEGATIVES);
+ 			if (er != erSuccess)
+ 				return er;
+ 			if (PROP_TYPE(prop.ulPropTag) == PT_ERROR)

@@ -1,0 +1,62 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Tue, 16 Apr 2019 18:20:48 +0200
+Subject: dbadm: add corrective procedure for bug KC-1444
+
+References: KC-1444
+---
+ ECtools/dbadm.cpp  | 17 +++++++++++++++++
+ doc/kopano-dbadm.8 |  6 ++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/ECtools/dbadm.cpp b/ECtools/dbadm.cpp
+index 53451b1..7747144 100644
+--- a/ECtools/dbadm.cpp
++++ b/ECtools/dbadm.cpp
+@@ -429,6 +429,21 @@ static ECRESULT kc1375(fancydb db)
+ 	return erSuccess;
+ }
+ 
++static ECRESULT kc_1444(fancydb db)
++{
++	ec_log_notice("kc-1444: updating tproperties...");
++	unsigned int aff = 0;
++	auto ret = db->DoUpdate("UPDATE tproperties AS t JOIN properties AS p"
++		" ON p.hierarchyid=t.hierarchyid AND p.tag=t.tag AND p.type=t.type"
++		" SET t.val_ulong=p.val_ulong"
++		" WHERE p.tag=" + stringify(PROP_ID(PR_MESSAGE_FLAGS)) +
++		" AND p.type=" + stringify(PROP_TYPE(PR_MESSAGE_FLAGS)), &aff);
++	if (ret != erSuccess)
++		return ret;
++	ec_log_notice("kc-1444: updated %u rows.", aff);
++	return erSuccess;
++}
++
+ static ECRESULT usmp_shrink_columns(fancydb db)
+ {
+ 	unsigned int aff = 0;
+@@ -640,6 +655,8 @@ int main(int argc, char **argv)
+ 			ret = remove_helper_index(db);
+ 		else if (strcmp(argv[i], "kc-1375") == 0)
+ 			ret = kc1375(db);
++		else if (strcmp(argv[i], "kc-1444") == 0)
++			ret = kc_1444(db);
+ 		else if (strcmp(argv[i], "usmp-shrink-columns") == 0)
+ 			ret = usmp_shrink_columns(db);
+ 		else if (strcmp(argv[i], "usmp-charset") == 0)
+diff --git a/doc/kopano-dbadm.8 b/doc/kopano-dbadm.8
+index 36844ed..1f50f5c 100644
+--- a/doc/kopano-dbadm.8
++++ b/doc/kopano-dbadm.8
+@@ -27,6 +27,12 @@ is done.
+ Deletes all cached IMAP Envelopes that show signs of having address lists with
+ excess parentheses. This action can be executed while kopano\-server is active.
+ If you do so, also execute `kopano\-srvadm \-\-clear\-cache=cell` afterwards.
++.SS kc\-1444
++.PP
++Synchronizes all PR_MESSAGE_FLAGS values from the "properties" to the
++"tproperties" table. This action can be executed while kopano\-server
++is active. If you do so, execute `kopano\-srvadm
++\-\-clear\-cache=cell` afterwards.
+ .SS np\-defrag
+ .PP
+ Compact the ID space in the namedproperties table and lowers the

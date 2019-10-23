@@ -1,0 +1,24 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Tue, 16 Apr 2019 14:40:48 +0200
+Subject: libserver: add missing space before LOCK SHARE
+
+---
+ provider/libserver/cmdutil.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/provider/libserver/cmdutil.cpp b/provider/libserver/cmdutil.cpp
+index 41c918b..6729284 100644
+--- a/provider/libserver/cmdutil.cpp
++++ b/provider/libserver/cmdutil.cpp
+@@ -1644,9 +1644,9 @@ static ECRESULT LockFolders(ECDatabase *lpDatabase, bool bShared,
+ 	auto strQuery = "SELECT 1 FROM properties WHERE hierarchyid IN(" +
+ 		kc_join(setParents, ",", [](std::set<unsigned int>::key_type p) { return stringify(p); }) + ")";
+ 	if (bShared)
+-		strQuery += "LOCK IN SHARE MODE";
++		strQuery += " LOCK IN SHARE MODE";
+ 	else
+-		strQuery += "FOR UPDATE";
++		strQuery += " FOR UPDATE";
+ 	return lpDatabase->DoSelect(strQuery, NULL);
+ }
+ 

@@ -1,0 +1,22 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Thu, 21 Mar 2019 00:17:39 +0100
+Subject: client: fix a comment about gratitious property sizes
+
+References: KC-1443
+---
+ provider/client/WSMAPIPropStorage.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/provider/client/WSMAPIPropStorage.cpp b/provider/client/WSMAPIPropStorage.cpp
+index 0302b7a..c4a4f45 100644
+--- a/provider/client/WSMAPIPropStorage.cpp
++++ b/provider/client/WSMAPIPropStorage.cpp
+@@ -426,7 +426,7 @@ ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(const struct saveObject *lp
+ 
+ 	// delProps contains all the available property tag
+ 	EcFillPropTags(lpsSaveObj, lpsMapiObject);
+-	// modProps contains all the props < 8K
++	/* modProps contains all the props < MAX_PROP_SIZE */
+ 	EcFillPropValues(lpsSaveObj, lpsMapiObject);
+ 	// delete stays false, unique id is set upon allocation
+ 	lpsMapiObject->ulObjId = lpsSaveObj->ulServerId;

@@ -1,0 +1,64 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Fri, 22 Feb 2019 00:41:51 +0100
+Subject: Partially revert "libserver: implement object caching by using the
+ cell cache"
+
+Present theory is that CHILDPROPS has tproperties data, which is
+(erroneously?) used to populate the cache.
+
+Fixes: kopanocore-8.6.80-869-gc0b1f0794
+References: KC-1417, KS-42569, KS-42574, KS-42620
+---
+ provider/libserver/ECStoreObjectTable.cpp | 4 ++--
+ provider/libserver/ECStoreObjectTable.h   | 1 +
+ provider/libserver/cmd.cpp                | 3 ++-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/provider/libserver/ECStoreObjectTable.cpp b/provider/libserver/ECStoreObjectTable.cpp
+index 7344a7f..1d4d05b 100644
+--- a/provider/libserver/ECStoreObjectTable.cpp
++++ b/provider/libserver/ECStoreObjectTable.cpp
+@@ -70,7 +70,7 @@ static bool IsTruncatableType(unsigned int ulTag)
+     return false;
+ }
+ 
+-static bool IsTruncated(const struct propVal *lpsPropVal)
++bool propVal_is_truncated(const struct propVal *lpsPropVal)
+ {
+ 	if(!IsTruncatableType(lpsPropVal->ulPropTag))
+ 		return false;
+@@ -496,7 +496,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis,
+ 				continue;
+ 			i = 0;
+ 			for (const auto &row : *lpRowList) {
+-				if (!IsTruncated(&lpsRowSet->__ptr[i].__ptr[k])) {
++				if (!propVal_is_truncated(&lpsRowSet->__ptr[i].__ptr[k])) {
+ 					++i;
+ 					continue;
+ 				}
+diff --git a/provider/libserver/ECStoreObjectTable.h b/provider/libserver/ECStoreObjectTable.h
+index 2e7e315..f96db36 100644
+--- a/provider/libserver/ECStoreObjectTable.h
++++ b/provider/libserver/ECStoreObjectTable.h
+@@ -70,6 +70,7 @@ private:
+ 
+ ECRESULT GetDeferredTableUpdates(ECDatabase *lpDatabase, unsigned int ulFolderId, std::list<unsigned int> *lpDeferred);
+ extern ECRESULT GetDeferredTableUpdates(ECDatabase *, const ECObjectTableList *, std::list<unsigned int> *deferred);
++extern bool propVal_is_truncated(const struct propVal *);
+ 
+ } /* namespace */
+ 
+diff --git a/provider/libserver/cmd.cpp b/provider/libserver/cmd.cpp
+index 4dd7e8a..20a7298 100644
+--- a/provider/libserver/cmd.cpp
++++ b/provider/libserver/cmd.cpp
+@@ -2621,7 +2621,8 @@ static HRESULT loadobject_cache(ECCacheManager *cache,
+ 			cache->SetCell(&key, pta.__ptr[i], &pv);
+ 			continue;
+ 		}
+-		cache->SetCell(&key, arr.__ptr[j].ulPropTag, &arr.__ptr[j]);
++		if (!propVal_is_truncated(&arr.__ptr[j]))
++			cache->SetCell(&key, arr.__ptr[j].ulPropTag, &arr.__ptr[j]);
+ 		++j;
+ 	}
+ 	cache->SetComplete(objid);
