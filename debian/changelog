@@ -1,3 +1,79 @@
+kopanocore (8.7.0-4) unstable; urgency=medium
+
+  [ intrigeri ]
+  * [7701ce1] Fix syntax of usr.sbin.kopano-search AppArmor profile.
+
+  [ Roel van Meer ]
+  * [c6864f2] Use correct pidfile paths in sysv init scripts
+   ( Closes: #924569)
+  * [d57a3c6] Use python3 to start kopano-search
+  * [8d862c6] Use python3 to start kopano-presence
+    (Closes: #942491)
+  * [8bce9f2] Use correct pidfile in status target of SysV init scripts
+  * [0a86326, e7fdb4f, 4bdc6d0, 66a4a60] rebuild patch queue from patch-queue
+    branch
+    Added patches:
+    Decrease-ICS-processing-batch-size.patch
+    server-check-for-NULL-SSL-context-before-calling-soap_ssl.patch
+     Patch cherry-picked from upstream
+     https://github.com/Kopano-dev/kopano-core/commit/eac93901
+
+    server-cure-use-after-free-crash-on-shutdown.patch
+     Patch cherry-picked from upstream
+     https://github.com/Kopano-dev/kopano-core/commit/e424a3f7
+
+    common-the-SSL-proto-list-string-is-TLSv1-not-TLSv1.0.patch
+    server-recognize-TLSv1.0-for-backward-compat.patch
+     (Upstream report: https://jira.kopano.io/browse/KC-1439)
+
+    # Several patches cherry-picked from ongoing Kopano development,
+      unfortunately there is no support by upstream due a stable release branch.
+      Thus we enforced to pick up issue fixing commits. Thanks Roel for carry
+      on this.
+    gateway-avoid-uncaught-exception-when-client-disconnects-.patch
+    Partially-revert-libserver-implement-object-caching-by-us.patch
+    libserver-remove-constant-5th-argument-to-GetCell.patch
+    libserver-turn-GetCell-bool-params-into-a-flags-argument.patch
+    libserver-only-return-PT_NULL-cacheentry-info-when-so-req.patch
+    libserver-reduce-indent-in-SOT-QueryRowByColumn.patch
+    libserver-shorten-common-subexpression-with-alias-ECStore.patch
+    libserver-stop-caching-truncated-tproperties-data.patch
+    libserver-add-option-to-disable-cell-read-cache.patch
+    m4lcommon-have-HrGetAllProps-preserve-MAPI_W_ERRORS_RETUR.patch
+    m4lcommon-factor-out-HrGetAllProp-s-large-property-post-l.patch
+    m4lcommon-add-new-helper-for-loading-large-properties-tra.patch
+    treewide-read-large-properties-using-HrGetFullProp.patch
+    client-fix-a-comment-about-gratitious-property-sizes.patch
+    libserver-restore-tproperties-synchronization-for-read-fl.patch
+    libserver-add-missing-space-before-LOCK-SHARE.patch
+    dbadm-pass-shared_ptr-KDatabase-consistently.patch
+    dbadm-add-corrective-procedure-for-bug-KC-1444.patch
+    (Closes: #931008, #935789, #939751, #941610)
+  * [70a95ce] autopkgtests: Don't treat failing install of mariadb as failure
+    (Closes: #941999)
+
+  [ Carsten Schoenert ]
+  * [cc87918] apparmor kopano-server: moving include folder
+    (Closes: #933761)
+  * [e6e3419] apparmor kopano-dagent: allow access to /e/ssl/openssl.cnf
+    (Closes: #934459)
+  * [efc4ee8] apparmor kopano-search: tune existing profile more
+    (Closes: #934460)
+  * [f3e4d27] kopano-server: install also ldap.cfg
+    (Closes: #933759)
+  * [7cdad77] kopano-spamd: add missing init.d script
+  * [28f9b54] kopano-server: move install content of /u/libexec folder
+    (Closes: #933887)
+  * [2fbe0d4] kopano-server: install also /e/k/admin.cfg
+  * [cd309d4] kopano-dagent: install also /e/k/autorespond config file
+  * [13653d4] kopano-utils: install also /u/s/kopano-rules
+  * [60bd636] d/control: increase Standards-Version to 4.4.1
+    No further changes needed.
+  * [44fc261] lintian: adding additional override for kopano-server
+  * [efbe4aa] kopano-libs.symbols: update symbols to 8.7.0(-4)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sat, 26 Oct 2019 11:59:39 +0200
+
 kopanocore (8.7.0-3) unstable; urgency=medium
 
   [ Julian Andres Klode ]
