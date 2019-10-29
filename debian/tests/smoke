@@ -66,9 +66,16 @@ echo "#######################################################################"
 echo
 
 echo "#######################################################################"
-echo "# Check that we can create a store for the user...                    #"
-kopano-storeadm -h default: -Cn testadmin
-echo "# Check that we can create a store for the user... done.              #"
+echo "# Check that we find a user 'testadmin' within the server...          #"
+kopano-admin --details testadmin
+echo "# Check that we find a user 'testadmin' within the server... done     #"
+echo "#######################################################################"
+echo
+
+echo "#######################################################################"
+echo "# Check that we can create a public store...                          #"
+kopano-storeadm -P
+echo "# Check that we can create a public store... done.                    #"
 echo "#######################################################################"
 echo
 
