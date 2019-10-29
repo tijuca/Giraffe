@@ -1,3 +1,16 @@
+kopanocore (8.7.0-5) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [27b1378] apparmor kopano-server: adopt changed folder for userscripts
+    (Closes: #933886)
+  * [12eace9] autopkgtest: adjust and expand the automatic testing
+  * [85bcfda] kopano-libs.symbols: update symbols to 8.7.0(-5)
+
+  [ Gert van Dijk ]
+  * [316e9a1] d/control: Remove Dep php-{cli,mapi} on dagent & monitor
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Tue, 29 Oct 2019 19:16:07 +0100
+
 kopanocore (8.7.0-4) unstable; urgency=medium
 
   [ intrigeri ]
