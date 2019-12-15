@@ -41,7 +41,7 @@
 
   /lib/@{multiarch}/ld-*.so mr,
 
-  /{,usr/}sbin/ldconfig Pix,
+  /{,usr/}sbin/ldconfig{,.real} Pixr,
 
   /run/kopano/search.pid rw,
   /run/kopano/search.pid.lock lrw,
