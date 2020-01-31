@@ -3,6 +3,9 @@ Date: Sat, 3 Nov 2018 15:14:04 +0100
 Subject: Use python3 everywhere
 
 ---
+ ECtools/archiver/scripts/kopano-archiver-aclset          | 2 +-
+ ECtools/archiver/scripts/kopano-archiver-aclsync         | 2 +-
+ ECtools/archiver/scripts/kopano-archiver-restore         | 2 +-
  ECtools/backup/kopano_backup/__init__.py                 | 2 +-
  ECtools/cli/kopano_cli/__init__.py                       | 2 +-
  ECtools/migration-pst/kopano_migration_pst/__init__.py   | 2 +-
@@ -13,6 +16,8 @@ Subject: Use python3 everywhere
  ECtools/search/kopano_search/__init__.py                 | 2 +-
  ECtools/search/kopano_search/plaintext.py                | 2 +-
  ECtools/spamd/kopano_spamd/__init__.py                   | 2 +-
+ ECtools/utils/kopano-mailbox-permissions                 | 2 +-
+ ECtools/utils/kopano-set-oof                             | 2 +-
  swig/python/kopano/kopano/daemon/version/version_info.py | 2 +-
  swig/python/kopano/scripts/delete_pattern.py             | 2 +-
  swig/python/kopano/scripts/dump-att.py                   | 2 +-
@@ -39,12 +44,48 @@ Subject: Use python3 everywhere
  swig/python/kopano/scripts/z-plot.py                     | 2 +-
  swig/python/kopano/scripts/z-rest.py                     | 2 +-
  swig/python/kopano/scripts/zarapy.py                     | 2 +-
+ tools/python-scripts/kopano-cachestat                    | 2 +-
+ tools/python-scripts/kopano-fix-ipm-subtree              | 2 +-
+ tools/python-scripts/kopano-localize-folders             | 2 +-
+ tools/python-scripts/kopano-recreate-systemfolders       | 2 +-
+ tools/python-scripts/kopano-rules                        | 2 +-
  tools/python-scripts/optimize-imap.py                    | 2 +-
+ tools/python-scripts/update-resource-recipients          | 2 +-
  tools/searchfolder_cleaning.py                           | 2 +-
- 38 files changed, 38 insertions(+), 38 deletions(-)
+ 49 files changed, 49 insertions(+), 49 deletions(-)
 
+diff --git a/ECtools/archiver/scripts/kopano-archiver-aclset b/ECtools/archiver/scripts/kopano-archiver-aclset
+index d193e39..0623634 100755
+--- a/ECtools/archiver/scripts/kopano-archiver-aclset
++++ b/ECtools/archiver/scripts/kopano-archiver-aclset
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ import logging
+ import sys
+diff --git a/ECtools/archiver/scripts/kopano-archiver-aclsync b/ECtools/archiver/scripts/kopano-archiver-aclsync
+index 1393b00..e3e3548 100755
+--- a/ECtools/archiver/scripts/kopano-archiver-aclsync
++++ b/ECtools/archiver/scripts/kopano-archiver-aclsync
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ import logging
+ import sys
+diff --git a/ECtools/archiver/scripts/kopano-archiver-restore b/ECtools/archiver/scripts/kopano-archiver-restore
+index c62d004..4ba2500 100755
+--- a/ECtools/archiver/scripts/kopano-archiver-restore
++++ b/ECtools/archiver/scripts/kopano-archiver-restore
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ import logging
+ import sys
 diff --git a/ECtools/backup/kopano_backup/__init__.py b/ECtools/backup/kopano_backup/__init__.py
-index 83a51fe..a3d53be 100644
+index 7141e08..42fbaf0 100644
 --- a/ECtools/backup/kopano_backup/__init__.py
 +++ b/ECtools/backup/kopano_backup/__init__.py
 @@ -1,4 +1,4 @@
@@ -54,7 +95,7 @@ index 83a51fe..a3d53be 100644
  from .version import __version__
  
 diff --git a/ECtools/cli/kopano_cli/__init__.py b/ECtools/cli/kopano_cli/__init__.py
-index c9c7d15..93d0e7f 100755
+index 88dc63c..4535a4d 100755
 --- a/ECtools/cli/kopano_cli/__init__.py
 +++ b/ECtools/cli/kopano_cli/__init__.py
 @@ -1,4 +1,4 @@
@@ -64,7 +105,7 @@ index c9c7d15..93d0e7f 100755
  from __future__ import print_function
  from .version import __version__
 diff --git a/ECtools/migration-pst/kopano_migration_pst/__init__.py b/ECtools/migration-pst/kopano_migration_pst/__init__.py
-index df6a47f..a747b70 100644
+index 0f1ffb6..afbb17a 100644
 --- a/ECtools/migration-pst/kopano_migration_pst/__init__.py
 +++ b/ECtools/migration-pst/kopano_migration_pst/__init__.py
 @@ -1,4 +1,4 @@
@@ -74,7 +115,7 @@ index df6a47f..a747b70 100644
  from .version import __version__
  
 diff --git a/ECtools/migration-pst/kopano_migration_pst/pst.py b/ECtools/migration-pst/kopano_migration_pst/pst.py
-index 164e228..77721e2 100644
+index 3a8a039..fca5b89 100644
 --- a/ECtools/migration-pst/kopano_migration_pst/pst.py
 +++ b/ECtools/migration-pst/kopano_migration_pst/pst.py
 @@ -1,4 +1,4 @@
@@ -134,7 +175,7 @@ index 08e567e..3ed349b 100644
  import magic
  import mimetypes
 diff --git a/ECtools/spamd/kopano_spamd/__init__.py b/ECtools/spamd/kopano_spamd/__init__.py
-index 8b5941e..c867e8d 100644
+index e4463ca..93fd56a 100644
 --- a/ECtools/spamd/kopano_spamd/__init__.py
 +++ b/ECtools/spamd/kopano_spamd/__init__.py
 @@ -1,4 +1,4 @@
@@ -143,6 +184,26 @@ index 8b5941e..c867e8d 100644
  # SPDX-License-Identifier: AGPL-3.0-or-later
  from .version import __version__
  
+diff --git a/ECtools/utils/kopano-mailbox-permissions b/ECtools/utils/kopano-mailbox-permissions
+index 8ab1839..d3356e0 100755
+--- a/ECtools/utils/kopano-mailbox-permissions
++++ b/ECtools/utils/kopano-mailbox-permissions
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ """
+diff --git a/ECtools/utils/kopano-set-oof b/ECtools/utils/kopano-set-oof
+index 8991133..e5938b7 100755
+--- a/ECtools/utils/kopano-set-oof
++++ b/ECtools/utils/kopano-set-oof
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python -u
++#!/usr/bin/python3 -u
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ import os
 diff --git a/swig/python/kopano/kopano/daemon/version/version_info.py b/swig/python/kopano/kopano/daemon/version/version_info.py
 index 8d816f8..d1800e1 100644
 --- a/swig/python/kopano/kopano/daemon/version/version_info.py
@@ -403,6 +464,56 @@ index 3a9b9a3..af6abf8 100755
  # SPDX-License-Identifier: AGPL-3.0-only
  
  # simple html-based viewer (users, folders, items)
+diff --git a/tools/python-scripts/kopano-cachestat b/tools/python-scripts/kopano-cachestat
+index 50029ec..6e15e84 100644
+--- a/tools/python-scripts/kopano-cachestat
++++ b/tools/python-scripts/kopano-cachestat
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python -u
++#!/usr/bin/python3 -u
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ from collections import defaultdict
+diff --git a/tools/python-scripts/kopano-fix-ipm-subtree b/tools/python-scripts/kopano-fix-ipm-subtree
+index 9a2311a..d4ae908 100755
+--- a/tools/python-scripts/kopano-fix-ipm-subtree
++++ b/tools/python-scripts/kopano-fix-ipm-subtree
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ # -*- coding: utf-8 -*-
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+diff --git a/tools/python-scripts/kopano-localize-folders b/tools/python-scripts/kopano-localize-folders
+index e3e2fd2..ba95a12 100755
+--- a/tools/python-scripts/kopano-localize-folders
++++ b/tools/python-scripts/kopano-localize-folders
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ # -*- coding: utf-8 -*-
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+diff --git a/tools/python-scripts/kopano-recreate-systemfolders b/tools/python-scripts/kopano-recreate-systemfolders
+index 00ac966..0946ac5 100755
+--- a/tools/python-scripts/kopano-recreate-systemfolders
++++ b/tools/python-scripts/kopano-recreate-systemfolders
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ # -*- coding: utf-8 -*-
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+diff --git a/tools/python-scripts/kopano-rules b/tools/python-scripts/kopano-rules
+index ffecd27..c853ded 100755
+--- a/tools/python-scripts/kopano-rules
++++ b/tools/python-scripts/kopano-rules
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-or-later
+ # -*- coding: utf-8 -*-
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 diff --git a/tools/python-scripts/optimize-imap.py b/tools/python-scripts/optimize-imap.py
 index 0614a50..f89a989 100755
 --- a/tools/python-scripts/optimize-imap.py
@@ -413,6 +524,16 @@ index 0614a50..f89a989 100755
  # SPDX-License-Identifier: AGPL-3.0-only
  
  import sys
+diff --git a/tools/python-scripts/update-resource-recipients b/tools/python-scripts/update-resource-recipients
+index c89ec8e..bd494d4 100755
+--- a/tools/python-scripts/update-resource-recipients
++++ b/tools/python-scripts/update-resource-recipients
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ # SPDX-License-Identifier: AGPL-3.0-only
+ 
+ from MAPI.Util import *
 diff --git a/tools/searchfolder_cleaning.py b/tools/searchfolder_cleaning.py
 index a273b42..1cc6e09 100644
 --- a/tools/searchfolder_cleaning.py

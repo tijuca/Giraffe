@@ -30,3 +30,4 @@ libserver-restore-tproperties-synchronization-for-read-fl.patch
 libserver-add-missing-space-before-LOCK-SHARE.patch
 dbadm-pass-shared_ptr-KDatabase-consistently.patch
 dbadm-add-corrective-procedure-for-bug-KC-1444.patch
+freebusy-avoid-out-of-bounds-access-in-HrAddFBBlock.patch

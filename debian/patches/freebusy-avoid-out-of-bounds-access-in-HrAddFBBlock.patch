@@ -1,0 +1,44 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Mon, 28 Oct 2019 13:01:59 +0100
+Subject: freebusy: avoid out of bounds access in HrAddFBBlock
+
+*lpcValues was replaced with ulModVal (lpcValues could be nullptr),
+but this is one element too much for copying the old array.
+
+valgrind:
+Invalid read of size 8
+KC::HrAddFBBlock(KC::OccrInfo const&, KC::OccrInfo**, unsigned int*) (freebusyutil.cpp:546)
+KC::recurrence::AddValidOccr (recurrence.cpp:1104)
+KC::recurrence::HrGetItems (recurrence.cpp:1007)
+KC::ICalRecurrence::HrParseICalRecurrenceRule (icalrecurrence.cpp:224)
+KC::VConverter::HrAddRecurrence (vconverter.cpp:1310)
+KC::VConverter::HrICal2MAPI (vconverter.cpp:165)
+KC::VEventConverter::HrICal2MAPI (vevent.cpp:37)
+KC::ICalToMapiImpl::ParseICal (ICalToMAPI.cpp:225)
+
+Fixes: kopanocore-8.2.0-freeze~170^2~3
+References: KC-235
+---
+ libfreebusy/freebusyutil.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/libfreebusy/freebusyutil.cpp b/libfreebusy/freebusyutil.cpp
+index 4ca135e..5db937f 100644
+--- a/libfreebusy/freebusyutil.cpp
++++ b/libfreebusy/freebusyutil.cpp
+@@ -547,12 +547,13 @@ HRESULT HrAddFBBlock(const OccrInfo &sOccrInfo, OccrInfo **lppsOccrInfo,
+ {
+ 	memory_ptr<OccrInfo> lpsNewOccrInfo;
+ 	OccrInfo *lpsInputOccrInfo = *lppsOccrInfo;
+-	ULONG ulModVal = lpcValues != NULL ? *lpcValues + 1 : 1;
++	unsigned int oldval = lpcValues != nullptr ? *lpcValues : 0;
++	unsigned int ulModVal = oldval + 1;
+ 	HRESULT hr = MAPIAllocateBuffer(sizeof(sOccrInfo) * ulModVal, &~lpsNewOccrInfo);
+ 	if (hr != hrSuccess)
+ 		return hr;
+ 	if (lpsInputOccrInfo != nullptr)
+-		for (ULONG i = 0; i < ulModVal; ++i)
++		for (ULONG i = 0; i < oldval; ++i)
+ 			lpsNewOccrInfo[i] = lpsInputOccrInfo[i];
+ 	if (lpcValues != NULL)
+ 		*lpcValues = ulModVal;
