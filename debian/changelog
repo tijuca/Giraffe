@@ -1,3 +1,36 @@
+kopanocore (8.7.0-6) unstable; urgency=medium
+
+  [ Steve Langasek ]
+  * [0f7f9e8] apparmor kopano-server: allow ldconfig{,.real} call
+    (Closes: #946659)
+
+  [ Carsten Schoenert ]
+  * [a351358] rebuild patch queue from patch-queue branch
+    Added patch (cherry-picked from upstream):
+    freebusy-avoid-out-of-bounds-access-in-HrAddFBBlock.patch
+    Fixes CVE-2019-19907
+    Updated patch:
+    Use-python3-everywhere.patch
+    We need to adjust the shebang within more Python files so debhelper isn't
+    adding a dependency on Python2 because '/usr/bin/python' was found.
+    (Closes: #936808)
+  * [5e65048] mv service file to current dh name schema
+    As recent debhelper isn't detecting a service file
+    $binary-package.$binary-package.service any more we need to adjust these
+    sequencer files a bit. A simple renaming is enough so the service files
+    for kopano-{dagent,presence,server} are also shipped within their
+    packages.
+  * [1aa9c45] kopano-server.service: picking up upstream things
+    The upstream service file is using some things we can also apply to our
+    service file like the Description and the additional man pages.
+  * [8351c36] kopano-dagent.service: pick Description from upstream
+    Picking up the more explaining Description from the upstream service file.
+  * [2c8b0ba] d/control: increase Standards-Version to 4.5.0
+    No further changes needed.
+  * [cf9a393] kopano-libs.symbols: update symbols to 8.7.0(-6)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sun, 02 Feb 2020 13:09:00 +0100
+
 kopanocore (8.7.0-5) unstable; urgency=medium
 
   [ Carsten Schoenert ]
