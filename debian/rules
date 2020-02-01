@@ -31,7 +31,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --prefix=/usr \
     --localstatedir=/var \
     --sysconfdir=/etc \
-	--with-systemunitdir=/usr/lib/systemd/system \
+    --with-systemunitdir=/usr/lib/systemd/system \
     --mandir=\$${prefix}/share/man \
     --infodir=\$${prefix}/share/info \
     --with-php-config=/usr/bin/php-config \
@@ -84,7 +84,7 @@ override_dh_install:
 
 	mv debian/tmp/usr/share/doc/kopano-server/example-config/*.cfg \
 	   debian/tmp/usr/share/doc/kopano-server/example-config/autorespond \
-           debian/tmp/etc/kopano/
+       debian/tmp/etc/kopano/
 	dh_install
 	# remove obsolete zarafa Python things
 	rm -rf debian/tmp/usr/lib/python3/dist-packages/zarafa*
@@ -123,4 +123,3 @@ override_dh_makeshlibs:
 override_dh_shlibdeps:
 	dh_shlibdeps -a -l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/kopano \
 			-l $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
-

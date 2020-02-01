@@ -404,7 +404,7 @@ kopanocore (8.6.2-1) unstable; urgency=medium
   * [a20fb40] New upstream version 8.6.2
   * [c670a19] kopano-utils: add new binary kopano-dbadm to package
     There is a new binary kopano-dbadm shipped by upstream, places within
-    kopano-utils. 
+    kopano-utils.
   * [c85dde6] kopano-libs.symbols: update symbols to 8.6.2
 
  -- Carsten Schoenert <c.schoenert@t-online.de>  Sat, 09 Jun 2018 09:07:29 +0200
@@ -616,7 +616,7 @@ kopanocore (8.3.4-3) unstable; urgency=medium
   [ Guido Günther ]
   * [75a1b00] kopano-dev: Depend on kopano-libs (Closes: #877454)
     Obviously needs the -dev package needs a depending on the library package.
-    Without those libraries no real development is possible. 
+    Without those libraries no real development is possible.
   * [e2098a7] kopano-search: drop dependencies on essential packages
     The dependencies on various now partially essential packages aren't needed
     and can be dropped.

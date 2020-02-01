@@ -423,4 +423,3 @@ Description: Complete and feature rich groupware solution - PHP MAPI bindings
  .
  Using this module, you can create PHP programs which use MAPI
  calls to interact with Kopano.
-
