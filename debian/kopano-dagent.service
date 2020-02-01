@@ -1,5 +1,5 @@
 [Unit]
-Description=Kopano DAgent Server
+Description=Kopano Groupware Core Delivery Agent
 After=network.target
 After=local-fs.target
 After=remote-fs.target
