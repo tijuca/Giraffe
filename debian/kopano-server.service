@@ -1,10 +1,10 @@
 [Unit]
-Description=Kopano Server
+Description=Kopano Groupware Core Storage Server
 After=network.target
 After=local-fs.target
 After=remote-fs.target
 After=mysql.service
-Documentation=man:kopano-server(8)
+Documentation=man:kopano-server(8) man:kopano-server.cfg(5) man:kopano-admin(8)
 
 [Service]
 Type=simple
