@@ -41,6 +41,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --with-distro=debian \
     --enable-python \
     PYTHON="python3" \
+	PYTHON_LIBS="$$(python3-config --libs --embed)" \
     $(CONFFLAG) \
     $(NULL)
 
