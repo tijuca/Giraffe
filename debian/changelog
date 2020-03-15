@@ -1,3 +1,14 @@
+kopanocore (8.7.0-7) unstable; urgency=medium
+
+  [ Matthias Klose ]
+  * [08a70ec] d/rules: adding PYTHON_LIBS to DEB_CONFIGURE_EXTRA_ARGS
+    (Closes: #953549)
+
+  [ Carsten Schoenert ]
+  * [ee791b0] kopano-libs.symbols: update symbols to 8.7.0(-7)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sun, 15 Mar 2020 11:05:50 +0100
+
 kopanocore (8.7.0-6) unstable; urgency=medium
 
   [ Steve Langasek ]
